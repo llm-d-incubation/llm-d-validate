@@ -1,0 +1,15 @@
+# Virtualenvs and build artifacts
+.venv/
+*.egg-info/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+uv.lock
+
+# Real fleet profiles. The committed example-*.yaml files carry placeholders for the cluster,
+# namespace, context and service names; a filled-in copy stays local.
+profiles/**/*.local.yaml
+
+# Run output. Evidence bundles are reproducible from the profile and are often large;
+# copy a run out with --remote-output file://<path> if one needs keeping.
+runs/

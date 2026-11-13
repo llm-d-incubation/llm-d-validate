@@ -1,0 +1,158 @@
+# Example: barebones llm-d fleet (decode + EPP router gateway), driven from outside the cluster.
+#
+# Every declaration below was verified against a live stack rather than inferred from
+# manifests. The contract suite re-checks the declared surfaces and header dispositions on each
+# run, so a stale one fails rather than silently losing coverage.
+#
+# The environment block and the service name below are PLACEHOLDERS. Copy this file to
+# profiles/<something>.local.yaml, which is gitignored, and fill them in for your own fleet.
+#
+# This fleet is deliberately the "no LiteLLM" shape the task calls out: two ingresses, not
+# three. It is also served WITHOUT --reasoning-parser or --tool-call-parser, which is why
+# model.reasoning.parser is null and model.tools.parser is absent.
+schema: llmdv.profile/1
+name: example-two-ingress
+vantage: external
+
+environment:
+  cluster: <cluster>
+  context: <kube-context>
+  namespace: <namespace>
+  # Overridable with --kubeconfig. Used read-only, to resolve selectors below to live pod
+  # names and to confirm the namespace exists before blaming the fleet for a refused
+  # connection.
+  kubeconfig: ~/.kube/config
+
+model:
+  public_id: Qwen/Qwen3-32B
+  aliases: []
+  # From GET /v1/models on the live fleet, not from the manifest: the deployment passes no
+  # --max-model-len, so this is vLLM's own resolved value.
+  max_model_len: 40960
+  reasoning:
+    # No --reasoning-parser on this deployment, so there is no reasoning_content field.
+    # Qwen3 thinks by default and emits a literal <think> block inside `content`. A test
+    # asserting content is non-empty passes here for the wrong reason; one asserting
+    # reasoning_content is populated fails against a healthy stack.
+    parser: null
+    inline_tag: think
+    default_on: true
+  tools:
+    # No --tool-call-parser and no --enable-auto-tool-choice, so tool calling is not
+    # declared. Tool cases will skip as undeclared rather than fail.
+    parser: null
+    auto_choice: false
+
+ingresses:
+  # ---------------------------------------------------------------- direct vLLM
+  # There is no decode Service in this namespace, only the EPP one, so reaching a replica
+  # directly means port-forwarding a pod. The pod name is NOT written here: it changes on
+  # every reschedule. The selector is resolved live instead.
+  - id: vllm
+    kind: vllm
+    base_url: http://localhost:18100
+    auth: {type: none}
+    health_path: /health
+    # /v1/responses verified live: object="response" with an output[] array and
+    # incomplete_details.reason="max_output_tokens".
+    surfaces: [chat_completions, completions, messages, responses]
+    timeouts: {connect: 5, request: 300, stream_idle: 60}
+    error_status:
+      # Verified: vLLM v0.30.0 returns 404 with the OpenAI error envelope.
+      unknown_model: [404]
+      unknown_path: [404]
+      wrong_method: [405]
+      # Measured: unknown top-level request fields are ignored, not refused -- the request
+      # succeeds and nothing reads the field. Declared as a success status so the case asserts
+      # the real client-visible behaviour: a client can set an option that silently does
+      # nothing. A layer that starts rejecting unknown fields fails this declaration.
+      unsupported_option: [200]
+    setup:
+      proxy: bypass
+      requires:
+        - kind: port_forward
+          namespace: <namespace>
+          selector: llm-d.ai/role=decode
+          local_port: 18100
+          remote_port: 8000
+
+  # ------------------------------------------------------- llm-d router gateway
+  # Service port 80 -> targetPort 8081, the llm-d-router-gateway HTTP listener
+  # (pod label llm-d.ai/igw-mode=llm-d-router-gateway), fronting the InferencePool.
+  # There are no InferenceObjectives in this namespace, so there are no priority bands --
+  # which is why x-llm-d-inference-objective is `ignored` here and not `consumed`.
+  - id: router
+    kind: llmd_router
+    base_url: http://localhost:18180
+    auth: {type: none}
+    health_path: /health
+    # /v1/responses verified live: object="response" with an output[] array and
+    # incomplete_details.reason="max_output_tokens".
+    surfaces: [chat_completions, completions, messages, responses]
+    timeouts: {connect: 5, request: 600, stream_idle: 120}
+    error_status:
+      unknown_model: [404]
+      unknown_path: [404]
+      wrong_method: [405]
+      # Measured: unknown top-level request fields are ignored, not refused -- the request
+      # succeeds and nothing reads the field. Declared as a success status so the case asserts
+      # the real client-visible behaviour: a client can set an option that silently does
+      # nothing. A layer that starts rejecting unknown fields fails this declaration.
+      unsupported_option: [200]
+    unstructured_errors:
+      # Measured: the endpoint picker rejects these during request-body extraction, before any
+      # routing decision, and answers in its own words ("inference error: BadRequest - error
+      # extracting request body: ...") as plain text rather than the upstream API's error shape,
+      # so no client SDK can parse the body. Errors the engine itself produces still come back
+      # as a structured envelope. The body is hardcoded upstream and not configurable; see #48.
+      # Declared here so the deviation is visible and a change in either direction fails.
+      - malformed_json
+      - missing_required_field
+      - wrong_field_type
+      - streaming_validation
+    setup:
+      proxy: bypass
+      requires:
+        - kind: port_forward
+          namespace: <namespace>
+          target: svc/<epp-service>
+          local_port: 18180
+          remote_port: 80
+
+capabilities:
+  # Not probed yet. Declared false so its cases skip as undeclared rather than assert
+  # against an unverified surface; flip it once checked.
+  count_tokens: false
+  stateful_responses: false
+  structured_output: false
+  # Set for a multimodal model served with its vision path on; the image cases then run.
+  vision: false
+  # vLLM 0.30.0 accepts these, but none is exercised by the two cases in this pass, so the
+  # list stays empty rather than claiming unverified support.
+  vllm_options: []
+
+headers:
+  x-request-id:
+    # Verified: neither layer echoes it back. Only x-went-into-resp-headers and server come
+    # back from vLLM. Declaring `echoed` here would be the stale-profile failure the
+    # contract suite exists to catch.
+    vllm: ignored
+    router: ignored
+  x-llm-d-inference-objective:
+    vllm: ignored
+    # No InferenceObjectives exist in this namespace, so the gateway has no band to put the
+    # request in. `consumed` would be the right value on a flow-control fleet.
+    router: ignored
+  x-llm-d-inference-fairness-id:
+    vllm: ignored
+    router: ignored
+
+clients:
+  # Forge speaks both OpenAI chat and Anthropic messages. Messages has raw HTTP and pinned SDK
+  # smokes plus streaming lifecycle checks; tool-loop cases remain under #27.
+  - id: forge
+    surfaces: [chat_completions, messages]
+    needs: [streaming, reasoning]
+  - id: rollout-probe
+    surfaces: [completions]
+    needs: []

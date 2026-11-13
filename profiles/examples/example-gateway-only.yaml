@@ -1,0 +1,140 @@
+# Example: one ingress, a gateway, where the layers behind it are not reachable.
+#
+# STATUS: A TEMPLATE. Every value marked <...> is a placeholder, and the declarations below are
+# the ones a first run must correct rather than confirm.
+#
+# This is the shape you get when a credential is all you have: a key for a proxy, no cluster
+# access, and no route to the engine behind it. It is a narrower profile than the two- and
+# three-ingress examples, and the narrowness is the point -- see "What this cannot tell you".
+#
+# Copy to profiles/<name>.local.yaml, which is gitignored, and fill in the placeholders.
+schema: llmdv.profile/1
+name: example-gateway-only
+
+# `external` and `in-cluster` differ only in base_url and setup. A gateway reached over HTTPS
+# needs no port-forward from either, so `setup.requires` stays empty and no kubeconfig is
+# required. `external` covers any client outside the cluster -- a laptop, a CI runner, a
+# jump host; what drove the run belongs in `--label`, not here.
+vantage: external
+
+model:
+  # MEASURE THIS. A gateway names models in its own vocabulary, and the id a client asks it for is
+  # usually not the id the engine answers to. `discovery.models_lists_declared_model` asserts that
+  # every declared name appears in this ingress's GET /v1/models, so the gateway's id is the one
+  # that belongs here -- not the engine's.
+  #
+  # That is also why this profile has one ingress rather than two. A profile declares one model id
+  # for all of its ingresses, so a gateway and its engine cannot share one until per-ingress
+  # overrides exist. Two profiles, or one ingress.
+  public_id: <the id the gateway advertises>
+  aliases: []
+  # MEASURE THIS, from GET /v1/models on the gateway. A gateway may report the engine's limit,
+  # its own lower one, or nothing at all. Copying the engine's value is how a context-overflow
+  # case ends up calibrated for a fleet that is not the one being tested.
+  # The number below is a placeholder, not a default. Replace it.
+  max_model_len: 32768
+  reasoning:
+    # MEASURE THIS by sending one request and looking at the response. A gateway can forward the
+    # engine's reasoning field, rename it, or drop the text while still reporting the tokens.
+    # Declaring the wrong shape fails a healthy stack; declaring none passes for the wrong reason.
+    parser: null
+    field: null
+    inline_tag: null
+    default_on: false
+  tools:
+    # Only if the gateway actually passes tool definitions through. A gateway with no tool support
+    # in front of an engine that has it will fail every tool case, which is a true finding about
+    # the gateway and a misleading one about the fleet.
+    parser: null
+    auto_choice: false
+
+ingresses:
+  - id: gateway
+    kind: litellm
+    base_url: https://<gateway-host>
+    # A gateway is usually the only authenticating layer in a stack, so a 401 here is a credential
+    # problem rather than a fleet one. The value is never stored: this names the variable, and a
+    # missing one is a preflight failure with the export command printed.
+    auth: {type: bearer, key_env: LLMDV_GATEWAY_KEY}
+    # MEASURE THIS. A health path that goes through authentication can only ever answer 401 to an
+    # unauthenticated probe, which preflight would read as unreachable. Prefer an auth-exempt path
+    # if the gateway has one.
+    health_path: /health
+    # MEASURE THIS by probing each path with a shape-valid body. A gateway's model_list bounds
+    # what is reachable, so it commonly exposes fewer surfaces than the engine behind it serves.
+    # Declaring one it does not route is a regression the contract suite will find immediately.
+    surfaces: [chat_completions]
+    # A gateway in front of a long-context model needs a generous request timeout: a client
+    # timeout that fires first cancels the request upstream, which looks like a fleet failure and
+    # is not one.
+    timeouts: {connect: 10, request: 1800, stream_idle: 120}
+    error_status:
+      # MEASURE EVERY LINE. Do not copy these from an engine profile.
+      #
+      # A gateway sits between the client and whatever produced the error, and commonly rewrites
+      # the status, the body, or both. The engine's 404 for an unknown model can arrive as a 400
+      # from the gateway's own validation, because the gateway rejected the name before any engine
+      # saw it. One request per class, bodies in a file sent with `-d @`, and read what comes back.
+      # The values below are the engine-side convention and are exactly what a gateway is
+      # likely to differ from. Replace each with what you measured.
+      unknown_model: [404]
+      unknown_path: [404]
+      wrong_method: [405]
+      bad_credentials: [401]
+    # Declare any error class the gateway answers WITHOUT a parseable envelope. A proxy that
+    # cannot route a request often answers in its own words rather than the upstream API's shape,
+    # and no client SDK can parse that. Declaring a class inverts the assertion to require the
+    # envelope's ABSENCE, so the deviation stays visible and a change in either direction fails.
+    unstructured_errors: []
+    # MEASURE THIS: request http://<gateway-host> (no port) and read the status and Location.
+    # Declare `expected` only if it answers a redirect to https://. llmdv derives that address from
+    # base_url, so no second hostname is written here. Leave it out on an ingress reached over
+    # plain HTTP, such as a port-forward to an internal layer.
+    transport:
+      http_redirect: expected
+    setup:
+      # An external HTTPS endpoint, so a corporate proxy hop is legitimate rather than a mistake.
+      # Use `bypass` only for a localhost target, where a hop silently becomes what you measure.
+      proxy: allow
+    # No `logs:` block. Collecting a layer's own account needs cluster access to the namespace it
+    # runs in, which this profile does not assume. Runs will carry every HTTP exchange and no pod
+    # logs, and the collector reports that rather than failing.
+
+capabilities:
+  # Declare false until probed. A case that skips as `undeclared` is honest; one that asserts
+  # against an unverified surface is not.
+  count_tokens: false
+  stateful_responses: false
+  structured_output: false
+  # Set for a multimodal model served with its vision path on; the image cases then run.
+  vision: false
+  vllm_options: []
+
+headers:
+  # MEASURE THESE. A gateway is the layer most likely to add, drop or rewrite a header, and only
+  # `status` and `response_headers` are observable from a client. `stripped`, `forwarded` and
+  # `rewritten` need an instrumented backend and will skip with that named -- which is the honest
+  # outcome, not a gap to paper over by declaring something observable instead.
+  x-request-id:
+    gateway: ignored
+
+clients:
+  # A client whose surfaces no ingress exposes fails validation, which is the point: it catches a
+  # client depending on something this gateway does not route.
+  - id: <your-client>
+    surfaces: [chat_completions]
+    needs: [streaming]
+
+# ---------------------------------------------------------------------------------------------
+# What this cannot tell you
+#
+# One ingress means no attribution. A failure says the exchange did not hold at this gateway; it
+# does not say whether the gateway, a router behind it, or the engine is responsible. summary.md
+# states that explicitly rather than printing a comparison table it cannot support.
+#
+# No pod logs means no second account of a failure. The run holds our side of every exchange and
+# nothing from the components that served it.
+#
+# Both are consequences of having one vantage point, not defects. A gateway-only run answers "can
+# a client complete its exchanges through the layer it actually talks to" -- which is worth
+# knowing, and is less than a full run. Report it as the narrower question it is.
