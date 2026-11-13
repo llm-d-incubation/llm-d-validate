@@ -1,99 +1,62 @@
-## Contributing Guidelines
+# Contributing to llm-d-validate
 
-Thank you for your interest in contributing to this project. Community involvement is highly valued and crucial for the project's growth and success. This project accepts contributions via GitHub pull requests. This document outlines the process to help get your contribution accepted.
+## Governance Structure
 
-To ensure a clear direction and cohesive vision for the project, the project leads have the final decision on all contributions. However, these guidelines outline how you can contribute effectively.
+`llm-d-validate` adopts the following hierarchical technical governance structure:
 
-## How You Can Contribute
+- A community of **contributors** who file issues and submit pull requests
+- A body of **core maintainers** who own `llm-d-validate` overall and drive its development
 
-There are several ways you can contribute:
+All contributions are expected to follow `llm-d-validate` design principles and best practices, as enforced by core maintainers. While high-quality pull requests are appreciated and encouraged, all maintainers reserve the right to prioritize their own work over code reviews at-will, hence contributors should not expect their work to be reviewed promptly.
 
-* **Reporting Issues:** Help us identify and fix bugs by reporting them clearly and concisely.
-* **Suggesting Features:** Share your ideas for new features or improvements.
-* **Improving Documentation:** Help make the project more accessible by enhancing the documentation.
-* **Submitting Code Contributions:** Code contributions that align with the project's vision are always welcome.
+Contributors can maximize the chances of their work being accepted by maintainers by meeting a high quality bar before sending a PR to maintainers.
 
-## Code of Conduct
+### Core maintainers
 
-This project adheres to the [Code of Conduct and Covenant](CODE_OF_CONDUCT.md). By participating, you are expected to uphold this code.
+The core maintainers lead the development of `llm-d-validate` and define the functional validation strategy for deployed `llm-d` stacks. Their responsibilities include:
+
+- Proposing, implementing and reviewing test cases, surfaces, ingress kinds, infra-profile fields and the run evidence `llm-d-validate` records
+- Keeping verdicts trustworthy: a case passes only when the stack behaves as the API defines, and every skip states why it skipped
+- Enforcing code quality standards and adherence to core design principles
+
+The core maintainers should publicly articulate their decision-making, and share the reasoning behind their decisions, vetoes, and dispute resolution.
+
+The list of core maintainers can be found in the [OWNERS](OWNERS) file.
+
+### Decision Making
+
+#### Uncontroversial Changes
+
+We are committed to accepting functional bug fixes that meet our quality standards and include minimized offline tests to avoid future regressions. A fix to a case that passes or fails wrongly should show the case failing against an injected defect, and passing without it. New cases for behaviour an API already defines generally fall under the same category, with the caveat that they may be rejected if the trade-off between usefulness and complexity is deemed unfavorable by core maintainers. Design changes that neither fix known functional issues nor add coverage are automatically considered controversial.
+
+#### Controversial Changes
+
+More controversial design changes (e.g., changing what an existing case asserts, breaking changes to the infra-profile schema, the run directory layout, exit codes or verdict semantics) are evaluated on a case-by-case basis under the subjective judgment of core maintainers.
+
+## Submitting a Pull Request
+
+We welcome contributions to any aspect of `llm-d-validate`! If you have a bug fix, feature request, or improvement, please submit a pull request (PR) to the repository. For a larger change, open an issue first to discuss it.
+
+For every Pull Request submitted, ensure the following steps have been done:
+
+1. [Sign your commits](https://docs.github.com/en/authentication/managing-commit-signature-verification/signing-commits), and add a DCO sign-off to each one with `git commit -s`. See [PR_SIGNOFF.md](PR_SIGNOFF.md) for details.
+2. Make sure the offline tests and linters pass **before you push** the contents of your PR:
+
+   ```sh
+   python -m pytest tests/ -q
+   ruff check src/ tests/ && ruff format --check src/ tests/
+   ```
+
+3. Never commit credentials, hostnames, namespaces or other cluster detail. Keep machine-specific profiles in a gitignored `*.local.yaml` copy.
 
 ## Community and Communication
 
-* **Developer Slack:** [Join our developer Slack workspace](https://llm-d.ai/slack) to connect with the core maintainers and other contributors, ask questions, and participate in discussions.
-* **Weekly Meetings:** Project updates, ongoing work discussions, and Q&A will be covered in our weekly project meetings. Please join by [adding the shared calendar](https://red.ht/llm-d-public-calendar). You can also [join our Google Group](https://groups.google.com/g/llm-d-contributors) for access to shared content.
-* **Code:** Hosted in the [llm-d](https://github.com/llm-d) GitHub organization
-* **Issues:** Project-scoped bugs or issues should be reported in this repo or in [llm-d/llm-d](https://github.com/llm-d/llm-d)
-* **Mailing List:** [llm-d-contributors@googlegroups.com](mailto:llm-d-contributors@googlegroups.com)
+- **Developer Slack:** [Join the llm-d Slack workspace](https://llm-d.ai/slack) to connect with the core maintainers and other contributors.
+- **Weekly Meetings:** Join by [adding the shared calendar](https://red.ht/llm-d-public-calendar), and [join the Google Group](https://groups.google.com/g/llm-d-contributors) for access to shared content.
+- **Issues:** Report bugs and feature requests in this repository.
 
-## Contributing Process
+This project adheres to the [Code of Conduct](CODE_OF_CONDUCT.md). See [SECURITY.md](SECURITY.md) for our vulnerability disclosure process.
 
-We follow a **lazy consensus** approach: changes proposed by people with responsibility for a problem, without disagreement from others, within a bounded time window of review by their peers, should be accepted.
+## License
 
-### Types of Contributions
-
-#### 1. Features with Public APIs or New Components
-
-All features involving public APIs, behavior between core components, or new core subsystems must be accompanied by an **approved project proposal**.
-
-**Process:**
-
-1. Create a pull request adding a proposal document under `./docs/proposals/` with a descriptive name
-2. Include these sections: Summary, Motivation (Goals/Non-Goals), Proposal, Design Details, Alternatives
-3. Get review from impacted component maintainers
-4. Get approval from project maintainers
-
-#### 2. Fixes, Issues, and Bugs
-
-For changes that fix broken code or add small changes within a component:
-
-* All bugs and commits must have a clear description of the bug, how to reproduce, and how the change is made
-* Any other changes can be proposed in a pull request — a maintainer must approve the change
-* For moderate size changes, create an RFC issue in GitHub, then engage in Slack
-
-## Code Review Requirements
-
-* **All code changes** must be submitted as pull requests (no direct pushes)
-* **All changes** must be reviewed and approved by a maintainer other than the author
-* **All repositories** must gate merges on compilation and passing tests
-* **All experimental features** must be off by default and require explicit opt-in
-
-## Commit and Pull Request Style
-
-* **Pull requests** should describe the problem succinctly
-* **Rebase and squash** before merging
-* **Use minimal commits** and break large changes into distinct commits
-* **Commit messages** should have:
-  * Short, descriptive titles
-  * Description of why the change was needed
-  * Enough detail for someone reviewing git history to understand the scope
-* **DCO Sign-off**: All commits must include a valid DCO sign-off line (`Signed-off-by: Name <email@domain.com>`)
-  * Add automatically with `git commit -s`
-  * See [PR_SIGNOFF.md](PR_SIGNOFF.md) for configuration details
-  * Required for all contributions per [Developer Certificate of Origin](https://developercertificate.org/)
-
-## Code Organization and Ownership
-
-* **Components** are the primary unit of code organization
-* **Maintainers** own components and approve changes
-* **Contributors** can become maintainers through sufficient evidence of contribution
-* Code ownership is reflected in [OWNERS files](https://go.k8s.io/owners) consistent with Kubernetes project conventions
-
-## Testing Requirements
-
-We use three tiers of testing:
-
-1. **Unit tests**: Fast verification of code parts, testing different arguments
-2. **Integration tests**: Testing protocols between components and built artifacts
-3. **End-to-end (e2e) tests**: Whole system testing including benchmarking
-
-Strong e2e coverage is required for deployed systems to prevent performance regression. Appropriate test coverage is an important part of code review.
-
-## Security
-
-See [SECURITY.md](SECURITY.md) for our vulnerability disclosure process.
-
-## API Changes and Deprecation
-
-* **No breaking changes**: Once an API/protocol is in GA release, it cannot be removed or behavior changed
-* **Versioning**: All protocols and APIs should be versionable with clear compatibility requirements
-* **Documentation**: All APIs must have documented specs describing expected behavior
+By contributing, you agree that your contributions are licensed under the [Apache 2.0 license](LICENSE).
