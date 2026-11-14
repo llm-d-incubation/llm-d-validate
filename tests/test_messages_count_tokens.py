@@ -212,7 +212,7 @@ def test_count_requests_respect_declared_throttling_without_retries(tmp_path, de
 
 
 @pytest.mark.parametrize("auth_type", ["bearer", "x-api-key"])
-def test_forge_cli_counts_with_profile_auth_and_redacts_evidence(tmp_path, auth_type):
+def test_agent_cli_counts_with_profile_auth_and_redacts_evidence(tmp_path, auth_type):
     secret = "llmdv-count-tokens-test-secret"
     header = (
         ("Authorization", f"Bearer {secret}") if auth_type == "bearer" else ("x-api-key", secret)
@@ -224,7 +224,7 @@ def test_forge_cli_counts_with_profile_auth_and_redacts_evidence(tmp_path, auth_
         profile.write_text(yaml.safe_dump(config))
         run_dir = tmp_path / "run"
         result = run_llmdv(
-            "verify", "--profile", str(profile), "--client", "forge",
+            "verify", "--profile", str(profile), "--client", "agent",
             "--local-output", str(run_dir), "--pod-logs", "off", "--evidence", "all",
             "-k", HAPPY, env={"LLMDV_COUNT_TOKENS_KEY": secret},
         )  # fmt: skip

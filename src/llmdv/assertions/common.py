@@ -5,10 +5,10 @@ case leaves proof of what was actually inspected and a failing one leaves the va
 it. Without that, a green run is only a claim that nothing raised.
 
 These are deliberately not per-test helpers. `assert_not_aborted` exists because a
-rollout probe found that a draining vLLM rejects work through
-`_reject_add_in_shutdown`, which arrives as `finish_reason: "abort"` on an HTTP **200** -- so a
-suite that checks status alone scores a dropped request as a success. Putting it here means
-every surface inherits it rather than each test remembering.
+draining vLLM rejects work through `_reject_add_in_shutdown`, which arrives as
+`finish_reason: "abort"` on an HTTP **200** -- so a suite that checks status alone scores a
+dropped request as a success. Putting it here means every surface inherits it rather than each
+test remembering.
 """
 
 from __future__ import annotations

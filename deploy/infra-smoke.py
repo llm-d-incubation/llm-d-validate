@@ -1,4 +1,4 @@
-"""Probe sent to the CBT container by infra-smoke.sh; no profile or inference calls."""
+"""Probe sent to the llmdv container by infra-smoke.sh; no profile or inference calls."""
 
 import json
 import os

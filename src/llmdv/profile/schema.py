@@ -906,7 +906,7 @@ class ClientBinary:
 class Client:
     """A real consumer of the fleet, and what it depends on.
 
-    Client is a selector over cases rather than a fourth abstraction: `--client forge`
+    Client is a selector over cases rather than a fourth abstraction: `--client agent`
     compiles to a marker expression. It exists so the suite can answer the question the
     issue actually asks -- can this client work here -- instead of a question about
     endpoints.

@@ -6,9 +6,10 @@ reason comparing their outcomes means anything.
 
 `served_by` is the part worth reading twice. Layer attribution assumes the ingresses are in
 series and otherwise identical, and they are not: direct vLLM reaches one replica while the
-router load-balances across many. In the GLM 5.3 fleets `--reasoning-parser` sits on the
-decode container only, so "direct passed, router failed" can mean the gateway is broken, or
-that the router picked a replica configured differently from the one that was port-forwarded.
+router load-balances across many. Engine flags such as `--reasoning-parser` can differ per
+container (on the decode container only, for example), so "direct passed, router failed" can
+mean the gateway is broken, or that the router picked a replica configured differently from
+the one that was port-forwarded.
 Recording which endpoint served a request is what keeps those two apart, so it is captured
 from the first pass even though nothing reads it until `llmdv matrix` exists.
 """

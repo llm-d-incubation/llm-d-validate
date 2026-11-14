@@ -86,8 +86,8 @@ def _run_reuse(tmp_path, fleet, binary, *extra):
 def test_reuse_leaves_room_for_a_model_that_always_thinks(tmp_path):
     """A model that cannot turn thinking off still answers each turn of the reuse session.
 
-    GLM-5.3 thinks whatever the request asks. Held to the probe's 256-token output budget, the
-    session spent it all thinking, ended without text and failed on a healthy fleet.
+    Such a model thinks whatever the request asks. Held to a 256-token output budget, the
+    session would spend it all thinking, end without text and fail on a healthy fleet.
     """
     binary = fake_claude_binary(tmp_path / "claude")
     with FakeFleet(cache_probe=True, forced_thinking_tokens=300) as fleet:

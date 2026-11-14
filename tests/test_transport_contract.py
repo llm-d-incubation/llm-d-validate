@@ -302,7 +302,7 @@ def test_retry_after_timeout(tmp_path, defects, passes):
     assert code == (0 if passes else 1)
 
 
-# The DeepSeek shape at a fiftieth of the time: a 60 s next-request budget and its declared
+# A slow deployment's shape at a fiftieth of the time: a 60 s next-request budget and its declared
 # 5 tokens/s, with a retry that generates 1200 tokens at 20 tokens/s. The whole retry may take
 # 60 s plus the 240 s its output takes at the declared rate, so only its start can show a
 # retry held behind the abandoned generation.

@@ -19,9 +19,8 @@ Seven classes of problem are caught here:
     environment   cluster access, pod logs or a metrics source the run needs is unavailable
                   (only a warning when it limits the evidence rather than the cases)
 
-The proxy check earns its place: the forge harness already documents that over the VPN every
-request shares one proxy hop, and an unnoticed hop produces plausible, wrong results rather
-than an error. That is worse than a failure.
+The proxy check earns its place: over a VPN every request can share one proxy hop, and an
+unnoticed hop produces plausible, wrong results rather than an error. That is worse than a failure.
 """
 
 from __future__ import annotations

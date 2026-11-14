@@ -33,6 +33,6 @@ ingresses:
       requires: []
 
 clients:
-  - id: forge
+  - id: agent
     surfaces: [chat_completions]
     needs: [streaming, reasoning]

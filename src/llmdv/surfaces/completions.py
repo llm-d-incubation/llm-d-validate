@@ -1,4 +1,4 @@
-"""POST /v1/completions -- prompt input and text choices for the rollout probe.
+"""POST /v1/completions -- prompt input and text choices.
 
 OpenAI errors, streaming request options and chunk assembly are shared with chat. Requests
 and response choices have their own grammar: no messages, roles, deltas or tools.

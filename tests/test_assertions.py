@@ -17,7 +17,7 @@ from llmdv.surfaces.base import Completion, Usage
 
 INLINE_MODEL = Model(public_id="m", reasoning=Reasoning(inline_tag="think", default_on=True))
 FIELD_MODEL = Model(
-    public_id="m", reasoning=Reasoning(parser="glm45", field_name="reasoning_content")
+    public_id="m", reasoning=Reasoning(parser="qwen3", field_name="reasoning_content")
 )
 
 
@@ -30,7 +30,7 @@ def completion(**kw):
 
 
 def test_abort_on_a_200_is_caught():
-    """The rollout-probe lesson: a draining replica reports abort on HTTP 200."""
+    """The draining-engine lesson: a draining replica reports abort on HTTP 200."""
     with pytest.raises(AssertionError, match="refused or abandoned"):
         assert_not_aborted(completion(finish_reason="abort"))
 

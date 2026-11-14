@@ -94,7 +94,7 @@ class RecordingClient:
     `trust_env=False` is deliberate and load-bearing. A profile declaring `proxy: bypass`
     means localhost traffic must not traverse the VPN proxy, and httpx would otherwise pick
     HTTP_PROXY up from the environment. An unnoticed proxy hop produces plausible, wrong
-    results -- which is the confounder the forge harness already documents.
+    results, a confounder that is easy to miss.
     """
 
     def __init__(

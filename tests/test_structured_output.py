@@ -300,7 +300,7 @@ def test_cli_client_filter_selects_only_its_structured_surfaces(tmp_path):
             "--profile",
             str(profile),
             "--client",
-            "forge",
+            "agent",
             "-k",
             "test_structured_output",
             "--local-output",

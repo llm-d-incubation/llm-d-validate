@@ -271,7 +271,7 @@ def test_bad_frames_fail_with_evidence(tmp_path, raw, failed_check):
     assert raw in (tmp_path / "run" / record["evidence"] / "transcript.sse").read_text()
 
 
-def test_forge_streams_through_both_ingresses_with_named_event_evidence(tmp_path):
+def test_agent_streams_through_both_ingresses_with_named_event_evidence(tmp_path):
     with FakeFleet() as direct, FakeFleet() as router:
         profile = write_profile(tmp_path, direct)
         config = yaml.safe_load(profile.read_text())
@@ -285,7 +285,7 @@ def test_forge_streams_through_both_ingresses_with_named_event_evidence(tmp_path
             "--profile",
             str(profile),
             "--client",
-            "forge",
+            "agent",
             "--local-output",
             str(run_dir),
             "--pod-logs",

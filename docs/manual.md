@@ -62,7 +62,7 @@ stream gets what, is in [docs/architecture.md](architecture.md#how-a-request-rea
 ## Selecting what runs
 
 ```sh
-llmdv verify --profile P --client forge        # the cases a client depends on
+llmdv verify --profile P --client agent        # the cases a client depends on
 llmdv verify --profile P --surface responses   # one API surface
 llmdv verify --profile P --ingress litellm     # one layer
 llmdv verify --profile P -m contract           # check the profile against reality

@@ -62,7 +62,7 @@ def test_trigger_creates_the_cronjob_template_with_only_its_arguments_replaced(t
     )
     result = subprocess.run(  # noqa: S603 - fixed script
         ["sh", str(DEPLOY / "trigger.sh"), "-n", "ns", "--id", "Release_1.2",
-         "--", "--client", "forge", "-k", 'name with "quotes"'],
+         "--", "--client", "agent", "-k", 'name with "quotes"'],
         capture_output=True,
         text=True,
         env={"PATH": f"{bin_dir}:/usr/bin:/bin"},
@@ -76,7 +76,7 @@ def test_trigger_creates_the_cronjob_template_with_only_its_arguments_replaced(t
     container = job["spec"]["template"]["spec"]["containers"][0]
     assert container["args"] == [
         "--label", "trigger=rollout", "--label", "rollout=Release_1.2",
-        "--client", "forge", "-k", 'name with "quotes"',
+        "--client", "agent", "-k", 'name with "quotes"',
     ]  # fmt: skip
     # Everything else is the CronJob's template, untouched.
     assert container["image"] == "registry.example.com/org/llmdv:sha"

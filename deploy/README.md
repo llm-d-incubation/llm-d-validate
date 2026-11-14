@@ -179,7 +179,7 @@ the Job's name, and returns:
 
 ```sh
 deploy/trigger.sh -n <namespace> --trigger manual --id "$RUN_ID" -- --compare
-deploy/trigger.sh -n <namespace> --id "$ROLLOUT_ID" -- --client forge --label deployment="$IMAGE_DIGEST"
+deploy/trigger.sh -n <namespace> --id "$ROLLOUT_ID" -- --client agent --label deployment="$IMAGE_DIGEST"
 deploy/trigger.sh -n <namespace> --trigger manual --profile-file /secure/path/profile.yaml -- -m contract
 ```
 

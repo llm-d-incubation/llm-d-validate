@@ -10,10 +10,10 @@
 #
 # Sources:
 #   model-server manifest         engine flags; the reasoning parser and
-#                                  --tool-call-parser glm47 are on the DECODE container only
+#                                  --tool-call-parser are on the DECODE container only
 #   router values                 EPP policy; the EPP Service on port 80
 #   litellm manifests             the LiteLLM Deployment and Service on port 4000
-#   litellm/litellm-cm.yaml        model_list, custom_auth, tenant keys, flow_control hook
+#   litellm config                model_list, custom_auth, keys
 schema: llmdv.profile/1
 name: example-three-ingress
 vantage: external
@@ -25,7 +25,7 @@ environment:
   # in the manifests, so guessing it here would be a line that silently never matches.
 
 model:
-  public_id: zai-org/GLM-5.3
+  public_id: <org>/<model>
   aliases: []
   # Deliberately omitted: the engine runs --max-model-len ${MAX_MODEL_LEN:-auto}, so the real
   # value comes from GET /v1/models at runtime. Writing a number here would invent one.
@@ -33,11 +33,11 @@ model:
     # This fleet DOES have a parser, so reasoning arrives in its own field rather than inline --
     # the opposite of the two-ingress example. That is exactly why the shape is declared, not
     # assumed.
-    parser: glm45
+    parser: <reasoning-parser>
     field: reasoning_content
     default_on: true
   tools:
-    parser: glm47
+    parser: <tool-call-parser>
     auto_choice: true
 
 ingresses:
@@ -83,7 +83,7 @@ ingresses:
           remote_port: 80
 
   # LiteLLM. The only authenticating layer in the stack, and the only one whose model_list
-  # bounds what is reachable -- it declares one entry, zai-org/GLM-5.3 over openai/, so
+  # bounds what is reachable -- it declares one entry, the model over openai/, so
   # /v1/messages is NOT exposed here even though the engine serves it.
   - id: litellm
     kind: litellm
@@ -148,15 +148,15 @@ headers:
     litellm: ignored
 
 clients:
-  # Forge needs /v1/messages, which LiteLLM's model_list does not expose -- so Forge is NOT
-  # fully served through that ingress on this fleet. `llmdv verify --client forge --ingress
-  # litellm` is the command that states it.
-  - id: forge
+  # An agent client that needs /v1/messages, which LiteLLM's model_list does not expose, is
+  # NOT fully served through that ingress. `llmdv verify --client agent --ingress litellm` is
+  # the command that states it.
+  - id: agent
     surfaces: [chat_completions, messages]
     needs: [streaming, tools, reasoning]
   - id: tau2
     surfaces: [chat_completions]
     needs: [tools]
-  - id: rollout-probe
+  - id: completions-probe
     surfaces: [completions]
     needs: []

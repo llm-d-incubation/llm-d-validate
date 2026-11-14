@@ -302,7 +302,7 @@ def test_throttling_respects_the_declaration_without_retrying(tmp_path, declared
 
 
 @pytest.mark.parametrize("auth_type", ["bearer", "x-api-key"])
-def test_forge_cli_selects_both_cases_with_authentication_and_redacted_evidence(
+def test_agent_cli_selects_both_cases_with_authentication_and_redacted_evidence(
     tmp_path, auth_type
 ):
     secret = "llmdv-answer-budget-test-secret"
@@ -320,7 +320,7 @@ def test_forge_cli_selects_both_cases_with_authentication_and_redacted_evidence(
             "--profile",
             str(profile),
             "--client",
-            "forge",
+            "agent",
             "--local-output",
             str(run_dir),
             "--pod-logs",

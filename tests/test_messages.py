@@ -139,7 +139,7 @@ def test_raw_and_sdk_smokes_reject_malformed_http_200(tmp_path, overrides, faile
 
 
 @pytest.mark.parametrize("auth_type", ["none", "x-api-key", "bearer"])
-def test_forge_cli_uses_profile_auth_for_raw_and_sdk_and_redacts_evidence(tmp_path, auth_type):
+def test_agent_cli_uses_profile_auth_for_raw_and_sdk_and_redacts_evidence(tmp_path, auth_type):
     secret = "llmdv-messages-test-secret"
     expected = (
         ("Authorization", f"Bearer {secret}")
@@ -161,7 +161,7 @@ def test_forge_cli_uses_profile_auth_for_raw_and_sdk_and_redacts_evidence(tmp_pa
             "--profile",
             str(profile),
             "--client",
-            "forge",
+            "agent",
             "--local-output",
             str(run_dir),
             "--pod-logs",

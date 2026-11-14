@@ -1,4 +1,4 @@
-"""The rollout probe must detect a failed generation even when HTTP succeeds."""
+"""A completion-only client must detect a failed generation even when HTTP succeeds."""
 
 from __future__ import annotations
 
@@ -68,7 +68,7 @@ def test_text_chunks_assemble_without_chat_deltas_and_keep_terminal_usage():
 
 
 @pytest.mark.parametrize("aborted", [False, True])
-def test_rollout_probe_cli_runs_completions_and_rejects_http_200_abort(tmp_path, aborted):
+def test_completions_probe_cli_runs_completions_and_rejects_http_200_abort(tmp_path, aborted):
     with FakeFleet(abort_finish_reason=aborted) as fleet:
         profile = write_profile(tmp_path, fleet)
         run_dir = tmp_path / "run"
@@ -77,7 +77,7 @@ def test_rollout_probe_cli_runs_completions_and_rejects_http_200_abort(tmp_path,
             "--profile",
             str(profile),
             "--client",
-            "rollout-probe",
+            "completions-probe",
             "--local-output",
             str(run_dir),
             "--pod-logs",

@@ -271,13 +271,13 @@ def _rendering(markers, surfaces=("chat_completions",)):
         # Muse, whichever of its efforts is listed first: medium is the first unique marker.
         (("none", "minimal", "low", "medium"), _rendering(MAPPED_MARKERS), "medium"),
         (("low", "minimal", "medium", "high"), _rendering(MAPPED_MARKERS), "medium"),
-        # GLM: the marker spells the quiet effort itself, though the map folds others onto it.
+        # A marker that spells the quiet effort itself, though the map folds others onto it.
         (
             ("low", "high", "max"),
             _rendering({"unset": "Max", "none": "Low", "minimal": "Low", "low": "Low"}),
             "low",
         ),
-        # DeepSeek and Granite: `none` renders no marker, so nothing shows a fold.
+        # A template where `none` renders no marker, so nothing shows a fold.
         (("none", "minimal"), _rendering({"none": None, "minimal": "50", "low": "50"}), "none"),
         (("none", "low"), _rendering({"unset": None, "none": None, "minimal": None}), "none"),
         # Every declared effort shares its marker with another: none qualifies.

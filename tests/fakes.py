@@ -829,9 +829,9 @@ def quiet_effort_payload(
     }
 
 
-# What a GLM-5.3-like template renders for each requested effort under a deployment effort map
+# What a chat template can render for each requested effort under a deployment effort map
 # that sends none, minimal and medium to low and xhigh to max; `unset` is the template default.
-# DeepSeek-like `none` renders no marker at all, which `effort_render` can ask for with None.
+# A template whose `none` renders no marker at all, which `effort_render` can ask for with None.
 RENDERED_EFFORTS = {
     "unset": "Max",
     "none": "Low",
@@ -2819,8 +2819,8 @@ ingresses:
 headers:
   x-request-id: {{fake: ignored}}
 clients:
-  - {{id: forge, surfaces: [chat_completions, messages], needs: [reasoning]}}
-  - {{id: rollout-probe, surfaces: [completions], needs: []}}
+  - {{id: agent, surfaces: [chat_completions, messages], needs: [reasoning]}}
+  - {{id: completions-probe, surfaces: [completions], needs: []}}
 """
 
 

@@ -1,4 +1,4 @@
-"""The non-streaming completion contract used by the disaggregated-rollout probe.
+"""The non-streaming completion contract a completion-only client depends on.
 
 A draining replica can return finish_reason="abort" on HTTP 200. The shared finish check
 must reject that response, even when it otherwise looks like a successful completion.
