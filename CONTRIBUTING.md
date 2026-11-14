@@ -10,6 +10,55 @@ community channels. This document covers only what is specific to this repositor
 The core maintainers are listed in [OWNERS](OWNERS). Comment `/lgtm` and `/approve` on a pull
 request to review and approve it; a pull request merges once it has both.
 
+## Pull requests
+
+These apply to every PR, whether a person or an AI agent wrote it. They keep contributions
+traceable and easy to review.
+
+### Every PR starts with an issue
+
+Before opening a PR, make sure an issue in this repository describes the work. A PR does not
+need to close its issue, but it must make clear progress toward it. If no issue exists, open one
+first.
+
+### Keep it small
+
+A PR should be small enough for a person to read and understand in a short time. Several small
+PRs that chip away at one issue are easier to review, test and revert than one large one. When a
+change cannot reasonably be split, say why in the description.
+
+### Writing the description
+
+Link the issue (`Closes #123` or `Part of #123`), then cover, briefly:
+
+- **What it solves:** which issue, or which part of it, this PR addresses.
+- **What is still open:** anything not yet tested or resolved, and why.
+- **Problems encountered:** development or testing problems, whether they are resolved, and
+  whether any blocked validation. If unresolved, suggest a path forward.
+
+### AI-assisted contributions
+
+If you use AI coding tools, keep the PR description and comments they write concise, focused on
+the issue, and limited to the work done.
+
+Avoid:
+
+- line counts, file counts or other change statistics
+- promotional language ("comprehensive", "robust", "production-ready")
+- summaries that repeat what the diff already shows
+
+Do mention:
+
+- any APIs added or changed, in a few sentences rather than file by file
+- changes or areas that are not confidently tested
+- new tests, and the gaps they close
+- how to verify: the exact command, test or steps a reviewer can run
+
+### Communicating progress
+
+After opening the PR, post a short comment on the linked issue summarizing the progress, so
+everyone following the issue stays informed.
+
 ## Development and testing
 
 ```sh
