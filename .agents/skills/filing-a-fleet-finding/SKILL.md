@@ -22,7 +22,7 @@ A fleet finding is a defect an llmdv run caught in the deployed serving stack. E
      - Put the host in `BASE`, read without printing. A committed profile names it by variable (`base_url_env`), a local one may write `base_url` inline; this reads either:
        `BASE=$(.venv/bin/python -c "import os,yaml;i=next(x for x in yaml.safe_load(open('<p>'))['ingresses'] if x['id']=='<ingress>');print(i.get('base_url') or os.environ[i['base_url_env']])")`
        Run it from the repository root; `<ingress>` is the segment of `failures/<ingress>/<case>/`.
-     - Load the key from wherever the person keeps it, never echoing it.
+     - Load the key from wherever the person keeps it ([`.agents/ENVIRONMENT.md`](../../ENVIRONMENT.md)), never echoing it.
 
    If the defect no longer reproduces, say so and do not file.
 4. **Search for existing issues** (needs `gh`; without it, give the person the searches to run) in the tracker you will file in and in llm-d-incubation/llm-d-validate (`gh issue list -R <owner>/<repo> --state open --search "<keywords>"`), and read the candidates' bodies. When one already describes the defect, draft a comment with the new evidence instead, and post it only with the user's explicit go-ahead.

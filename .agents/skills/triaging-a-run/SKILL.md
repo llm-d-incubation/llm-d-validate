@@ -9,7 +9,7 @@ Turn a run directory into a short list of causes, each with the issue that track
 
 Investigate read-only against the fleet: rerunning cases and sending single requests is fine; changing a deployment to test a theory needs the user's explicit approval. Writing your notes into the run directory is fine.
 
-The run directory alone answers most of this. The rest depends on what the person has: `gh` for issue and PR search, cluster access (`kubectl` or `oc`) for pod state and logs, bucket access for other runs. Check first; without one, do that step from what is left and say what you could not check.
+The run directory alone answers most of this. The rest depends on what the person has ([`.agents/ENVIRONMENT.md`](../../ENVIRONMENT.md)): `gh` for issue and PR search, cluster access (`kubectl` or `oc`) for pod state and logs, bucket access for other runs. Check first; without one, do that step from what is left and say what you could not check.
 
 ## What a run directory holds
 

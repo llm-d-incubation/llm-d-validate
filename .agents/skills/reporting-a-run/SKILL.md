@@ -17,7 +17,7 @@ The static page draws no conclusions. That is your job, and it must stay visibly
 ## Steps
 
 1. **Get the run directory onto this machine.** A local run needs nothing. To pull a published one, follow running-and-comparing-live-runs ("Pull a run back"); the run's `outcome.json` gives its `publication.location`. Without bucket access, ask someone who has it for the run directory. If `llmdv compare --from "$PREFIX" --profile <profile name> --list` cannot list the folder, `aws s3 ls "$PREFIX/<profile name>/" --endpoint-url "$AWS_ENDPOINT_URL_S3"` does.
-2. **Build the static page** from the repository root, with every `auth.key_env` variable the run's `profile.used.yaml` names exported, so the credential scan checks their exact values. Load them from wherever the person keeps the key (ask; never echo it), under the profile's names:
+2. **Build the static page** from the repository root, with every `auth.key_env` variable the run's `profile.used.yaml` names exported, so the credential scan checks their exact values. Load them as [`.agents/ENVIRONMENT.md`](../../ENVIRONMENT.md) describes (ask where the person keeps the key; never echo it), under the profile's names:
    ```sh
    export <auth.key_env>="$<their key variable>"
    .venv/bin/llmdv analyze runs/<run_id>
@@ -30,7 +30,7 @@ The static page draws no conclusions. That is your job, and it must stay visibly
    - what a pass means.
 
    Describe the general rule the case enforces, not this profile's path through it, plus one clause on when it skips. Write from the code, never from this run's outcome. For more than about 40 case ids, split them by suite across parallel subagents with these same instructions, then merge.
-4. **Investigate, largest failure group first.** For each group, read one or two of its bundles: `verdict.txt`, `response.json`, `transcript.sse` and `assertion.txt` under `failures/`. Also read the comment beside the profile line the case judges (it records what was measured).
+4. **Investigate, largest failure group first.** For each group, read one or two of its bundles: `verdict.txt`, `response.json`, `transcript.sse` and `assertion.txt` under `failures/`. Also read the comment beside the profile line the case judges (it records what was measured), and [`.agents/GROUND-TRUTH.md`](../../GROUND-TRUTH.md).
 5. **Write `runs/<run_id>/agent-notes.json`,** keeping it beside the evidence so the page can be rebuilt:
    ```json
    {

@@ -1,10 +1,10 @@
 """The `llmdv` entry point.
 
-argparse rather than Typer, for two reasons: Click and Typer write help and errors straight to
-stdout/stderr, which fights the single-logger contract this tool is built around; and
-`llmdv verify` forwards unknown arguments to pytest, which `parse_known_args` does plainly
-while Click needs `ignore_unknown_options` plus `allow_extra_args` and would see a
-pytest-bound `-p` or `-k` as its own.
+argparse rather than Typer, for the reasons in .agents/DECISIONS.md. The two decisive
+ones: Click and Typer write help and errors straight to stdout/stderr, which fights the
+single-logger contract this tool is built around; and `llmdv verify` forwards unknown arguments
+to pytest, which `parse_known_args` does plainly while Click needs `ignore_unknown_options`
+plus `allow_extra_args` and would see a pytest-bound `-p` or `-k` as its own.
 
 The CLI layer stays deliberately thin -- parse, build a config, call a function -- so that
 decision stays reversible without touching the library.

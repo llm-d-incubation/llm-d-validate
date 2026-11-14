@@ -9,7 +9,7 @@ Every path writes the same run directory, so reading and comparing work the same
 
 ## Before any live run
 
-Before the first live step, check what the person has and ask only for what is missing.
+Before the first live step, check what the person has and ask only for what is missing: [`.agents/ENVIRONMENT.md`](../../ENVIRONMENT.md).
 
 1. **Check nobody else is running against this gateway.** One live run per gateway at a time: cache and session cases depend on what earlier requests left behind, and the key is rate-limited.
 2. **Never pass `-n`.** `llmdv verify` refuses parallel workers; live cases run one at a time.

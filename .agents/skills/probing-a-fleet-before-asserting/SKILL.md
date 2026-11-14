@@ -11,9 +11,10 @@ The recurring failure here is an assertion that is plausible, reads correctly in
 
 ## Procedure
 
-1. **Reach the layer directly.** For a layer behind a port-forward, `llmdv profile show <profile> --setup` prints the forwards with pods resolved live. For a gateway or a router route, export the profile's `base_url_env` and `auth.key_env` variables instead (`--setup` then prints "no setup required"); the testing-a-model-deployment skill shows the credential mapping.
+1. **Read [`.agents/GROUND-TRUTH.md`](../../GROUND-TRUTH.md) first.** It lists behaviours already measured, so you do not rediscover them, and its "Tooling pitfalls" section covers common probe mistakes (inline JSON, `| head`).
+2. **Reach the layer directly.** For a layer behind a port-forward, `llmdv profile show <profile> --setup` prints the forwards with pods resolved live. For a gateway or a router route, export the profile's `base_url_env` and `auth.key_env` variables instead (`--setup` then prints "no setup required"); the testing-a-model-deployment skill shows the credential mapping.
 
-2. **Send the real request and keep the whole response.** Body in a file, output to a file:
+3. **Send the real request and keep the whole response.** Body in a file, output to a file:
    ```sh
    cat > body.json <<'JSON'
    {"model":"<model>","messages":[{"role":"user","content":"hi"}],"max_tokens":16}
@@ -24,15 +25,15 @@ The recurring failure here is an assertion that is plausible, reads correctly in
    ```
    Drop the `Authorization` line for a router reached directly; it authenticates nothing. The best capture is often a recorded one: `llmdv verify --profile <profile> --evidence all -k <case>` writes every exchange to `exchanges.jsonl`.
 
-3. **Probe every declared layer, not one.** `vllm`, `llmd_router` and `litellm` ingresses disagree on error status, on which paths exist, on which headers come back, and on whether a response is transformed.
+4. **Probe every declared layer, not one.** `vllm`, `llmd_router` and `litellm` ingresses disagree on error status, on which paths exist, on which headers come back, and on whether a response is transformed.
 
-4. **For a stream, capture the raw frames.** Count them, find which carry a finish reason, check for the terminal sentinel, and run it with and without any option you will assert on. The absence case is as much a contract as the presence case.
+5. **For a stream, capture the raw frames.** Count them, find which carry a finish reason, check for the terminal sentinel, and run it with and without any option you will assert on. The absence case is as much a contract as the presence case.
 
-5. **Write the capture into a fixture** under `tests/fixtures/`. A real capture holds the parser to what a server sends, vendor fields included; a hand-written one tests your assumptions. Strip internal hostnames and Service names first (`x-litellm-model-api-base`, `x-envoy-decorator-operation`, backend headers): a fixture is a committed file.
+6. **Write the capture into a fixture** under `tests/fixtures/`. A real capture holds the parser to what a server sends, vendor fields included; a hand-written one tests your assumptions. Strip internal hostnames and Service names first (`x-litellm-model-api-base`, `x-envoy-decorator-operation`, backend headers): a fixture is a committed file.
 
-6. **Write the assertion**, recording what it observed through `journal.record` so the verdict carries its evidence.
+7. **Write the assertion**, recording what it observed through `journal.record` so the verdict carries its evidence.
 
-7. **Prove it can fail.** Add the matching defect to the fake fleet (see extending-llmdv for which file) and assert the case fails against it.
+8. **Prove it can fail.** Add the matching defect to the fake fleet (see extending-llmdv for which file) and assert the case fails against it.
 
 On a fleet declared `shared`, keep probes to well-formed requests: malformed bodies, huge prompts and disconnects belong to the disruptive families the policy excludes.
 

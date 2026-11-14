@@ -18,7 +18,7 @@ Never change the deployment while testing it. A fix to a deployment is someone e
 | The environment | prod, staging, test or canary, and whether others use it while you run |
 | The profile | a committed one, or "find or make one" |
 
-Then check what the person has: cluster access, the bucket, and where they keep each gateway's URL and key. Never ask for a key in the conversation; they load it into the shell. A router (EPP) route reached directly needs no key. The snippets below call a loaded gateway's values `GATEWAY_URL` and `GATEWAY_KEY`: `export GATEWAY_URL="$<their url variable>" GATEWAY_KEY="$<their key variable>"`.
+Then check what the person has ([`.agents/ENVIRONMENT.md`](../../ENVIRONMENT.md)): cluster access, the bucket, and where they keep each gateway's URL and key. Never ask for a key in the conversation; they load it into the shell. A router (EPP) route reached directly needs no key. The snippets below call a loaded gateway's values `GATEWAY_URL` and `GATEWAY_KEY`: `export GATEWAY_URL="$<their url variable>" GATEWAY_KEY="$<their key variable>"`.
 
 ## 2. Find the endpoints if you were not given them
 
@@ -68,7 +68,7 @@ Every `.local.yaml` is gitignored and may write `base_url` inline. A committed p
 **Adding the router to a gateway profile.** The new ingress inherits the top-level `model`, `capabilities` and `known_failures`, so override what differs at the router:
 - `kind: llmd_router`, `auth: {type: none}`, `rate_limited: false`, `health_path: /health`;
 - `model: {public_id: <the id from the router's /v1/models>}` (the engine's served name, not the gateway's);
-- `error_status` and `unstructured_errors`: start from `examples/example-two-ingress.yaml`'s router ingress, whose comments cover the EPP's plain-text errors;
+- `error_status` and `unstructured_errors`: start from `examples/example-two-ingress.yaml`'s router ingress, and read [`.agents/GROUND-TRUTH.md`](../../GROUND-TRUTH.md) on the EPP's plain-text errors;
 - `surfaces`: what the router serves (often the render routes too); the contract run checks them;
 - `transport` and `setup`: none needed for a route reached directly; a port-forward needs `setup.requires`.
 
@@ -133,7 +133,7 @@ llmdv verify --profile <profile> --evidence all -k "<tests>"  # the cases you ca
 llmdv verify --profile <profile> --analyze                    # the full suite, 15-60 min; runs/<timestamp>/
 ```
 
-Restrict a multi-ingress profile with `--ingress <id>`. Keep the machine awake for the full run, or run it unattended with `llmdv job` or as a cluster job ([docs/end-to-end.md](../../../docs/end-to-end.md#from-a-cluster-job)). Exit `1` is test failures, `3` an environment problem (nothing was tested), `5` results not delivered, `6` interrupted; see [docs/manual.md](../../../docs/manual.md#exit-codes).
+Restrict a multi-ingress profile with `--ingress <id>`. Keep the machine awake for the full run, or run it unattended with `llmdv job` or as a cluster job ([docs/end-to-end.md](../../../docs/end-to-end.md#from-a-cluster-job); [`.agents/ENVIRONMENT.md`](../../ENVIRONMENT.md), "Long runs"). Exit `1` is test failures, `3` an environment problem (nothing was tested), `5` results not delivered, `6` interrupted; see [docs/manual.md](../../../docs/manual.md#exit-codes).
 
 ## 8. Compare and report
 

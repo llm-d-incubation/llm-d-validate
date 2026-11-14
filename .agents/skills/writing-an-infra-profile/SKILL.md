@@ -27,7 +27,7 @@ Field reference: [`profiles/REFERENCE.md`](../../../profiles/REFERENCE.md). Guid
 
    Per layer:
    - **`litellm`:** `rate_limited: true` (a 429 then skips as `throttled`), `health_path: /health/liveliness`, `capabilities.model_info` from its `GET /v1/model/info`. Its model id is the gateway's (often prefixed, e.g. `<provider>/…`, and suffixed per gateway, e.g. `-staging`), not the engine's.
-   - **`llmd_router`:** no auth (`{type: none}`), the engine's model id, and no `/v1/model/info`. The EPP answers some malformed bodies with plain text (`error extracting request body: …`); see the `router` ingress in `examples/example-two-ingress.yaml` before declaring `unstructured_errors`.
+   - **`llmd_router`:** no auth (`{type: none}`), the engine's model id, and no `/v1/model/info`. The EPP answers some malformed bodies with plain text (`error extracting request body: …`); see [`.agents/GROUND-TRUTH.md`](../../GROUND-TRUTH.md) before declaring `unstructured_errors`.
 
    Declare `fleet_policy: dedicated` (the default): it runs the disruptive families too, and they have not disturbed the deployments they ran against. Use `shared`, which skips them as `excluded_by_policy`, only when the deployment's owner asks for it, and say so in a comment.
 

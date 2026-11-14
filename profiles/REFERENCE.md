@@ -343,7 +343,7 @@ Template keyword and aggregate-metric observability for the cache cases is not b
 
 ## effort_rendering
 
-`capabilities.effort_rendering`, or the same under an ingress. A deployment can map a requested effort onto another (vLLM's `--reasoning-effort-map`), and no response says which effort the model was given. For each declared effort, and for a request with no effort, the `field_options.*_effort_rendered` cases send one token with `prompt_logprobs: 0`, rebuild the rendered prompt from each position's `decoded_token`, and require `pattern` to capture exactly the declared marker, once. A missing `prompt_logprobs` on a declared surface fails. Declare a surface only where its layer returns prompt logprobs; through the LiteLLM gateway only Chat does.
+`capabilities.effort_rendering`, or the same under an ingress. A deployment can map a requested effort onto another (vLLM's `--reasoning-effort-map`), and no response says which effort the model was given. For each declared effort, and for a request with no effort, the `field_options.*_effort_rendered` cases send one token with `prompt_logprobs: 0`, rebuild the rendered prompt from each position's `decoded_token`, and require `pattern` to capture exactly the declared marker, once. A missing `prompt_logprobs` on a declared surface fails. Declare a surface only where its layer returns prompt logprobs; through the LiteLLM gateway only Chat does (see [`.agents/GROUND-TRUTH.md`](../.agents/GROUND-TRUTH.md)).
 
 | Key | Type | Default | Meaning |
 | --- | --- | --- | --- |
