@@ -97,14 +97,14 @@ flowchart TB
     P -->|"no"| E0["exit 0"]
 ```
 
-The codes are listed in [README.md](README.md#exit-codes). Widening `1` to cover an environment
+The codes are listed in [MANUAL.md](MANUAL.md#exit-codes). Widening `1` to cover an environment
 problem is the failure this exists to prevent.
 
 ## Directory layout
 
 ```
 llm-d-validate/
-  install.sh              creates .venv and installs llmdv (see README.md)
+  install.sh              creates .venv and installs llmdv (see MANUAL.md)
   pyproject.toml          console script `llmdv`; pytest11 entry point
   Containerfile           the unattended runner image, pinned by requirements.lock
   profiles/               fleet profiles (see profiles/README.md)
@@ -208,7 +208,7 @@ These are load-bearing. Changing one changes what a result means.
 **Ingress and surface stay orthogonal.** The moment a case reaches into a layer's internals,
 running it elsewhere stops being a comparison.
 
-**A skip carries its class.** One of the [six skip classes](README.md#skip-classes):
+**A skip carries its class.** One of the [six skip classes](MANUAL.md#skip-classes):
 `undeclared`, `not_implemented`, `requires_instrumentation`, `requires_load`,
 `excluded_by_policy`, `throttled`. Collapsing them makes a matrix read as coverage when it is not.
 

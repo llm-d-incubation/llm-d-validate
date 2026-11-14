@@ -136,7 +136,7 @@ bash runs/$RUN/failures/<ingress>/<case>/repro.sh
 
 ## Reference
 
-**Exit codes** are the same for every path: see [README.md](README.md#exit-codes).
+**Exit codes** are the same for every path: see [MANUAL.md](MANUAL.md#exit-codes).
 
 <details>
 <summary><b>Troubleshooting</b></summary>

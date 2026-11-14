@@ -152,6 +152,6 @@ layers.
   `llmdv profile show <profile.yaml> --matrix`.
 - The per-case list for one area:
   `pytest --collect-only -q -m <marker>`, where the marker is the suite package name. See
-  [Selecting what runs](README.md#selecting-what-runs).
+  [Selecting what runs](MANUAL.md#selecting-what-runs).
 - Every profile key: [profiles/REFERENCE.md](profiles/REFERENCE.md).
 

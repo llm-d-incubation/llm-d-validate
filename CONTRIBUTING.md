@@ -29,7 +29,7 @@ with flags for the defects the suite exists to catch. CI runs it on Python 3.10,
 - **Prove it can fail.** Add the defect to `tests/fakes.py` and assert that the case fails
   against it, including that a recorded check is marked not-ok. A case that cannot fail checks
   nothing.
-- **Classify every skip.** Use one of the [six skip classes](README.md#skip-classes), never a
+- **Classify every skip.** Use one of the [six skip classes](MANUAL.md#skip-classes), never a
   bare skip.
 - **Assert what the API defines.** A case checks the behaviour the API specifies, not what one
   deployment happens to do today.

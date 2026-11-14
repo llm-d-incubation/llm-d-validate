@@ -106,9 +106,9 @@ llmdv profile show     profiles/<system>/<model>.local.yaml --matrix # what will
 llmdv verify --profile profiles/<system>/<model>.local.yaml -m contract   # the declarations, live
 ```
 
-`llmdv profile validate` is offline by design: no cluster, no credentials. That keeps "your profile is wrong" (exit 2) apart from "your vantage point is wrong" (exit 3) and "the fleet is broken" (exit 1). See [exit codes](../README.md#exit-codes).
+`llmdv profile validate` is offline by design: no cluster, no credentials. That keeps "your profile is wrong" (exit 2) apart from "your vantage point is wrong" (exit 3) and "the fleet is broken" (exit 1). See [exit codes](../MANUAL.md#exit-codes).
 
-`-m contract` runs only the surface and header checks, the quickest way to find a stale `surfaces` or `headers` line. Other declarations are judged by the cases that use them. Once it is clean, run the full suite; [selecting what runs](../README.md#selecting-what-runs) covers narrowing it, and [output](../README.md#output) covers what a run writes.
+`-m contract` runs only the surface and header checks, the quickest way to find a stale `surfaces` or `headers` line. Other declarations are judged by the cases that use them. Once it is clean, run the full suite; [selecting what runs](../MANUAL.md#selecting-what-runs) covers narrowing it, and [output](../MANUAL.md#output) covers what a run writes.
 
 ## Further reading
 
