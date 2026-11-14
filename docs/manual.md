@@ -245,8 +245,9 @@ llmdv analyze runs/<run> --notes notes.json     # embed an analysis written else
 
 `dashboard.html` is one self-contained page: the system under test, failures grouped by their
 first failing check, the profile, and every test with its evidence and a replay `curl`. It shows
-only what llmdv recorded, and it refuses to write if its data holds a credential. To add an
-analysis written elsewhere, pass it with `--notes`.
+only what llmdv recorded, and it refuses to write if its data holds a credential. For an
+agent-written analysis on the page, use the
+[`reporting-a-run`](../.agents/skills/reporting-a-run/SKILL.md) skill.
 
 ## Comparing runs
 

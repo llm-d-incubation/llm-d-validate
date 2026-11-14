@@ -310,7 +310,7 @@ Each list lives once in `src/llmdv/profile/schema.py` and is shared by parsing a
 
 ### Change sentinels
 
-These declare what a fleet does so the first run after a fleet or client change fails the case that names it. The values come from a run against a known-good build: declare placeholders, run once with `--evidence all`, and copy each observed value from the failing check.
+These declare what a fleet does so the first run after a fleet or client change fails the case that names it. The values come from a run against a known-good build: declare placeholders, run once with `--evidence all`, and copy each observed value from the failing check. The [`writing-an-infra-profile`](../.agents/skills/writing-an-infra-profile/SKILL.md) skill has the procedure.
 
 - **`forward_compat`**: probe to `accepted`, `rejected` or `either`, or a mapping of surface to outcome. Probes: `unknown_message_field`, `unknown_block`, `unknown_tool_type`, `unknown_header`, `unknown_beta`, `unknown_item`, `unknown_enum_value`, `count_tokens_block`. Every outcome fails a 5xx, and each probe is followed by a plain request that must succeed.
 - **`byte_fidelity`**: `big_integer`, `big_integer_history` (both need a tool parser), `key_order` (needs `structured_output`) and `unicode_escapes`.

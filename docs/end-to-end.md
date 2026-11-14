@@ -1,8 +1,9 @@
 # End to end: run `llmdv` against a live stack, then read the results
 
 Run the suite against a real gateway from your machine, unattended as a job, or as a cluster job.
-Every run writes
-the same run directory, so reading the results works the same way afterwards.
+Every run writes the same run directory, so reading the results works the same way afterwards.
+Agents follow the [`running-and-comparing-live-runs`](../.agents/skills/running-and-comparing-live-runs/SKILL.md)
+skill.
 
 **Contents:** [Setup once](#setup-once) · [From your machine](#from-your-machine) ·
 [Publish a run](#publish-a-run) · [Unattended](#unattended) ·
@@ -171,6 +172,10 @@ bash runs/$RUN/failures/<ingress>/<case>/repro.sh
 ## Reference
 
 **Exit codes** are the same for every path: see [docs/manual.md](manual.md#exit-codes).
+
+**Triage and report.** For an agent-written analysis on the dashboard, use the
+[`reporting-a-run`](../.agents/skills/reporting-a-run/SKILL.md) skill; to turn a failure group into
+an issue, use [`filing-a-fleet-finding`](../.agents/skills/filing-a-fleet-finding/SKILL.md).
 
 <details>
 <summary><b>Troubleshooting</b></summary>

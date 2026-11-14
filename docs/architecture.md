@@ -232,7 +232,8 @@ test that checked nothing.
 
 A new surface, ingress kind, case, client or assertion is additive: register it, preserve the
 invariants above, and prove the new case can fail: add the defect to `tests/fakes.py` and assert
-the failure, including that a recorded check is marked not-ok.
+the failure, including that a recorded check is marked not-ok. The steps are in the
+[`extending-llmdv`](../.agents/skills/extending-llmdv/SKILL.md) skill.
 
 ## Testing your change
 

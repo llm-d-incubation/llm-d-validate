@@ -96,7 +96,7 @@ Probe the fleet while you write, and record what you saw in a YAML comment besid
       unknown_model: [404]
 ```
 
-Every case family the fleet is eligible for should be declared, so a run exercises everything it can. Probe each behaviour before declaring it, and record what you measured in a comment beside the line, as above.
+Every case family the fleet is eligible for should be declared, so a run exercises everything it can. The [`writing-an-infra-profile`](../.agents/skills/writing-an-infra-profile/SKILL.md) skill covers the procedure: how to probe safely, what to measure for a gateway, how to fill pins and baselines, and how to describe the layers behind an ingress without guessing.
 
 ## Check it, then run it
 
@@ -114,4 +114,5 @@ llmdv verify --profile profiles/<system>/<model>.local.yaml -m contract   # the 
 
 - [REFERENCE.md](REFERENCE.md): every field, its type, default and meaning.
 - [FLEET.md](FLEET.md): configuration, metrics and log rules for a profile that can read the cluster.
+- [`writing-an-infra-profile`](../.agents/skills/writing-an-infra-profile/SKILL.md): probing a fleet and choosing declarations.
 - [Extending llmdv](../docs/architecture.md#extending-llmdv): adding a case or a capability.
