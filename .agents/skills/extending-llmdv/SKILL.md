@@ -5,7 +5,7 @@ description: Use when adding or changing a surface, ingress kind, test case, cli
 
 # Extending llmdv
 
-Each addition is one module plus one registry line. [ARCHITECTURE.md](../../../ARCHITECTURE.md) has the layout; this is the procedure and the checks. Paths below are under `src/llmdv/` unless they start with `tests/`.
+Each addition is one module plus one registry line. [docs/architecture.md](../../../docs/architecture.md) has the layout; this is the procedure and the checks. Paths below are under `src/llmdv/` unless they start with `tests/`.
 
 ## Add a surface
 
@@ -91,4 +91,4 @@ llmdv verify --profile <profile> -k <your case>
 
 Then **prove the case can fail**: add the defect to the fake fleet and assert the failure. HTTP and SSE defects go in `tests/transport_fakes.py` (`DEFECTS`, through `FakeFleet(transport=…)`); response-content defects in `tests/fakes.py`; fleet-suite fakes in `tests/fleet_fakes.py`. Assert that the case fails, and that a recorded check is marked not-ok. A bundle whose verdict says FAIL while every check says ok means the deciding assertion recorded nothing.
 
-Finally, update the suite's row in [COVERAGE.md](../../../COVERAGE.md) (case count, status) and the Total row; close or edit a Gaps row if the case fills one.
+Finally, update the suite's row in [docs/coverage.md](../../../docs/coverage.md) (case count, status) and the Total row; close or edit a Gaps row if the case fills one.

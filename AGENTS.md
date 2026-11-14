@@ -3,7 +3,7 @@
 What an agent or a new contributor needs before changing anything here.
 
 `llmdv` is a functional test library that points at **already-deployed** model serving stacks.
-Start with [ARCHITECTURE.md](ARCHITECTURE.md) for the layout and [MANUAL.md](MANUAL.md) for
+Start with [docs/architecture.md](docs/architecture.md) for the layout and [docs/manual.md](docs/manual.md) for
 every command. Before any live step, check what the person you are working for has: tools,
 access, and where they keep credentials. The skills assume nothing about the machine.
 

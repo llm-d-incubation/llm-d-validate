@@ -106,12 +106,12 @@ llmdv profile show     profiles/<system>/<model>.local.yaml --matrix # what will
 llmdv verify --profile profiles/<system>/<model>.local.yaml -m contract   # the declarations, live
 ```
 
-`llmdv profile validate` is offline by design: no cluster, no credentials. That keeps "your profile is wrong" (exit 2) apart from "your vantage point is wrong" (exit 3) and "the fleet is broken" (exit 1). See [exit codes](../MANUAL.md#exit-codes).
+`llmdv profile validate` is offline by design: no cluster, no credentials. That keeps "your profile is wrong" (exit 2) apart from "your vantage point is wrong" (exit 3) and "the fleet is broken" (exit 1). See [exit codes](../docs/manual.md#exit-codes).
 
-`-m contract` runs only the surface and header checks, the quickest way to find a stale `surfaces` or `headers` line. Other declarations are judged by the cases that use them. Once it is clean, run the full suite; [selecting what runs](../MANUAL.md#selecting-what-runs) covers narrowing it, and [output](../MANUAL.md#output) covers what a run writes.
+`-m contract` runs only the surface and header checks, the quickest way to find a stale `surfaces` or `headers` line. Other declarations are judged by the cases that use them. Once it is clean, run the full suite; [selecting what runs](../docs/manual.md#selecting-what-runs) covers narrowing it, and [output](../docs/manual.md#output) covers what a run writes.
 
 ## Further reading
 
 - [REFERENCE.md](REFERENCE.md): every field, its type, default and meaning.
 - [FLEET.md](FLEET.md): configuration, metrics and log rules for a profile that can read the cluster.
-- [Extending llmdv](../ARCHITECTURE.md#extending-llmdv): adding a case or a capability.
+- [Extending llmdv](../docs/architecture.md#extending-llmdv): adding a case or a capability.

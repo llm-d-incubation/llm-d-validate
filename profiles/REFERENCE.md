@@ -457,7 +457,7 @@ What a run reports:
   banner, `summary.md` and `outcome.json` (`verification.known.unmatched`): either the fix
   landed and the entry should go, or the selection left its cases out. `llmdv compare` reports
   a fix landing when a case the previous run labelled passes now, and never calls a regression
-  known. See [COMPARE.md](../COMPARE.md).
+  known. See [docs/compare.md](../docs/compare.md).
 - `verdict.txt` in a failure bundle, `alerts.json` and the dashboard's failure groups carry the
   label too, so a reader who starts anywhere learns the failure is filed.
 

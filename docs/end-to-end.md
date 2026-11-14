@@ -36,8 +36,8 @@ issue or a chat. If your credentials file sets variables without `export`, load 
 
 ## From your machine
 
-Copy [`example-gateway-only.yaml`](profiles/examples/example-gateway-only.yaml) to
-`profiles/<system>/<model>.local.yaml` and fill it in ([profiles/README.md](profiles/README.md)).
+Copy [`example-gateway-only.yaml`](../profiles/examples/example-gateway-only.yaml) to
+`profiles/<system>/<model>.local.yaml` and fill it in ([profiles/README.md](../profiles/README.md)).
 Then:
 
 ```sh
@@ -75,7 +75,7 @@ A run is published to `<prefix>/<profile name>/<run id>/`, and is complete once 
 
 `llmdv job` runs `llmdv verify` as a child process, publishes, optionally notifies a webhook, and
 prints `outcome.json`, however verify ended. That makes it suitable for a Kubernetes CronJob or a
-CI step. The [`Containerfile`](Containerfile) builds a runner image.
+CI step. The [`Containerfile`](../Containerfile) builds a runner image.
 
 ```sh
 llmdv job --profile /etc/llmdv/profile.yaml --remote-output "s3://$AWS_BUCKET/<prefix>" -- -m contract
@@ -89,7 +89,7 @@ llmdv job --profile /etc/llmdv/profile.yaml --remote-output "s3://$AWS_BUCKET/<p
 - **Arguments after `--`** go to `llmdv verify`, such as `-- -m contract`. `--analyze` and
   `--compare` are the job's own flags: a dashboard in the run, and a comparison after publishing.
 - **Scheduled runs** labelled `trigger=nightly` are the baselines for `--compare`
-  ([COMPARE.md](COMPARE.md)). Label one-off runs differently so they never become baselines.
+  ([docs/compare.md](compare.md)). Label one-off runs differently so they never become baselines.
 - **If publishing fails** and a fallback location is configured (`--fallback-output` or
   `LLMDV_FALLBACK_URI`), the run is kept there; `outcome.json` says where.
 
@@ -136,7 +136,7 @@ bash runs/$RUN/failures/<ingress>/<case>/repro.sh
 
 ## Reference
 
-**Exit codes** are the same for every path: see [MANUAL.md](MANUAL.md#exit-codes).
+**Exit codes** are the same for every path: see [docs/manual.md](manual.md#exit-codes).
 
 <details>
 <summary><b>Troubleshooting</b></summary>

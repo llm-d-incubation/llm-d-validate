@@ -22,18 +22,18 @@ pre-commit install                                          # optional: formats 
 The offline suite runs every case against `tests/fakes.py`, a real HTTP server on a local socket
 with flags for the defects the suite exists to catch. CI runs it on Python 3.10, 3.11 and 3.12.
 
-[ARCHITECTURE.md](ARCHITECTURE.md) describes the layout, and the invariants a change must keep.
+[docs/architecture.md](docs/architecture.md) describes the layout, and the invariants a change must keep.
 
 ## Adding a case
 
 - **Prove it can fail.** Add the defect to `tests/fakes.py` and assert that the case fails
   against it, including that a recorded check is marked not-ok. A case that cannot fail checks
   nothing.
-- **Classify every skip.** Use one of the [six skip classes](MANUAL.md#skip-classes), never a
+- **Classify every skip.** Use one of the [six skip classes](docs/manual.md#skip-classes), never a
   bare skip.
 - **Assert what the API defines.** A case checks the behaviour the API specifies, not what one
   deployment happens to do today.
-- **Update [COVERAGE.md](COVERAGE.md)** with the suite's case count.
+- **Update [docs/coverage.md](docs/coverage.md)** with the suite's case count.
 
 ## Adding a profile example
 

@@ -12,10 +12,10 @@
 
 <p align="center">
   <a href="#quick-start">Quick start</a> ·
-  <a href="MANUAL.md">Manual</a> ·
+  <a href="docs/manual.md">Manual</a> ·
   <a href="profiles/README.md">Profiles</a> ·
-  <a href="ARCHITECTURE.md">Architecture</a> ·
-  <a href="COVERAGE.md">Coverage</a> ·
+  <a href="docs/architecture.md">Architecture</a> ·
+  <a href="docs/coverage.md">Coverage</a> ·
   <a href="CONTRIBUTING.md">Contributing</a>
 </p>
 
@@ -49,7 +49,7 @@ llmdv verify --profile profiles/my-stack.local.yaml              # the full run
 
 `*.local.yaml` profiles are gitignored, so your hosts never reach the repository. The
 [profile guide](profiles/README.md) covers the two- and three-ingress examples, and
-[END-TO-END.md](END-TO-END.md) covers publishing runs and running unattended.
+[docs/end-to-end.md](docs/end-to-end.md) covers publishing runs and running unattended.
 
 ## What a run gives you
 
@@ -66,21 +66,22 @@ Each run writes a directory under `runs/<timestamp>/`:
 Add `--analyze` to build `dashboard.html`, one self-contained page with every test, its
 evidence and its replay `curl`. `llmdv analyze <run directory>` builds it for any earlier run.
 
-[Output](MANUAL.md#output) explains every file;
-[exit codes](MANUAL.md#exit-codes) explains how the run ended.
+[Output](docs/manual.md#output) explains every file;
+[exit codes](docs/manual.md#exit-codes) explains how the run ended.
 
 ## Repository layout
 
 | Path | What it is |
 | --- | --- |
-| [`src/llmdv/`](src/llmdv/) | `llmdv`, a pytest-based library and CLI. The [manual](MANUAL.md) covers every command |
+| [`src/llmdv/`](src/llmdv/) | `llmdv`, a pytest-based library and CLI. The [manual](docs/manual.md) covers every command |
+| [`docs/`](docs/) | the [manual](docs/manual.md), [architecture](docs/architecture.md), [end-to-end runs](docs/end-to-end.md), [comparing runs](docs/compare.md) and [coverage](docs/coverage.md) |
 | [`profiles/`](profiles/) | the [profile guide](profiles/README.md), the [field reference](profiles/REFERENCE.md) and templates to copy |
 | [`.agents/skills/`](.agents/skills/) | procedures for agents and people, such as [writing a profile](.agents/skills/writing-an-infra-profile/SKILL.md) and [running and comparing live runs](.agents/skills/running-and-comparing-live-runs/SKILL.md) |
 | [`.github/workflows/`](.github/workflows/) | CI: lint and the offline suite on every pull request |
 
 ## Coverage
 
-[COVERAGE.md](COVERAGE.md) shows what each suite checks, the profile key that enables it, and
+[docs/coverage.md](docs/coverage.md) shows what each suite checks, the profile key that enables it, and
 what is still missing. `llmdv profile show <profile> --matrix` shows what will run against yours.
 
 ## Development

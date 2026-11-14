@@ -30,7 +30,7 @@ python3 -m venv .venv && ./.venv/bin/pip install -e '.[dev,s3,ibm-cos]'
 ## Quick start against a live fleet
 
 With only a gateway URL and a key, start from
-[`example-gateway-only.yaml`](profiles/examples/example-gateway-only.yaml). With cluster access,
+[`example-gateway-only.yaml`](../profiles/examples/example-gateway-only.yaml). With cluster access,
 the two-ingress example drives the engine and the router through port-forwards:
 
 ```sh
@@ -57,7 +57,7 @@ A run opens with a banner and ends with a summary:
 
 Cases run grouped by phase, contract first, then by ingress in the order the profile declares
 them. `-v` prints the recorded checks under each case. How llmdv finds a cluster CLI, and which
-stream gets what, is in [ARCHITECTURE.md](ARCHITECTURE.md#how-a-request-reaches-the-fleet).
+stream gets what, is in [docs/architecture.md](architecture.md#how-a-request-reaches-the-fleet).
 
 ## Selecting what runs
 
@@ -90,9 +90,9 @@ llmdv verify --profile P -k test_sessions                                 # the 
 ```
 
 These run the actual client binary through a local recording relay. The profile must declare a
-pinned binary under [`clients`](profiles/REFERENCE.md#clients) and an ingress must declare
+pinned binary under [`clients`](../profiles/REFERENCE.md#clients) and an ingress must declare
 `messages`; sessions also need `capabilities.client_sessions`. The runner image built from
-[`Containerfile`](Containerfile) ships a pinned binary.
+[`Containerfile`](../Containerfile) ships a pinned binary.
 
 > **The sessions execute model-generated code.** Writes are confined to a project directory, but
 > reads and executed code are not. Run them in a disposable pod or container, never on a
@@ -154,8 +154,8 @@ counted as coverage.
 
 A profile is hand-written YAML describing one fleet from one vantage point. It carries no
 secrets or hostnames: `auth.key_env` and `base_url_env` name environment variables. Start with
-[profiles/README.md](profiles/README.md); every field is in
-[profiles/REFERENCE.md](profiles/REFERENCE.md).
+[profiles/README.md](../profiles/README.md); every field is in
+[profiles/REFERENCE.md](../profiles/REFERENCE.md).
 
 ## Output
 
@@ -233,7 +233,7 @@ cd runs/<run> && ./reproduce.sh                       # rerun the verification i
 
 `reproduce.sh` reads `profile.used.yaml` beside it, not the repository's copy, and reads
 credentials from the environment. Publishing a run with `--remote-output` is covered in
-[END-TO-END.md](END-TO-END.md#publish-a-run).
+[docs/end-to-end.md](end-to-end.md#publish-a-run).
 
 ### A dashboard for triage
 
@@ -251,18 +251,18 @@ analysis written elsewhere, pass it with `--notes`.
 ## Comparing runs
 
 `llmdv compare` reads two runs of the same profile back from the archive and reports which cases
-changed their answer. See [COMPARE.md](COMPARE.md).
+changed their answer. See [docs/compare.md](compare.md).
 
 ## Running unattended
 
 `llmdv job` runs verify as a child process, then publishes and notifies however verify ended, so
 it suits a CronJob or a CI step. Running from your PC or unattended is in
-[END-TO-END.md](END-TO-END.md).
+[docs/end-to-end.md](end-to-end.md).
 
 ## Extending
 
 A new ingress kind, surface, case or client is additive. See
-[ARCHITECTURE.md](ARCHITECTURE.md#extending-llmdv).
+[docs/architecture.md](architecture.md#extending-llmdv).
 
 ## Running llmdv's own tests
 
@@ -279,8 +279,8 @@ Parallel is for these offline tests only. `llmdv verify` refuses `-n`, `--numpro
 rate-limited key must not be multiplied.
 
 CI runs lint and these tests on Python 3.10 and 3.11 for every pull request
-([`offline-tests.yaml`](.github/workflows/offline-tests.yaml)).
+([`offline-tests.yaml`](../.github/workflows/offline-tests.yaml)).
 
 ## Coverage
 
-What is tested, what is not, and what has run live: [COVERAGE.md](COVERAGE.md).
+What is tested, what is not, and what has run live: [docs/coverage.md](coverage.md).

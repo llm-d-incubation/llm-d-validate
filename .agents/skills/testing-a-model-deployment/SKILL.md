@@ -133,7 +133,7 @@ llmdv verify --profile <profile> --evidence all -k "<tests>"  # the cases you ca
 llmdv verify --profile <profile> --analyze                    # the full suite, 15-60 min; runs/<timestamp>/
 ```
 
-Restrict a multi-ingress profile with `--ingress <id>`. Keep the machine awake for the full run, or run it unattended with `llmdv job` ([END-TO-END.md](../../../END-TO-END.md#unattended)). Exit `1` is test failures, `3` an environment problem (nothing was tested), `5` results not delivered, `6` interrupted; see [MANUAL.md](../../../MANUAL.md#exit-codes).
+Restrict a multi-ingress profile with `--ingress <id>`. Keep the machine awake for the full run, or run it unattended with `llmdv job` ([docs/end-to-end.md](../../../docs/end-to-end.md#unattended)). Exit `1` is test failures, `3` an environment problem (nothing was tested), `5` results not delivered, `6` interrupted; see [docs/manual.md](../../../docs/manual.md#exit-codes).
 
 ## 8. Compare and report
 

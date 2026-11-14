@@ -15,7 +15,7 @@ Status describes llmdv and the profiles in this repository, not one night's run.
 serves a blocked capability runs those cases once its profile declares it;
 `llmdv profile show <profile.yaml> --matrix` shows what runs and what skips for that profile.
 An offline regression pass says nothing about a live fleet. For what a fleet actually does, run
-the cases against it (see [END-TO-END.md](END-TO-END.md)).
+the cases against it (see [docs/end-to-end.md](end-to-end.md)).
 
 ## Coverage
 
@@ -43,10 +43,10 @@ the cases against it (see [END-TO-END.md](END-TO-END.md)).
 | **Total** | **364** | | | |
 
 Keys without a prefix live under `capabilities`, either at the top level or per ingress; see
-[profiles/REFERENCE.md](profiles/REFERENCE.md#capabilities). Surfaces and transport, logs and
-error declarations are per ingress ([#ingresses](profiles/REFERENCE.md#ingresses)). An
+[profiles/REFERENCE.md](../profiles/REFERENCE.md#capabilities). Surfaces and transport, logs and
+error declarations are per ingress ([#ingresses](../profiles/REFERENCE.md#ingresses)). An
 undeclared key skips its case as `undeclared` without sending a request. Ingresses can override
-model and capability declarations; see [#ingresses](profiles/REFERENCE.md#ingresses).
+model and capability declarations; see [#ingresses](../profiles/REFERENCE.md#ingresses).
 
 ## Gaps
 
@@ -152,6 +152,6 @@ layers.
   `llmdv profile show <profile.yaml> --matrix`.
 - The per-case list for one area:
   `pytest --collect-only -q -m <marker>`, where the marker is the suite package name. See
-  [Selecting what runs](MANUAL.md#selecting-what-runs).
-- Every profile key: [profiles/REFERENCE.md](profiles/REFERENCE.md).
+  [Selecting what runs](manual.md#selecting-what-runs).
+- Every profile key: [profiles/REFERENCE.md](../profiles/REFERENCE.md).
 
