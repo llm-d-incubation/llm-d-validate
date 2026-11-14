@@ -45,7 +45,7 @@ _DOCUMENT_WORDS = (
     "river stone maple copper lantern harbor meadow saddle timber falcon glacier orchard pepper "
     "violin anchor basket candle desert ember fossil garden hammer island jacket kettle ladder "
     "marble needle oyster pillow rocket silver tunnel velvet walnut bridge cactus dolphin engine "
-    "feather granite helmet jungle lemon magnet nectar olive quartz radar salmon tiger umbrella"
+    "feather garnet helmet jungle lemon magnet nectar olive quartz radar salmon tiger umbrella"
 ).split()
 
 

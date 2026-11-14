@@ -207,7 +207,7 @@ def test_effort_repeat_misses_a_render_that_drops_kwargs(tmp_path):
     assert [r["outcome"] for r in records if r["outcome"] != "skip"] == ["pass"], records
 
 
-# Muse's measured rendering: the template knows low, medium, high and xhigh; the deployment's
+# A measured rendering: the template knows low, medium, high and xhigh; the deployment's
 # map sends none and minimal to low and max to xhigh, on the top-level field only.
 MAPPED_MARKERS = {
     "unset": "512",
@@ -268,7 +268,7 @@ def _rendering(markers, surfaces=("chat_completions",)):
         # No Chat rendering declared: the first effort, as before.
         (("none", "low"), None, "none"),
         (("none", "low"), _rendering({"none": "8", "low": "8"}, ("responses",)), "none"),
-        # Muse, whichever of its efforts is listed first: medium is the first unique marker.
+        # That rendering, whichever effort is listed first: medium is the first unique marker.
         (("none", "minimal", "low", "medium"), _rendering(MAPPED_MARKERS), "medium"),
         (("low", "minimal", "medium", "high"), _rendering(MAPPED_MARKERS), "medium"),
         # A marker that spells the quiet effort itself, though the map folds others onto it.
