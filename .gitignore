@@ -1,0 +1,37 @@
+# Virtualenvs and build artifacts
+.venv/
+*.egg-info/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+build/
+dist/
+*.whl
+.coverage
+htmlcov/
+uv.lock
+
+# macOS and editor files
+.DS_Store
+*.sw[a-p]
+*~
+
+# Local credentials. secrets.env.example is the committed template; a filled-in copy stays local.
+.env
+deploy/secrets.env
+
+# Real fleet profiles. The committed example-*.yaml files carry placeholders for the cluster,
+# namespace, context and service names; a filled-in copy stays local.
+profiles/**/*.local.yaml
+
+# Run output. Evidence bundles are reproducible from the profile and are often large;
+# copy a run out with --remote-output file://<path> if one needs keeping.
+runs/
+
+# Real kustomize overlays carry cluster detail, like local profiles.
+deploy/overlays/*.local/
+
+# Claude Code's per-user settings, locks and links. Shared agent instructions and skills live in
+# .agents/, which works for any agent.
+.claude/

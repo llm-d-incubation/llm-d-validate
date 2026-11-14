@@ -1,0 +1,10 @@
+# Generic base: no cluster-identifiable detail. An overlay supplies the namespace, image,
+# profile, settings and schedule; see ../README.md.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+labels:
+  - pairs:
+      app.kubernetes.io/name: llmdv
+resources:
+  - cronjob.yaml
+  - role-trigger.yaml

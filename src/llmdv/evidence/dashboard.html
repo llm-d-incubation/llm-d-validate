@@ -1,0 +1,314 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>__TITLE__</title>
+<style>
+/* Layout: one column. System under test first, then the verdict, then where the evidence
+   lives, then the profile, then every test as an expandable row with its own evidence. */
+:root {
+  --bg: #f6f7f9; --surface: #ffffff; --fg: #1b1f24; --muted: #5d6673; --rule: #d8dde4;
+  --accent: #2457a6; --accent-soft: #e5edf9; --code-bg: #eef1f5;
+  --ok: #237a3b; --ok-soft: #e3f3e7; --fail: #b42318; --fail-soft: #fbe7e5;
+  --skip: #6b7280; --skip-soft: #eef0f3; --warn: #9a6100; --warn-soft: #fbf1dc;
+  --mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #12151a; --surface: #1a1f26; --fg: #e5e9ef; --muted: #98a2b0; --rule: #2c333d;
+  --accent: #7aa7ec; --accent-soft: #1d2b42; --code-bg: #20262f;
+  --ok: #6fcf8a; --ok-soft: #1b3324; --fail: #ff8a80; --fail-soft: #3d201e;
+  --skip: #a3abb7; --skip-soft: #252b34; --warn: #e5b45a; --warn-soft: #3a2f1a; color-scheme: dark; } }
+:root[data-theme="dark"] {
+  --bg: #12151a; --surface: #1a1f26; --fg: #e5e9ef; --muted: #98a2b0; --rule: #2c333d;
+  --accent: #7aa7ec; --accent-soft: #1d2b42; --code-bg: #20262f;
+  --ok: #6fcf8a; --ok-soft: #1b3324; --fail: #ff8a80; --fail-soft: #3d201e;
+  --skip: #a3abb7; --skip-soft: #252b34; --warn: #e5b45a; --warn-soft: #3a2f1a; color-scheme: dark; }
+* { box-sizing: border-box; }
+html, body { margin: 0; }
+body { background: var(--bg); color: var(--fg); font: 15px/1.5 var(--sans); padding-inline: 16px; padding-block: 0 4rem; }
+.wrap { max-width: 1200px; margin-inline: auto; min-width: 0; }
+h1 { font-size: 1.6rem; margin: 1.5rem 0 0.3rem; }
+h2 { font-size: 1.2rem; margin: 2rem 0 0.7rem; padding-top: 0.5rem; border-top: 1px solid var(--rule); }
+h3 { font-size: 1rem; margin: 1.2rem 0 0.5rem; }
+p { margin: 0 0 0.8rem; max-width: 80ch; }
+code, pre, .mono { font-family: var(--mono); font-size: 0.82rem; }
+code { background: var(--code-bg); padding: 0.05em 0.3em; border-radius: 3px; }
+pre { background: var(--code-bg); padding: 0.7rem 0.9rem; border-radius: 4px; overflow: auto; max-height: 420px; margin: 0 0 0.6rem; white-space: pre-wrap; word-break: break-word; }
+.muted { color: var(--muted); }
+.banner { margin: 1rem 0; padding: 0.7rem 1rem; border-radius: 4px; background: var(--warn-soft); color: var(--warn); border-left: 3px solid var(--warn); }
+.pill { display: inline-block; font: 600 0.72rem/1.6 var(--mono); letter-spacing: 0.04em; text-transform: uppercase; padding: 0 0.5em; border-radius: 3px; border: 1px solid currentColor; white-space: nowrap; }
+.pass { color: var(--ok); } .fail, .error { color: var(--fail); } .skip { color: var(--skip); }
+.grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 0.8rem; }
+.card { background: var(--surface); border: 1px solid var(--rule); border-radius: 6px; padding: 0.8rem 1rem; min-width: 0; }
+.card h3 { margin-top: 0; }
+.kv { display: grid; grid-template-columns: max-content 1fr; gap: 0.15rem 0.8rem; font-size: 0.88rem; }
+.kv dt { color: var(--muted); } .kv dd { margin: 0; min-width: 0; word-break: break-word; }
+.tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 0.6rem; }
+.tile { background: var(--surface); border: 1px solid var(--rule); border-radius: 6px; padding: 0.6rem 0.8rem; }
+.tile .n { font: 700 1.6rem/1.2 var(--sans); font-variant-numeric: tabular-nums; }
+.tile .k { font: 0.7rem var(--mono); text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); }
+.tablewrap { overflow-x: auto; border: 1px solid var(--rule); border-radius: 6px; background: var(--surface); margin-bottom: 0.8rem; }
+table { border-collapse: collapse; width: 100%; font-size: 0.86rem; }
+th, td { text-align: left; vertical-align: top; padding: 0.4rem 0.6rem; border-bottom: 1px solid var(--rule); }
+th { font: 600 0.7rem var(--mono); text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); background: var(--bg); }
+td.n { text-align: right; font-variant-numeric: tabular-nums; }
+tr:last-child td { border-bottom: 0; }
+.cmd { display: flex; gap: 0.5rem; align-items: flex-start; margin: 0.3rem 0 0.6rem; }
+.cmd pre { flex: 1; margin: 0; }
+button { font: inherit; font-size: 0.82rem; padding: 0.3rem 0.7rem; border: 1px solid var(--rule); border-radius: 4px; background: var(--surface); color: var(--fg); cursor: pointer; }
+button:hover { border-color: var(--accent); }
+button:focus-visible, summary:focus-visible, input:focus-visible, select:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+details.panel { background: var(--surface); border: 1px solid var(--rule); border-radius: 6px; margin-bottom: 0.8rem; }
+details.panel > summary { cursor: pointer; padding: 0.6rem 0.9rem; font-weight: 600; }
+details.panel > .body { padding: 0 0.9rem 0.9rem; }
+.filters { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 3; background: var(--bg); padding: 0.6rem 0; display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center; border-bottom: 1px solid var(--rule); }
+.filters input, .filters select { font: inherit; font-size: 0.9rem; padding: 0.35rem 0.55rem; border: 1px solid var(--rule); border-radius: 4px; background: var(--surface); color: var(--fg); }
+.filters input { flex: 1 1 240px; min-width: 0; }
+.chip[aria-pressed="true"] { background: var(--accent-soft); border-color: var(--accent); }
+.test { background: var(--surface); border: 1px solid var(--rule); border-left-width: 4px; border-radius: 4px; margin: 0.4rem 0; }
+.test.o-pass { border-left-color: var(--ok); } .test.o-fail, .test.o-error { border-left-color: var(--fail); } .test.o-skip { border-left-color: var(--skip); }
+.test > summary { cursor: pointer; padding: 0.45rem 0.7rem; display: flex; flex-wrap: wrap; gap: 0.3rem 0.8rem; align-items: baseline; list-style: none; }
+.test > summary::-webkit-details-marker { display: none; }
+.test .cid { font-family: var(--mono); font-size: 0.84rem; font-weight: 600; }
+.test .meta { font-family: var(--mono); font-size: 0.75rem; color: var(--muted); }
+.test .why { flex-basis: 100%; font-size: 0.84rem; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.test .content { padding: 0.2rem 0.8rem 0.8rem; border-top: 1px dashed var(--rule); min-width: 0; }
+.ok-true { color: var(--ok); } .ok-false { color: var(--fail); }
+.exch { border: 1px solid var(--rule); border-radius: 4px; margin: 0.5rem 0; }
+.exch > summary { cursor: pointer; padding: 0.4rem 0.6rem; font-family: var(--mono); font-size: 0.8rem; }
+.exch .cols { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 0.6rem; padding: 0 0.6rem 0.6rem; }
+.exch .cols > div { min-width: 0; }
+.bar { display: flex; height: 10px; border-radius: 5px; overflow: hidden; background: var(--skip-soft); min-width: 80px; }
+.bar span { display: block; height: 100%; }
+.bar .b-pass { background: var(--ok); } .bar .b-fail { background: var(--fail); } .bar .b-skip { background: var(--skip); }
+#more { margin: 0.8rem 0; }
+.note { background: var(--warn-soft); border-left: 3px solid var(--warn); padding: 0.5rem 0.8rem; border-radius: 0 4px 4px 0; margin: 0.6rem 0; }
+.intent { background: var(--accent-soft); border-left: 3px solid var(--accent); padding: 0.5rem 0.8rem; border-radius: 0 4px 4px 0; margin: 0.6rem 0; }
+.intent .note-k { color: var(--accent); }
+.note-k { font: 600 0.7rem var(--mono); text-transform: uppercase; letter-spacing: 0.05em; color: var(--warn); margin-bottom: 0.2rem; }
+</style>
+</head>
+<body>
+<div class="wrap" id="app"><p class="muted">Loading run data…</p></div>
+<script id="data" type="application/octet-stream">__DATA__</script>
+<script>
+(async function () {
+  const app = document.getElementById('app');
+  let D;
+  try {
+    const bin = Uint8Array.from(atob(document.getElementById('data').textContent.trim()), c => c.charCodeAt(0));
+    const stream = new Blob([bin]).stream().pipeThrough(new DecompressionStream('gzip'));
+    D = JSON.parse(await new Response(stream).text());
+  } catch (e) {
+    app.innerHTML = '<p class="banner">This browser could not decompress the embedded run data (' + String(e) + '). Open the file in a current Chrome, Firefox or Safari.</p>';
+    return;
+  }
+
+  // Everything below renders recorded data. Anything it cannot render must say so on the page,
+  // not leave it on "Loading run data...".
+  try {
+
+  const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  const j = v => typeof v === 'string' ? v : JSON.stringify(v, null, 2);
+  let copyId = 0;
+  const copyStore = {};
+  const cmd = (text, label) => { const id = 'c' + (copyId++); copyStore[id] = text;
+    return `<div class="cmd"><pre>${esc(text)}</pre><button type="button" data-copy="${id}" aria-label="Copy ${esc(label || 'command')}">Copy</button></div>`; };
+  const pill = o => `<span class="pill ${esc(o)}">${esc(o)}</span>`;
+  const kv = obj => '<dl class="kv">' + Object.entries(obj).filter(([, v]) => v !== undefined && v !== null && v !== '').map(([k, v]) => `<dt>${esc(k)}</dt><dd>${typeof v === 'object' ? `<code>${esc(JSON.stringify(v))}</code>` : esc(v)}</dd>`).join('') + '</dl>';
+  const fmtS = s => s == null ? '—' : s < 90 ? s.toFixed(1) + ' s' : (s / 60).toFixed(1) + ' min';
+  // A hand-written profile can hold anything anywhere, and an invalid one is exactly what an
+  // exit-2 run records: take only the shapes the page can render.
+  const isObj = v => v !== null && typeof v === 'object' && !Array.isArray(v);
+  const c = D.counts || {};
+  const total = (D.tests || []).length;
+  const P = isObj(D.profile) ? D.profile : {};
+  const ingresses = (Array.isArray(P.ingresses) ? P.ingresses : []).filter(isObj);
+
+  let h = '';
+  h += `<h1>llmdv run ${esc(D.run_id)}</h1>`;
+  h += `<p class="muted">profile <b>${esc((D.outcome.profile || {}).name || P.name || '?')}</b> · started ${esc(D.started || '?')} · ${D.finished ? 'finished ' + esc(D.finished) + ' · ' + fmtS(D.duration_s) : 'not finished'} · llmdv ${esc((D.env || D.outcome).llmdv_version || '?')}${(D.env || D.outcome).git_sha ? ' @ ' + esc((D.env || D.outcome).git_sha) : ''} · dashboard generated ${esc(D.generated)}</p>`;
+  h += `<p>${pill(D.exit.code == null ? 'in progress' : (D.exit.class || 'exit ' + D.exit.code))} <span class="muted">exit ${esc(D.exit.code == null ? '—' : D.exit.code)}: ${esc(D.exit.meaning)}</span></p>`;
+  const noteBox = (title, text) => `<div class="note"><div class="note-k">${esc(title)}</div><div>${esc(text).replace(/\n/g, '<br>')}</div></div>`;
+  if (D.notes) h += `<section id="agent-analysis"><h2>Agent analysis</h2><p class="muted">Written by ${esc(D.notes.author)}, not recorded by llmdv. Leads to check against the evidence below, not verdicts.</p>` + (D.notes.summary ? noteBox('summary', D.notes.summary) : '') + `</section>`;
+  if (D.in_progress) h += `<div class="banner">This run has no finish time or no env.json: it is still running or was killed. Counts and evidence cover only the cases recorded so far.</div>`;
+
+  // ---------------------------------------------------------------- System Under Test
+  h += `<h2 id="sut">System Under Test</h2>`;
+  h += `<div class="grid">`;
+  for (const ing of ingresses) {
+    const m = ing.model || P.model || {};
+    h += `<div class="card"><h3>${esc(ing.id)} <span class="pill">${esc(ing.kind)}</span></h3>` + kv({
+      'endpoint': ing.base_url, 'auth': ing.auth ? `${ing.auth.type || 'none'}${ing.auth.key_env ? ' via $' + ing.auth.key_env : ''}` : 'none',
+      'surfaces': (ing.surfaces || []).join(', '), 'health path': ing.health_path, 'timeouts': ing.timeouts,
+      'rate limited': ing.rate_limited, 'proxy': (ing.setup || {}).proxy, 'tls verify': (ing.tls || {}).verify,
+      'model': (m.public_id || (P.model || {}).public_id), 'context window': (m.max_model_len || (P.model || {}).max_model_len),
+    }) + `</div>`;
+  }
+  const pm = P.model || {};
+  h += `<div class="card"><h3>Run context</h3>` + kv({
+    'model': pm.public_id, 'aliases': (pm.aliases || []).join(', '), 'context window': pm.max_model_len,
+    'reasoning': pm.reasoning, 'tools': pm.tools, 'vantage': P.vantage || (D.env || {}).vantage, 'fleet policy': P.fleet_policy,
+    'labels': (D.outcome.labels || (D.env || {}).labels), 'environment': P.environment,
+  }) + `</div>`;
+  if (D.env && D.env.versions) h += `<div class="card"><h3>Client side</h3>` + kv(Object.assign({}, D.env.versions, { 'kube cli': D.env.kube_cli })) + `</div>`;
+  h += `</div>`;
+  h += `<h3>What the recorded traffic shows about the layers</h3><p class="muted">Signals only, not conclusions. Name a component behind an ingress as confirmed only with direct read-only evidence; see the writing-an-infra-profile skill.</p>`;
+  if (D.stack.length) {
+    h += `<div class="tablewrap"><table><thead><tr><th>Ingress</th><th>Signal</th><th>Values seen (count)</th></tr></thead><tbody>`;
+    for (const s of D.stack) {
+      const looked = ['server', 'x-litellm-version', 'x-litellm-model-name', 'x-litellm-model-api-base', 'system_fingerprint'];
+      for (const k of looked) h += `<tr><td>${esc(s.ingress)}</td><td><code>${esc(k)}</code></td><td>${s.found[k] ? esc(Object.entries(s.found[k]).map(([v, n]) => `${v} (${n})`).join('; ')) : '<span class="muted">not seen</span>'}</td></tr>`;
+      const router = Object.keys(s.found).filter(k => k.startsWith('router header: '));
+      h += `<tr><td>${esc(s.ingress)}</td><td>router headers (<code>x-llm-d*</code>, <code>x-went*</code>, <code>x-envoy*</code>, <code>x-gateway*</code>, <code>x-inference*</code>, <code>x-epp*</code>)</td><td>${router.length ? esc(router.map(r => r.slice(15)).join(', ')) : '<span class="muted">none seen</span>'}</td></tr>`;
+      h += `<tr><td>${esc(s.ingress)}</td><td>EPP error bodies (<code>inference error: …</code>)</td><td>${s.epp_error_bodies ? esc(s.epp_error_bodies) : '<span class="muted">none seen</span>'}</td></tr>`;
+    }
+    h += `</tbody></table></div>`;
+  } else h += `<p class="muted">No exchanges recorded.</p>`;
+
+  // ---------------------------------------------------------------- Summary
+  h += `<h2 id="summary">Summary</h2><div class="tiles">`;
+  for (const [k, cls] of [['pass', 'pass'], ['fail', 'fail'], ['error', 'error'], ['skip', 'skip']]) if (c[k] || k !== 'error') h += `<div class="tile"><div class="k">${k}</div><div class="n ${cls}">${c[k] || 0}</div></div>`;
+  h += `<div class="tile"><div class="k">recorded</div><div class="n">${total}</div></div><div class="tile"><div class="k">duration</div><div class="n" style="font-size:1.2rem">${fmtS(D.duration_s)}</div></div></div>`;
+  if (Object.keys(D.skips).length) {
+    h += `<h3>Skips by class</h3><div class="tablewrap"><table><thead><tr><th>Class</th><th class="n">Count</th><th>Meaning</th></tr></thead><tbody>`;
+    for (const [k, n] of Object.entries(D.skips).sort((a, b) => b[1] - a[1])) h += `<tr><td><code>${esc(k)}</code></td><td class="n">${n}</td><td>${esc(D.skip_meaning[k] || '')}</td></tr>`;
+    h += `</tbody></table></div>`;
+  }
+  if (D.clusters.length) {
+    h += `<h3>Failures grouped by first failing check</h3><p class="muted">One defect often fails many cases; read each group once.</p><div class="tablewrap"><table><thead><tr><th class="n">Cases</th><th>First failing check or message</th><th>Examples</th><th>Known</th>${D.notes ? '<th>Agent note</th>' : ''}</tr></thead><tbody>`;
+    for (const g of D.clusters) h += `<tr><td class="n">${g.count}</td><td><a href="#" data-search="${esc(g.key)}"><code>${esc(g.key)}</code></a></td><td class="mono">${esc(g.examples.join(', '))}</td><td class="mono">${esc(Object.entries(g.known || {}).map(([i, n]) => `${i} ×${n}`).join(', '))}</td>${D.notes ? `<td>${esc(g.note || '')}</td>` : ''}</tr>`;
+    h += `</tbody></table></div>`;
+  }
+  h += `<h3>By suite</h3><div class="tablewrap"><table><thead><tr><th>Suite</th><th class="n">Pass</th><th class="n">Fail</th><th class="n">Skip</th><th>Mix</th></tr></thead><tbody>`;
+  for (const [s, n] of Object.entries(D.by_suite)) {
+    const t = (n.pass || 0) + (n.fail || 0) + (n.error || 0) + (n.skip || 0) || 1;
+    h += `<tr><td><a href="#" data-suite="${esc(s)}">${esc(s)}</a></td><td class="n">${n.pass || 0}</td><td class="n">${(n.fail || 0) + (n.error || 0)}</td><td class="n">${n.skip || 0}</td><td><div class="bar" role="img" aria-label="${esc(s)} mix"><span class="b-pass" style="width:${100 * (n.pass || 0) / t}%"></span><span class="b-fail" style="width:${100 * ((n.fail || 0) + (n.error || 0)) / t}%"></span><span class="b-skip" style="width:${100 * (n.skip || 0) / t}%"></span></div></td></tr>`;
+  }
+  h += `</tbody></table></div>`;
+  const pre = D.outcome.preflight_problems || [];
+  if (pre.length) h += `<h3>Preflight problems</h3><pre>${esc(j(pre))}</pre>`;
+  if (D.slowest.length) h += `<h3>Slowest cases</h3><div class="tablewrap"><table><tbody>${D.slowest.map(s => `<tr><td class="mono">${esc(s.case)}</td><td class="n">${fmtS(s.s)}</td></tr>`).join('')}</tbody></table></div>`;
+
+  // ---------------------------------------------------------------- Where the results are
+  h += `<h2 id="where">Where the results are</h2>`;
+  h += `<h3>On this machine</h3>` + cmd(D.run_dir, 'run directory path');
+  h += `<p class="muted">results.jsonl (one record per case), exchanges.jsonl (every request and response), failures/ and cases/ (per-case bundles), llmdv.log, env.json, outcome.json, reproduce.sh, profile.used.yaml. MANIFEST.json ${D.manifest.present ? 'is present' + (D.manifest.files != null ? ` (${D.manifest.files} files)` : '') : 'is absent (written only when the run is published)'}.</p>`;
+  const pub = D.publication || {};
+  h += `<h3>Remote copy</h3>` + kv({ status: pub.status || 'not recorded', destination: pub.destination, location: pub.location, error: pub.error });
+  if (D.pull) h += `<p>Pull it to this machine:</p>` + cmd(D.pull, 'pull command');
+  if (D.publish_cmd) h += `<p>Not published. To upload this run:</p>` + cmd(D.publish_cmd, 'publish command');
+  if (D.logs.length) h += `<h3>Pod logs collected</h3><div class="tablewrap"><table><tbody>${D.logs.map(l => `<tr><td class="mono">${esc(l.path)}</td><td class="n">${l.bytes}</td></tr>`).join('')}</tbody></table></div>`;
+  else h += `<p class="muted">Pod logs: ${esc(((D.env || {}).pod_logs || {}).reason || 'none collected')}</p>`;
+
+  // ---------------------------------------------------------------- Profile
+  h += `<h2 id="profile">Profile and reproduction</h2>`;
+  h += `<details class="panel" open><summary>profile.used.yaml — the exact declarations this run was judged against</summary><div class="body"><p><button type="button" id="save-profile">Save as profile.used.yaml</button> <span class="muted">Rerun with <code>llmdv verify --profile profile.used.yaml</code>; it carries no secrets, only the names of the variables that hold them.</span></p>` + cmd(D.profile_raw || '(not found)', 'profile') + `</div></details>`;
+  h += `<details class="panel"><summary>Rerun the whole run</summary><div class="body"><p>reproduce.sh uses profile.used.yaml from the run directory and writes to a fresh directory. Export the credential variables the profile names first.</p>` + cmd(`bash ${D.run_dir}/reproduce.sh`, 'rerun command') + (D.reproduce ? `<pre>${esc(D.reproduce)}</pre>` : '') + `</div></details>`;
+  if (D.summary_md) h += `<details class="panel"><summary>summary.md as llmdv wrote it</summary><div class="body"><pre>${esc(D.summary_md)}</pre></div></details>`;
+  if (D.alerts) h += `<details class="panel"><summary>alerts.json</summary><div class="body"><pre>${esc(j(D.alerts))}</pre></div></details>`;
+  if (D.comparison) h += `<details class="panel"><summary>comparison.json</summary><div class="body"><pre>${esc(j(D.comparison))}</pre></div></details>`;
+
+  // ---------------------------------------------------------------- Tests
+  const suites = [...new Set(D.tests.map(t => t.suite))].sort();
+  const surfaces = [...new Set(D.tests.map(t => t.surface).filter(Boolean))].sort();
+  h += `<h2 id="tests">Every test</h2><div class="filters" role="search">`;
+  for (const [k, n] of [['all', total], ['fail', (c.fail || 0) + (c.error || 0)], ['skip', c.skip || 0], ['pass', c.pass || 0]]) h += `<button type="button" class="chip" data-outcome="${k}" aria-pressed="${k === ((c.fail || c.error) ? 'fail' : 'all')}">${k} ${n}</button>`;
+  h += `<select id="suite" aria-label="Suite"><option value="">all suites</option>${suites.map(s => `<option>${esc(s)}</option>`).join('')}</select>`;
+  h += `<select id="surface" aria-label="Surface"><option value="">all surfaces</option>${surfaces.map(s => `<option>${esc(s)}</option>`).join('')}</select>`;
+  h += `<input id="q" type="search" placeholder="Search case, reason, check" aria-label="Search tests"><span class="muted mono" id="hits"></span></div>`;
+  h += `<div id="list"></div><button type="button" id="more" hidden>Show more</button>`;
+  app.innerHTML = h;
+
+  // ---------------------------------------------------------------- test rendering
+  const testHead = (t, i) => `<details class="test o-${esc(t.outcome)}" data-i="${i}"><summary>${pill(t.outcome)}<span class="cid">${esc(t.case_id)}</span>${t.variant ? `<span class="meta">[${esc(t.variant)}]</span>` : ''}<span class="meta">${esc(t.surface || '')}${t.http_status ? ' · HTTP ' + esc(t.http_status) : ''}${t.duration_s != null ? ' · ' + fmtS(t.duration_s) : ''}${t.skip_class ? ' · ' + esc(t.skip_class) : ''}</span>${t.note ? '<span class="pill" style="color:var(--warn)">note</span>' : ''}${t.intent ? `<span class="why">${esc(t.intent)}</span>` : ''}${t.reason ? `<span class="why">${esc(t.reason.split('\n')[0])}</span>` : ''}</summary><div class="content"></div></details>`;
+  const exHtml = (e, t) => {
+    let s = `<details class="exch"${t.outcome !== 'pass' ? ' open' : ''}><summary>#${esc(e.seq)} ${esc(e.method)} ${esc(e.url)} → ${esc(e.status == null ? 'no response' : e.status)}${e.elapsed_s != null ? ' · ' + e.elapsed_s.toFixed(3) + ' s' : ''}</summary>`;
+    if (e.transport_error) s += `<p class="fail" style="padding:0 0.6rem">transport error: ${esc(e.transport_error)}</p>`;
+    s += `<div class="cols"><div><h3>Request</h3><pre>${esc(j(e.request_headers))}</pre><pre>${esc(e.request_body == null ? '(no body)' : e.request_body)}</pre></div><div><h3>Response</h3><pre>${esc(j(e.response_headers))}</pre><pre>${esc(e.response_body == null ? '(no body recorded)' : e.response_body)}</pre></div></div>`;
+    s += `<div style="padding:0 0.6rem 0.6rem"><h3>Replay this exchange</h3>` + cmd(e.curl, 'curl') + `</div></details>`;
+    return s;
+  };
+  const testBody = t => {
+    let s = '';
+    if (t.intent) s += `<div class="intent"><div class="note-k">what this test sets out to prove (agent summary)</div><div>${esc(t.intent)}</div></div>`;
+    if (t.note) s += noteBox('agent note, not recorded by llmdv', t.note);
+    s += `<h3>Rerun this test</h3>` + cmd(t.rerun, 'rerun command');
+    if (t.files['repro.sh']) s += `<details class="panel"><summary>repro.sh from the evidence bundle</summary><div class="body">` + cmd(t.files['repro.sh'], 'repro.sh') + `</div></details>`;
+    s += kv({ 'test': t.nodeid, 'ingress': t.ingress, 'surface': t.surface, 'variant': t.variant, 'recorded at': t.ts, 'evidence bundle': t.bundle ? D.run_dir + '/' + t.bundle : 'none (passes are bundled only with --evidence all)', 'served by': t.served_by });
+    if (t.reason) s += `<h3>Error</h3><pre>${esc(t.reason)}</pre>`;
+    if (t.checks.length) s += `<h3>Recorded checks</h3><div class="tablewrap"><table><thead><tr><th></th><th>Check</th><th>Observed</th><th>Expected</th></tr></thead><tbody>${t.checks.map(k => `<tr><td class="ok-${k.ok}">${k.ok === false ? 'FAIL' : 'ok'}</td><td class="mono">${esc(k.name)}</td><td class="mono">${esc(typeof k.observed === 'string' ? k.observed : JSON.stringify(k.observed)).slice(0, 600)}</td><td>${esc(k.expected == null ? '' : k.expected)}</td></tr>`).join('')}</tbody></table></div>`;
+    if (t.files['assertion.txt']) s += `<details class="panel"${t.outcome !== 'pass' ? ' open' : ''}><summary>Output: assertion and traceback</summary><div class="body"><pre>${esc(t.files['assertion.txt'])}</pre></div></details>`;
+    if (t.files['captured_output.txt']) s += `<details class="panel"><summary>Captured output</summary><div class="body"><pre>${esc(t.files['captured_output.txt'])}</pre></div></details>`;
+    if (t.files['transcript.sse']) s += `<details class="panel"><summary>Stream transcript (transcript.sse)</summary><div class="body"><pre>${esc(t.files['transcript.sse'])}</pre></div></details>`;
+    s += `<h3>Requests and responses <span class="muted">(${t.exchanges.length} of ${t.exchanges_total} shown)</span></h3>`;
+    s += t.exchanges.length ? t.exchanges.map(e => exHtml(e, t)).join('') : `<p class="muted">No HTTP exchange was recorded for this test${t.outcome === 'skip' ? ': it skipped before sending anything' : ''}.</p>`;
+    return s;
+  };
+
+  // ---------------------------------------------------------------- filtering
+  const list = document.getElementById('list'), more = document.getElementById('more'), hits = document.getElementById('hits');
+  const q = document.getElementById('q'), suiteSel = document.getElementById('suite'), surfSel = document.getElementById('surface');
+  let outcome = (c.fail || c.error) ? 'fail' : 'all', shown = 0, matches = [];
+  const PAGE = 150;
+  const text = D.tests.map(t => [t.case_id, t.variant, t.surface, t.reason, t.nodeid, t.intent, t.note, (t.checks || []).filter(k => k.ok === false).map(k => k.name).join(' '), ''].join(' ').toLowerCase());
+  const apply = () => {
+    const needle = q.value.trim().toLowerCase();
+    matches = [];
+    D.tests.forEach((t, i) => {
+      const o = t.outcome === 'error' ? 'fail' : t.outcome;
+      if (outcome !== 'all' && o !== outcome) return;
+      if (suiteSel.value && t.suite !== suiteSel.value) return;
+      if (surfSel.value && t.surface !== surfSel.value) return;
+      if (needle && !text[i].includes(needle)) return;
+      matches.push(i);
+    });
+    list.innerHTML = ''; shown = 0; page();
+    hits.textContent = `${matches.length} of ${total}`;
+    try { localStorage.setItem('llmdv-dash-' + D.run_id, JSON.stringify({ outcome, q: q.value, suite: suiteSel.value, surface: surfSel.value })); } catch (e) {}
+  };
+  const page = () => {
+    const next = matches.slice(shown, shown + PAGE);
+    list.insertAdjacentHTML('beforeend', next.map(i => testHead(D.tests[i], i)).join(''));
+    shown += next.length; more.hidden = shown >= matches.length;
+    more.textContent = `Show ${Math.min(PAGE, matches.length - shown)} more`;
+  };
+  more.addEventListener('click', page);
+  list.addEventListener('toggle', ev => {
+    const d = ev.target; if (!d.classList || !d.classList.contains('test') || !d.open) return;
+    const body = d.querySelector('.content'); if (!body.dataset.done) { body.innerHTML = testBody(D.tests[+d.dataset.i]); body.dataset.done = '1'; }
+  }, true);
+  document.querySelectorAll('.chip').forEach(b => b.addEventListener('click', () => {
+    outcome = b.dataset.outcome; document.querySelectorAll('.chip').forEach(x => x.setAttribute('aria-pressed', String(x === b))); apply(); }));
+  [q, suiteSel, surfSel].forEach(el => el.addEventListener('input', apply));
+  document.addEventListener('click', ev => {
+    const s = ev.target.closest('[data-search],[data-suite]');
+    if (s) { ev.preventDefault();
+      if (s.dataset.search) { q.value = s.dataset.search; outcome = 'all'; document.querySelectorAll('.chip').forEach(x => x.setAttribute('aria-pressed', String(x.dataset.outcome === 'all'))); }
+      if (s.dataset.suite) suiteSel.value = s.dataset.suite;
+      apply(); document.getElementById('tests').scrollIntoView(); return; }
+    const b = ev.target.closest('button[data-copy]'); if (!b) return;
+    const textToCopy = copyStore[b.dataset.copy];
+    const done = ok => { b.textContent = ok ? 'Copied' : 'Select and copy'; setTimeout(() => { b.textContent = 'Copy'; }, 1500); };
+    if (navigator.clipboard) navigator.clipboard.writeText(textToCopy).then(() => done(true), () => { const pre = b.previousElementSibling; const r = document.createRange(); r.selectNodeContents(pre); const sel = getSelection(); sel.removeAllRanges(); sel.addRange(r); done(false); });
+    else done(false);
+  });
+  const save = document.getElementById('save-profile');
+  if (save) save.addEventListener('click', () => {
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(new Blob([D.profile_raw || ''], { type: 'application/yaml' }));
+    a.download = 'profile.used.yaml'; document.body.appendChild(a); a.click(); a.remove();
+    save.textContent = 'Saved (check your downloads)'; setTimeout(() => { save.textContent = 'Save as profile.used.yaml'; }, 2000);
+  });
+  try { const s = JSON.parse(localStorage.getItem('llmdv-dash-' + D.run_id) || 'null'); if (s) { outcome = s.outcome || outcome; q.value = s.q || ''; suiteSel.value = s.suite || ''; surfSel.value = s.surface || '';
+    document.querySelectorAll('.chip').forEach(x => x.setAttribute('aria-pressed', String(x.dataset.outcome === outcome))); } } catch (e) {}
+  apply();
+  } catch (e) {
+    app.innerHTML = '<p class="banner">This dashboard could not render the run data (' + String(e).replace(/[&<>]/g, '') + '). The run directory itself is intact: read outcome.json, results.jsonl and failures/ directly, or rebuild the page with a newer llmdv.</p>';
+  }
+})();
+</script>
+</body>
+</html>

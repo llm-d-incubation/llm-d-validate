@@ -1,0 +1,148 @@
+# llmdv's own offline checks on every pull request and every push to main: lint, then the
+# offline suite in parallel (pytest -n auto). No secrets, no cluster, no gateway -- every test
+# runs against fakes on localhost.
+#
+# Everything a job builds stays in its working directory, which is cleaned at the start of the
+# next job, and nothing is left behind elsewhere in the runner:
+#   - Python is a uv standalone build, installed under $RUNNER_TEMP for this job only, and the
+#     virtualenv is rebuilt inside the checkout every time (actions/checkout with clean: true
+#     removes untracked files, .venv included). Not actions/setup-python: its builds find
+#     libpython only through LD_LIBRARY_PATH, and the tests start llmdv subprocesses with a
+#     scrubbed environment, so every one of them failed to load the interpreter;
+#   - pytest's temporary directories go under $RUNNER_TEMP, which the runner empties after
+#     every job, instead of accumulating in the container's /tmp;
+#   - the worker count comes from the container's CPU limit, because os.cpu_count() inside a
+#     container reports the host's cores and -n auto would oversubscribe.
+#
+# Live verification against real endpoints is NOT run here and must never run in parallel:
+# `llmdv verify` refuses -n.
+name: offline tests
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# A new push to a PR cancels the run it supersedes; main keeps every run.
+concurrency:
+  group: offline-tests-${{ github.event.pull_request.number || github.sha }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+# Only uv's own standalone interpreters, never one the container happens to have.
+env:
+  UV_PYTHON_PREFERENCE: only-managed
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      # A sparse checkout leaves files marked skip-worktree in this runner's reused workspace, and
+      # actions/checkout does not restore them when the commit is unchanged, so whole directories
+      # go missing. An earlier live-tests plan job did this. Start from an empty workspace whenever
+      # sparse mode is on, a file is marked skip-worktree, or a tracked file is missing.
+      - name: Reset a sparse workspace
+        working-directory: .
+        shell: bash
+        run: |
+          if [ -d .git ] && { [ "$(git config --get core.sparseCheckout)" = true ] \
+              || git ls-files -v 2>/dev/null | grep -q '^S' \
+              || [ -n "$(git ls-files --deleted 2>/dev/null | head -n 1)" ]; }; then
+            echo "::notice::clearing a sparse workspace left by an earlier job"
+            find . -mindepth 1 -maxdepth 1 -exec rm -rf {} +
+          fi
+      - uses: actions/checkout@v4
+        with:
+          clean: true
+      - uses: astral-sh/setup-uv@v6
+      # Interpreters and uv's cache live under RUNNER_TEMP, which the runner empties after
+      # every job, so nothing accumulates in the reused container.
+      - name: Python
+        run: |
+          echo "UV_PYTHON_INSTALL_DIR=$RUNNER_TEMP/uv-python" >> "$GITHUB_ENV"
+          echo "UV_CACHE_DIR=$RUNNER_TEMP/uv-cache" >> "$GITHUB_ENV"
+          UV_PYTHON_INSTALL_DIR="$RUNNER_TEMP/uv-python" UV_CACHE_DIR="$RUNNER_TEMP/uv-cache" \
+            uv python install 3.11
+      # The same pinned ruff the pre-commit hook uses (pyproject.toml's dev extra).
+      - name: Install
+        run: PYTHON="$(uv python find 3.11)" ./install.sh --dev --recreate
+      - name: ruff check
+        run: .venv/bin/ruff check src/ tests/
+      - name: ruff format
+        run: .venv/bin/ruff format --check src/ tests/
+
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        # 3.10 is the floor in pyproject.toml; 3.11 is what the runner image ships.
+        python: ["3.10", "3.11"]
+    name: test (python ${{ matrix.python }})
+    steps:
+      # A sparse checkout leaves files marked skip-worktree in this runner's reused workspace, and
+      # actions/checkout does not restore them when the commit is unchanged, so whole directories
+      # go missing. An earlier live-tests plan job did this. Start from an empty workspace whenever
+      # sparse mode is on, a file is marked skip-worktree, or a tracked file is missing.
+      - name: Reset a sparse workspace
+        working-directory: .
+        shell: bash
+        run: |
+          if [ -d .git ] && { [ "$(git config --get core.sparseCheckout)" = true ] \
+              || git ls-files -v 2>/dev/null | grep -q '^S' \
+              || [ -n "$(git ls-files --deleted 2>/dev/null | head -n 1)" ]; }; then
+            echo "::notice::clearing a sparse workspace left by an earlier job"
+            find . -mindepth 1 -maxdepth 1 -exec rm -rf {} +
+          fi
+      - uses: actions/checkout@v4
+        with:
+          clean: true
+      - uses: astral-sh/setup-uv@v6
+      # Interpreters and uv's cache live under RUNNER_TEMP, which the runner empties after
+      # every job, so nothing accumulates in the reused container.
+      - name: Python
+        run: |
+          echo "UV_PYTHON_INSTALL_DIR=$RUNNER_TEMP/uv-python" >> "$GITHUB_ENV"
+          echo "UV_CACHE_DIR=$RUNNER_TEMP/uv-cache" >> "$GITHUB_ENV"
+          UV_PYTHON_INSTALL_DIR="$RUNNER_TEMP/uv-python" UV_CACHE_DIR="$RUNNER_TEMP/uv-cache" \
+            uv python install ${{ matrix.python }}
+      # Workers = the container's CPU quota (cgroup v2 cpu.max, else v1), capped by the CPUs
+      # this process may use; never fewer than 1.
+      - name: Runner
+        id: runner
+        run: |
+          visible=$(nproc)
+          quota=""
+          if [ -r /sys/fs/cgroup/cpu.max ]; then
+            read -r q p < /sys/fs/cgroup/cpu.max
+            [ "$q" != "max" ] && quota=$(( q / p ))
+          elif [ -r /sys/fs/cgroup/cpu/cpu.cfs_quota_us ]; then
+            q=$(cat /sys/fs/cgroup/cpu/cpu.cfs_quota_us); p=$(cat /sys/fs/cgroup/cpu/cpu.cfs_period_us)
+            [ "$q" -gt 0 ] && quota=$(( q / p ))
+          fi
+          workers=${quota:-$visible}
+          [ "$workers" -gt "$visible" ] && workers=$visible
+          [ "$workers" -lt 1 ] && workers=1
+          echo "workers=$workers" >> "$GITHUB_OUTPUT"
+          mem=$(awk '/^MemTotal:/ {printf "%.1f GiB", $2/1048576}' /proc/meminfo)
+          echo "cpus visible: $visible  cpu quota: ${quota:-none}  workers: $workers  memory: $mem"
+          echo "os: $(. /etc/os-release && echo "$PRETTY_NAME")  python: $("$(uv python find ${{ matrix.python }})" --version)"
+      # --dev brings pytest-xdist, which only the offline suite uses.
+      - name: Install
+        run: PYTHON="$(uv python find ${{ matrix.python }})" ./install.sh --dev --recreate
+      - name: Offline suite
+        run: >-
+          PYTHONPATH=src .venv/bin/python -m pytest tests/ -q
+          -n ${{ steps.runner.outputs.workers }}
+          -p no:cacheprovider
+          --basetemp "$RUNNER_TEMP/pytest"
+          --durations=25

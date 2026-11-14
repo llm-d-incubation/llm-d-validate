@@ -1,0 +1,162 @@
+# Example: the full three-ingress shape, with LiteLLM in front.
+#
+# STATUS: DERIVED FROM MANIFESTS, NOT YET VERIFIED AGAINST THE LIVE FLEET.
+#
+# Every line below is read out of deployment manifests, not measured from a running stack --
+# unlike example-two-ingress.yaml, which was captured live. Run
+# `llmdv verify --profile <this file> -m contract` once the forwards are up: the contract suite
+# exists precisely to find the lines that are wrong, and on a first run against a profile of
+# this provenance it is expected to find some.
+#
+# Sources:
+#   model-server manifest         engine flags; the reasoning parser and
+#                                  --tool-call-parser are on the DECODE container only
+#   router values                 EPP policy; the EPP Service on port 80
+#   litellm manifests             the LiteLLM Deployment and Service on port 4000
+#   litellm config                model_list, custom_auth, keys
+schema: llmdv.profile/1
+name: example-three-ingress
+vantage: external
+
+environment:
+  cluster: <cluster>
+  namespace: <namespace>
+  # Set --context/--kubeconfig on the command line; this cluster's context name is not recorded
+  # in the manifests, so guessing it here would be a line that silently never matches.
+
+model:
+  public_id: <org>/<model>
+  aliases: []
+  # Deliberately omitted: the engine runs --max-model-len ${MAX_MODEL_LEN:-auto}, so the real
+  # value comes from GET /v1/models at runtime. Writing a number here would invent one.
+  reasoning:
+    # This fleet DOES have a parser, so reasoning arrives in its own field rather than inline --
+    # the opposite of the two-ingress example. That is exactly why the shape is declared, not
+    # assumed.
+    parser: <reasoning-parser>
+    field: reasoning_content
+    default_on: true
+  tools:
+    parser: <tool-call-parser>
+    auto_choice: true
+
+ingresses:
+  # Direct vLLM. NOTE the port asymmetry: prefill serves 8000 and decode serves 8200, and only
+  # decode carries the reasoning and tool parsers. A case that passes against decode and fails
+  # against prefill is a role asymmetry, not a gateway bug -- see llmdv/ingress/base.py.
+  - id: vllm
+    kind: vllm
+    base_url: http://localhost:18200
+    auth: {type: none}
+    health_path: /health
+    surfaces: [chat_completions, completions, messages]
+    timeouts: {connect: 5, request: 600, stream_idle: 60}
+    error_status:
+      unknown_model: [404]
+    setup:
+      proxy: bypass
+      requires:
+        - kind: port_forward
+          namespace: <namespace>
+          selector: llm-d.ai/role=decode
+          local_port: 18200
+          remote_port: 8200
+
+  # The EPP. router/README.md is explicit that clients drive the EPP Service on port 80 and
+  # never the decode Service.
+  - id: router
+    kind: llmd_router
+    base_url: http://localhost:18080
+    auth: {type: none}
+    health_path: /health
+    surfaces: [chat_completions, completions, messages]
+    timeouts: {connect: 5, request: 900, stream_idle: 120}
+    error_status:
+      unknown_model: [404]
+    setup:
+      proxy: bypass
+      requires:
+        - kind: port_forward
+          namespace: <namespace>
+          target: svc/<epp-service>
+          local_port: 18080
+          remote_port: 80
+
+  # LiteLLM. The only authenticating layer in the stack, and the only one whose model_list
+  # bounds what is reachable -- it declares one entry, the model over openai/, so
+  # /v1/messages is NOT exposed here even though the engine serves it.
+  - id: litellm
+    kind: litellm
+    base_url: http://localhost:14000
+    auth: {type: bearer, key_env: LLMDV_LITELLM_KEY}
+    # /health/readiness goes through custom_auth and a probe carries no key, so it can only
+    # ever 401. /health/liveliness is auth-exempt and is what actually gates traffic.
+    health_path: /health/liveliness
+    surfaces: [chat_completions]
+    # litellm_settings.request_timeout is 3600 because 256k-context requests take minutes at
+    # high concurrency; a shorter client timeout would cancel and show up as
+    # EvictedContextCancelled in the flow-control metrics rather than as a llmdv failure.
+    timeouts: {connect: 5, request: 3600, stream_idle: 120}
+    error_status:
+      unknown_model: [400, 404]
+      bad_credentials: [401]
+    setup:
+      proxy: bypass
+      requires:
+        - kind: port_forward
+          namespace: <namespace>
+          target: svc/<litellm-service>
+          local_port: 14000
+          remote_port: 4000
+
+capabilities:
+  # Unverified on this fleet. Declared false so their cases skip as undeclared rather than
+  # assert against a feature nobody has checked. /v1/responses is likewise left out of every
+  # ingress's surfaces until it has been probed.
+  count_tokens: false
+  stateful_responses: false
+  structured_output: false
+  # Set for a multimodal model served with its vision path on; the image cases then run.
+  vision: false
+  vllm_options: []
+
+headers:
+  # This is the block that makes the three-ingress shape worth testing. flow_control.py strips
+  # the client's value in async_pre_call_hook and re-injects it from objectives.yaml in
+  # async_pre_call_deployment_hook, with forward_client_headers_to_llm_api: false -- so the
+  # same header has three different dispositions depending on where it enters.
+  #
+  # `rewritten` and `consumed` are NOT client-observable, so their cases will SKIP with
+  # requires_instrumentation and requires_load. That is the honest outcome: proving LiteLLM
+  # strips a privilege header needs an instrumented backend, and proving the EPP acted on a
+  # priority band needs a load experiment. A green pass here would be a claim the evidence
+  # does not support.
+  x-llm-d-inference-objective:
+    vllm: ignored
+    router: consumed      # -> skip: requires_load
+    litellm: rewritten    # -> skip: requires_instrumentation
+  x-llm-d-inference-fairness-id:
+    vllm: ignored
+    router: consumed
+    litellm: rewritten
+  x-litellm-ratelimit-saturation:
+    # The hook strips this one too, and never accepts it from a client.
+    litellm: rewritten
+  x-request-id:
+    vllm: ignored
+    router: ignored
+    litellm: ignored
+
+clients:
+  # An agent client that needs /v1/messages, which LiteLLM's model_list does not expose, is
+  # NOT fully served through that ingress. `llmdv verify --client agent --ingress litellm` is
+  # the command that states it.
+  - id: agent
+    surfaces: [chat_completions, messages]
+    needs: [streaming, tools, reasoning]
+  - id: tau2
+    surfaces: [chat_completions]
+    needs: [tools]
+  - id: completions-probe
+    surfaces: [completions]
+    needs: []
