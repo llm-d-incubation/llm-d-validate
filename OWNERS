@@ -1,0 +1,9 @@
+# See https://go.k8s.io/owners for format documentation
+
+reviewers:
+  - vezio            # Core Maintainer
+  - albertoperdomo2  # Core Maintainer
+
+approvers:
+  - vezio            # Core Maintainer
+  - albertoperdomo2  # Core Maintainer
