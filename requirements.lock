@@ -9,7 +9,7 @@ annotated-types==0.8.0 \
 anthropic==1.11.0 \
     --hash=sha256:3906fabac7ad7b5b46c6186040398fc7826885c77ce34e4dd7849de16fc8d0f8 \
     --hash=sha256:52f97b2c485cca7ac66058374f5073a3febb7e6849b16989c145d602a3efee21
-    # via llmdv (pyproject.toml)
+    # via llm-d-validate (pyproject.toml)
 anyio==4.15.1 \
     --hash=sha256:6152fdbbf9a77fdec97731721bebf7c4c44f7c29b424b0065826173efc7ed101 \
     --hash=sha256:9f28306018cbd6d329e64a36d58256edff76dd996fe423bc957326e578b82a94
@@ -27,7 +27,7 @@ attrs==26.1.0 \
 boto3==1.43.106 \
     --hash=sha256:c11ad4c429a983493ba10014c7af9831a455c2c0eea91c1cefff74530e480277 \
     --hash=sha256:fdf2e304f9e8864b8613591b18b36ee995560c9666033622eda1cb9057866880
-    # via llmdv (pyproject.toml)
+    # via llm-d-validate (pyproject.toml)
 botocore==1.43.106 \
     --hash=sha256:006870b3b4e40547232ad12c3bb4faec91bbbe0659aafaa3b7fa48a112c4ee97 \
     --hash=sha256:c1fb8818f9957cb5037f73db34ac1a12ba43562e31d6e7f9cb7e5fc64e1dba78
@@ -240,7 +240,7 @@ httpcore2==2.13.1 ; sys_platform != 'emscripten' \
 httpx==0.28.1 \
     --hash=sha256:75e98c5f16b0f35b567856f597f06ff2270a374470a5c2392242528e3e3e42fc \
     --hash=sha256:d909fcccc110f8c7faf814ca82a9a4d816bc5a6dbfea25d6591d6985b8ba59ad
-    # via llmdv (pyproject.toml)
+    # via llm-d-validate (pyproject.toml)
 httpx2==2.13.1 \
     --hash=sha256:6dff50fabc270ee5fd25d845d0b078ed20564579744d6d962850975996d2f9a4 \
     --hash=sha256:e48744a19e3af5ee48313d0ce5fe941d5422fae5705ea922a4aabf94d7800dfa
@@ -253,7 +253,7 @@ httpx2-jsfetch==1.0 ; python_full_version >= '3.12' and sys_platform == 'emscrip
     # via httpx2
 ibm-cos-sdk==2.16.2 \
     --hash=sha256:b9ec5a390606b29a179736b34b90e829988b281eaa66fe5002bd9dac09adea3a
-    # via llmdv (pyproject.toml)
+    # via llm-d-validate (pyproject.toml)
 ibm-cos-sdk-core==2.16.2 \
     --hash=sha256:b975bc53ae8fdac8356851d8f66e4d286eaa8d8de3322d6f1734b76a6867f695
     # via
@@ -408,7 +408,7 @@ jmespath==1.0.1 \
 jsonschema==4.26.0 \
     --hash=sha256:0c26707e2efad8aa1bfc5b7ce170f3fccc2e4918ff85989ba9ffa9facb2be326 \
     --hash=sha256:d489f15263b8d200f8387e64b4c3a75f06629559fb73deb8fdfb525f2dab50ce
-    # via llmdv (pyproject.toml)
+    # via llm-d-validate (pyproject.toml)
 jsonschema-specifications==2025.9.1 \
     --hash=sha256:98802fee3a11ee76ecaca44429fda8a41bff98b00a0f2838151b113f210cc6fe \
     --hash=sha256:b540987f239e745613c7a9176f3edb72b832a4ac465cf02712288397832b5e8d
@@ -416,7 +416,7 @@ jsonschema-specifications==2025.9.1 \
 openai==3.11.0 \
     --hash=sha256:1ee0114c218bba9ffdea1927b974b4ddeee5f173000b0930aab53efc7c349989 \
     --hash=sha256:2fc169442feafd535f4959605b42d47bc922216385a6d2473b0d47956691d9fd
-    # via llmdv (pyproject.toml)
+    # via llm-d-validate (pyproject.toml)
 packaging==26.3 \
     --hash=sha256:94edc256424af38762eb31306eed28beb9f0efc50a8837492c9d6fd6004aed79 \
     --hash=sha256:d7193f7c8e4e93f444fde0262bf90af30e16fa0ad0ad44cb553c87339b23cd1c
@@ -560,7 +560,7 @@ pygments==2.21.0 \
 pytest==9.1.1 \
     --hash=sha256:1088fbde8f2b49d95a549a195707afa7a76a3ce9bcadc26b6d71f0ffda5fe313 \
     --hash=sha256:37a86b45efb9a47a61a36449063e8e18d0cab3161329fc099eb21783169c4f0c
-    # via llmdv (pyproject.toml)
+    # via llm-d-validate (pyproject.toml)
 python-dateutil==2.9.0.post0 \
     --hash=sha256:37dd54208da7e1cd875388217d5e00ebd4179249f90fb72437e91a35459a0ad3 \
     --hash=sha256:a8b2bc7bffae282281c8140a97d3aa9c14da0b136dfe83f850eea9a5f7470427
@@ -641,7 +641,7 @@ pyyaml==6.0.3 \
     --hash=sha256:f7057c9a337546edc7973c0d3ba84ddcdf0daa14533c2065749c9075001090e6 \
     --hash=sha256:fa160448684b4e94d80416c0fa4aac48967a969efe22931448d853ada8baf926 \
     --hash=sha256:fc09d0aa354569bc501d4e787133afc08552722d3ab34836a80547331bb5d4a0
-    # via llmdv (pyproject.toml)
+    # via llm-d-validate (pyproject.toml)
 referencing==0.37.0 \
     --hash=sha256:381329a9f99628c9069361716891d34ad94af76e461dcb0335825aecc7692231 \
     --hash=sha256:44aefc3142c5b842538163acb373e24cce6632bd54bdb01b21ad5863489f50d8

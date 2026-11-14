@@ -248,7 +248,7 @@ The two delivery steps are also ordinary commands:
 
 ```sh
 llmdv publish runs/<run> --remote-output s3://bucket/llmdv   # records a killed run as crashed; no-op if already published
-llmdv notify runs/<run>                                    # posts outcome.json to $LLMDV_NOTIFY_WEBHOOK
+llmdv notify runs/<run>                                      # posts outcome.json to $LLMDV_NOTIFY_WEBHOOK
 ```
 
 `llmdv notify` retries a failing webhook within bounds and never logs its URL. Everything published

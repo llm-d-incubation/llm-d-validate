@@ -88,8 +88,8 @@ what is still missing. `llmdv profile show <profile> --matrix` shows what will r
 ## Development
 
 ```sh
-./install.sh --dev                      # adds ruff, pre-commit and pytest-xdist
-.venv/bin/pre-commit install            # formats staged Python on commit
+./install.sh --dev                            # adds ruff, pre-commit and pytest-xdist
+.venv/bin/pre-commit install                  # formats staged Python on commit
 .venv/bin/python -m pytest tests -q -n auto   # the offline suite, against local fakes
 ```
 
