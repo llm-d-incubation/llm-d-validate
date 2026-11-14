@@ -107,6 +107,7 @@ llm-d-validate/
   install.sh              creates .venv and installs llmdv (see docs/manual.md)
   pyproject.toml          console script `llmdv`; pytest11 entry point
   Containerfile           the unattended runner image, pinned by requirements.lock
+  deploy/                 trigger.sh, the smoke test and the kustomize base (see deploy/README.md)
   docs/                   the manual, architecture, end-to-end runs, comparing runs, coverage
   profiles/               fleet profiles (see profiles/README.md)
   src/llmdv/

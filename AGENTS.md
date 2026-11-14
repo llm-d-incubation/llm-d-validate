@@ -17,7 +17,7 @@ Each lives at `.agents/skills/<name>/SKILL.md`. Load the one that matches before
 | [probing-a-fleet-before-asserting](.agents/skills/probing-a-fleet-before-asserting/SKILL.md) | writing or changing an assertion about a live response, or a live case fails |
 | [extending-llmdv](.agents/skills/extending-llmdv/SKILL.md) | adding a surface, ingress kind, case, client, assertion or capability |
 | [testing-a-model-deployment](.agents/skills/testing-a-model-deployment/SKILL.md) | testing a model you were handed endpoints for (a LiteLLM gateway, a router or EPP route, or both): picking and pointing a profile, first checks, the run, the comparison |
-| [running-and-comparing-live-runs](.agents/skills/running-and-comparing-live-runs/SKILL.md) | starting a live run, pulling one back, comparing runs |
+| [running-and-comparing-live-runs](.agents/skills/running-and-comparing-live-runs/SKILL.md) | starting a live run (PC, unattended or cluster job), pulling one back, comparing runs |
 | [reporting-a-run](.agents/skills/reporting-a-run/SKILL.md) | sharing a run directory; building the annotated HTML dashboard and its notes |
 | [triaging-a-run](.agents/skills/triaging-a-run/SKILL.md) | finding out what broke in a run and why: grouping failures into causes, existing issues, transient or real, the layer responsible, reproducing from bundles and logs |
 | [filing-a-fleet-finding](.agents/skills/filing-a-fleet-finding/SKILL.md) | turning a failure group into a GitHub issue or issue draft |

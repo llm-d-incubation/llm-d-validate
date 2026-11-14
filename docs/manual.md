@@ -91,8 +91,8 @@ llmdv verify --profile P -k test_sessions                                 # the 
 
 These run the actual client binary through a local recording relay. The profile must declare a
 pinned binary under [`clients`](../profiles/REFERENCE.md#clients) and an ingress must declare
-`messages`; sessions also need `capabilities.client_sessions`. The runner image built from
-[`Containerfile`](../Containerfile) ships a pinned binary.
+`messages`; sessions also need `capabilities.client_sessions`. The runner image ships a pinned
+binary: see [deploy/README.md](../deploy/README.md).
 
 > **The sessions execute model-generated code.** Writes are confined to a project directory, but
 > reads and executed code are not. Run them in a disposable pod or container, never on a
@@ -217,8 +217,8 @@ A check is recorded before its assertion fires, so a failure shows the value tha
 a case fails while every recorded check passed, `verdict.txt` says so.
 
 `--pod-logs {off,failures,all}` (default `failures`) also collects each layer's own logs for the
-run window, read-only. In a cluster this needs `get` on pods and `get` on `pods/log` in the
-profile's namespace.
+run window, read-only; see [deploy/README.md](../deploy/README.md) for the access it needs in a
+cluster.
 
 `--artifact-sink file:///path` or `s3://bucket/prefix` stores transcripts and pod logs that are
 too large for the run directory whole. The capped local copy is always kept with a reference;
@@ -233,7 +233,7 @@ cd runs/<run> && ./reproduce.sh                       # rerun the verification i
 
 `reproduce.sh` reads `profile.used.yaml` beside it, not the repository's copy, and reads
 credentials from the environment. Publishing a run with `--remote-output` is covered in
-[docs/end-to-end.md](end-to-end.md#publish-a-run).
+[deploy/README.md](../deploy/README.md).
 
 ### A dashboard for triage
 
@@ -255,9 +255,9 @@ changed their answer. See [docs/compare.md](compare.md).
 
 ## Running unattended
 
-`llmdv job` runs verify as a child process, then publishes and notifies however verify ended, so
-it suits a CronJob or a CI step. Running from your PC or unattended is in
-[docs/end-to-end.md](end-to-end.md).
+`llmdv job` runs verify as a child process, then publishes and notifies however verify ended. The
+image, the CronJob, `trigger.sh` and the credentials are in [deploy/README.md](../deploy/README.md);
+running from your PC or as a cluster job is in [docs/end-to-end.md](end-to-end.md).
 
 ## Extending
 

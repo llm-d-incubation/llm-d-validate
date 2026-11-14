@@ -1,0 +1,74 @@
+# The one pod specification: scheduled nightly, and cloned by trigger.sh on a signal.
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: llmdv
+spec:
+  schedule: "0 2 * * *"
+  timeZone: Etc/UTC
+  # Only against its own runs; a triggered Job may overlap, harmlessly (unique run ids).
+  concurrencyPolicy: Forbid
+  startingDeadlineSeconds: 3600
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 5
+  jobTemplate:
+    spec:
+      # No retries: a retried run would hide the failure under test.
+      backoffLimit: 0
+      # Above LLMDV_RUN_BUDGET plus the time to publish and notify.
+      activeDeadlineSeconds: 3600
+      ttlSecondsAfterFinished: 86400
+      template:
+        spec:
+          # The run never calls the Kubernetes API.
+          automountServiceAccountToken: false
+          restartPolicy: Never
+          # Time for llmdv to publish and notify after SIGTERM.
+          terminationGracePeriodSeconds: 120
+          securityContext:
+            runAsNonRoot: true
+            seccompProfile:
+              type: RuntimeDefault
+          containers:
+            - name: llmdv
+              image: llmdv
+              # `llmdv verify` selection arguments; empty runs everything the profile declares.
+              args: []
+              env:
+                - name: LLMDV_RUN_BUDGET
+                  value: "3000"
+              envFrom:
+                # Results destination, S3 authentication mode and endpoint settings.
+                - configMapRef:
+                    name: llmdv-settings
+                # LLMDV_NOTIFY_WEBHOOK and object-store credentials; created out of band.
+                - secretRef:
+                    name: llmdv-secrets
+                    optional: true
+              securityContext:
+                allowPrivilegeEscalation: false
+                readOnlyRootFilesystem: true
+                capabilities:
+                  drop: [ALL]
+              resources:
+                requests:
+                  cpu: 100m
+                  memory: 256Mi
+                limits:
+                  memory: 1Gi
+              volumeMounts:
+                - name: profile
+                  mountPath: /etc/llmdv
+                  readOnly: true
+                - name: work
+                  mountPath: /work
+                - name: tmp
+                  mountPath: /tmp
+          volumes:
+            - name: profile
+              configMap:
+                name: llmdv-profile
+            - name: work
+              emptyDir: {}
+            - name: tmp
+              emptyDir: {}

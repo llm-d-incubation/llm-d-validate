@@ -75,6 +75,7 @@ evidence and its replay `curl`. `llmdv analyze <run directory>` builds it for an
 | --- | --- |
 | [`src/llmdv/`](src/llmdv/) | `llmdv`, a pytest-based library and CLI. The [manual](docs/manual.md) covers every command |
 | [`docs/`](docs/) | the [manual](docs/manual.md), [architecture](docs/architecture.md), [end-to-end runs](docs/end-to-end.md), [comparing runs](docs/compare.md) and [coverage](docs/coverage.md) |
+| [`deploy/`](deploy/) | running `llmdv job` in a cluster: the kustomize base, an example overlay, `trigger.sh` and the infrastructure smoke test |
 | [`profiles/`](profiles/) | the [profile guide](profiles/README.md), the [field reference](profiles/REFERENCE.md) and templates to copy |
 | [`.agents/skills/`](.agents/skills/) | procedures for agents and people, such as [writing a profile](.agents/skills/writing-an-infra-profile/SKILL.md) and [running and comparing live runs](.agents/skills/running-and-comparing-live-runs/SKILL.md) |
 | [`.github/workflows/`](.github/workflows/) | CI: lint and the offline suite on every pull request |

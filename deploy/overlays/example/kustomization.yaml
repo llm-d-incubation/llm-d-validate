@@ -1,0 +1,66 @@
+# An example overlay with placeholders only. Real overlays carry cluster detail, so they live
+# with the fleet's own manifests, not in this repository.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: fleet-namespace
+resources:
+  - ../../base
+images:
+  - name: llmdv
+    newName: registry.example.com/org/llmdv
+    newTag: replace-with-git-sha
+configMapGenerator:
+  # Mounted at /etc/llmdv/profile.yaml.
+  - name: llmdv-profile
+    files:
+      - profile.yaml
+  - name: llmdv-settings
+    literals:
+      - LLMDV_RESULTS_URI=s3://example-bucket/llmdv
+      # Only for an S3-compatible store; omit for AWS S3 itself.
+      - AWS_ENDPOINT_URL=https://s3.example.com
+      # For IBM COS IAM, replace AWS_ENDPOINT_URL above with these settings:
+      # - LLMDV_S3_AUTH=ibm-iam
+      # - IBM_COS_ENDPOINT=https://s3.us-east.cloud-object-storage.appdomain.cloud
+      # Supply IBM_COS_API_KEY and IBM_COS_SERVICE_INSTANCE_ID through a Secret.
+      # See deploy/README.md for mapping an existing IBM storage Secret's keys.
+patches:
+  # Uncomment for an on-demand-only deployment; every run starts with trigger.sh.
+  # - target:
+  #     kind: CronJob
+  #     name: llmdv
+  #   patch: |-
+  #     - op: add
+  #       path: /spec/suspend
+  #       value: true
+  - target:
+      kind: CronJob
+      name: llmdv
+    patch: |-
+      - op: replace
+        path: /spec/schedule
+        value: "30 1 * * *"
+  # Optional: when S3 is unavailable, publish to an existing PVC instead. Set its name below.
+  # - target:
+  #     kind: CronJob
+  #     name: llmdv
+  #   patch: |-
+  #     kind: CronJob
+  #     metadata: {name: llmdv}
+  #     spec:
+  #       jobTemplate:
+  #         spec:
+  #           template:
+  #             spec:
+  #               volumes:
+  #                 - name: results
+  #                   persistentVolumeClaim: {claimName: YOUR-PVC-NAME}
+  #               containers:
+  #                 - name: llmdv
+  #                   env:
+  #                     - {name: LLMDV_FALLBACK_URI, value: "file:///results"}
+  #                   volumeMounts:
+  #                     - {name: results, mountPath: /results}
+# The rollout caller's identity, bound to the trigger Role. Replace with whatever starts runs
+# on a signal in your environment.
+#   - a RoleBinding from Role llmdv-trigger to that ServiceAccount or user

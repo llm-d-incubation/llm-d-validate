@@ -1,0 +1,38 @@
+# An in-cluster profile: the same schema as an external profile, but reaching the fleet by
+# Service DNS, so `setup` needs no port-forwards. Placeholders throughout; see
+# ../../../profiles/README.md for every field.
+schema: llmdv.profile/1
+name: fleet-a
+vantage: in-cluster
+
+model:
+  public_id: example/model-id
+  max_model_len: 8192
+  reasoning:
+    parser: null
+    inline_tag: think
+    default_on: true
+  tools:
+    parser: null
+    auto_choice: false
+
+ingresses:
+  - id: router
+    kind: llmd_router
+    base_url: http://gateway-service.fleet-namespace.svc.cluster.local
+    auth: {type: none}
+    health_path: /health
+    surfaces: [chat_completions]
+    error_status:
+      unknown_model: [404]
+      unknown_path: [404]
+      wrong_method: [405]
+      unsupported_option: [200]
+    setup:
+      proxy: bypass
+      requires: []
+
+clients:
+  - id: forge
+    surfaces: [chat_completions]
+    needs: [streaming, reasoning]

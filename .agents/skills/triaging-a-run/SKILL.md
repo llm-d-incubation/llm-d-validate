@@ -106,8 +106,8 @@ Then rerun the two or three smallest cases now: `llmdv verify --profile <profile
 - The split from step 1, which shows where the defect is and is not.
 - The server's own logs (read-only, with access to the cluster serving it; `oc` works the same), found by the request id in `request_headers` or by time:
   ```sh
-  kubectl -n <namespace> logs deployment/<epp> --since=3h | grep <x-request-id>
-  kubectl -n <namespace> logs deployment/<vllm> --since=3h | grep -E ' (ERROR|CRITICAL) |Traceback' | sort | uniq -c | sort -rn | head
+  kubectl -n <namespace> logs deploy/<epp>  --since=3h | grep <x-request-id>
+  kubectl -n <namespace> logs deploy/<vllm> --since=3h | grep -E ' (ERROR|CRITICAL) |Traceback' | sort | uniq -c | sort -rn | head
   ```
   A traceback names the code path; the exact source is in the image's build (vLLM's commit is in `system_fingerprint`, e.g. `+g<sha>`), read that commit, not upstream `main`.
   Without cluster access, or when the logs are gone (the pod was replaced), look for them quoted in issues and PRs, ask the deployment owner, and rerun the failing cases with `--pod-logs all` if the profile declares a log source.

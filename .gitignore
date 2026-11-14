@@ -14,6 +14,9 @@ profiles/**/*.local.yaml
 # copy a run out with --remote-output file://<path> if one needs keeping.
 runs/
 
+# Real kustomize overlays carry cluster detail, like local profiles.
+deploy/overlays/*.local/
+
 # Claude Code's per-user settings, locks and links. Shared agent instructions and skills live in
 # .agents/, which works for any agent.
 .claude/

@@ -1,11 +1,11 @@
 ---
 name: running-and-comparing-live-runs
-description: Use when starting a live llmdv run against a real gateway (from a PC, or unattended with llmdv job), publishing a run or pulling a published run back from the results bucket, or listing or comparing runs with llmdv compare.
+description: Use when starting a live llmdv run against a real gateway (from a PC, unattended with llmdv job, or as a cluster job with trigger.sh), publishing a run or pulling a published run back from the results bucket, or listing or comparing runs with llmdv compare.
 ---
 
 # Running and comparing live runs
 
-Every path writes the same run directory, so reading and comparing work the same way afterwards. Human version: [docs/end-to-end.md](../../../docs/end-to-end.md). Comparison semantics: [docs/compare.md](../../../docs/compare.md).
+Every path writes the same run directory, so reading and comparing work the same way afterwards. Human version: [docs/end-to-end.md](../../../docs/end-to-end.md). Cluster job and secrets: [deploy/README.md](../../../deploy/README.md). Comparison semantics: [docs/compare.md](../../../docs/compare.md).
 
 ## Before any live run
 
@@ -49,16 +49,25 @@ llmdv job --profile <profile> --remote-output "s3://$AWS_BUCKET/<prefix>" -- -m 
 
 Arguments after `--` go to `llmdv verify`. Results go to `--remote-output`, or `LLMDV_RESULTS_URI` when it is not given; `outcome.json` in the job log says where.
 
+**From a cluster job** (`deploy/trigger.sh`, needs the `llmdv-trigger` Role):
+
+```sh
+job="$(deploy/trigger.sh -n <namespace> --trigger manual --id <id> -- -m contract)"
+kubectl -n <namespace> logs -f "job/$job"
+```
+
+Arguments after `--` replace the CronJob's args. Use `--cli oc` for OpenShift and `--profile-file` for a one-off in-cluster profile. Results go to the cluster's `LLMDV_RESULTS_URI`, which may differ from where your other runs publish; `outcome.json` in the job log says where.
+
 ## Prefixes and triggers
 
-A scheduled run is labelled `trigger=nightly`; label every other run differently (e.g. `trigger=on-demand`). Only `llmdv job --compare` restricts its baselines to `trigger=nightly` runs. A standalone `llmdv compare` compares the latest run under the prefix with the one before it, whatever its trigger, so never publish a one-off under the scheduled runs' prefix: it would become the next comparison's baseline.
+A scheduled run, including a scheduled cluster job, is labelled `trigger=nightly`; label every other run differently (e.g. `trigger=on-demand`). Only `llmdv job --compare` restricts its baselines to `trigger=nightly` runs. A standalone `llmdv compare` compares the latest run under the prefix with the one before it, whatever its trigger, so never publish a one-off under the scheduled runs' prefix: it would become the next comparison's baseline.
 
 ## Pull a run back
 
 A published run sits at `s3://$AWS_BUCKET/<prefix>/<profile name>/<run id>/`. The profile name is its `name:` field, not its path. Run ids start with a UTC timestamp and sort oldest first.
 
 ```sh
-PREFIX="s3://$AWS_BUCKET/<prefix>"   # the prefix it was published under, or a job's LLMDV_RESULTS_URI
+PREFIX="s3://$AWS_BUCKET/<prefix>"   # the prefix it was published under, or a cluster's LLMDV_RESULTS_URI
 llmdv compare --from "$PREFIX" --profile <profile name> --list
 # if --list fails, list the folder directly:
 aws s3 ls "$PREFIX/<profile name>/" --endpoint-url "$AWS_ENDPOINT_URL_S3"

@@ -1,10 +1,12 @@
 # End to end: run `llmdv` against a live stack, then read the results
 
-Run the suite against a real gateway from your machine, or unattended as a job. Every run writes
+Run the suite against a real gateway from your machine, unattended as a job, or as a cluster job.
+Every run writes
 the same run directory, so reading the results works the same way afterwards.
 
 **Contents:** [Setup once](#setup-once) · [From your machine](#from-your-machine) ·
 [Publish a run](#publish-a-run) · [Unattended](#unattended) ·
+[From a cluster job](#from-a-cluster-job) ·
 [Read the results](#read-the-results) · [Rules](#rules-for-every-live-run) ·
 [Reference](#reference)
 
@@ -25,6 +27,7 @@ an S3 or S3-compatible bucket.
 | `llmdv`, installed as above (`--s3` adds the bucket client) | every path, and reading any run |
 | the gateway URL and key | every live run |
 | read-only cluster access (`get` on pods and `pods/log`) | port-forwarded ingresses and `--pod-logs` |
+| cluster access with the `llmdv-trigger` Role, and the CronJob deployed ([deploy/README.md](../deploy/README.md)) | cluster jobs |
 | the [AWS CLI](https://aws.amazon.com/cli/) and bucket credentials | pulling a published run (publishing needs only the credentials) |
 
 A profile names its variables in `base_url_env` and `auth.key_env`; export those from wherever you
@@ -95,6 +98,37 @@ llmdv job --profile /etc/llmdv/profile.yaml --remote-output "s3://$AWS_BUCKET/<p
 
 </details>
 
+## From a cluster job
+
+When the fleet is only reachable from inside its cluster, `llmdv job` runs there as a CronJob,
+on its own schedule. To start a one-off run:
+
+```sh
+job="$(deploy/trigger.sh -n <namespace> --trigger manual --id contract-check -- -m contract)"
+kubectl -n <namespace> logs -f "job/$job"
+```
+
+<details>
+<summary><b>More:</b> what a job does, options, and where results land</summary>
+
+`llmdv job` runs `llmdv verify` as a child process, publishes, optionally notifies Slack, and prints
+`outcome.json` to the job log. Deploying it (image, overlay, settings and Secret) and every `trigger.sh` option are in
+[deploy/README.md](../deploy/README.md).
+
+- **Scheduled runs** are labelled `trigger=nightly` and are the baselines for `--compare`
+  ([compare.md](compare.md)).
+- **One-off runs:** the arguments after `--` replace the CronJob's `args:`; for example
+  `-- --analyze --compare` for a full run with a dashboard and a comparison. These runs are
+  never baselines.
+- **Options:** `--cli oc` for OpenShift, and `--profile-file <in-cluster profile>` to run a
+  different profile once.
+- **Results** land at `<LLMDV_RESULTS_URI>/<profile name>/<run id>/`. `LLMDV_RESULTS_URI` is the
+  cluster's own setting, which may be a different bucket or prefix from your other runs. If
+  publishing fails and a fallback volume is configured, the run is kept there; `outcome.json` in
+  the job log says where.
+
+</details>
+
 ## Read the results
 
 A run you did not publish is already in `runs/`. To pull a published one:
@@ -148,6 +182,7 @@ bash runs/$RUN/failures/<ingress>/<case>/repro.sh
 | `llmdv compare --list` finds no runs | wrong prefix, or the profile *path* was given instead of its name; or the run has not finished publishing |
 | exit `3` | the gateway, a key or the bucket was unreachable; nothing was tested |
 | a run is not in the bucket after exit `0` | look for exit `5`: the upload failed, and the log says why |
+| `trigger.sh` is refused | the caller lacks the `llmdv-trigger` Role, or `--profile-file` is not an in-cluster profile (`vantage: in-cluster`) |
 | many timeouts in a run from your machine | the machine slept, or another live run hit the same gateway at the same time |
 
 </details>
