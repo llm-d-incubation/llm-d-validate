@@ -2,36 +2,36 @@
 
 ## Governance Structure
 
-`llm-d-validate` adopts the following hierarchical technical governance structure:
+`llm-d-validate` is developed by:
 
-- A community of **contributors** who file issues and submit pull requests
-- A body of **core maintainers** who own `llm-d-validate` overall and drive its development
+- A community of **contributors** who file issues, share ideas and submit pull requests
+- A group of **core maintainers** who guide `llm-d-validate` overall and help drive its development
 
-All contributions are expected to follow `llm-d-validate` design principles and best practices, as enforced by core maintainers. While high-quality pull requests are appreciated and encouraged, all maintainers reserve the right to prioritize their own work over code reviews at-will, hence contributors should not expect their work to be reviewed promptly.
+We ask that contributions follow the `llm-d-validate` design principles and best practices, and the core maintainers are here to help with that. We truly appreciate every pull request. Maintainers balance reviews with their own project work, so a review may sometimes take a little while; thank you for your patience.
 
-Contributors can maximize the chances of their work being accepted by maintainers by meeting a high quality bar before sending a PR to maintainers.
+The best way to help a pull request move quickly is to keep it focused, well tested and clearly described.
 
 ### Core maintainers
 
-The core maintainers lead the development of `llm-d-validate` and define the functional validation strategy for deployed `llm-d` stacks. Their responsibilities include:
+The core maintainers lead the development of `llm-d-validate` and shape the functional validation strategy for deployed `llm-d` stacks. Their responsibilities include:
 
 - Proposing, implementing and reviewing test cases, surfaces, ingress kinds, infra-profile fields and the run evidence `llm-d-validate` records
 - Keeping verdicts trustworthy: a case passes only when the stack behaves as the API defines, and every skip states why it skipped
-- Enforcing code quality standards and adherence to core design principles
+- Supporting code quality and the project's core design principles
 
-The core maintainers should publicly articulate their decision-making, and share the reasoning behind their decisions, vetoes, and dispute resolution.
+The core maintainers aim to make decisions in the open and to share the reasoning behind them, including how disagreements are resolved.
 
 The list of core maintainers can be found in the [OWNERS](OWNERS) file.
 
-### Decision Making
+### How Changes Are Reviewed
 
-#### Uncontroversial Changes
+#### Straightforward Changes
 
-We are committed to accepting functional bug fixes that meet our quality standards and include minimized offline tests to avoid future regressions. A fix to a case that passes or fails wrongly should show the case failing against an injected defect, and passing without it. New cases for behaviour an API already defines generally fall under the same category, with the caveat that they may be rejected if the trade-off between usefulness and complexity is deemed unfavorable by core maintainers. Design changes that neither fix known functional issues nor add coverage are automatically considered controversial.
+Bug fixes that come with focused offline tests are always welcome. A fix to a case that passes or fails incorrectly is easiest to review when it shows the case failing against an injected defect, and passing without it. New cases for behaviour an API already defines are welcome too; maintainers will weigh how much a change adds against the complexity it brings. Design changes beyond fixes and new coverage are best discussed first, as described below.
 
-#### Controversial Changes
+#### Changes That Benefit From Discussion
 
-More controversial design changes (e.g., changing what an existing case asserts, breaking changes to the infra-profile schema, the run directory layout, exit codes or verdict semantics) are evaluated on a case-by-case basis under the subjective judgment of core maintainers.
+Some changes affect how people already use `llm-d-validate`, for example changing what an existing case asserts, or changes to the infra-profile schema, the run directory layout, exit codes or verdict semantics. For these, please open an issue first so the community and maintainers can talk it through together. Maintainers consider each one on its own merits and will share their reasoning.
 
 ## Submitting a Pull Request
 
