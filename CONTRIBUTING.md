@@ -51,9 +51,11 @@ For every Pull Request submitted, ensure the following steps have been done:
 
 ## Community and Communication
 
-- **Developer Slack:** [Join the llm-d Slack workspace](https://llm-d.ai/slack) to connect with the core maintainers and other contributors.
-- **Weekly Meetings:** Join by [adding the shared calendar](https://red.ht/llm-d-public-calendar), and [join the Google Group](https://groups.google.com/g/llm-d-contributors) for access to shared content.
-- **Issues:** Report bugs and feature requests in this repository.
+- **Developer Slack:** [Join our developer Slack workspace](https://llm-d.ai/slack) to connect with the core maintainers and other contributors, ask questions, and participate in discussions.
+- **Weekly Meetings:** Project updates, ongoing work discussions, and Q&A will be covered in our weekly project meetings. Please join by [adding the shared calendar](https://red.ht/llm-d-public-calendar). You can also [join our Google Group](https://groups.google.com/g/llm-d-contributors) for access to shared content.
+- **Code:** Hosted in the [llm-d](https://github.com/llm-d) GitHub organization
+- **Issues:** Project-scoped bugs or issues should be reported in this repo or in [llm-d/llm-d](https://github.com/llm-d/llm-d)
+- **Mailing List:** [llm-d-contributors@googlegroups.com](mailto:llm-d-contributors@googlegroups.com)
 
 This project adheres to the [Code of Conduct](CODE_OF_CONDUCT.md). See [SECURITY.md](SECURITY.md) for our vulnerability disclosure process.
 
