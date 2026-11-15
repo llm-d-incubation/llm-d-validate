@@ -1,0 +1,25 @@
+# Typos configuration: https://github.com/crate-ci/typos
+#
+# Each entry below is intentional. Keep entries narrow (an exact identifier where possible) so a
+# real typo elsewhere is still caught.
+
+[default.extend-words]
+# Both spellings are standard English.
+unparseable = "unparseable"
+# The prefix in "mis-selected".
+mis = "mis"
+# "PNGs" is split into "PN" + "Gs".
+PN = "PN"
+
+[default.extend-identifiers]
+# Deliberate misspellings: these tests prove an unknown key or name is rejected.
+inline_sytem = "inline_sytem"
+error_envlope = "error_envlope"
+blok_size = "blok_size"
+effort_efect = "effort_efect"
+# A possessive inside a test name ("the entry's own ingress").
+test_every_awaited_signal_must_have_answered_from_the_entrys_own_ingress = "test_every_awaited_signal_must_have_answered_from_the_entrys_own_ingress"
+
+[default]
+# A <think> tag deliberately split across two streamed fragments.
+extend-ignore-re = ['"<thi"']
