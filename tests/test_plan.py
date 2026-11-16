@@ -19,6 +19,7 @@ from pathlib import Path
 import pytest
 import yaml
 
+from llmdv.profile import compose
 from tests.fakes import SRC, FakeFleet, run_llmdv
 
 ROOT = SRC.parent
@@ -26,6 +27,7 @@ FULL = ["deploy/overlays/example/profile.yaml", "profiles/examples/example-two-i
 BY_COUNT = [
     "profiles/examples/example-gateway-only.yaml",
     "profiles/examples/example-three-ingress.yaml",
+    "profiles/examples/example-two-ingress-staging.yaml",
 ]
 
 
@@ -39,9 +41,16 @@ def test_every_example_profile_is_compared():
 URL_ENV = "LLMDV_PLAN_TEST_URL"
 
 
+def _raw(example: str) -> dict:
+    """The example as one mapping, with any `extends` parents merged in, as the loader sees it."""
+    raw = compose.composed(compose.layers(ROOT / example))
+    raw.pop("extends", None)
+    return raw
+
+
 def _pointed(example: str, tmp_path: Path) -> Path:
     """The example profile with every ingress's address read from URL_ENV, nothing else changed."""
-    raw = yaml.safe_load((ROOT / example).read_text())
+    raw = _raw(example)
     for ingress in raw["ingresses"]:
         ingress.pop("base_url", None)
         ingress["base_url_env"] = URL_ENV
@@ -69,7 +78,7 @@ def _verify(profile: Path, run_dir: Path, base_url: str, *extra: str) -> list[di
 
 
 def _model(example: str) -> str:
-    return yaml.safe_load((ROOT / example).read_text())["model"]["public_id"]
+    return _raw(example)["model"]["public_id"]
 
 
 @pytest.mark.parametrize("example", FULL)
