@@ -1,3 +1,3 @@
 # ingress
 
-`base.py` defines the ingress adapter, `ServedBy` (which endpoint answered) and the headers that name a layer's build. `vllm.py`, `router.py` and `litellm.py` override only what differs. A registry maps each `IngressKind` to its adapter.
+`base.py` defines `ServedBy` (which endpoint answered), one `IngressAdapter` class, and the `ADAPTERS` table: one row per `IngressKind` with the headers that name that layer's backend and build. Adding a kind is one row.

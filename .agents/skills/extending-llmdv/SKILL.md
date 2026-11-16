@@ -20,8 +20,7 @@ Each addition is one module plus one registry line. [docs/architecture.md](../..
 ## Add an ingress kind
 
 1. Add a member to `IngressKind` in `profile/schema.py`, and its depth in `_KIND_DEPTH` beside it (outermost first; the report orders layers by it).
-2. Subclass `IngressAdapter` in `ingress/<kind>.py`, overriding only what differs, usually `backend_headers` or `served_by`. Declare `version_headers` (and `version_header_prefixes`) for the headers whose value names the layer's build and is safe to publish; `backend_headers` may name a host or Service and never reach `outcome.json`.
-3. Register it: one import in `ingress/__init__.py`.
+2. Add its row to `ADAPTERS` in `ingress/base.py`: an `IngressAdapter(...)` that sets only the fields that differ from the base, usually `backend_headers`. Set `version_headers` (and `version_header_prefixes`) to the headers whose value names the layer's build and is safe to publish; `backend_headers` may name a host or Service and never reach `outcome.json`. `extra_headers` adds named headers to `served_by.extra`. A comment above the row says what a failure at this layer points at and what the layer reveals.
 
 ## Add a case
 

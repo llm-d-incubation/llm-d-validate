@@ -154,9 +154,11 @@ carries a complete `model` and `capabilities`. `transport.py`, `fleet.py` and `e
 per-ingress HTTP behaviour, fleet invariants and the evolution declarations.
 
 ### `ingress/`
-`base.py` defines the adapter and `ServedBy`, which endpoint answered, and `version_headers`, the headers whose value names the layer's build (recorded per run in `outcome.json`, see `evidence/stack.py`). `vllm.py`, `router.py` and
-`litellm.py` override only what differs, mostly what the layer discloses about its backend. A
-registry maps `IngressKind` to adapter.
+`base.py` defines `ServedBy`, which endpoint answered, and one `IngressAdapter` class. The
+`ADAPTERS` table holds one row per `IngressKind` with what differs between layers: the headers
+that name the backend, `version_headers`, the headers whose value names the layer's build
+(recorded per run in `outcome.json`, see `evidence/stack.py`), and any extra headers worth
+recording. An unknown kind gets the base adapter.
 
 ### `surfaces/`
 `base.py` defines `WireSurface` (requests and errors) and `Surface` (generation responses).

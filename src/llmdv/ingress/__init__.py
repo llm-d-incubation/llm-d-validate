@@ -1,10 +1,8 @@
-"""Ingress registry.
+"""Ingress adapters: one class, and a table of what each kind reveals about itself.
 
-Each adapter registers at import time, so this package imports all three. Adding an ingress
-kind is one module, one line here, and one new `IngressKind` member.
+Adding an ingress kind is one `IngressKind` member and one row in `ADAPTERS`.
 """
 
-from . import litellm, router, vllm  # noqa: F401 -- imported for registration side effects
-from .base import IngressAdapter, ServedBy, adapter_for, client_for, register
+from .base import ADAPTERS, IngressAdapter, ServedBy, adapter_for, client_for
 
-__all__ = ["IngressAdapter", "ServedBy", "adapter_for", "client_for", "register"]
+__all__ = ["ADAPTERS", "IngressAdapter", "ServedBy", "adapter_for", "client_for"]

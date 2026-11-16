@@ -23,8 +23,6 @@ from typing import Any
 from ..http.client import Exchange, RecordingClient
 from ..profile.schema import Ingress, IngressKind, ProxyMode
 
-_REGISTRY: dict[IngressKind, IngressAdapter] = {}
-
 
 @dataclass(frozen=True)
 class ServedBy:
@@ -48,18 +46,20 @@ class ServedBy:
         }
 
 
-class IngressAdapter:
-    """Per-layer behaviour. Subclasses override only what actually differs."""
+# Forwarded IP and host values are intentionally excluded because they add sensitive data.
+IDENTITY_HEADERS = ("server", "via", "x-forwarded-proto")
 
-    kind: IngressKind
+
+@dataclass(frozen=True)
+class IngressAdapter:
+    """What one layer reveals about itself. Kinds differ only in data, which `ADAPTERS` holds.
+
+    The defaults are the base layer: an ingress of unknown kind gets them, and reveals no
+    backend.
+    """
+
     # Response headers that may name the backend, best-effort and layer-specific.
     backend_headers: tuple[str, ...] = ()
-    # Forwarded IP and host values are intentionally excluded because they add sensitive data.
-    identity_headers = (
-        "server",
-        "via",
-        "x-forwarded-proto",
-    )
     # Response headers and body fields whose value names the build behind this layer, and is
     # safe to publish: a version, a build id, a signature. Never a hostname or an internal
     # service name; those stay in `backend_headers`, which attribution reads and the outcome
@@ -68,6 +68,9 @@ class IngressAdapter:
     version_headers: tuple[str, ...] = ("server",)
     version_header_prefixes: tuple[str, ...] = ()
     version_fields: tuple[str, ...] = ("system_fingerprint",)
+    # Further response headers this layer records in `served_by.extra`, after the base ones.
+    extra_headers: tuple[str, ...] = ()
+    identity_headers: tuple[str, ...] = IDENTITY_HEADERS
 
     def version_signals(self, headers: dict[str, str], body: Any) -> dict[str, str]:
         """The build signals one response carries, by signal name, lower-cased header names."""
@@ -94,30 +97,68 @@ class IngressAdapter:
         model_echo = None
         if isinstance(exchange.response_body, dict):
             model_echo = exchange.response_body.get("model")
+        extra = {
+            k: v
+            for k, v in headers.items()
+            # Throttling signals are evidence whatever the layer: without them a 429 is a
+            # bare status with nothing to say how long to wait or what the quota was.
+            if k.startswith("x-llm-d")
+            or k.startswith("x-ratelimit-")
+            or k == "retry-after"
+            or k in self.identity_headers
+        }
+        for name in self.extra_headers:
+            if name in headers:
+                extra[name] = headers[name]
         return ServedBy(
             x_request_id=headers.get("x-request-id"),
             backend_pod=backend,
             model_echo=model_echo,
-            extra={
-                k: v
-                for k, v in headers.items()
-                # Throttling signals are evidence whatever the layer: without them a 429 is a
-                # bare status with nothing to say how long to wait or what the quota was.
-                if k.startswith("x-llm-d")
-                or k.startswith("x-ratelimit-")
-                or k == "retry-after"
-                or k in self.identity_headers
-            },
+            extra=extra,
         )
 
 
-def register(adapter: IngressAdapter) -> IngressAdapter:
-    _REGISTRY[adapter.kind] = adapter
-    return adapter
+# One row per ingress kind; a field a row leaves out takes the base default above.
+ADAPTERS: dict[IngressKind, IngressAdapter] = {
+    # Direct vLLM: the engine's own OpenAI-compatible server. Nothing sits in front, so a
+    # failure here is the backend, the model template, or the fixture. vLLM reveals no backend
+    # identity in its response headers -- verified against v0.30.0, which returns only
+    # `server: uvicorn` and `x-went-into-resp-headers` -- so `backend_pod` stays None and the
+    # port-forward target recorded in the bundle is what identifies the replica.
+    IngressKind.VLLM: IngressAdapter(),
+    # The llm-d router gateway (EPP + Envoy, or the in-gateway `llm-d-router-gateway` mode).
+    # Failure here with direct vLLM passing points at gateway parsing, mutation, routing or
+    # timeout behaviour -- but only if both layers reached an identically configured replica,
+    # which is why the destination headers are captured when the build emits them. The names
+    # are best-effort across router builds. A build that emits none yields `backend_pod: None`,
+    # which is recorded rather than guessed: a wrong backend attribution costs more than a
+    # missing one. The version headers are the router's own signature and its routing headers;
+    # Envoy's decorator names a Service, so it is not one of them.
+    IngressKind.LLMD_ROUTER: IngressAdapter(
+        backend_headers=(
+            "x-gateway-destination-endpoint",
+            "x-llm-d-destination-endpoint",
+            "x-envoy-upstream-host",
+        ),
+        version_headers=("server", "x-went-into-resp-headers"),
+        version_header_prefixes=("x-llm-d-",),
+    ),
+    # LiteLLM proxy. Failure here with the router passing points at LiteLLM mapping,
+    # transformation, auth or timeout behaviour. It is also the only layer in a typical stack
+    # that authenticates, so a 401 here is a credential problem rather than a fleet problem.
+    # LiteLLM names the deployment it selected and, with the v3 limiter active, mirrors
+    # rate-limit state into `x-ratelimit-*` (recorded for every layer), so a `promised`
+    # rate-limit-header declaration can be verified from the response alone.
+    IngressKind.LITELLM: IngressAdapter(
+        backend_headers=("x-litellm-model-id", "x-litellm-deployment"),
+        version_headers=("server", "x-litellm-version", "x-litellm-model-name"),
+        extra_headers=("x-litellm-call-id", "x-litellm-response-cost"),
+    ),
+}
 
 
 def adapter_for(kind: IngressKind) -> IngressAdapter:
-    return _REGISTRY.get(kind) or IngressAdapter()
+    return ADAPTERS.get(kind) or IngressAdapter()
 
 
 def client_for(
