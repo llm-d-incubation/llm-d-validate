@@ -74,28 +74,7 @@ def add_parser(subparsers, parents) -> None:
         aliases=["run", "execute"],
         help="run functional tests against a deployed fleet",
     )
-    # No short form: -p is pytest's plugin flag, and trailing args are forwarded to pytest.
-    verify.add_argument("--profile", required=True, help="path to an infra-profile YAML")
-    verify.add_argument(
-        "--ingress",
-        action="append",
-        default=[],
-        help="restrict to this ingress id (repeatable; a union)",
-    )
-    verify.add_argument(
-        "--client",
-        action="append",
-        default=[],
-        help="restrict to surfaces this client needs (repeatable; a union)",
-    )
-    verify.add_argument(
-        "--surface",
-        action="append",
-        default=[],
-        help="restrict to this surface (repeatable; a union)",
-    )
-    verify.add_argument("-k", dest="keyword", default=None, help="pytest keyword expression")
-    verify.add_argument("-m", dest="marker", default=None, help="pytest marker expression")
+    add_selection_arguments(verify)
     verify.add_argument(
         "--local-output",
         default=None,
@@ -166,6 +145,32 @@ def add_parser(subparsers, parents) -> None:
     # routed llmdv's own --local-output into the pytest argv and made a bad --client look like a
     # pytest usage error instead of a llmdv one.
     verify.set_defaults(func=cmd_verify)
+
+
+def add_selection_arguments(parser: argparse.ArgumentParser) -> None:
+    """The profile and the selectors, shared with `llmdv plan` so both select alike."""
+    # No short form: -p is pytest's plugin flag, and trailing args are forwarded to pytest.
+    parser.add_argument("--profile", required=True, help="path to an infra-profile YAML")
+    parser.add_argument(
+        "--ingress",
+        action="append",
+        default=[],
+        help="restrict to this ingress id (repeatable; a union)",
+    )
+    parser.add_argument(
+        "--client",
+        action="append",
+        default=[],
+        help="restrict to surfaces this client needs (repeatable; a union)",
+    )
+    parser.add_argument(
+        "--surface",
+        action="append",
+        default=[],
+        help="restrict to this surface (repeatable; a union)",
+    )
+    parser.add_argument("-k", dest="keyword", default=None, help="pytest keyword expression")
+    parser.add_argument("-m", dest="marker", default=None, help="pytest marker expression")
 
 
 @dataclass
@@ -843,12 +848,6 @@ def _build_pytest_argv(
         argv += ["--llmdv-artifact-sink", args.artifact_sink]
     if getattr(args, "verbose", 0) >= 1:
         argv += ["--llmdv-show-checks"]
-    for ingress_id in args.ingress:
-        argv += ["--llmdv-ingress", ingress_id]
-    for client_id in args.client:
-        argv += ["--llmdv-client", client_id]
-    for surface in args.surface:
-        argv += ["--llmdv-surface", surface]
     if args.kubeconfig:
         argv += ["--llmdv-kubeconfig", str(args.kubeconfig)]
     if args.context:
@@ -857,11 +856,26 @@ def _build_pytest_argv(
         argv += ["--llmdv-kube-cli", args.kube_cli]
     if started_at:
         argv += ["--llmdv-started-at", started_at]
+    return argv + selection_argv(args)
+
+
+def selection_argv(args: argparse.Namespace) -> list[str]:
+    """The pytest arguments that choose cases, shared with `llmdv plan`.
+
+    The selectors come first and the forwarded arguments last, so a forwarded `-k` or `-m`
+    still overrides the llmdv one, as it always has.
+    """
+    argv: list[str] = []
+    for ingress_id in args.ingress:
+        argv += ["--llmdv-ingress", ingress_id]
+    for client_id in args.client:
+        argv += ["--llmdv-client", client_id]
+    for surface in args.surface:
+        argv += ["--llmdv-surface", surface]
     if args.keyword:
         argv += ["-k", args.keyword]
     if args.marker:
         argv += ["-m", args.marker]
-
     extra = [item for item in (getattr(args, "pytest_args", None) or []) if item != "--"]
     return argv + extra
 
@@ -891,7 +905,9 @@ def _plugin_is_registered() -> bool:
         return False
 
 
-def _run_pytest(argv: list[str], raw: bool, setup_commands: dict[str, list[str]]) -> int:
+def _run_pytest(
+    argv: list[str], raw: bool, setup_commands: dict[str, list[str]], plugins: tuple = ()
+) -> int:
     import pytest
 
     class _Attach:
@@ -901,12 +917,12 @@ def _run_pytest(argv: list[str], raw: bool, setup_commands: dict[str, list[str]]
             config._llmdv_setup_commands = setup_commands
 
     if raw:
-        return int(pytest.main(argv, plugins=[_Attach()]))
+        return int(pytest.main(argv, plugins=[_Attach(), *plugins]))
 
     stdout = LoggerWriter("llmdv.pytest", logging.DEBUG)
     stderr = LoggerWriter("llmdv.pytest", logging.WARNING)
     with contextlib.redirect_stdout(stdout), contextlib.redirect_stderr(stderr):
-        code = int(pytest.main(argv, plugins=[_Attach()]))
+        code = int(pytest.main(argv, plugins=[_Attach(), *plugins]))
     stdout.flush()
     stderr.flush()
     return code

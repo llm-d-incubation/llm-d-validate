@@ -141,8 +141,9 @@ is not shipped.
 
 ### `cli/`
 One module per subcommand: `verify_cmd.py` (embeds pytest and owns the run directory, which it
-publishes however verification ends), `job_cmd.py`, `publish_cmd.py`, `notify_cmd.py`,
-`compare_cmd.py`, `analyze_cmd.py` and `profile_cmd.py` (offline except `show --setup`).
+publishes however verification ends), `plan_cmd.py` (the same collection stopped before any
+case runs), `job_cmd.py`, `publish_cmd.py`, `notify_cmd.py`, `compare_cmd.py`, `analyze_cmd.py`
+and `profile_cmd.py` (offline except `show --setup`).
 `main.py` holds the shared flags; `banner.py`, `contract_display.py` and `style.py` render output;
 `exit_codes.py` holds the codes; `verify_cmd._finish` and `job_cmd._exit_code` apply their precedence.
 

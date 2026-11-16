@@ -24,6 +24,7 @@ import functools
 import json
 import re
 import uuid
+from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
@@ -684,52 +685,107 @@ def _gate(request: pytest.FixtureRequest) -> None:
     Runs before the client is built so an undeclared surface costs no connection. The reason
     string is what distinguishes a fleet gap from a tool gap in the results.
     """
+    target = request.getfixturevalue("ingress") if "ingress" in request.fixturenames else None
+    decided = gate(request.node, lambda: request.getfixturevalue("profile"), target)
+    if decided is not None:
+        skip_class, reason = decided
+        _mark_skip(request.node, skip_class)
+        pytest.skip(reason)
+
+
+def gate(
+    node: pytest.Item, profile: Callable[[], Profile], target: Ingress | None
+) -> tuple[SkipClass, str] | None:
+    """The classified skip `_gate` applies to a case, or None when the case runs.
+
+    Reads only the profile and the case's markers, so `llmdv plan` asks it the same question
+    without setting up a fixture. `profile` is called only when a rule needs it.
+    """
     # Policy first, and deliberately before the surface check: a shared fleet is other people's,
     # and a case that costs it real work or puts deliberately malformed input into its logs should
     # be declined before a connection is opened. The row stays in the matrix as
     # excluded_by_policy rather than vanishing, because a missing row reads as coverage.
-    disruptive = request.node.get_closest_marker("disruptive")
-    if disruptive:
-        policy: Profile = request.getfixturevalue("profile")
-        if policy.fleet_policy is FleetPolicy.SHARED:
-            why = (disruptive.args[0] if disruptive.args else "") or "is disruptive"
-            _mark_skip(request.node, SkipClass.EXCLUDED_BY_POLICY)
-            pytest.skip(
-                f"[{SkipClass.EXCLUDED_BY_POLICY.value}] fleet_policy is shared and this case {why}"
-            )
-
-    name = surface_of(request.node)
-    if name is None:
-        return
-
-    target = None
-    if "ingress" in request.fixturenames:
-        target = request.getfixturevalue("ingress")
-        if not target.exposes(name):
-            _mark_skip(request.node, SkipClass.UNDECLARED)
-            pytest.skip(
-                f"[{SkipClass.UNDECLARED.value}] ingress {target.id!r} does not "
-                f"expose surface {name!r}"
-            )
-
-    if name not in surfaces_pkg.implemented():
-        _mark_skip(request.node, SkipClass.NOT_IMPLEMENTED)
-        pytest.skip(
-            f"[{SkipClass.NOT_IMPLEMENTED.value}] surface {name!r} is declared by this "
-            f"fleet but llmdv {__version__} cannot drive it yet"
+    disruptive = node.get_closest_marker("disruptive")
+    if disruptive and profile().fleet_policy is FleetPolicy.SHARED:
+        why = (disruptive.args[0] if disruptive.args else "") or "is disruptive"
+        return (
+            SkipClass.EXCLUDED_BY_POLICY,
+            f"[{SkipClass.EXCLUDED_BY_POLICY.value}] fleet_policy is shared and this case {why}",
         )
 
-    needs = request.node.get_closest_marker("needs")
+    name = surface_of(node)
+    if name is None:
+        return None
+
+    if target is not None and not target.exposes(name):
+        return (
+            SkipClass.UNDECLARED,
+            f"[{SkipClass.UNDECLARED.value}] ingress {target.id!r} does not "
+            f"expose surface {name!r}",
+        )
+
+    if name not in surfaces_pkg.implemented():
+        return (
+            SkipClass.NOT_IMPLEMENTED,
+            f"[{SkipClass.NOT_IMPLEMENTED.value}] surface {name!r} is declared by this "
+            f"fleet but llmdv {__version__} cannot drive it yet",
+        )
+
+    needs = node.get_closest_marker("needs")
     if needs:
-        declared = target or request.getfixturevalue("profile")
+        declared = target or profile()
         where = f"ingress {target.id!r}" if target else "profile"
         for capability in needs.args:
             if not _has_capability(declared, capability, name):
-                _mark_skip(request.node, SkipClass.UNDECLARED)
-                pytest.skip(
+                return (
+                    SkipClass.UNDECLARED,
                     f"[{SkipClass.UNDECLARED.value}] {where} does not declare "
-                    f"capability {capability!r} for surface {name!r}"
+                    f"capability {capability!r} for surface {name!r}",
                 )
+    return None
+
+
+def plan_row(item: pytest.Item) -> dict[str, Any]:
+    """What setup would decide for a collected case, without setting anything up.
+
+    The same two steps in the same order as a run: pytest's own skip marks (placed at
+    collection, e.g. a fleet check with no declared rule), then `gate`. A case that passes both
+    is planned to run; anything its fixtures or body decide later is left to the run.
+    """
+    from _pytest.skipping import evaluate_skip_marks
+
+    profile: Profile = item.config._llmdv_profile  # type: ignore[attr-defined]
+    skip_class: str | None = None
+    reason: str | None = None
+    marked = evaluate_skip_marks(item)
+    if marked is not None:
+        reason = marked.reason
+        skip_class = _skip_class_from_reason(reason)
+    else:
+        callspec = getattr(item, "callspec", None)
+        target = (
+            callspec.params.get("ingress")
+            if callspec is not None and "ingress" in getattr(item, "fixturenames", ())
+            else None
+        )
+        decided = gate(item, lambda: profile, target)
+        if decided is not None:
+            skip_class, reason = decided[0].value, decided[1]
+    ingress = _ingress_from_params(item, profile)
+    case_marker = item.get_closest_marker("case_id")
+    selectable = known_markers()
+    return {
+        "nodeid": item.nodeid,
+        "case_id": case_marker.args[0] if case_marker and case_marker.args else None,
+        "suite": _suite_of(item),
+        "ingress": ingress.id if ingress else None,
+        "variant": _variant(item),
+        "surface": surface_of(item),
+        "markers": sorted({mark.name for mark in item.iter_markers()} & selectable),
+        "outcome": "skip" if reason is not None else "run",
+        "skip_class": skip_class,
+        "reason": reason,
+    }
 
 
 def _has_capability(declared: Ingress | Profile, name: str, surface: str) -> bool:

@@ -45,7 +45,8 @@ def add_parser(subparsers, parents) -> None:
     show.add_argument(
         "--matrix",
         action="store_true",
-        help="print the case matrix this profile implies, including what will skip",
+        help="print the surface matrix this profile implies, including what will skip; "
+        "`llmdv plan` lists the cases",
     )
     show.set_defaults(func=cmd_show)
 

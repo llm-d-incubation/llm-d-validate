@@ -27,6 +27,7 @@ from . import (
     exit_codes,
     job_cmd,
     notify_cmd,
+    plan_cmd,
     profile_cmd,
     publish_cmd,
     style,
@@ -103,6 +104,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--version", action="version", version=f"llmdv {__version__}")
     subparsers = parser.add_subparsers(dest="command", required=True)
     profile_cmd.add_parser(subparsers, [parent])
+    plan_cmd.add_parser(subparsers, [parent])
     verify_cmd.add_parser(subparsers, [parent])
     publish_cmd.add_parser(subparsers, [parent])
     job_cmd.add_parser(subparsers, [parent])

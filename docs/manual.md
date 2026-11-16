@@ -85,6 +85,25 @@ Cases also carry `disruptive`, `surface`, `surface_generic`, `case_id` and `need
 is not a marker exits `2` and lists the ones that exist, rather than deselecting everything and
 reporting `PASSED`.
 
+### See what will run
+
+`llmdv plan` takes the same profile and selectors as `verify` and lists every case `verify` would
+run, and every case it would skip with its [skip class](#skip-classes) and reason. It sends no
+request, runs no preflight and reads no cluster, so it works before any port-forward is up:
+
+```sh
+llmdv plan --profile P -m contract            # counts per suite and skip class, then the cases
+llmdv plan --profile P --ingress router -q    # counts only
+llmdv plan --profile P --json                 # an llmdv.plan/1 document, one row per case
+```
+
+The plan is `verify`'s own collection and the same skip decisions it makes before a case starts:
+`undeclared` surfaces and capabilities, `not_implemented`, and `excluded_by_policy`. A case
+planned to run can still skip from inside once it runs, for a reason only the run decides: a
+`throttled` 429, a `requires_instrumentation` disposition, or a declaration the case reads
+itself. A selector error exits `2` exactly as it does for `verify`. `profile show --matrix` is
+the coarser view: surfaces per ingress, not cases.
+
 ### Driving a real Claude Code client
 
 ```sh

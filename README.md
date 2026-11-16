@@ -43,6 +43,7 @@ cp profiles/examples/example-gateway-only.yaml profiles/my-stack.local.yaml   # 
 export LLMDV_GATEWAY_KEY='<gateway key>'
 
 llmdv profile validate profiles/my-stack.local.yaml          # offline check of the profile
+llmdv plan --profile profiles/my-stack.local.yaml            # what would run and skip, offline
 llmdv verify --profile profiles/my-stack.local.yaml -m contract   # about a minute
 llmdv verify --profile profiles/my-stack.local.yaml              # the full run
 ```
