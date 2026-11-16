@@ -514,7 +514,8 @@ def test_model_validation_uses_the_same_rules_and_paths_for_defaults_and_ingress
     config = configuration()
     if location == "defaults":
         config["model"].update(settings)
-        paths = ("model", "ingresses[0](engine).model", "ingresses[1](gateway).model")
+        # Inherited by both ingresses, but reported once, where it was declared.
+        paths = ("model",)
     else:
         config["ingresses"][1]["model"] = settings
         paths = ("ingresses[1](gateway).model",)

@@ -56,12 +56,8 @@ def test_negative_context_length_is_an_invalid_profile(tmp_path):
         )
     )
     errors = [d for d in loader.validate(profile) if d.level == "error"]
-    assert errors == [
-        loader.Diagnostic("error", "model.max_model_len", "must not be negative"),
-        loader.Diagnostic(
-            "error", "ingresses[0](direct).model.max_model_len", "must not be negative"
-        ),
-    ]
+    # Once, where it was declared: the ingress only inherits it.
+    assert errors == [loader.Diagnostic("error", "model.max_model_len", "must not be negative")]
 
 
 @pytest.mark.parametrize("value", ["0", "-1", "true", "false", "1.5", '"37"', '""', "[]", "{}"])
@@ -524,3 +520,37 @@ def test_every_load_error_names_the_file_and_a_path_that_resolves_in_it(tmp_path
         assert line.startswith(f"{path}: "), line
         where = line.removeprefix(f"{path}: ").split(": ", 1)[0]
         resolve(document, where)
+
+
+def test_one_load_reports_every_shape_error(tmp_path):
+    text = (
+        MINIMAL.replace("public_id: some/model", "public_id: some/model, max_model_len: '8k'")
+        + "    rate_limited: 'yes'\n"
+        + "    timeouts: {connect: soon}\n"
+        + "fleet_policy: sometimes\n"
+    )
+    with pytest.raises(loader.ProfileError) as exc:
+        loader.load(write(tmp_path, text))
+    paths = [line.split(": ")[1] for line in str(exc.value).splitlines()]
+    assert paths == [
+        "model.max_model_len",
+        "ingresses[0](direct).timeouts.connect",
+        "ingresses[0](direct).rate_limited",
+        "fleet_policy",
+    ]
+
+
+def test_an_inherited_load_error_is_reported_once_where_it_was_declared(tmp_path):
+    text = MINIMAL.replace("public_id: some/model", "public_id: some/model, aliases: other")
+    text += "  - {id: second, base_url: 'http://localhost:9998', model: {aliases: [x, 1]}}\n"
+    with pytest.raises(loader.ProfileError) as exc:
+        loader.load(write(tmp_path, text))
+    paths = [line.split(": ")[1] for line in str(exc.value).splitlines()]
+    assert paths == ["model.aliases", "ingresses[1](second).model.aliases[1]"]
+
+
+def test_an_inherited_model_problem_is_validated_once(tmp_path):
+    text = MINIMAL.replace("model: {public_id: some/model}", "model: {}")
+    text += "  - {id: second, base_url: 'http://localhost:9998', surfaces: [chat_completions]}\n"
+    errors = [d for d in loader.validate(loader.load(write(tmp_path, text))) if d.level == "error"]
+    assert errors == [loader.Diagnostic("error", "model.public_id", "required")]
