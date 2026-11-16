@@ -560,16 +560,16 @@ def fleet_diagnostics(profile: Any) -> list[Diagnostic]:
         out.append(
             Diagnostic("error", "fleet.metrics", "declares rules but environment.metrics is unset")
         )
-    for rule in profile.fleet.metrics:
-        at = f"fleet.metrics({rule.id})"
+    for index, rule in enumerate(profile.fleet.metrics):
+        at = f"fleet.metrics[{index}]({rule.id})"
         if rule.ingress and rule.ingress not in ingress_ids:
             out.append(
                 Diagnostic("error", f"{at}.ingress", f"names undeclared ingress {rule.ingress!r}")
             )
         if rule.when and rule.when not in capabilities:
             out.append(Diagnostic("error", f"{at}.when", f"unknown capability {rule.when!r}"))
-    for rule in profile.fleet.config:
-        at = f"fleet.config({rule.id})"
+    for index, rule in enumerate(profile.fleet.config):
+        at = f"fleet.config[{index}]({rule.id})"
         gated_out = bool(rule.when) and not any(
             getattr(ingress.capabilities, rule.when, None) for ingress in profile.ingresses
         )

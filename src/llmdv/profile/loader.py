@@ -107,7 +107,10 @@ def load(path: str | Path) -> Profile:
         raise ProfileError(f"{file_path}: invalid YAML: {exc}") from exc
     if not isinstance(raw, dict):
         raise ProfileError(f"{file_path}: top level must be a mapping")
-    return _build(raw, file_path)
+    try:
+        return _build(raw, file_path)
+    except ProfileError as exc:
+        raise ProfileError(*(f"{file_path}: {problem}" for problem in exc.problems)) from exc
 
 
 def validate(profile: Profile) -> list[Diagnostic]:
@@ -285,7 +288,8 @@ def validate(profile: Profile) -> list[Diagnostic]:
 def validate_models(profile: Profile) -> list[Diagnostic]:
     """Model rules shared by offline validation and native pytest before any requests."""
     models = [("model", profile.model)] + [
-        (f"ingresses({ingress.id}).model", ingress.model) for ingress in profile.ingresses
+        (f"ingresses[{index}]({ingress.id}).model", ingress.model)
+        for index, ingress in enumerate(profile.ingresses)
     ]
     out = []
     for where, model in models:
@@ -331,22 +335,26 @@ def resolve_all_secrets(profile: Profile) -> dict[str, str]:
 
 def _build(raw: dict[str, Any], path: Path) -> Profile:
     try:
-        model_raw = raw.get("model") or {}
-        capabilities_raw = raw.get("capabilities") or {}
+        model_raw = _block(raw.get("model"), "model")
+        capabilities_raw = _block(raw.get("capabilities"), "capabilities")
         model = _model(model_raw)
         capabilities = _capabilities(capabilities_raw)
         return Profile(
             schema=str(raw.get("schema", SUPPORTED_SCHEMA)),
             name=str(raw.get("name") or path.stem),
             vantage=_enum(Vantage, raw.get("vantage"), Vantage.EXTERNAL, "vantage"),
-            environment=_environment(raw.get("environment") or {}),
+            environment=_environment(_block(raw.get("environment"), "environment")),
             model=model,
             ingresses=tuple(
-                _ingress(item, model_raw, capabilities_raw) for item in (raw.get("ingresses") or [])
+                _ingress(item, f"ingresses[{index}]", model_raw, capabilities_raw)
+                for index, item in _entries(raw.get("ingresses"), "ingresses")
             ),
             capabilities=capabilities,
-            headers=_headers(raw.get("headers") or {}),
-            clients=tuple(_client(item, path.parent) for item in (raw.get("clients") or [])),
+            headers=_headers(_block(raw.get("headers"), "headers")),
+            clients=tuple(
+                _client(item, f"clients[{index}]", path.parent)
+                for index, item in _entries(raw.get("clients"), "clients")
+            ),
             fleet_policy=_enum(
                 FleetPolicy, raw.get("fleet_policy"), FleetPolicy.DEDICATED, "fleet_policy"
             ),
@@ -357,7 +365,8 @@ def _build(raw: dict[str, Any], path: Path) -> Profile:
     except ProfileError:
         raise
     except (TypeError, ValueError, AttributeError) as exc:
-        raise ProfileError(f"{path}: {exc}") from exc
+        # A shape no parser checks for. The file is named by `load`, which adds it to every line.
+        raise ProfileError(str(exc)) from exc
 
 
 _ISSUE = re.compile(r"^(?:[\w.-]+/[\w.-]+)?#\d+$|^https?://\S+$")
@@ -415,6 +424,29 @@ def _known_failures(raw: Any) -> tuple[KnownFailure, ...]:
             )
         )
     return tuple(out)
+
+
+def _block(value: Any, where: str) -> dict[str, Any]:
+    """An optional mapping: empty when undeclared."""
+    return {} if value is None else parse.mapping(value, where)
+
+
+def _entries(value: Any, where: str) -> list[tuple[int, dict[str, Any]]]:
+    """An optional list of mappings, each with its index, so a problem names the entry."""
+    if value is None:
+        return []
+    return [
+        (index, parse.mapping(item, f"{where}[{index}]"))
+        for index, item in enumerate(parse.items(value, where))
+    ]
+
+
+def _number(convert, value: Any, where: str):
+    """A number as `convert` reads it, naming the path when it cannot."""
+    try:
+        return convert(value)
+    except (TypeError, ValueError):
+        raise ProfileError(f"{where}: expected a number, got {value!r}") from None
 
 
 def _one_or_more(value: Any, where: str) -> tuple[str, ...]:
@@ -596,78 +628,90 @@ def _model(raw: dict[str, Any], where: str = "model") -> Model:
     )
 
 
-def _base_url(raw: dict[str, Any], ingress_id: str) -> str:
+def _base_url(raw: dict[str, Any], at: str) -> str:
     """`base_url`, or the value of the variable `base_url_env` names. Never both."""
     env = _opt_str(raw.get("base_url_env"))
     if env and raw.get("base_url"):
-        raise ProfileError(f"ingresses({ingress_id}): declare base_url or base_url_env, not both")
+        raise ProfileError(f"{at}: declare base_url or base_url_env, not both")
     value = os.environ.get(env, "") if env else str(raw.get("base_url") or "")
     return value.strip().rstrip("/")
 
 
 def _ingress(
-    raw: dict[str, Any], model_defaults: dict[str, Any], capability_defaults: dict[str, Any]
+    raw: dict[str, Any],
+    where: str,
+    model_defaults: dict[str, Any],
+    capability_defaults: dict[str, Any],
 ) -> Ingress:
     ingress_id = str(raw.get("id") or "")
-    auth_raw = raw.get("auth") or {}
-    timeouts_raw = raw.get("timeouts") or {}
-    setup_raw = raw.get("setup") or {}
+    at = f"{where}({ingress_id})"
+    auth_raw = _block(raw.get("auth"), f"{at}.auth")
+    timeouts_raw = _block(raw.get("timeouts"), f"{at}.timeouts")
+    setup_raw = _block(raw.get("setup"), f"{at}.setup")
     ingress = Ingress(
         id=ingress_id,
-        model=_ingress_model(
-            raw.get("model", {}), model_defaults, f"ingresses({ingress_id}).model"
-        ),
+        model=_ingress_model(raw.get("model", {}), model_defaults, f"{at}.model"),
         capabilities=_ingress_capabilities(
-            raw.get("capabilities", {}),
-            capability_defaults,
-            f"ingresses({ingress_id}).capabilities",
+            raw.get("capabilities", {}), capability_defaults, f"{at}.capabilities"
         ),
-        kind=_enum(IngressKind, raw.get("kind"), IngressKind.VLLM, f"ingresses({ingress_id}).kind"),
-        base_url=_base_url(raw, ingress_id),
+        kind=_enum(IngressKind, raw.get("kind"), IngressKind.VLLM, f"{at}.kind"),
+        base_url=_base_url(raw, at),
         base_url_env=_opt_str(raw.get("base_url_env")),
         auth=Auth(
-            type=_enum(
-                AuthType, auth_raw.get("type"), AuthType.NONE, f"ingresses({ingress_id}).auth.type"
-            ),
+            type=_enum(AuthType, auth_raw.get("type"), AuthType.NONE, f"{at}.auth.type"),
             key_env=_opt_str(auth_raw.get("key_env")),
         ),
         health_path=str(raw.get("health_path") or "/health"),
-        surfaces=_optional_strings(raw.get("surfaces"), f"ingresses({ingress_id}).surfaces"),
+        surfaces=_optional_strings(raw.get("surfaces"), f"{at}.surfaces"),
         timeouts=Timeouts(
-            connect=float(timeouts_raw.get("connect", 5.0)),
-            request=float(timeouts_raw.get("request", 600.0)),
-            stream_idle=float(timeouts_raw.get("stream_idle", 60.0)),
+            **{
+                name: _number(float, timeouts_raw.get(name, default), f"{at}.timeouts.{name}")
+                for name, default in (("connect", 5.0), ("request", 600.0), ("stream_idle", 60.0))
+            }
         ),
-        error_status={
-            str(key): tuple(int(code) for code in _as_list(value))
-            for key, value in (raw.get("error_status") or {}).items()
-        },
+        error_status=_error_status(
+            _block(raw.get("error_status"), f"{at}.error_status"), f"{at}.error_status"
+        ),
         unstructured_errors=_optional_strings(
-            raw.get("unstructured_errors"), f"ingresses({ingress_id}).unstructured_errors"
+            raw.get("unstructured_errors"), f"{at}.unstructured_errors"
         ),
-        rate_limited=parse.flag(
-            raw.get("rate_limited"), False, f"ingresses[{raw.get('id')}].rate_limited"
+        rate_limited=parse.flag(raw.get("rate_limited"), False, f"{at}.rate_limited"),
+        logs=tuple(
+            _log_source(item, f"{at}.logs[{index}]")
+            for index, item in _entries(raw.get("logs"), f"{at}.logs")
         ),
-        logs=tuple(_log_source(item) for item in (raw.get("logs") or [])),
-        tls=Tls(verify=parse.flag((raw.get("tls") or {}).get("verify"), True, "tls.verify")),
-        transport=transport_contract.parse(
-            raw.get("transport"), f"ingresses({ingress_id}).transport"
+        tls=Tls(
+            verify=parse.flag(
+                _block(raw.get("tls"), f"{at}.tls").get("verify"), True, f"{at}.tls.verify"
+            )
         ),
+        transport=transport_contract.parse(raw.get("transport"), f"{at}.transport"),
         setup=Setup(
-            proxy=_enum(
-                ProxyMode,
-                setup_raw.get("proxy"),
-                ProxyMode.BYPASS,
-                f"ingresses({ingress_id}).setup.proxy",
+            proxy=_enum(ProxyMode, setup_raw.get("proxy"), ProxyMode.BYPASS, f"{at}.setup.proxy"),
+            requires=tuple(
+                _requirement(item, f"{at}.setup.requires[{index}]")
+                for index, item in _entries(setup_raw.get("requires"), f"{at}.setup.requires")
             ),
-            requires=tuple(_requirement(item) for item in (setup_raw.get("requires") or [])),
         ),
     )
-    _check_http_redirect(ingress)
+    _check_http_redirect(ingress, at)
     return ingress
 
 
-def _check_http_redirect(ingress: Ingress) -> None:
+def _error_status(raw: dict[str, Any], where: str) -> dict[str, tuple[int, ...]]:
+    """Statuses per error class. A scalar is a one-element list."""
+    out = {}
+    for key, value in raw.items():
+        at = f"{where}.{key}"
+        if isinstance(value, (list, tuple)):
+            codes = [(f"{at}[{index}]", code) for index, code in enumerate(value)]
+        else:
+            codes = [(at, value)]
+        out[str(key)] = tuple(_number(int, code, path) for path, code in codes)
+    return out
+
+
+def _check_http_redirect(ingress: Ingress, at: str) -> None:
     """`transport.http_redirect` belongs on an ingress reached over TLS on the default port.
 
     Only a literal `base_url` is checked here. A value from `base_url_env` is the operator's
@@ -677,14 +721,14 @@ def _check_http_redirect(ingress: Ingress) -> None:
         return
     reason = transport_contract.plain_http_url(ingress.base_url)[1]
     if reason:
-        raise ProfileError(f"ingresses({ingress.id}): {reason}")
+        raise ProfileError(f"{at}: {reason}")
 
 
-def _requirement(raw: dict[str, Any]) -> Requirement:
+def _requirement(raw: dict[str, Any], where: str) -> Requirement:
     return Requirement(
         kind=str(raw.get("kind") or "port_forward"),
-        local_port=_opt_int(raw.get("local_port")),
-        remote_port=_opt_int(raw.get("remote_port")),
+        local_port=_opt_int(raw.get("local_port"), f"{where}.local_port"),
+        remote_port=_opt_int(raw.get("remote_port"), f"{where}.remote_port"),
         namespace=_opt_str(raw.get("namespace")),
         target=_opt_str(raw.get("target")),
         selector=_opt_str(raw.get("selector")),
@@ -692,14 +736,14 @@ def _requirement(raw: dict[str, Any]) -> Requirement:
     )
 
 
-def _log_source(raw: dict[str, Any]) -> LogSource:
+def _log_source(raw: dict[str, Any], where: str) -> LogSource:
     return LogSource(
         selector=_opt_str(raw.get("selector")),
         target=_opt_str(raw.get("target")),
         container=_opt_str(raw.get("container")),
-        tail=int(raw.get("tail", 2000)),
-        forbid=parse_signatures(raw.get("forbid"), "logs.forbid"),
-        allow=parse_allow(raw.get("allow"), "logs.allow"),
+        tail=_number(int, raw.get("tail", 2000), f"{where}.tail"),
+        forbid=parse_signatures(raw.get("forbid"), f"{where}.forbid"),
+        allow=parse_allow(raw.get("allow"), f"{where}.allow"),
     )
 
 
@@ -933,25 +977,23 @@ def _headers(raw: dict[str, Any]) -> dict[str, dict[str, Disposition]]:
     return out
 
 
-def _client(raw: dict[str, Any], base_dir: Path) -> Client:
+def _client(raw: dict[str, Any], where: str, base_dir: Path) -> Client:
+    client_id = str(raw.get("id") or "")
+    at = f"{where}({client_id})"
     return Client(
-        id=str(raw.get("id") or ""),
-        surfaces=_optional_strings(raw.get("surfaces"), f"clients({raw.get('id')}).surfaces"),
-        needs=_optional_strings(raw.get("needs"), f"clients({raw.get('id')}).needs"),
-        binaries=_binaries(raw.get("binaries", []), f"clients({raw.get('id')}).binaries", base_dir),
+        id=client_id,
+        surfaces=_optional_strings(raw.get("surfaces"), f"{at}.surfaces"),
+        needs=_optional_strings(raw.get("needs"), f"{at}.needs"),
+        binaries=_binaries(raw.get("binaries", []), f"{at}.binaries", base_dir),
     )
-
-
-def _as_list(value: Any) -> list[Any]:
-    return list(value) if isinstance(value, (list, tuple)) else [value]
 
 
 def _opt_str(value: Any) -> str | None:
     return str(value) if value not in (None, "") else None
 
 
-def _opt_int(value: Any) -> int | None:
-    return int(value) if value not in (None, "") else None
+def _opt_int(value: Any, where: str) -> int | None:
+    return _number(int, value, where) if value not in (None, "") else None
 
 
 def _opt_positive_int(value: Any, where: str) -> int | None:
@@ -1015,7 +1057,7 @@ def _effort_rendering(raw: Any, where: str) -> EffortRendering | None:
     ):
         problems.append(f"{where}.surfaces: select distinct names from {', '.join(EFFORT_VALUES)}")
     if problems:
-        raise ProfileError("\n".join(problems))
+        raise ProfileError(*problems)
     return EffortRendering(pattern=pattern, efforts=markers, surfaces=tuple(selected))
 
 
@@ -1149,7 +1191,7 @@ def _cache_reuse(raw: Any, where: str) -> CacheReuse | None:
             "as messages:enabled:2048"
         )
     if problems:
-        raise ProfileError("\n".join(problems))
+        raise ProfileError(*problems)
     return CacheReuse(
         min_ratio=float(ratio),
         surfaces=tuple(selected),

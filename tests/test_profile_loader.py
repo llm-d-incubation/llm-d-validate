@@ -6,9 +6,11 @@ cases below are mostly about it reporting the right thing rather than merely fai
 
 from __future__ import annotations
 
+import re
 import textwrap
 
 import pytest
+import yaml
 
 from llmdv.profile import loader
 from llmdv.profile.schema import (
@@ -56,7 +58,9 @@ def test_negative_context_length_is_an_invalid_profile(tmp_path):
     errors = [d for d in loader.validate(profile) if d.level == "error"]
     assert errors == [
         loader.Diagnostic("error", "model.max_model_len", "must not be negative"),
-        loader.Diagnostic("error", "ingresses(direct).model.max_model_len", "must not be negative"),
+        loader.Diagnostic(
+            "error", "ingresses[0](direct).model.max_model_len", "must not be negative"
+        ),
     ]
 
 
@@ -468,3 +472,55 @@ def test_a_list_item_that_is_not_a_string_is_not_converted(tmp_path):
     text = MINIMAL.replace("surfaces: [chat_completions]", "surfaces: [chat_completions, 7]")
     with pytest.raises(loader.ProfileError, match=r"surfaces\[1\]: expected a string, got 7"):
         loader.load(write(tmp_path, text))
+
+
+def resolve(document, path):
+    """The value at a diagnostic path such as `ingresses[0](direct).tls.verify`."""
+    node = document
+    for part in path.split("."):
+        name, rest = re.match(r"([^\[(]*)(.*)", part).groups()
+        if name:
+            node = node[name]
+        for index, entry_id in re.findall(r"\[(\d+)\]|\(([^)]*)\)", rest):
+            if index:
+                node = node[int(index)]
+            else:
+                assert node.get("id") == entry_id, f"{path}: the entry's id is {node.get('id')!r}"
+    return node
+
+
+INGRESS = "  - id: direct\n    kind: vllm\n    base_url: http://localhost:9999\n"
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        MINIMAL + "    rate_limited: 'yes'\n",
+        MINIMAL + "    tls: {verify: 'no'}\n",
+        MINIMAL + "    tls: [verify]\n",
+        MINIMAL + "    auth: []\n",
+        MINIMAL + "    logs: [{selector: app=x, forbid: oops}]\n",
+        MINIMAL + "    logs: [app=x]\n",
+        MINIMAL + "    transport: {credential_headers: x-api-key}\n",
+        MINIMAL + "    timeouts: {connect: soon}\n",
+        MINIMAL + "    error_status: {unknown_model: [404, nope]}\n",
+        MINIMAL + "    setup: {requires: [port-forward]}\n",
+        MINIMAL + "    setup: {requires: [{local_port: eighty}]}\n",
+        MINIMAL + "    base_url_env: X\n",
+        MINIMAL + "clients: [ide]\n",
+        MINIMAL + "clients:\n  - {id: ide, needs: tools}\n",
+        MINIMAL.replace("model: {public_id: some/model}", "model: [some/model]"),
+        "schema: llmdv.profile/1\nmodel: {public_id: m}\ningresses: [direct]\n",
+        "schema: llmdv.profile/1\nmodel: {public_id: m}\ningresses: 5\n",
+        "schema: llmdv.profile/1\nmodel: {public_id: m}\ningresses:\n" + INGRESS + "  - 7\n",
+    ],
+)
+def test_every_load_error_names_the_file_and_a_path_that_resolves_in_it(tmp_path, text):
+    path = write(tmp_path, text)
+    with pytest.raises(loader.ProfileError) as exc:
+        loader.load(path)
+    document = yaml.safe_load(path.read_text())
+    for line in str(exc.value).splitlines():
+        assert line.startswith(f"{path}: "), line
+        where = line.removeprefix(f"{path}: ").split(": ", 1)[0]
+        resolve(document, where)

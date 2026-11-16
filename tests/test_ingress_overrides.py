@@ -207,7 +207,7 @@ def test_invalid_override_fails_during_loading_with_its_ingress_path(tmp_path, b
     config["ingresses"][1][block] = value
     with pytest.raises(loader.ProfileError) as exc:
         loader.load(write(tmp_path, config))
-    assert f"ingresses(gateway).{field}:" in str(exc.value)
+    assert f"ingresses[1](gateway).{field}:" in str(exc.value)
 
 
 @pytest.mark.parametrize("entry_point", ["pytest", "verify"])
@@ -233,7 +233,7 @@ def test_bad_override_is_a_usage_error_before_network_access(
             expected = 2
         assert not first.seen and not second.seen
     assert result.returncode == expected, result.stdout + result.stderr
-    assert f"ingresses(gateway).model.{field}" in result.stderr
+    assert f"ingresses[1](gateway).model.{field}" in result.stderr
 
 
 def test_all_suites_use_each_ingress_model_including_sdk_and_header_probes(tmp_path):
@@ -514,10 +514,10 @@ def test_model_validation_uses_the_same_rules_and_paths_for_defaults_and_ingress
     config = configuration()
     if location == "defaults":
         config["model"].update(settings)
-        paths = ("model", "ingresses(engine).model", "ingresses(gateway).model")
+        paths = ("model", "ingresses[0](engine).model", "ingresses[1](gateway).model")
     else:
         config["ingresses"][1]["model"] = settings
-        paths = ("ingresses(gateway).model",)
+        paths = ("ingresses[1](gateway).model",)
     profile = loader.load(write(tmp_path, config))
     assert loader.validate(profile) == [
         loader.Diagnostic(level, f"{path}.{suffix}", message) for path in paths

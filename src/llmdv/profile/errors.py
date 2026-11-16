@@ -12,7 +12,14 @@ from dataclasses import dataclass
 
 
 class ProfileError(Exception):
-    """Raised for a profile that cannot be turned into an object at all."""
+    """Raised for a profile that cannot be turned into an object at all.
+
+    It carries one line per problem, each a path in the profile and what is wrong there.
+    """
+
+    def __init__(self, *problems: str) -> None:
+        super().__init__("\n".join(problems))
+        self.problems = problems
 
 
 @dataclass(frozen=True)
