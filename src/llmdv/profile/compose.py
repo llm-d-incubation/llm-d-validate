@@ -1,12 +1,14 @@
-"""`extends`: one profile written as changes to another.
+"""`extends`: one profile written as changes to others.
 
-A profile may name one parent with a top-level `extends: <path>`, relative to its own file. The
-parent may extend another, so a profile is a chain of files resolved root first. Each file is
-merged over the one before it by the rule a per-ingress override already uses: mappings merge
-key by key, a list or any other value replaces, and `null` clears. `ingresses` is keyed by `id`,
-the name the rest of a profile and every error path use, so it merges like a mapping: a child
-entry merges over the parent's entry with the same id by the same rule, and an entry with a new
-id is added at the end. A child can then add `setup` to one ingress without restating the others.
+A profile may name a parent with a top-level `extends: <path>`, or several with a list of paths,
+each relative to its own file. A parent may extend others in turn, so the files form one
+sequence, resolved depth first: each parent's own parents before the parent, list entries left to
+right, and the file itself last. Each file is merged over everything before it by the rule a
+per-ingress override already uses: mappings merge key by key, a list or any other value replaces,
+and `null` clears. `ingresses` is keyed by `id`, the name the rest of a profile and every error
+path use, so it merges like a mapping: a child entry merges over the parent's entry with the same
+id by the same rule, and an entry with a new id is added at the end. A child can then add `setup`
+to one ingress without restating the others. A file may appear in the sequence only once.
 
 The composed mapping is what the loader validates, so a profile is checked exactly as it runs,
 and a problem is reported against the file that set the value at fault.
@@ -88,28 +90,61 @@ def read(path: Path) -> dict[str, Any]:
 
 
 def layers(path: str | Path) -> list[Layer]:
-    """The chain of files `path` extends, root first, ending with `path` itself."""
+    """The files `path` extends, in the order they merge, ending with `path` itself.
+
+    Depth first: a parent's own parents come before it, list entries left to right. A file
+    reached a second time, by a cycle or by two routes, is refused, so each file is merged once.
+    """
     chain: list[Layer] = []
-    current = Path(path)
-    while True:
+    reached: dict[Path, list[Path]] = {}  # each file, by the route it was first reached
+
+    def visit(current: Path, route: list[Path]) -> None:
         raw = read(current)
-        chain.insert(
-            0, Layer(current, {key: value for key, value in raw.items() if key != "extends"})
+        reached[current.resolve()] = route
+        for key, resolved in _parents(current, raw.get("extends")):
+            if not resolved.is_file():
+                raise ProfileError(f"{current}: {key}: no such profile file: {resolved}")
+            if any(resolved.resolve() == step.resolve() for step in route):
+                names = " -> ".join(str(step) for step in route)
+                raise ProfileError(f"{current}: {key}: a cycle: {names} -> {resolved}")
+            first = reached.get(resolved.resolve())
+            if first is not None:
+                raise ProfileError(
+                    f"{current}: {key}: {resolved} is reached twice, by "
+                    f"{' -> '.join(map(str, first))} and by "
+                    f"{' -> '.join(map(str, [*route, resolved]))}"
+                )
+            visit(resolved, [*route, resolved])
+        chain.append(Layer(current, {key: value for key, value in raw.items() if key != "extends"}))
+
+    start = Path(path)
+    visit(start, [start])
+    return chain
+
+
+def _parents(current: Path, value: Any) -> list[tuple[str, Path]]:
+    """Each parent `extends` names, with the key an error about it names."""
+    if value is None:
+        return []
+    if isinstance(value, str) and value:
+        return [("extends", Path(os.path.normpath(current.parent / value)))]
+    if not isinstance(value, list) or not value:
+        raise ProfileError(
+            f"{current}: extends: expected the path of a parent profile or a non-empty list of "
+            f"them, got {value!r}"
         )
-        parent = raw.get("extends")
-        if parent is None:
-            return chain
-        if not isinstance(parent, str) or not parent:
+    parents: list[tuple[str, Path]] = []
+    for index, entry in enumerate(value):
+        key = f"extends[{index}]"
+        if not isinstance(entry, str) or not entry:
             raise ProfileError(
-                f"{current}: extends: expected the path of a parent profile, got {parent!r}"
+                f"{current}: {key}: expected the path of a parent profile, got {entry!r}"
             )
-        resolved = Path(os.path.normpath(current.parent / parent))
-        if not resolved.is_file():
-            raise ProfileError(f"{current}: extends: no such profile file: {resolved}")
-        if any(resolved.resolve() == layer.path.resolve() for layer in chain):
-            names = " -> ".join(str(layer.path) for layer in reversed(chain))
-            raise ProfileError(f"{current}: extends: a cycle: {names} -> {resolved}")
-        current = resolved
+        resolved = Path(os.path.normpath(current.parent / entry))
+        if any(resolved == earlier for _, earlier in parents):
+            raise ProfileError(f"{current}: {key}: {resolved} is already named in this list")
+        parents.append((key, resolved))
+    return parents
 
 
 def composed(chain: list[Layer]) -> dict[str, Any]:

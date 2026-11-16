@@ -31,16 +31,18 @@ Conventions:
 
 ## extends
 
-`extends: <path>` makes a profile a set of changes to another one, its parent. The path is relative to the file that names it. A parent may extend a further parent; each file names at most one.
+`extends: <path>` makes a profile a set of changes to another one, its parent. The path is relative to the file that names it. `extends` may instead be a non-empty list of paths, to combine independent parts such as an engine, a gateway and a guide. A parent may extend further parents, by a path or a list.
 
-The loaded profile is the parent with the child merged over it, by the same rule as a [per-ingress override](#per-ingress-overrides):
+The files form one sequence, resolved depth first: a parent's own parents come before it, list entries left to right, and the file itself comes last. `extends: x.yaml` and `extends: [x.yaml]` mean the same.
+
+The loaded profile is each file of that sequence merged over everything before it, by the same rule as a [per-ingress override](#per-ingress-overrides), so a later file wins:
 
 - A mapping merges key by key, so a child names only what it changes.
 - A list, or any other value, replaces the parent's.
 - `null` clears the parent's value.
 - `ingresses` is keyed by `id`, as every error path names it (`ingresses[0](engine)`), so it merges like a mapping: a child entry merges over the parent's entry with the same `id` by the rules above, and an entry with a new `id` is added after the parent's. A child cannot remove an inherited ingress; select columns with `-k` instead.
 
-The composed profile is what is validated, digested and written to `profile.used.yaml`, with a comment block naming the file that set each key. A problem is reported against the file that set the value at fault. A missing parent, or a chain that leads back to a file already in it, is an invalid profile (exit 2).
+The composed profile is what is validated, digested and written to `profile.used.yaml`, with a comment block naming the file that set each key. A problem is reported against the file that set the value at fault. A missing parent, a chain that leads back to a file already in it, a file reached by two routes, an empty list, or a list that names a file twice is an invalid profile (exit 2), and the error names the entry, such as `extends[1]`.
 
 ## environment
 
