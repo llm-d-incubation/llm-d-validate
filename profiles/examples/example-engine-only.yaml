@@ -1,0 +1,87 @@
+# Example: one engine, reached directly, with no gateway or router in front.
+#
+# STATUS: A TEMPLATE. Values marked <...> are placeholders, and every behavior line below is one a
+# first run must confirm, not assume.
+#
+# This is the shape of a single vLLM server: `vllm serve` on a workstation, a model server you
+# port-forward to yourself, or an engine Service you can reach. No cluster access is assumed, so
+# there is no environment block and `setup.requires` stays empty; if you reach the engine through
+# a port-forward, start it yourself (`llmdv profile show <this file> --setup` prints nothing to run).
+#
+# One ingress means no attribution: a failure says the engine did not behave as declared, and there
+# is no other layer to compare it with. That is the whole question for this shape.
+#
+# Copy to profiles/<name>.local.yaml, which is gitignored, and fill in the placeholders.
+schema: llmdv.profile/1
+name: example-engine-only
+vantage: external
+
+model:
+  # MEASURE THIS from GET /v1/models on the engine. vLLM answers with the served model name:
+  # the --served-model-name if one was given, otherwise the model path or Hugging Face id.
+  public_id: <the id the engine advertises>
+  aliases: []
+  # MEASURE THIS: /v1/models reports max_model_len. The number below is a placeholder.
+  max_model_len: 32768
+  reasoning:
+    # MEASURE THIS by sending one request. With --reasoning-parser, reasoning arrives in
+    # reasoning_content: declare the parser and the field. Without one, a thinking model writes an
+    # inline <think> block into content: declare parser null and inline_tag think.
+    parser: null
+    field: null
+    inline_tag: null
+    default_on: false
+  tools:
+    # Only with --tool-call-parser (and --enable-auto-tool-choice for tool_choice: auto). Without
+    # them tool cases skip as undeclared rather than fail.
+    parser: null
+    auto_choice: false
+
+ingresses:
+  - id: engine
+    kind: vllm
+    # MEASURE THIS: where the engine listens. `vllm serve` defaults to port 8000.
+    base_url: http://localhost:8000
+    # vLLM authenticates only when started with --api-key; then use
+    # {type: bearer, key_env: LLMDV_ENGINE_KEY} and export that variable.
+    auth: {type: none}
+    health_path: /health
+    # MEASURE THIS by probing each path with a shape-valid body. Recent vLLM serves all four.
+    surfaces: [chat_completions, completions, messages, responses]
+    timeouts: {connect: 5, request: 300, stream_idle: 60}
+    error_status:
+      # As measured on vLLM 0.30 in example-two-ingress.yaml; re-measure on your version.
+      unknown_model: [404]
+      unknown_path: [404]
+      wrong_method: [405]
+      # vLLM ignores unknown top-level request fields rather than refusing them. Declared as a
+      # success status so the case asserts that client-visible behavior; an engine that starts
+      # refusing them fails this line.
+      unsupported_option: [200]
+    unstructured_errors: []
+    setup:
+      # A localhost target: a proxy hop would change what is measured.
+      proxy: bypass
+      requires: []
+
+capabilities:
+  # Declared false until probed, so their cases skip as undeclared rather than assert against an
+  # unverified feature; flip each once checked.
+  count_tokens: false
+  stateful_responses: false
+  structured_output: false
+  # Set for a multimodal model served with its vision path on; the image cases then run.
+  vision: false
+  # Engine-specific request options (see REFERENCE.md). Left empty until each is probed.
+  vllm_options: []
+
+headers:
+  x-request-id:
+    # vLLM does not echo it; declaring `echoed` would be a line the contract suite fails.
+    engine: ignored
+
+clients:
+  # A client whose surfaces the engine does not expose fails validation, which is the point.
+  - id: <your-client>
+    surfaces: [chat_completions]
+    needs: [streaming]

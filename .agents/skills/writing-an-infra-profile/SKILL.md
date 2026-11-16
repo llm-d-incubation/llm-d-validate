@@ -15,6 +15,7 @@ Field reference: [`profiles/REFERENCE.md`](../../../profiles/REFERENCE.md). Guid
 
    | Start from | Ingress kinds | Use for |
    |---|---|---|
+   | `examples/example-engine-only.yaml` | `vllm` | a single model server reached directly, with nothing in front |
    | `examples/example-gateway-only.yaml` | `litellm` | a model behind a LiteLLM gateway: a URL and a key are all you have |
    | `examples/example-two-ingress.yaml` | `vllm` + `llmd_router` | engine and router, with port-forwards |
    | `examples/example-three-ingress.yaml` | `litellm` + `llmd_router` + `vllm` | all three layers; a template to measure against |

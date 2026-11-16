@@ -23,6 +23,7 @@ profiles/
 
 | File | What it is |
 | --- | --- |
+| `examples/example-engine-only.yaml` | One `vllm` ingress reached directly, with no gateway or router and no cluster access: a single model server. |
 | `examples/example-gateway-only.yaml` | One `litellm` ingress and no cluster access. The shape you get when a key is all you have. |
 | `examples/example-two-ingress.yaml` | An llm-d fleet without LiteLLM: a `vllm` engine and an `llmd_router` gateway. Captured from a live stack; the environment and service names are placeholders. |
 | `examples/example-three-ingress.yaml` | The full shape with LiteLLM in front of the router and engine, including header dispositions. A template: replace each value with what you measure. |

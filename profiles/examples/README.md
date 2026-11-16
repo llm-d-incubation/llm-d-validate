@@ -5,6 +5,7 @@ you measure. Copy to `profiles/<system>/<model>.local.yaml` (gitignored) for rea
 
 | Profile | Shape |
 | --- | --- |
+| [example-engine-only.yaml](example-engine-only.yaml) | one engine reached directly, such as `vllm serve`, with nothing in front |
 | [example-gateway-only.yaml](example-gateway-only.yaml) | one gateway, no cluster access: a URL and a key are all you have |
 | [example-two-ingress.yaml](example-two-ingress.yaml) | an engine plus a router gateway |
 | [example-three-ingress.yaml](example-three-ingress.yaml) | a proxy (LiteLLM) in front of both |

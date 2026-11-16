@@ -28,6 +28,7 @@ BY_COUNT = [
     "profiles/examples/example-gateway-only.yaml",
     "profiles/examples/example-three-ingress.yaml",
     "profiles/examples/example-two-ingress-staging.yaml",
+    "profiles/examples/example-engine-only.yaml",
 ]
 
 
