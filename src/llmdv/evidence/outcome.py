@@ -16,10 +16,12 @@ from typing import Any
 
 from .. import __version__
 from ..http import redact
+from ..output.remote import PublicationStatus
 from ..profile.known import FIX_EXPECTED, KNOWN, LABELLED, unmatched
 
 SCHEMA = "llmdv.outcome/1"
 FILENAME = "outcome.json"
+
 
 MAX_FAILURES = 50
 MAX_REASON = 300
@@ -151,7 +153,14 @@ def read_results(run_dir: Path) -> list[dict[str, Any]]:
 
 
 def write_dict(run_dir: Path, body: dict[str, Any]) -> None:
-    """Replace outcome.json atomically, so a run killed mid-write never leaves it truncated."""
+    """Replace outcome.json atomically, so a run killed mid-write never leaves it truncated.
+
+    Refuses a publication status outside PublicationStatus: a reader that does not know a
+    status cannot tell a published run from a lost one.
+    """
+    status = (body.get("publication") or {}).get("status")
+    if status is not None:
+        PublicationStatus(status)
     path = Path(run_dir) / FILENAME
     temporary = path.with_name(f".{FILENAME}.tmp")
     temporary.write_text(json.dumps(redact.redact_value(body), indent=2) + "\n", encoding="utf-8")

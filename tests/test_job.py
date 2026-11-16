@@ -484,3 +484,23 @@ def test_job_analyze_dashboard_carries_alerts_and_the_comparison(tmp_path):
     published = payload(remote)
     assert published["alerts"] == local["alerts"]
     assert published["comparison"] == local["comparison"]
+
+
+def test_compare_without_a_destination_is_named_before_the_run(tmp_path):
+    """The run still goes ahead and exits 2, but the mistake is the job's first error."""
+    with FakeFleet() as fleet:
+        command = job_command(tmp_path, fleet, "--compare", "-k", "models_lists")
+        at = command.index("--remote-output")
+        del command[at : at + 2]
+        result = subprocess.run(  # noqa: S603 - fixed interpreter and args
+            command,
+            capture_output=True,
+            text=True,
+            cwd=SRC.parent,
+            env={"PYTHONPATH": str(SRC), "PATH": "/usr/bin:/bin"},
+        )
+
+    assert result.returncode == 2, diagnose(result)
+    assert outcome_of(tmp_path)["verification"]["exit_code"] == 0
+    warned = result.stderr.index("the comparison will be skipped and the job will exit 2")
+    assert warned < result.stderr.index("-- preflight")

@@ -8,9 +8,12 @@ import subprocess
 import sys
 import time
 
+import pytest
+
 from llmdv.cli import verify_cmd
 from llmdv.cli.exit_codes import INTERNAL, INTERRUPTED
-from llmdv.evidence.outcome import Outcome
+from llmdv.evidence.outcome import Outcome, write_dict
+from llmdv.output.remote import PublicationStatus
 from tests.fakes import SRC, FakeFleet, profile_yaml, run_llmdv
 
 
@@ -201,3 +204,25 @@ def test_pytest_interrupted_means_the_budget_only_when_sigint_caused_it():
     """pytest reports a collection error as "interrupted" too, and that one is a llmdv defect."""
     assert verify_cmd._map_pytest_exit(2, interrupted=True) == INTERRUPTED
     assert verify_cmd._map_pytest_exit(2, interrupted=False) == INTERNAL
+
+
+# ----------------------------------------------------------------- publication status
+
+
+def test_a_publication_status_outside_the_closed_set_is_refused(tmp_path):
+    with pytest.raises(ValueError, match="uploaded"):
+        write_dict(tmp_path, {"run_id": "r", "publication": {"status": "uploaded"}})
+    assert not (tmp_path / "outcome.json").exists()
+
+
+@pytest.mark.parametrize(
+    "publication",
+    [{"destination": "file:///x"}, *({"status": status.value} for status in PublicationStatus)],
+)
+def test_every_known_publication_state_is_written_as_a_plain_string(tmp_path, publication):
+    """The in-flight state, a destination with no status, is allowed: the upload has begun."""
+    body = {"run_id": "r", "publication": {**publication}}
+    if "status" in publication:
+        body["publication"]["status"] = PublicationStatus(publication["status"])
+    write_dict(tmp_path, body)
+    assert json.loads((tmp_path / "outcome.json").read_text())["publication"] == publication

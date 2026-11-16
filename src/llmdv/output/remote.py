@@ -8,6 +8,7 @@ from __future__ import annotations
 import shutil
 from collections.abc import Callable
 from dataclasses import dataclass
+from enum import Enum
 from pathlib import Path
 from typing import Any
 from urllib.parse import urlsplit
@@ -46,6 +47,19 @@ DELIVERY = Patience()
 GLANCE = Patience(attempts=1, connect=3, read=10)
 
 
+class PublicationStatus(str, Enum):
+    """How a run's publication ended: `publication.status`, a closed set.
+
+    A publication with a destination and no status is in flight: the upload has begun and has
+    not recorded how it went. A run killed there is published again by `llmdv publish`.
+    """
+
+    PUBLISHED = "published"
+    FAILED = "failed"
+    NOT_REQUESTED = "not_requested"  # no destination was given
+    SKIPPED = "skipped"  # `llmdv job` had a destination but no credentials for it
+
+
 class UnsupportedRemote(Exception):
     pass
 
@@ -81,9 +95,9 @@ def deliver(run_dir: Path, uri: str, name: str) -> dict[str, Any]:
     record: dict[str, Any] = {"destination": uri}
     try:
         location = sink_for(uri).publish(run_dir, name)
-        record.update(status="published", location=location)
+        record.update(status=PublicationStatus.PUBLISHED, location=location)
     except Exception as exc:  # noqa: BLE001 -- any delivery error means "not published"
-        record.update(status="failed", error=scrub(str(exc)))
+        record.update(status=PublicationStatus.FAILED, error=scrub(str(exc)))
     return record
 
 

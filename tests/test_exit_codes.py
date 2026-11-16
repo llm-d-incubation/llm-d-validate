@@ -3,9 +3,12 @@ from exit_codes."""
 
 from __future__ import annotations
 
+import itertools
 import re
 
-from llmdv.cli import exit_codes
+import pytest
+
+from llmdv.cli import exit_codes, job_cmd
 from llmdv.cli.main import build_parser
 from llmdv.evidence import dashboard
 from tests.fakes import SRC
@@ -56,3 +59,27 @@ def test_the_dashboard_names_codes_as_exit_codes_does():
     assert dashboard.EXIT_MEANING == {
         code: (exit_codes.class_of(code), meaning) for code, meaning in exit_codes.MEANING.items()
     }
+
+
+# ----------------------------------------------------------------- llmdv job's precedence
+
+# Every code llmdv returns, plus one it never does: verify killed by an OOM.
+JOB_INPUTS = sorted(set(exit_codes.EXITS) | {137})
+
+
+@pytest.mark.parametrize("verify_code", JOB_INPUTS)
+def test_job_exit_precedence_over_every_combination(verify_code):
+    """Verification first, then the comparison, then delivery: any failed delivery is 5."""
+    for compare_code, publish_code, notify_code in itertools.product(JOB_INPUTS, repeat=3):
+        code = job_cmd._exit_code(verify_code, compare_code, publish_code, notify_code)
+        inputs = (verify_code, compare_code, publish_code, notify_code)
+        if verify_code not in (exit_codes.OK, exit_codes.NOT_DELIVERED):
+            expected = verify_code
+        elif compare_code in (exit_codes.TEST_FAILURES, exit_codes.USAGE):
+            expected = compare_code
+        elif publish_code != exit_codes.OK or notify_code != exit_codes.OK:
+            expected = exit_codes.NOT_DELIVERED
+        else:
+            expected = exit_codes.OK
+        assert code == expected, inputs
+        assert code in exit_codes.EXITS or code == verify_code, inputs

@@ -244,6 +244,11 @@ to upload the rest still go, but the manifest is withheld. Retention is a bucket
 When S3 is unavailable and a fallback is configured, the bundle goes there with the same layout;
 `outcome.json` and the Slack message name the destination that failed and why.
 
+In the local `outcome.json`, `publication.status` is one of `published`, `failed`,
+`not_requested` (no destination given) or `skipped` (`llmdv job` found no credentials for it).
+A `publication` with a destination and no status means the upload was under way when the process
+stopped; `llmdv publish` uploads the run again, manifest last.
+
 The two delivery steps are also ordinary commands:
 
 ```sh

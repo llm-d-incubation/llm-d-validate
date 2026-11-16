@@ -44,7 +44,7 @@ from ..output import (
     default_run_dir,
     run_prefix,
 )
-from ..output.remote import deliver, parse_remote_uri
+from ..output.remote import PublicationStatus, deliver, parse_remote_uri
 from ..profile import loader
 from ..profile.schema import Profile
 from ..results.record import new_run_id
@@ -418,7 +418,7 @@ def _finish(args: argparse.Namespace, run: _Run, code: int) -> int:
         name = f"{outcome.profile['name']}/{outcome.run_id}"
         outcome.publication = deliver(run_dir, args.remote_output, name)
         published = outcome.publication.get("location")
-        if outcome.publication["status"] != "published":
+        if outcome.publication["status"] != PublicationStatus.PUBLISHED:
             publication_failed = True
             log.error(
                 "results were NOT published to %s: %s",
@@ -427,7 +427,7 @@ def _finish(args: argparse.Namespace, run: _Run, code: int) -> int:
             )
             log.error("the only copy is the local run directory: %s", run_dir)
     else:
-        outcome.publication = {"status": "not_requested"}
+        outcome.publication = {"status": PublicationStatus.NOT_REQUESTED}
     outcome.write(run_dir)
 
     if run.ran_pytest:

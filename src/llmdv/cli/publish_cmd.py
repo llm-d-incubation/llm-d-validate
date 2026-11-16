@@ -15,7 +15,13 @@ from ..evidence import dashboard
 from ..evidence import outcome as outcome_file
 from ..evidence.outcome import now, read_results, summarise
 from ..log.setup import get_logger
-from ..output.remote import UnsupportedRemote, deliver, missing_credentials, parse_remote_uri
+from ..output.remote import (
+    PublicationStatus,
+    UnsupportedRemote,
+    deliver,
+    missing_credentials,
+    parse_remote_uri,
+)
 from .exit_codes import NOT_DELIVERED, OK, PREFLIGHT, USAGE, class_of
 
 log = get_logger("cli.publish")
@@ -83,7 +89,7 @@ def publish_run(
         log.warning("%s has no readable outcome.json; rebuilding what can be known", run_dir)
         body = _rebuilt_outcome(run_dir)
 
-    if (body.get("publication") or {}).get("status") == "published":
+    if (body.get("publication") or {}).get("status") == PublicationStatus.PUBLISHED:
         log.info("already published to %s", body["publication"].get("location"))
         return OK
 
@@ -114,7 +120,7 @@ def publish_run(
     if reason:
         body["publication"] = {
             "destination": remote_output,
-            "status": "failed",
+            "status": PublicationStatus.FAILED,
             "error": reason,
             **fallback,
         }
@@ -125,7 +131,7 @@ def publish_run(
     name = f"{(body.get('profile') or {}).get('name') or 'unknown'}/{body['run_id']}"
     body["publication"] = {**deliver(run_dir, remote_output, name), **fallback}
     outcome_file.write_dict(run_dir, body)
-    if body["publication"]["status"] != "published":
+    if body["publication"]["status"] != PublicationStatus.PUBLISHED:
         log.error("results were NOT published: %s", body["publication"]["error"])
         return NOT_DELIVERED
     log.info("published to %s", body["publication"]["location"])

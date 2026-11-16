@@ -18,7 +18,7 @@ from pathlib import Path
 from ..compare.archive import NIGHTLY_TRIGGER, publish_one
 from ..evidence import alerts, dashboard, outcome
 from ..log.setup import emit, get_logger
-from ..output.remote import UnsupportedRemote, parse_remote_uri
+from ..output.remote import PublicationStatus, UnsupportedRemote, parse_remote_uri
 from ..output.s3 import missing_credentials_reason
 from .compare_cmd import compare_run
 from .exit_codes import NOT_DELIVERED, OK, TEST_FAILURES, USAGE
@@ -83,7 +83,8 @@ def _publish_dashboard(run_dir: Path, destination: str | None) -> None:
         return
     log.info("dashboard: %s", page)
     body = outcome.read(run_dir) or {}
-    if not destination or (body.get("publication") or {}).get("status") != "published":
+    status = (body.get("publication") or {}).get("status")
+    if not destination or status != PublicationStatus.PUBLISHED:
         return
     profile = (body.get("profile") or {}).get("name")
     run_id = body.get("run_id")
@@ -157,6 +158,13 @@ def cmd_job(args: argparse.Namespace) -> int:
             args.remote_output = None
     else:
         log.warning("no results destination configured; publication skipped, results stay local")
+        if args.compare:
+            # The run still goes ahead: its evidence and notification are worth more than a
+            # bare exit 2. Said now, so the mistake is in the first lines of the log.
+            log.error(
+                "--compare needs --remote-output; the comparison will be skipped and the job "
+                "will exit 2"
+            )
 
     stamp = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H-%M-%SZ")
     run_dir = (args.work_dir / stamp).resolve()
@@ -228,7 +236,7 @@ def cmd_job(args: argparse.Namespace) -> int:
     body = outcome.read(run_dir)
     if publication_skipped and body is not None and not tried_fallback:
         body["publication"] = {
-            "status": "skipped",
+            "status": PublicationStatus.SKIPPED,
             "destination": requested_remote,
             "reason": publication_skipped,
         }
@@ -301,7 +309,8 @@ def _exit_code(verify_code: int, compare_code: int, publish_code: int, notify_co
         return TEST_FAILURES
     if compare_code == USAGE:
         return USAGE
-    return NOT_DELIVERED if NOT_DELIVERED in (publish_code, notify_code) else OK
+    # A delivery that did not happen is never a success, whatever code it ended with.
+    return OK if publish_code == notify_code == OK else NOT_DELIVERED
 
 
 def _verify(args: argparse.Namespace, run_dir: Path, passthrough: list[str]) -> int:
