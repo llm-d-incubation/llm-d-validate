@@ -117,7 +117,10 @@ def test_probe_checks_log_access_even_when_the_pod_is_absent(tmp_path, monkeypat
             "--kubeconfig=/dev/null",
             f"--server={api.base_url}",
             f"--cache-dir={tmp_path / 'cache'}",
-            "--request-timeout=3s",
+            # The fake answers at once; the timeout only bounds a hang. A short one made a busy
+            # CI runner's slow kubectl read as an inconclusive probe. How a timeout is classified
+            # is checked without a wire in test_anything_else_is_inconclusive.
+            "--request-timeout=60s",
         ]
         monkeypatch.setattr(KubeContext, "_base", lambda self: base)
         report = verdict(build(tmp_path), KubeContext(), require_logs=True)
