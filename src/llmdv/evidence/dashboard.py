@@ -37,6 +37,8 @@ from pathlib import Path
 
 import yaml
 
+from ..cli import exit_codes
+from ..cli.exit_codes import class_of
 from ..http import redact
 from ..log.setup import get_logger
 
@@ -45,18 +47,8 @@ log = get_logger("evidence.dashboard")
 FILENAME = "dashboard.html"
 TEMPLATE = Path(__file__).with_name("dashboard.html")
 
-EXIT_MEANING = {
-    0: ("ok", "Every collected case passed or skipped."),
-    1: ("fleet", "Test failures: the system under test did not behave as the profile declares."),
-    2: ("usage", "Usage error or invalid profile; nothing was verified."),
-    3: ("preflight", "Preflight unsatisfied: the operator's environment, not the fleet."),
-    4: ("internal", "llmdv raised: a defect in the test library itself."),
-    5: (
-        "not_delivered",
-        "Verification finished but results or the notification were not delivered.",
-    ),
-    6: ("interrupted", "The run was interrupted before it finished."),
-}
+# Each exit code's class and meaning, from the one table in exit_codes.
+EXIT_MEANING = {code: (class_of(code), meaning) for code, meaning in exit_codes.MEANING.items()}
 
 SKIP_MEANING = {
     "undeclared": "The profile does not declare it; nothing was sent.",

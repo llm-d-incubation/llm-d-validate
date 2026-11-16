@@ -137,9 +137,11 @@ def test_the_cli_refuses_to_run_without_a_webhook(tmp_path):
 
 def test_every_exit_class_has_a_status():
     """The exit-code classes are defined once, in exit_codes; notify must cover each of them."""
-    from llmdv.cli.exit_codes import CLASS, class_of
+    from llmdv.cli.exit_codes import CLASS, EXITS, class_of
 
     assert set(notify.STATUS) == set(CLASS.values()) | {class_of(137)}
+    for code in EXITS:
+        assert class_of(code) in notify.STATUS, code
 
 
 def test_a_fallback_upload_names_the_destination_that_was_unavailable():

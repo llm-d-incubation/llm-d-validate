@@ -24,6 +24,7 @@ from ..log.setup import configure, get_logger
 from . import (
     analyze_cmd,
     compare_cmd,
+    exit_codes,
     job_cmd,
     notify_cmd,
     profile_cmd,
@@ -96,10 +97,7 @@ def build_parser() -> argparse.ArgumentParser:
         parents=[parent],
         description="Functional validation for deployed llm-d model serving stacks. "
         "Tests already-deployed stacks; never deploys or mutates anything.",
-        epilog="exit codes: 0 ok | 1 test failures (the fleet) | 2 usage or invalid profile | "
-        "3 preflight unsatisfied (your vantage point) | 4 internal error | "
-        "5 verification passed but results or notification not delivered | "
-        "6 interrupted before completion",
+        epilog=exit_codes.epilog(),
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
     parser.add_argument("--version", action="version", version=f"llmdv {__version__}")

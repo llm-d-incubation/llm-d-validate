@@ -102,18 +102,23 @@ binary: see [deploy/README.md](../deploy/README.md).
 
 Separating environment problems from fleet problems is the point of having more than two.
 
-| Code | Meaning |
-| --- | --- |
-| `0` | every selected case passed (skips do not fail a run) |
-| `1` | test failures: **the fleet** |
-| `2` | bad usage, or an invalid profile |
-| `3` | preflight unsatisfied: **your vantage point**; nothing was tested |
-| `4` | an internal error in llmdv |
-| `5` | verification passed, but results were not published (or, from `llmdv notify`, the notification was not sent) |
-| `6` | stopped by SIGINT or SIGTERM, e.g. a run budget or a pod being stopped; what finished is kept and published |
+| Code | Class | Meaning |
+| --- | --- | --- |
+| `0` | `ok` | every selected case passed (skips do not fail a run) |
+| `1` | `fleet` | test failures: the fleet did not behave as the profile declares |
+| `2` | `usage` | bad usage, or an invalid profile; nothing was verified |
+| `3` | `environment` | preflight unsatisfied: your vantage point, not the fleet; nothing was tested |
+| `4` | `internal` | an internal error: a defect in llmdv itself |
+| `5` | `ok` | verification passed, but results or the notification were not delivered |
+| `6` | `interrupted` | stopped by SIGINT or SIGTERM, e.g. a run budget or a pod being stopped; what finished is kept and published |
 
 A delivery failure never hides a verification failure: failed tests and a failed upload exit
 `1`, and `outcome.json` records both. `5` is returned only when verification succeeded.
+
+The class is what `outcome.json` records as `verification.class`. `5` is class `ok` because the
+verification passed; `publication` says what happened to the results. A code llmdv never returns
+itself, such as `137` after an OOM kill, is class `crashed`: the run died before recording its
+outcome.
 
 ## Skip classes
 
