@@ -41,6 +41,7 @@ from ..cli import exit_codes
 from ..cli.exit_codes import class_of
 from ..http import redact
 from ..log.setup import get_logger
+from ..results import read as results_file
 
 log = get_logger("evidence.dashboard")
 
@@ -251,7 +252,7 @@ def build(run: Path, body_cap: int, max_exchanges: int) -> dict:
     reproduce = read_text(run / "reproduce.sh")
     summary_md = read_text(run / "summary.md", 20000)
 
-    records = list(read_jsonl(run / "results.jsonl"))
+    records = results_file.read(run / "results.jsonl")
     wanted = {r.get("nodeid") for r in records}
 
     exchanges_by_node: dict[str, list[dict]] = collections.defaultdict(list)

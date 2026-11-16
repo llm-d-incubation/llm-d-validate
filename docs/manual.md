@@ -213,6 +213,11 @@ runs/<utc-timestamp>/            # echoed in the banner and the summary
   MANIFEST.json                  # with --remote-output: every file's sha256, published last
 ```
 
+`llmdv compare`, `analyze`, `publish` and `job` read `results.jsonl` records written as
+`llmdv.results/1`, which grows only by optional fields, so older and newer runs compare as one
+history. A record under any other schema is refused, with the file and line named, rather than
+read as something it may not be.
+
 The run directory is created before the profile is read, so an invalid profile, a failed
 preflight and an interrupted run leave the same bundle, with `outcome.json` saying which.
 

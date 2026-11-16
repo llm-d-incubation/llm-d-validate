@@ -47,6 +47,7 @@ from ..output import (
 from ..output.remote import PublicationStatus, deliver, parse_remote_uri
 from ..profile import loader
 from ..profile.schema import Profile
+from ..results.read import check_schema
 from ..results.record import new_run_id
 from . import banner
 from .exit_codes import (
@@ -993,7 +994,13 @@ def _read_records(run_dir: Path) -> list[dict]:
     results = run_dir / "results.jsonl"
     if not results.is_file():
         return []
-    return [json.loads(line) for line in results.read_text().splitlines() if line.strip()]
+    records = []
+    for number, line in enumerate(results.read_text().splitlines(), start=1):
+        if line.strip():
+            record = json.loads(line)
+            check_schema(record, f"{results}, line {number}")
+            records.append(record)
+    return records
 
 
 def _pod_log_section(collection) -> list[str]:

@@ -39,6 +39,8 @@ MEANING = {
     6: "interrupted; what finished is kept",
 }
 MAX_GROUPS = 12
+# The results schemas this summary reads, the same majors llmdv's own readers accept.
+READABLE = ("llmdv.results/1",)
 # Credential shapes, matching llmdv's own dashboard scan. A hit is replaced, never printed.
 CREDENTIAL = re.compile(
     r"\bsk-[A-Za-z0-9_-]{16,}|Bearer\s+(?!\$\{)(?!\*\*\*)[A-Za-z0-9._~+/-]{20,}|AKIA[0-9A-Z]{16}"
@@ -77,16 +79,36 @@ def read_text(path: Path | None) -> str:
         return ""
 
 
+class UnreadableSchema(ValueError):
+    """A record written under a results schema this script cannot read."""
+
+
+def readable(schema: object) -> bool:
+    """Whether `schema` names one of the READABLE majors, with or without a minor version."""
+    return isinstance(schema, str) and any(
+        schema == name or schema.startswith(name + ".") for name in READABLE
+    )
+
+
 def read_results(run: Path) -> list[dict]:
-    records = []
+    """The run's records. A record under any other results schema is refused, naming the file,
+    the line and the schema, rather than counted as something it may not be."""
+    path, records = run / "results.jsonl", []
     try:
-        for line in (run / "results.jsonl").read_text().splitlines():
-            try:
-                records.append(json.loads(line))
-            except ValueError:
-                continue
+        lines = path.read_text().splitlines()
     except OSError:
-        pass
+        return records
+    for number, line in enumerate(lines, start=1):
+        try:
+            record = json.loads(line)
+        except ValueError:
+            continue
+        if isinstance(record, dict) and "schema" in record and not readable(record["schema"]):
+            raise UnreadableSchema(
+                f"{path.name}, line {number}: schema {record['schema']!r} is not one this "
+                f"summary reads ({' or '.join(READABLE)})"
+            )
+        records.append(record)
     return records
 
 
@@ -161,7 +183,11 @@ def main() -> int:
     else:
         dashboard_line = "No dashboard: start the run with `analyze=true` to publish one."
 
-    records = read_results(run)
+    try:
+        records = read_results(run)
+    except UnreadableSchema as exc:
+        records = []
+        out += [f"Results not summarized: {exc}.", ""]
     if records:
         suites: dict[str, collections.Counter] = collections.defaultdict(collections.Counter)
         for r in records:

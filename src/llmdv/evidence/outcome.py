@@ -18,6 +18,7 @@ from .. import __version__
 from ..http import redact
 from ..output.remote import PublicationStatus
 from ..profile.known import FIX_EXPECTED, KNOWN, LABELLED, unmatched
+from ..results import read as results_file
 
 SCHEMA = "llmdv.outcome/1"
 FILENAME = "outcome.json"
@@ -139,17 +140,9 @@ def known_summary(records: list[dict[str, Any]], entries: Iterable = ()) -> dict
 
 
 def read_results(run_dir: Path) -> list[dict[str, Any]]:
-    """The records results.jsonl holds so far; a crashed run may have cut its last line short."""
-    path = Path(run_dir) / "results.jsonl"
-    if not path.is_file():
-        return []
-    records = []
-    for line in path.read_text(encoding="utf-8").splitlines():
-        try:
-            records.append(json.loads(line))
-        except ValueError:
-            continue
-    return records
+    """The records results.jsonl holds so far; a crashed run may have cut its last line short.
+    Raises UnreadableSchema for a record written under a results schema this llmdv cannot read."""
+    return results_file.read(Path(run_dir) / "results.jsonl")
 
 
 def write_dict(run_dir: Path, body: dict[str, Any]) -> None:

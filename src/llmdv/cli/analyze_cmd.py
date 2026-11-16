@@ -17,6 +17,7 @@ from pathlib import Path
 
 from ..evidence import dashboard
 from ..log.setup import emit, get_logger
+from ..results.read import UnreadableSchema
 from .exit_codes import NOT_DELIVERED, OK, USAGE
 
 log = get_logger("cli.analyze")
@@ -68,6 +69,9 @@ def cmd_analyze(args: argparse.Namespace) -> int:
     except dashboard.CredentialFound as exc:
         log.error("dashboard NOT written: possible credential in the run data (%s)", exc)
         return NOT_DELIVERED
+    except UnreadableSchema as exc:
+        log.error("dashboard NOT written: %s", exc)
+        return USAGE
 
     info = dashboard.summary(args.run_dir)
     counts = info["counts"]

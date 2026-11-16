@@ -20,6 +20,7 @@ from typing import Any
 
 from ..ingress import IngressAdapter, adapter_for
 from ..profile.schema import IngressKind
+from ..results import read as results_file
 
 MAX_VALUES = 5
 MAX_LEN = 80
@@ -78,7 +79,7 @@ def stack_from_run(run_dir: Path) -> Stack:
     """The stack a finished run observed: its exchanges.jsonl, read with the ingress kinds that
     results.jsonl recorded."""
     run_dir = Path(run_dir)
-    kinds = ingress_kinds(_read_jsonl(run_dir / "results.jsonl"))
+    kinds = ingress_kinds(results_file.read(run_dir / "results.jsonl"))
     return observed_stack(_read_jsonl(run_dir / "exchanges.jsonl"), kinds)
 
 

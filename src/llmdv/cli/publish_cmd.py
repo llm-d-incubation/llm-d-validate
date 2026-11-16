@@ -22,6 +22,7 @@ from ..output.remote import (
     missing_credentials,
     parse_remote_uri,
 )
+from ..results.read import UnreadableSchema
 from .exit_codes import NOT_DELIVERED, OK, PREFLIGHT, USAGE, class_of
 
 log = get_logger("cli.publish")
@@ -79,10 +80,26 @@ def publish_run(
     sent: the operator's environment, as it is when `llmdv verify` finds the same at preflight.
 
     `primary` records the destination that was unavailable when this is a fallback upload.
+    A run whose results were written under a schema this llmdv cannot read is USAGE.
     """
     if not run_dir.is_dir() or not any(run_dir.iterdir()):
         log.error("%s is empty or missing, so there is nothing to publish", run_dir)
         return USAGE
+    try:
+        return _publish(run_dir, remote_output, exit_code, primary, analyze=analyze)
+    except UnreadableSchema as exc:
+        log.error("results were NOT published: %s", exc)
+        return USAGE
+
+
+def _publish(
+    run_dir: Path,
+    remote_output: str,
+    exit_code: int | None,
+    primary: dict | None,
+    *,
+    analyze: bool,
+) -> int:
     body = outcome_file.read(run_dir)
     if body is None:
         # Missing or unreadable: the run died before, or while, recording it. Publish anyway.

@@ -17,6 +17,7 @@ from pathlib import Path
 from ..http.redact import scrub
 from ..output import manifest
 from ..output.remote import UnsupportedRemote, parse_remote_uri
+from ..results.read import UnreadableSchema, check_schema
 
 
 class NoSuchRun(Exception):
@@ -104,17 +105,20 @@ def read_results(uri: str, profile: str, run_id: str) -> list[dict]:
             raise NoSuchRun(f"cannot read {profile}/{run_id}/results.jsonl: {exc}") from exc
     else:
         raise UnsupportedRemote(f"cannot read runs from {target.scheme}://")
-    return _records(text, run_id)
+    return _records(text, run_id, f"{profile}/{run_id}/results.jsonl")
 
 
 def read_local_results(run_dir: Path) -> list[dict]:
     """Read the finishing run strictly, even before its publication has completed."""
     path = run_dir / "results.jsonl"
-    return _records(path.read_text(encoding="utf-8"), run_dir.name) if path.is_file() else []
+    if not path.is_file():
+        return []
+    return _records(path.read_text(encoding="utf-8"), run_dir.name, str(path))
 
 
-def _records(text: str, run_id: str) -> list[dict]:
-    """Reject partial or malformed input instead of comparing a silently reduced set."""
+def _records(text: str, run_id: str, source: str) -> list[dict]:
+    """Reject partial or malformed input instead of comparing a silently reduced set.
+    `source` names the file in the refusal of a schema this llmdv cannot read."""
     records = []
     for line_number, line in enumerate(text.splitlines(), start=1):
         if not line.strip():
@@ -131,6 +135,10 @@ def _records(text: str, run_id: str) -> list[dict]:
             "error",
         ):
             raise InvalidRun(f"{where}: expected a result with outcome pass, fail, skip or error")
+        try:
+            check_schema(record, f"{source}, line {line_number}")
+        except UnreadableSchema as exc:
+            raise InvalidRun(str(exc)) from exc
         records.append(record)
     return records
 
