@@ -148,12 +148,14 @@ def split_lines(chunks: Iterable[bytes], stats: dict[str, Any]) -> Iterator[str]
 
     def decode(data: bytes, final: bool = False) -> str:
         nonlocal decoder
+        state = decoder.getstate()
         try:
             return decoder.decode(data, final)
         except UnicodeDecodeError:
             stats["utf8_valid"] = False
             decoder = codecs.getincrementaldecoder("utf-8")("replace")
-            return data.decode("utf-8", "replace")
+            decoder.setstate(state)
+            return decoder.decode(data, final)
 
     for chunk in chunks:
         text = decode(chunk)

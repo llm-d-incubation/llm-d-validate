@@ -234,8 +234,8 @@ class RecordingClient:
         `timeouts.stream_idle` bounds each read, including a connection that stops sending.
 
         `drain` keeps reading after the terminal event until EOF, so a case can see frames a
-        server sends after its own terminal event. `framing` splits the raw bytes itself and
-        records line terminators and UTF-8 validity, which a decoded line reader hides.
+        server sends after its own terminal event. `framing` records line terminators and
+        UTF-8 validity alongside the decoded events.
         `close_on_headers` closes a successful stream as soon as its headers arrive, before
         any event: during prefill on a long prompt. `idle_timeout` replaces `stream_idle` for this
         one stream.
@@ -285,10 +285,8 @@ class RecordingClient:
                     except ValueError:
                         exchange.response_text = redact.scrub(text[:8000])
                 else:
-                    lines = (
-                        sse.split_lines(response.iter_bytes(), transcript.framing)
-                        if framing
-                        else response.iter_lines()
+                    lines = sse.split_lines(
+                        response.iter_bytes(), transcript.framing if framing else {}
                     )
                     sse.read(
                         lines,

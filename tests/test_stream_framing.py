@@ -4,10 +4,12 @@ from __future__ import annotations
 
 import json
 
+import httpx
 import pytest
 
 from llmdv.assertions.frames import assert_nothing_after_terminal, assert_sse_lines
 from llmdv.http import sse
+from llmdv.http.client import RecordingClient
 from tests.fakes import (
     MODEL,
     FakeFleet,
@@ -176,12 +178,29 @@ def test_split_lines_records_terminators_and_invalid_utf8():
     assert stats["partial_line_at_eof"] is True
 
 
-def test_split_lines_joins_a_multibyte_character_across_chunks():
+@pytest.mark.parametrize("character", ["\u00e9", "\x85", "\u2028", "\u2029"])
+def test_split_lines_joins_a_multibyte_character_across_chunks(character):
     stats: dict = {}
-    encoded = "data: \u00e9\n\n".encode()
+    encoded = f"data: {character}\n\n".encode()
     lines = list(sse.split_lines([encoded[:7], encoded[7:]], stats))
-    assert lines == ["data: \u00e9", ""]
+    assert lines == [f"data: {character}", ""]
     assert stats["utf8_valid"] is True and not stats["partial_line_at_eof"]
+
+
+@pytest.mark.parametrize(
+    "chunks,expected,partial",
+    [
+        ([b"data: \xe2", b"X\n\n"], ["data: \ufffdX", ""], False),
+        ([b"data: \xff\xe2", b"\x82\xac\n\n"], ["data: \ufffd\u20ac", ""], False),
+        ([b"data: \xe2"], ["data: \ufffd"], True),
+    ],
+    ids=["buffered-prefix", "trailing-prefix", "eof"],
+)
+def test_split_lines_preserves_invalid_utf8_across_chunks(chunks, expected, partial):
+    stats: dict = {}
+    assert list(sse.split_lines(chunks, stats)) == expected
+    assert stats["utf8_valid"] is False
+    assert stats["partial_line_at_eof"] == partial
 
 
 def test_drain_keeps_lines_after_the_terminal_event_apart():
@@ -211,6 +230,80 @@ def test_drain_limit_reports_that_eof_was_not_observed():
 def test_sse_field_check_does_not_treat_unicode_separators_as_lines(separator):
     transcript = sse.Transcript(raw=f'data: {{"text": "before{separator}after"}}\n\n')
     assert_sse_lines(transcript)
+
+
+@pytest.mark.parametrize("separator", ["\x85", "\u2028", "\u2029"])
+@pytest.mark.parametrize("framing", [False, True], ids=["default", "framing"])
+def test_recording_client_preserves_unicode_separators(separator, framing):
+    chunk = {
+        "id": "chatcmpl-test",
+        "object": "chat.completion.chunk",
+        "created": 0,
+        "model": MODEL,
+        "choices": [
+            {"index": 0, "delta": {"content": f"before{separator}after"}, "finish_reason": None}
+        ],
+    }
+    raw = f"data: {json.dumps(chunk, ensure_ascii=False)}\n\ndata: [DONE]\n\n"
+    with FakeFleet(transport={"chat_stream": raw.encode()}) as fleet:
+        with RecordingClient(fleet.base_url) as client:
+            exchange, transcript = client.stream(
+                "/v1/chat/completions",
+                json_body={
+                    "model": MODEL,
+                    "messages": [{"role": "user", "content": "Hello"}],
+                    "stream": True,
+                },
+                **({"framing": True} if framing else {}),
+            )
+    assert exchange.status == 200 and exchange.transport_error is None
+    assert transcript.saw_done
+    assert [event.json() for event in transcript.data_events] == [chunk]
+    assert transcript.raw == raw
+    assert transcript.bytes_received == len(raw.encode())
+    assert exchange.response_text == raw
+    assert bool(transcript.framing) == framing
+
+
+@pytest.mark.parametrize(
+    "chunks,content",
+    [
+        ([b'data: {"content": "\xe2', b'X"}\n\n'], "\ufffdX"),
+        ([b'data: {"content": "\xff\xe2', b'\x82\xac"}\n\n'], "\ufffd\u20ac"),
+    ],
+    ids=["buffered-prefix", "trailing-prefix"],
+)
+@pytest.mark.parametrize("framing", [None, False, True], ids=["default", "disabled", "framing"])
+def test_recording_client_preserves_invalid_utf8_across_chunks(chunks, content, framing):
+    class Chunks(httpx.SyncByteStream):
+        def __iter__(self):
+            yield from chunks
+            yield b"data: [DONE]\n\n"
+
+    expected = {"content": content}
+    raw = f"data: {json.dumps(expected, ensure_ascii=False)}\n\ndata: [DONE]\n\n"
+    reference = httpx.Response(200, stream=Chunks())
+    assert "\n".join(reference.iter_lines()) + "\n" == raw
+
+    def respond(request):
+        return httpx.Response(200, stream=Chunks())
+
+    with RecordingClient("http://test") as client:
+        client._client.close()
+        client._client = httpx.Client(transport=httpx.MockTransport(respond))
+        exchange, transcript = client.stream(
+            "/v1/chat/completions", **({} if framing is None else {"framing": framing})
+        )
+    assert exchange.status == 200 and exchange.transport_error is None
+    assert transcript.saw_done
+    assert [event.json() for event in transcript.data_events] == [expected]
+    assert transcript.raw == raw and exchange.response_text == raw
+    assert transcript.bytes_received == len(raw.encode())
+    if framing:
+        assert transcript.framing["utf8_valid"] is False
+        assert not transcript.framing["partial_line_at_eof"]
+    else:
+        assert transcript.framing == {}
 
 
 def _thinking_stream(thinking_first: bool) -> str:
