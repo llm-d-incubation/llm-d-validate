@@ -6,9 +6,9 @@ an environment variable instead.
 Two vocabularies in here carry most of the design's weight.
 
 `Disposition` is what a layer does to a header. The same header has three different
-dispositions depending on where it enters an llm-d stack: LiteLLM's flow-control hook
-strips the client's `x-llm-d-inference-objective` and rewrites it from `objectives.yaml`, the
-EPP consumes it, and vLLM ignores it. Only some of those are observable from outside, which
+dispositions depending on where it enters a stack: a proxy hook may strip the client's
+priority header (such as `x-llm-d-inference-objective`) and set its own, the router consumes it,
+and the engine ignores it. Only some of those are observable from outside, which
 is what `verifiable_by` records -- an unobservable one must skip with a reason, never pass.
 
 `SkipClass` keeps six reasons distinguishable. A matrix that renders "the fleet does not

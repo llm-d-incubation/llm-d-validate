@@ -42,6 +42,15 @@ contexts, API server hostnames, pod or service names, or tenant keys — not in 
 profiles, docs, issues, PR bodies or commit messages. The committed `profiles/examples/*.yaml`
 carry placeholders; real values live in `profiles/<system>/*.local.yaml`, which is gitignored.
 
+**The core validates any model-serving stack.** Validating llm-d's guides efficiently is the
+main goal, and a custom llm-d deployment or a stack with no llm-d at all must work just as well:
+any OpenAI- or Anthropic-compatible gateway, router or engine, described by its own profile.
+Nothing in `src/` depends on an llm-d guide, a guide's name, `guide.yaml` or llm-d's
+`llm-d.ai/*` pod labels. Guide support is data (the guide profiles) and optional conveniences
+layered on top; a profile without them behaves exactly as before. Pods are found through
+selectors the profile declares, never by assuming a label. `tests/test_stack_agnostic_core.py`
+enforces this.
+
 ## Conventions that are enforced
 
 **No `print`.** Ruff rule `T20`. Everything goes through the logger tree: diagnostics to
