@@ -9,6 +9,7 @@ from __future__ import annotations
 from typing import Any
 
 from ..surfaces.base import KNOWN_SURFACES, SURFACE_PATHS
+from .errors import ProfileError
 from .schema import (
     BYTE_FIDELITY_PROBES,
     CONTRACT_PARTS,
@@ -25,12 +26,6 @@ RENDER_SURFACES = frozenset(
 HEX = frozenset("0123456789abcdef")
 
 
-def _error(message: str) -> Exception:
-    from .loader import ProfileError
-
-    return ProfileError(message)
-
-
 # The key an outcome declared for every surface is stored under.
 EVERY_SURFACE = "*"
 
@@ -44,24 +39,24 @@ def forward_compat(raw: Any, where: str) -> dict[str, dict[str, str]]:
     if raw is None:
         return {}
     if not isinstance(raw, dict):
-        raise _error(f"{where}: expected a mapping of probe to outcome, got {raw!r}")
+        raise ProfileError(f"{where}: expected a mapping of probe to outcome, got {raw!r}")
     out: dict[str, dict[str, str]] = {}
     for probe, declared in raw.items():
         if probe not in FORWARD_COMPAT_PROBES:
-            raise _error(
+            raise ProfileError(
                 f"{where}.{probe}: unknown probe; known: {', '.join(FORWARD_COMPAT_PROBES)}"
             )
         if isinstance(declared, dict) and declared:
             for surface in declared:
                 if surface not in KNOWN_SURFACES:
-                    raise _error(f"{where}.{probe}.{surface}: unknown surface")
+                    raise ProfileError(f"{where}.{probe}.{surface}: unknown surface")
             per = {str(surface): outcome for surface, outcome in declared.items()}
         else:
             per = {EVERY_SURFACE: declared}
         for at, outcome in per.items():
             if outcome not in FORWARD_COMPAT_OUTCOMES:
                 place = f"{where}.{probe}" + ("" if at == EVERY_SURFACE else f".{at}")
-                raise _error(
+                raise ProfileError(
                     f"{place}: expected one of {', '.join(FORWARD_COMPAT_OUTCOMES)} or a "
                     f"mapping of surface to one of them, got {outcome!r}"
                 )
@@ -74,10 +69,10 @@ def byte_fidelity(raw: Any, where: str) -> tuple[str, ...]:
     if raw is None:
         return ()
     if not isinstance(raw, list) or len(raw) != len(set(map(str, raw))):
-        raise _error(f"{where}: expected a list of distinct probe names, got {raw!r}")
+        raise ProfileError(f"{where}: expected a list of distinct probe names, got {raw!r}")
     for name in raw:
         if name not in BYTE_FIDELITY_PROBES:
-            raise _error(
+            raise ProfileError(
                 f"{where}: unknown probe {name!r}; known: {', '.join(BYTE_FIDELITY_PROBES)}"
             )
     return tuple(raw)
@@ -88,20 +83,22 @@ def prompt_pins(raw: Any, where: str) -> dict[str, dict[str, int]]:
     if raw is None:
         return {}
     if not isinstance(raw, dict):
-        raise _error(f"{where}: expected a mapping of surface to pins, got {raw!r}")
+        raise ProfileError(f"{where}: expected a mapping of surface to pins, got {raw!r}")
     out: dict[str, dict[str, int]] = {}
     for surface, pins in raw.items():
         if surface not in KNOWN_SURFACES:
-            raise _error(f"{where}.{surface}: unknown surface")
+            raise ProfileError(f"{where}.{surface}: unknown surface")
         if not isinstance(pins, dict):
-            raise _error(f"{where}.{surface}: expected a mapping of pin to tokens, got {pins!r}")
+            raise ProfileError(
+                f"{where}.{surface}: expected a mapping of pin to tokens, got {pins!r}"
+            )
         for name, tokens in pins.items():
             if name not in PROMPT_PINS:
-                raise _error(
+                raise ProfileError(
                     f"{where}.{surface}.{name}: unknown pin; known: {', '.join(PROMPT_PINS)}"
                 )
             if type(tokens) is not int or tokens <= 0:
-                raise _error(
+                raise ProfileError(
                     f"{where}.{surface}.{name}: expected a positive integer, got {tokens!r}"
                 )
         out[str(surface)] = {str(name): tokens for name, tokens in pins.items()}
@@ -113,20 +110,20 @@ def contract_baseline(raw: Any, where: str) -> dict[str, dict[str, dict[str, tup
     if raw is None:
         return {}
     if not isinstance(raw, dict):
-        raise _error(f"{where}: expected a mapping of surface to parts, got {raw!r}")
+        raise ProfileError(f"{where}: expected a mapping of surface to parts, got {raw!r}")
     out: dict[str, dict[str, dict[str, tuple[str, ...]]]] = {}
     for surface, parts in raw.items():
         if surface not in KNOWN_SURFACES:
-            raise _error(f"{where}.{surface}: unknown surface")
+            raise ProfileError(f"{where}.{surface}: unknown surface")
         if not isinstance(parts, dict):
-            raise _error(f"{where}.{surface}: expected a mapping of part to paths")
+            raise ProfileError(f"{where}.{surface}: expected a mapping of part to paths")
         out[str(surface)] = {}
         for part, paths in parts.items():
             at = f"{where}.{surface}.{part}"
             if part not in CONTRACT_PARTS:
-                raise _error(f"{at}: unknown part; known: {', '.join(CONTRACT_PARTS)}")
+                raise ProfileError(f"{at}: unknown part; known: {', '.join(CONTRACT_PARTS)}")
             if not isinstance(paths, dict) or not paths:
-                raise _error(f"{at}: expected a non-empty mapping of key path to types")
+                raise ProfileError(f"{at}: expected a non-empty mapping of key path to types")
             parsed: dict[str, tuple[str, ...]] = {}
             for path, types in paths.items():
                 types = [types] if isinstance(types, str) else types
@@ -136,7 +133,7 @@ def contract_baseline(raw: Any, where: str) -> dict[str, dict[str, dict[str, tup
                     or not types
                     or any(item not in CONTRACT_TYPES for item in types)
                 ):
-                    raise _error(
+                    raise ProfileError(
                         f"{at}.{path}: expected a list of types from {', '.join(CONTRACT_TYPES)}"
                     )
                 parsed[path] = tuple(types)
@@ -149,17 +146,19 @@ def render_pins(raw: Any, where: str) -> dict[str, dict[str, str]]:
     if raw is None:
         return {}
     if not isinstance(raw, dict):
-        raise _error(f"{where}: expected a mapping of render surface to pins, got {raw!r}")
+        raise ProfileError(f"{where}: expected a mapping of render surface to pins, got {raw!r}")
     out: dict[str, dict[str, str]] = {}
     for surface, pins in raw.items():
         if surface not in RENDER_SURFACES:
             known = ", ".join(sorted(RENDER_SURFACES))
-            raise _error(f"{where}.{surface}: not a render surface; known: {known}")
+            raise ProfileError(f"{where}.{surface}: not a render surface; known: {known}")
         if not isinstance(pins, dict):
-            raise _error(f"{where}.{surface}: expected a mapping of pin to digest, got {pins!r}")
+            raise ProfileError(
+                f"{where}.{surface}: expected a mapping of pin to digest, got {pins!r}"
+            )
         for name, digest in pins.items():
             if name not in PROMPT_PINS:
-                raise _error(
+                raise ProfileError(
                     f"{where}.{surface}.{name}: unknown pin; known: {', '.join(PROMPT_PINS)}"
                 )
             if (
@@ -167,7 +166,7 @@ def render_pins(raw: Any, where: str) -> dict[str, dict[str, str]]:
                 or len(digest) != RENDER_PIN_DIGEST_LENGTH
                 or not set(digest) <= HEX
             ):
-                raise _error(
+                raise ProfileError(
                     f"{where}.{surface}.{name}: expected a lowercase hex SHA-256 digest, "
                     f"got {digest!r}"
                 )

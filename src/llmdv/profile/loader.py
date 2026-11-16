@@ -1,8 +1,10 @@
 """YAML -> Profile, with diagnostics that name the path that is wrong.
 
-Validation collects every problem rather than raising on the first, because a profile is
-edited as a whole and a loader that reports one error per run wastes a round trip each time.
-Like a kustomize validator, it reports exactly where a profile breaks.
+Problems are found in two passes. `load` checks types and shapes, and raises `ProfileError` at
+the first value it cannot turn into an object. `validate` runs on a loaded profile and collects
+every range, cross-field and cross-section problem as a `Diagnostic`, because a profile is edited
+as a whole and a check that reports one error per run wastes a round trip each time. Both name
+the path that is wrong.
 
 `validate` is offline by design. It resolves no secrets and contacts no cluster, so a profile
 can be written and checked on a laptop with no access to the fleet it describes. Missing
@@ -18,15 +20,24 @@ import json
 import math
 import os
 import re
-from dataclasses import dataclass, fields
+from dataclasses import fields
 from pathlib import Path
 from typing import Any
 
 import yaml
 
+from ..http.redact import SECRET_HEADERS
 from ..surfaces import base as surfaces
 from . import evolution
 from . import transport as transport_contract
+from .errors import Diagnostic, ProfileError
+from .fleet import (
+    fleet_diagnostics,
+    parse_allow,
+    parse_fleet,
+    parse_metrics_source,
+    parse_signatures,
+)
 from .schema import (
     CACHE_AFFINITIES,
     CHAT_FIELDS,
@@ -85,20 +96,6 @@ from .schema import (
 SUPPORTED_SCHEMA = "llmdv.profile/1"
 
 
-class ProfileError(Exception):
-    """Raised for a profile that cannot be turned into an object at all."""
-
-
-@dataclass(frozen=True)
-class Diagnostic:
-    level: str  # "error" | "warning"
-    path: str
-    message: str
-
-    def __str__(self) -> str:
-        return f"{self.level.upper():<7} {self.path}: {self.message}"
-
-
 def load(path: str | Path) -> Profile:
     """Parse a profile file into a Profile. Raises ProfileError on unusable input."""
     file_path = Path(path)
@@ -115,8 +112,6 @@ def load(path: str | Path) -> Profile:
 
 def validate(profile: Profile) -> list[Diagnostic]:
     """Offline checks across the whole profile. Errors block a run; warnings do not."""
-    from .fleet import fleet_diagnostics
-
     out = validate_models(profile)
 
     if profile.schema != SUPPORTED_SCHEMA:
@@ -283,7 +278,7 @@ def validate(profile: Profile) -> list[Diagnostic]:
                 )
             )
 
-    out += [Diagnostic(*item) for item in fleet_diagnostics(profile)]
+    out += fleet_diagnostics(profile)
     return out
 
 
@@ -356,7 +351,7 @@ def _build(raw: dict[str, Any], path: Path) -> Profile:
                 FleetPolicy, raw.get("fleet_policy"), FleetPolicy.DEDICATED, "fleet_policy"
             ),
             source_path=path,
-            fleet=_fleet(raw.get("fleet")),
+            fleet=parse_fleet(raw.get("fleet")),
             known_failures=_known_failures(raw.get("known_failures")),
         )
     except ProfileError:
@@ -491,26 +486,8 @@ def _environment(raw: dict[str, Any]) -> Environment:
         context=_opt_str(raw.get("context")),
         namespace=_opt_str(raw.get("namespace")),
         kubeconfig=Path(str(kubeconfig)).expanduser() if kubeconfig else None,
-        metrics=_metrics_source(raw.get("metrics")),
+        metrics=parse_metrics_source(raw.get("metrics")),
     )
-
-
-def _fleet(raw: Any):
-    from .fleet import FleetDeclarationError, parse_fleet
-
-    try:
-        return parse_fleet(raw)
-    except FleetDeclarationError as exc:
-        raise ProfileError(str(exc)) from None
-
-
-def _metrics_source(raw: Any):
-    from .fleet import FleetDeclarationError, parse_metrics_source
-
-    try:
-        return parse_metrics_source(raw)
-    except FleetDeclarationError as exc:
-        raise ProfileError(str(exc)) from None
 
 
 def _check_override_keys(raw, cls, where, nullable=(), renames=None) -> None:
@@ -710,7 +687,9 @@ def _ingress(
         ),
         logs=tuple(_log_source(item) for item in (raw.get("logs") or [])),
         tls=Tls(verify=_bool((raw.get("tls") or {}).get("verify"), True, "tls.verify")),
-        transport=_transport(raw.get("transport"), f"ingresses({ingress_id}).transport"),
+        transport=transport_contract.parse(
+            raw.get("transport"), f"ingresses({ingress_id}).transport"
+        ),
         setup=Setup(
             proxy=_enum(
                 ProxyMode,
@@ -738,13 +717,6 @@ def _check_http_redirect(ingress: Ingress) -> None:
         raise ProfileError(f"ingresses({ingress.id}): {reason}")
 
 
-def _transport(raw: Any, where: str) -> transport_contract.TransportContract:
-    try:
-        return transport_contract.parse(raw, where)
-    except transport_contract.TransportError as exc:
-        raise ProfileError(str(exc)) from exc
-
-
 def _requirement(raw: dict[str, Any]) -> Requirement:
     return Requirement(
         kind=str(raw.get("kind") or "port_forward"),
@@ -758,20 +730,13 @@ def _requirement(raw: dict[str, Any]) -> Requirement:
 
 
 def _log_source(raw: dict[str, Any]) -> LogSource:
-    from .fleet import FleetDeclarationError, parse_allow, parse_signatures
-
-    try:
-        forbid = parse_signatures(raw.get("forbid"), "logs.forbid")
-        allow = parse_allow(raw.get("allow"), "logs.allow")
-    except FleetDeclarationError as exc:
-        raise ProfileError(str(exc)) from None
     return LogSource(
         selector=_opt_str(raw.get("selector")),
         target=_opt_str(raw.get("target")),
         container=_opt_str(raw.get("container")),
         tail=int(raw.get("tail", 2000)),
-        forbid=forbid,
-        allow=allow,
+        forbid=parse_signatures(raw.get("forbid"), "logs.forbid"),
+        allow=parse_allow(raw.get("allow"), "logs.allow"),
     )
 
 
@@ -1107,8 +1072,6 @@ def _cache_reuse(raw: Any, where: str) -> CacheReuse | None:
             "stripped_system_prefix",
         ),
     )
-    from ..http.redact import SECRET_HEADERS
-
     problems: list[str] = []
     ratio = raw.get("min_ratio")
     if not _finite(ratio) or not 0 < ratio <= 1:
@@ -1252,8 +1215,6 @@ def _setting_entry(entry: Any, selected: Any) -> bool:
 
 
 def _binaries(raw: Any, where: str, base_dir: Path) -> tuple[ClientBinary, ...]:
-    import re
-
     if not isinstance(raw, list):
         raise ProfileError(f"{where}: expected a list of pinned Claude Code binaries")
     binaries = []
@@ -1281,8 +1242,6 @@ def _binaries(raw: Any, where: str, base_dir: Path) -> tuple[ClientBinary, ...]:
 
 
 def _header_rewrites(raw: Any, where: str) -> dict[str, str]:
-    from ..http.redact import SECRET_HEADERS
-
     if not isinstance(raw, dict):
         raise ProfileError(f"{where}: expected a header/value mapping")
     result = {}

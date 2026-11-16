@@ -14,8 +14,11 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass, is_dataclass
+from dataclasses import fields as dataclass_fields
 from types import NoneType
 from typing import Any, get_args, get_type_hints
+
+from .errors import Diagnostic, ProfileError
 
 # What a configuration rule checks. Each is one llmdv case, and each declared rule a variant.
 CONFIG_CHECKS = (
@@ -31,7 +34,7 @@ CONFIG_CHECKS = (
 CONFIG_VIEWS = ("containers", "data")
 
 
-class FleetDeclarationError(ValueError):
+class FleetDeclarationError(ProfileError):
     """A fleet declaration that cannot be turned into a rule."""
 
 
@@ -541,15 +544,14 @@ def parse_fleet(raw: Any) -> FleetChecks:
     )
 
 
-def fleet_diagnostics(profile: Any) -> list[tuple[str, str, str]]:
-    """Cross-section checks on the fleet block, as (level, path, message) triples.
+def fleet_diagnostics(profile: Any) -> list[Diagnostic]:
+    """Cross-section checks on the fleet block.
 
     Offline like the rest of `validate`: names are checked against the profile, never against a
     cluster.
     """
-    from dataclasses import fields as dataclass_fields
-
-    from .schema import Capabilities
+    # Read from the profile rather than imported: `schema` imports this module.
+    Capabilities = type(profile.capabilities)
 
     def capability_path_known(path: str) -> bool:
         current: type = Capabilities
@@ -565,31 +567,37 @@ def fleet_diagnostics(profile: Any) -> list[tuple[str, str, str]]:
                 current = next_type
         return True
 
-    out: list[tuple[str, str, str]] = []
+    out: list[Diagnostic] = []
     capabilities = {item.name for item in dataclass_fields(Capabilities)}
     ingress_ids = set(profile.ingress_ids)
     namespace = profile.environment.namespace
     if profile.fleet.metrics and profile.environment.metrics is None:
-        out.append(("error", "fleet.metrics", "declares rules but environment.metrics is unset"))
+        out.append(
+            Diagnostic("error", "fleet.metrics", "declares rules but environment.metrics is unset")
+        )
     for rule in profile.fleet.metrics:
         at = f"fleet.metrics({rule.id})"
         if rule.ingress and rule.ingress not in ingress_ids:
-            out.append(("error", f"{at}.ingress", f"names undeclared ingress {rule.ingress!r}"))
+            out.append(
+                Diagnostic("error", f"{at}.ingress", f"names undeclared ingress {rule.ingress!r}")
+            )
         if rule.when and rule.when not in capabilities:
-            out.append(("error", f"{at}.when", f"unknown capability {rule.when!r}"))
+            out.append(Diagnostic("error", f"{at}.when", f"unknown capability {rule.when!r}"))
     for rule in profile.fleet.config:
         at = f"fleet.config({rule.id})"
         gated_out = bool(rule.when) and not any(
             getattr(ingress.capabilities, rule.when, None) for ingress in profile.ingresses
         )
         if rule.ingress and rule.ingress not in ingress_ids:
-            out.append(("error", f"{at}.ingress", f"names undeclared ingress {rule.ingress!r}"))
+            out.append(
+                Diagnostic("error", f"{at}.ingress", f"names undeclared ingress {rule.ingress!r}")
+            )
         if rule.when and rule.when not in capabilities:
-            out.append(("error", f"{at}.when", f"unknown capability {rule.when!r}"))
+            out.append(Diagnostic("error", f"{at}.when", f"unknown capability {rule.when!r}"))
         if rule.expect_capability:
             if not capability_path_known(rule.expect_capability):
                 out.append(
-                    (
+                    Diagnostic(
                         "error",
                         f"{at}.expect_capability",
                         f"unknown capability {rule.expect_capability!r}",
@@ -600,7 +608,7 @@ def fleet_diagnostics(profile: Any) -> list[tuple[str, str, str]]:
                 for ingress in profile.ingresses
             ):
                 out.append(
-                    (
+                    Diagnostic(
                         "error",
                         f"{at}.expect_capability",
                         f"capability {rule.expect_capability!r} is not declared by any ingress",
@@ -608,7 +616,11 @@ def fleet_diagnostics(profile: Any) -> list[tuple[str, str, str]]:
                 )
         refs = [rule.objects] if rule.objects else [source.objects for source in rule.sources]
         if not namespace and any(ref is not None and not ref.namespace for ref in refs):
-            out.append(("error", at, "reads objects with no namespace; set environment.namespace"))
+            out.append(
+                Diagnostic(
+                    "error", at, "reads objects with no namespace; set environment.namespace"
+                )
+            )
     return out
 
 

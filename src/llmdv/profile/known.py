@@ -133,26 +133,6 @@ def _parts(version: str) -> tuple[int, ...]:
     return tuple(int(part) for part in version.split("."))
 
 
-def matches_case(patterns: Iterable[str], case_id: str | None, variant: str | None) -> bool:
-    """Whether any glob names the case, by id or by `id[variant]`.
-
-    Only `*` and `?` are wild. Brackets are literal, because a variant is written in them
-    (`openai_chat.request_field[logit_bias]`) and fnmatch would read that as a character class.
-    """
-    names = [case_id or ""]
-    if variant:
-        names.append(f"{case_id}[{variant}]")
-    return any(_glob(pattern).fullmatch(name) for pattern in patterns for name in names)
-
-
-def _glob(pattern: str) -> re.Pattern[str]:
-    parts = [
-        ".*" if piece == "*" else "." if piece == "?" else re.escape(piece)
-        for piece in re.split(r"([*?])", pattern)
-    ]
-    return re.compile("".join(parts))
-
-
 def unmatched(entries: Iterable[KnownFailure], records: Iterable[Mapping[str, Any]]) -> list[dict]:
     """The entries that labelled no record: candidates for pruning, or for a `-k` that left
     their cases out. Matched by issue and check, which together name an entry."""

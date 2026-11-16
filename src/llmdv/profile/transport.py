@@ -16,6 +16,9 @@ from dataclasses import dataclass, fields
 from typing import Any
 from urllib.parse import urlsplit
 
+from ..http.redact import SECRET_HEADERS
+from .errors import ProfileError
+
 # Error classes for transport-level requests. A case without a declared status for its class
 # applies the documented default named in its docstring.
 TRANSPORT_ERROR_CLASSES = frozenset(
@@ -83,7 +86,7 @@ ADMIN_PATHS = frozenset(
 )
 
 
-class TransportError(ValueError):
+class TransportError(ProfileError):
     """A malformed `transport` declaration."""
 
 
@@ -241,8 +244,6 @@ def _header(value: Any, where: str) -> str | None:
         return None
     if not isinstance(value, str) or not value or any(c.isspace() or c == ":" for c in value):
         raise TransportError(f"{where}: expected a header name, got {value!r}")
-    from ..http.redact import SECRET_HEADERS
-
     if value.lower() in SECRET_HEADERS:
         raise TransportError(f"{where}: expected a non-credential header")
     return value.lower()
