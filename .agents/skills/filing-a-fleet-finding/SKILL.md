@@ -17,7 +17,7 @@ A fleet finding is a defect an llmdv run caught in the deployed serving stack. E
    - the gateway version, where the ingress reports its own (e.g. `x-litellm-version`);
    - **a split** wherever it shows where the defect is and is not. Each line of `exchanges.jsonl` has `url`, `status`, `request_body`, `response_headers` and `response_body` (a stream is one SSE string; the body can be null). Count by path and stream mode.
 3. **Re-verify it now.**
-   - **Rerun the cases:** the two or three smallest, with `llmdv verify --profile <p> --evidence all -k "<test functions>"` (function names without the `[...]` suffix: `-k` does not match brackets). Record the date and result.
+   - **Rerun the cases:** the two or three smallest, with `llmdv verify --profile <p> --evidence all -k "<test names>"` (a function name selects every variant; quote a full `name[variant]` from the `nodeid` to select one). Record the date and result.
    - **Run the curl:** run the request from the new `repro.sh` as the curl the issue will show: the same path and body, trimmed headers, and a filter that shows the defect. Paste its real output as "observed".
      - Put the host in `BASE`, read without printing. A committed profile names it by variable (`base_url_env`), a local one may write `base_url` inline; this reads either:
        `BASE=$(.venv/bin/python -c "import os,yaml;i=next(x for x in yaml.safe_load(open('<p>'))['ingresses'] if x['id']=='<ingress>');print(i.get('base_url') or os.environ[i['base_url_env']])")`

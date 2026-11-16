@@ -1,15 +1,16 @@
 # Example: barebones llm-d fleet (decode + EPP router gateway), driven from outside the cluster.
 #
-# Every declaration below was verified against a live stack rather than inferred from
-# manifests. The contract suite re-checks the declared surfaces and header dispositions on each
-# run, so a stale one fails rather than silently losing coverage.
+# The declarations were measured against one live stack of this shape (vLLM 0.30.0 behind the
+# EPP), not inferred from manifests; the comments say what was observed. Re-measure them on yours:
+# the contract suite re-checks the declared surfaces and header dispositions on each run, so a
+# stale line fails rather than silently losing coverage.
 #
 # The environment block and the service name below are PLACEHOLDERS. Copy this file to
 # profiles/<something>.local.yaml, which is gitignored, and fill them in for your own fleet.
 #
-# This fleet is deliberately the "no LiteLLM" shape the task calls out: two ingresses, not
-# three. It is also served WITHOUT --reasoning-parser or --tool-call-parser, which is why
-# model.reasoning.parser is null and model.tools.parser is absent.
+# This is the shape with no proxy in front: two ingresses, not three. The engine is served
+# WITHOUT --reasoning-parser or --tool-call-parser, which is why model.reasoning.parser and
+# model.tools.parser are null.
 schema: llmdv.profile/1
 name: example-two-ingress
 vantage: external
@@ -26,7 +27,7 @@ environment:
 model:
   public_id: Qwen/Qwen3-32B
   aliases: []
-  # From GET /v1/models on the live fleet, not from the manifest: the deployment passes no
+  # From GET /v1/models on the running stack, not from the manifest: that deployment passed no
   # --max-model-len, so this is vLLM's own resolved value.
   max_model_len: 40960
   reasoning:
@@ -120,15 +121,15 @@ ingresses:
           remote_port: 80
 
 capabilities:
-  # Not probed yet. Declared false so its cases skip as undeclared rather than assert
-  # against an unverified surface; flip it once checked.
+  # Declared false until probed, so their cases skip as undeclared rather than assert against
+  # an unverified feature; flip each once checked.
   count_tokens: false
   stateful_responses: false
   structured_output: false
   # Set for a multimodal model served with its vision path on; the image cases then run.
   vision: false
-  # vLLM 0.30.0 accepts these, but none is exercised by the two cases in this pass, so the
-  # list stays empty rather than claiming unverified support.
+  # Engine-specific request options (see REFERENCE.md). Left empty until each is probed, rather
+  # than claiming unverified support.
   vllm_options: []
 
 headers:

@@ -96,7 +96,7 @@ Suspect a moment in the fleet when failures:
 - coincide with two `system_fingerprint` values in `outcome.json` `stack`, or a pod restart (`kubectl get pod … -o jsonpath='{.status.containerStatuses[0].restartCount}'`). Compare the build part of the fingerprint (`vllm-<version>+g<sha>`); the suffix after the parallelism (`-tp<n>-<hash>`) differs between deployments of one build, so it alone does not mean a different engine;
 - flip between runs: check the same cases in the previous runs (running-and-comparing-live-runs).
 
-Then rerun the two or three smallest cases now: `llmdv verify --profile <profile> --evidence all -k "<test functions>"`. The function name is the part of `nodeid` after `::`, without the `[...]` (`-k` does not match brackets). Model-dependent cases (tool arguments, effort ordering, repeats at temperature 0) can flip without any change; call them stochastic, not fixed or broken, from one run.
+Then rerun the two or three smallest cases now: `llmdv verify --profile <profile> --evidence all -k "<test functions>"`. The name is the part of `nodeid` after `::`: the function name alone selects every variant, and the full `name[variant]`, quoted, selects one. Model-dependent cases (tool arguments, effort ordering, repeats at temperature 0) can flip without any change; call them stochastic, not fixed or broken, from one run.
 
 ### How did it fail?
 

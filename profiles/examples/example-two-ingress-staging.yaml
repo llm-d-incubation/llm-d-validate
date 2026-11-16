@@ -1,0 +1,32 @@
+# Example: the same stack as example-two-ingress.yaml, deployed in a second namespace.
+#
+# `extends` makes this file a set of changes to its parent: everything not named here (the model,
+# surfaces, error contracts, headers and clients) comes from example-two-ingress.yaml, so a fix
+# there applies to both. Ingresses are keyed by `id`, so each entry below changes only that
+# ingress. `requires` is a list, and a list replaces the parent's whole, so it is restated.
+#
+# `llmdv profile show <this file>` prints the composed profile, and a run's profile.used.yaml
+# records which file set each key.
+extends: example-two-ingress.yaml
+name: example-two-ingress-staging
+
+environment:
+  namespace: <staging-namespace>
+
+ingresses:
+  - id: vllm
+    setup:
+      requires:
+        - kind: port_forward
+          namespace: <staging-namespace>
+          selector: llm-d.ai/role=decode
+          local_port: 18100
+          remote_port: 8000
+  - id: router
+    setup:
+      requires:
+        - kind: port_forward
+          namespace: <staging-namespace>
+          target: svc/<epp-service>
+          local_port: 18180
+          remote_port: 80

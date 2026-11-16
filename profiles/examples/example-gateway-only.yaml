@@ -23,9 +23,9 @@ model:
   # every declared name appears in this ingress's GET /v1/models, so the gateway's id is the one
   # that belongs here -- not the engine's.
   #
-  # That is also why this profile has one ingress rather than two. A profile declares one model id
-  # for all of its ingresses, so a gateway and its engine cannot share one until per-ingress
-  # overrides exist. Two profiles, or one ingress.
+  # This profile has one ingress because only the gateway is reachable. If you can also reach the
+  # engine, add it as a second ingress with its own `model.public_id` (a per-ingress override; see
+  # REFERENCE.md), since the two layers usually name the model differently.
   public_id: <the id the gateway advertises>
   aliases: []
   # MEASURE THIS, from GET /v1/models on the gateway. A gateway may report the engine's limit,

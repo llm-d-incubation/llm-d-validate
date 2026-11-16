@@ -17,7 +17,9 @@ Field reference: [`profiles/REFERENCE.md`](../../../profiles/REFERENCE.md). Guid
    |---|---|---|
    | `examples/example-gateway-only.yaml` | `litellm` | a model behind a LiteLLM gateway: a URL and a key are all you have |
    | `examples/example-two-ingress.yaml` | `vllm` + `llmd_router` | engine and router, with port-forwards |
-   | `examples/example-three-ingress.yaml` | `litellm` + `llmd_router` + `vllm` | all three layers; derived from manifests, never run |
+   | `examples/example-three-ingress.yaml` | `litellm` + `llmd_router` + `vllm` | all three layers; a template to measure against |
+
+   A variant of an existing profile (another namespace, an in-cluster copy) is a short file with `extends: <parent>.yaml` that names only what differs; see `examples/example-two-ingress-staging.yaml`.
 
    Declare only the layers you can reach. One ingress is a complete profile; a declared but unreachable layer fails preflight.
 

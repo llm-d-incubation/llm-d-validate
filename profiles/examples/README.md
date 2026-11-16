@@ -8,5 +8,6 @@ you measure. Copy to `profiles/<system>/<model>.local.yaml` (gitignored) for rea
 | [example-gateway-only.yaml](example-gateway-only.yaml) | one gateway, no cluster access: a URL and a key are all you have |
 | [example-two-ingress.yaml](example-two-ingress.yaml) | an engine plus a router gateway |
 | [example-three-ingress.yaml](example-three-ingress.yaml) | a proxy (LiteLLM) in front of both |
+| [example-two-ingress-staging.yaml](example-two-ingress-staging.yaml) | the two-ingress stack in a second namespace, written with `extends` as only its changes |
 
 See the [profile guide](../README.md) and the [field reference](../REFERENCE.md).

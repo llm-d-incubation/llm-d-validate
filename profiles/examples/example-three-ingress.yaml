@@ -1,19 +1,18 @@
 # Example: the full three-ingress shape, with LiteLLM in front.
 #
-# STATUS: DERIVED FROM MANIFESTS, NOT YET VERIFIED AGAINST THE LIVE FLEET.
+# STATUS: A TEMPLATE. Values marked <...> are placeholders. The declarations show the shape of a
+# stack with an engine, the llm-d router (EPP) and a LiteLLM proxy in front of both; replace each
+# with what you measure on yours.
 #
-# Every line below is read out of deployment manifests, not measured from a running stack --
-# unlike example-two-ingress.yaml, which was captured live. Run
-# `llmdv verify --profile <this file> -m contract` once the forwards are up: the contract suite
-# exists precisely to find the lines that are wrong, and on a first run against a profile of
-# this provenance it is expected to find some.
+# A profile written from deployment manifests rather than from a running stack has lines that are
+# wrong. Run `llmdv verify --profile <this file> -m contract` once the forwards are up: the
+# contract suite exists to find them, and on a first run it is expected to.
 #
-# Sources:
-#   model-server manifest         engine flags; the reasoning parser and
-#                                  --tool-call-parser are on the DECODE container only
-#   router values                 EPP policy; the EPP Service on port 80
-#   litellm manifests             the LiteLLM Deployment and Service on port 4000
-#   litellm config                model_list, custom_auth, keys
+# Where to read each layer's settings before you measure:
+#   engine flags                  the reasoning and tool-call parsers; on a prefill/decode
+#                                  split, check which role carries them
+#   router configuration          the EPP Service and its port
+#   LiteLLM configuration         model_list, authentication, keys and timeouts
 schema: llmdv.profile/1
 name: example-three-ingress
 vantage: external
@@ -21,8 +20,8 @@ vantage: external
 environment:
   cluster: <cluster>
   namespace: <namespace>
-  # Set --context/--kubeconfig on the command line; this cluster's context name is not recorded
-  # in the manifests, so guessing it here would be a line that silently never matches.
+  # Set --context/--kubeconfig on the command line, or add `context:` and `kubeconfig:` here as
+  # example-two-ingress.yaml does. A guessed context name is a line that silently never matches.
 
 model:
   public_id: <org>/<model>
@@ -41,9 +40,10 @@ model:
     auto_choice: true
 
 ingresses:
-  # Direct vLLM. NOTE the port asymmetry: prefill serves 8000 and decode serves 8200, and only
-  # decode carries the reasoning and tool parsers. A case that passes against decode and fails
-  # against prefill is a role asymmetry, not a gateway bug -- see llmdv/ingress/base.py.
+  # Direct vLLM, decode role. On a prefill/decode split the roles can serve different ports
+  # (here decode serves 8200) and only one may carry the reasoning and tool parsers. A case that
+  # passes against decode and fails against prefill is a role asymmetry, not a gateway bug;
+  # declare each role as its own ingress if you test both.
   - id: vllm
     kind: vllm
     base_url: http://localhost:18200
@@ -62,8 +62,8 @@ ingresses:
           local_port: 18200
           remote_port: 8200
 
-  # The EPP. router/README.md is explicit that clients drive the EPP Service on port 80 and
-  # never the decode Service.
+  # The EPP. Clients drive the EPP Service (port 80 here), never a decode Service directly; the
+  # direct engine ingress above is for comparison only.
   - id: router
     kind: llmd_router
     base_url: http://localhost:18080
@@ -82,20 +82,20 @@ ingresses:
           local_port: 18080
           remote_port: 80
 
-  # LiteLLM. The only authenticating layer in the stack, and the only one whose model_list
-  # bounds what is reachable -- it declares one entry, the model over openai/, so
-  # /v1/messages is NOT exposed here even though the engine serves it.
+  # LiteLLM. Here the only authenticating layer, and the only one whose model_list bounds what
+  # is reachable. This one lists the model over its OpenAI provider only, so /v1/messages is
+  # NOT exposed here even though the engine serves it.
   - id: litellm
     kind: litellm
     base_url: http://localhost:14000
     auth: {type: bearer, key_env: LLMDV_LITELLM_KEY}
-    # /health/readiness goes through custom_auth and a probe carries no key, so it can only
-    # ever 401. /health/liveliness is auth-exempt and is what actually gates traffic.
+    # A health path behind authentication can only ever answer 401 to a probe, which carries no
+    # key. LiteLLM's /health/liveliness is auth-exempt; check that yours is.
     health_path: /health/liveliness
     surfaces: [chat_completions]
-    # litellm_settings.request_timeout is 3600 because 256k-context requests take minutes at
-    # high concurrency; a shorter client timeout would cancel and show up as
-    # EvictedContextCancelled in the flow-control metrics rather than as a llmdv failure.
+    # Match LiteLLM's own request_timeout. Long-context requests can take minutes under load, and
+    # a client timeout that fires first cancels the request upstream, which looks like a fleet
+    # failure and is not one.
     timeouts: {connect: 5, request: 3600, stream_idle: 120}
     error_status:
       unknown_model: [400, 404]
@@ -110,9 +110,9 @@ ingresses:
           remote_port: 4000
 
 capabilities:
-  # Unverified on this fleet. Declared false so their cases skip as undeclared rather than
-  # assert against a feature nobody has checked. /v1/responses is likewise left out of every
-  # ingress's surfaces until it has been probed.
+  # Declared false until probed, so their cases skip as undeclared rather than assert against a
+  # feature nobody has checked. /v1/responses is likewise left out of every ingress's surfaces
+  # until it has been probed.
   count_tokens: false
   stateful_responses: false
   structured_output: false
@@ -121,10 +121,10 @@ capabilities:
   vllm_options: []
 
 headers:
-  # This is the block that makes the three-ingress shape worth testing. flow_control.py strips
-  # the client's value in async_pre_call_hook and re-injects it from objectives.yaml in
-  # async_pre_call_deployment_hook, with forward_client_headers_to_llm_api: false -- so the
-  # same header has three different dispositions depending on where it enters.
+  # This is the block that makes the three-ingress shape worth testing. In this example LiteLLM
+  # is configured, by a pre-call hook, to drop the client's priority headers and set its own, and
+  # not to forward client headers -- so the same header has three different dispositions
+  # depending on where it enters. Declare what your proxy is configured to do.
   #
   # `rewritten` and `consumed` are NOT client-observable, so their cases will SKIP with
   # requires_instrumentation and requires_load. That is the honest outcome: proving LiteLLM
@@ -140,7 +140,7 @@ headers:
     router: consumed
     litellm: rewritten
   x-litellm-ratelimit-saturation:
-    # The hook strips this one too, and never accepts it from a client.
+    # The same hook drops this one too, and never accepts it from a client.
     litellm: rewritten
   x-request-id:
     vllm: ignored

@@ -25,7 +25,8 @@ profiles/
 | --- | --- |
 | `examples/example-gateway-only.yaml` | One `litellm` ingress and no cluster access. The shape you get when a key is all you have. |
 | `examples/example-two-ingress.yaml` | An llm-d fleet without LiteLLM: a `vllm` engine and an `llmd_router` gateway. Captured from a live stack; the environment and service names are placeholders. |
-| `examples/example-three-ingress.yaml` | The full shape with LiteLLM in front of the router and engine, including header dispositions. Derived from deployment manifests and never run. |
+| `examples/example-three-ingress.yaml` | The full shape with LiteLLM in front of the router and engine, including header dispositions. A template: replace each value with what you measure. |
+| `examples/example-two-ingress-staging.yaml` | The two-ingress stack in a second namespace, written with [`extends`](#reuse-a-profile-with-extends) as only its changes. |
 | `**/*.local.yaml` | Your own profiles, anywhere under `profiles/`. Gitignored. |
 
 ## Start from the closest example
