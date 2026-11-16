@@ -161,8 +161,9 @@ counted as coverage.
 ## Profiles
 
 A profile is hand-written YAML describing one fleet from one vantage point. It carries no
-secrets or hostnames: `auth.key_env` and `base_url_env` name environment variables. Start with
-[profiles/README.md](../profiles/README.md); every field is in
+secrets or hostnames: `auth.key_env` and `base_url_env` name environment variables. A profile may
+`extends:` another and hold only its changes; the run validates and records the composed result.
+Start with [profiles/README.md](../profiles/README.md); every field is in
 [profiles/REFERENCE.md](../profiles/REFERENCE.md).
 
 ## Output

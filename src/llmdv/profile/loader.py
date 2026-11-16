@@ -32,7 +32,7 @@ import yaml
 
 from ..http.redact import SECRET_HEADERS
 from ..surfaces import base as surfaces
-from . import evolution, parse
+from . import compose, evolution, parse
 from . import transport as transport_contract
 from .errors import Diagnostic, ProfileError
 from .fleet import (
@@ -101,20 +101,35 @@ SUPPORTED_SCHEMA = "llmdv.profile/1"
 
 
 def load(path: str | Path) -> Profile:
-    """Parse a profile file into a Profile. Raises ProfileError on unusable input."""
-    file_path = Path(path)
-    if not file_path.is_file():
-        raise ProfileError(f"no such profile file: {file_path}")
+    """Parse a profile file, and the files it extends, into a Profile.
+
+    Raises ProfileError on unusable input, naming for each problem the file that set the value.
+    """
+    chain = compose.layers(path)
     try:
-        raw = yaml.safe_load(file_path.read_text()) or {}
-    except yaml.YAMLError as exc:
-        raise ProfileError(f"{file_path}: invalid YAML: {exc}") from exc
-    if not isinstance(raw, dict):
-        raise ProfileError(f"{file_path}: top level must be a mapping")
-    try:
-        return _build(raw, file_path)
+        # A relative client executable resolves against the file that declared it.
+        clients_dir = compose.origin(chain, "clients").parent
+        return _build(compose.composed(chain), chain[-1].path, clients_dir)
     except ProfileError as exc:
-        raise ProfileError(*(f"{file_path}: {problem}" for problem in exc.problems)) from exc
+        raise ProfileError(
+            *(
+                f"{compose.origin(chain, problem.split(': ', 1)[0])}: {problem}"
+                for problem in exc.problems
+            )
+        ) from exc
+
+
+def composed_text(path: str | Path) -> str | None:
+    """A profile that extends another as one self-contained file, with where each key was set.
+
+    None for a profile that extends nothing, which is its own complete record, or that cannot be
+    composed, which the loader reports.
+    """
+    try:
+        chain = compose.layers(path)
+    except ProfileError:
+        return None
+    return compose.render(chain) if len(chain) > 1 else None
 
 
 def validate(profile: Profile) -> list[Diagnostic]:
@@ -355,7 +370,7 @@ def resolve_all_secrets(profile: Profile) -> dict[str, str]:
 # --------------------------------------------------------------------- building
 
 
-def _build(raw: dict[str, Any], path: Path) -> Profile:
+def _build(raw: dict[str, Any], path: Path, clients_dir: Path) -> Profile:
     # What each ingress inherits. A top-level block that fails to parse is reported once, where
     # it was declared, and its ingresses then check only their own overrides.
     defaults: dict[str, dict[str, Any]] = {"model": {}, "capabilities": {}}
@@ -390,7 +405,7 @@ def _build(raw: dict[str, Any], path: Path) -> Profile:
                 ),
                 headers=lambda: _headers(_block(raw.get("headers"), "headers")),
                 clients=lambda: _every(
-                    partial(_client, item, f"clients[{index}]", path.parent)
+                    partial(_client, item, f"clients[{index}]", clients_dir)
                     for index, item in _entries(raw.get("clients"), "clients")
                 ),
                 fleet_policy=lambda: _enum(
@@ -520,7 +535,7 @@ def _one_or_more(value: Any, where: str) -> tuple[str, ...]:
 
 
 def contract_digest(path: str | Path) -> str | None:
-    """A short digest of the declarations in a profile file, or None when it cannot be read.
+    """A short digest of the declarations in a profile, or None when it cannot be read.
 
     Hashes the parsed document rather than its bytes, with `known_failures` left out: comments
     carry probes, and the known-failure list carries triage, and neither changes what a run
@@ -531,6 +546,12 @@ def contract_digest(path: str | Path) -> str | None:
         raw = yaml.safe_load(Path(path).read_text(encoding="utf-8"))
     except (OSError, yaml.YAMLError):
         return None
+    if isinstance(raw, dict) and "extends" in raw:
+        # The declarations a run is judged against are the composed ones.
+        try:
+            raw = compose.composed(compose.layers(path))
+        except ProfileError:
+            return None
     if isinstance(raw, dict):
         raw = {name: value for name, value in raw.items() if name != "known_failures"}
     canonical = json.dumps(_stringify_keys(raw), sort_keys=True, default=str, separators=(",", ":"))
@@ -599,17 +620,6 @@ def _nullable_string(value: Any, where: str) -> str | None:
     return None if value is None else parse.string(value, where) or None
 
 
-def _deep_merge(defaults: dict[str, Any], override: dict[str, Any]) -> dict[str, Any]:
-    """Merge mappings without mutating either input; scalars, lists and null replace."""
-    merged = dict(defaults)
-    for name, value in override.items():
-        if isinstance(value, dict) and isinstance(merged.get(name), dict):
-            merged[name] = _deep_merge(merged[name], value)
-        else:
-            merged[name] = value
-    return merged
-
-
 def _ingress_model(override: Any, defaults: dict[str, Any], where: str) -> Model:
     _check_override_keys(override, Model, where, nullable=("max_model_len", "answer_max_tokens"))
     _check_override_keys(
@@ -620,7 +630,7 @@ def _ingress_model(override: Any, defaults: dict[str, Any], where: str) -> Model
         renames={"field_name": "field"},
     )
     _check_override_keys(override.get("tools", {}), Tools, f"{where}.tools", nullable=("parser",))
-    return _model(_deep_merge(defaults, override), where)
+    return _model(compose.merge(defaults, override), where)
 
 
 def _ingress_capabilities(override: Any, defaults: dict[str, Any], where: str) -> Capabilities:
@@ -637,7 +647,7 @@ def _ingress_capabilities(override: Any, defaults: dict[str, Any], where: str) -
             "responses_compact",
         ),
     )
-    return _capabilities(_deep_merge(defaults, override), where)
+    return _capabilities(compose.merge(defaults, override), where)
 
 
 def _model(raw: dict[str, Any], where: str = "model") -> Model:

@@ -40,7 +40,7 @@ ARTIFACTS = (
     ("llmdv.log", "full DEBUG transcript: every check and exchange, redacted"),
     ("env.json", "llmdv/python/SDK versions and the resolved setup"),
     ("reproduce.sh", "re-runs this exact verification"),
-    ("profile.used.yaml", "the profile verbatim; it carries no secrets by design"),
+    ("profile.used.yaml", "the profile as run, composed if it extends one; no secrets by design"),
     ("logs/", "pod logs for the run window, per layer"),
     ("cases/", "per-case evidence bundles (--evidence all)"),
     ("failures/", "per-failure evidence: verdict.txt, request, response, repro.sh"),

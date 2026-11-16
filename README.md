@@ -48,7 +48,7 @@ llmdv verify --profile profiles/my-stack.local.yaml              # the full run
 ```
 
 `*.local.yaml` profiles are gitignored, so your hosts never reach the repository. The
-[profile guide](profiles/README.md) covers the two- and three-ingress examples, and
+[profile guide](profiles/README.md) covers the two- and three-ingress examples and `extends`, and
 [docs/end-to-end.md](docs/end-to-end.md) covers publishing runs and running unattended.
 
 ## What a run gives you

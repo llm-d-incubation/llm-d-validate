@@ -232,9 +232,14 @@ def cmd_verify(args: argparse.Namespace) -> int:
 def _verify(args: argparse.Namespace, run: _Run) -> int:
     run_dir = run.run_dir
 
-    # Copied even when invalid: a refusal only means something against what was refused.
+    # Copied even when invalid: a refusal only means something against what was refused. A
+    # profile that extends another is written composed, so the record stands on its own.
     if Path(args.profile).is_file():
-        shutil.copyfile(args.profile, run_dir / "profile.used.yaml")
+        composed = loader.composed_text(args.profile)
+        if composed is None:
+            shutil.copyfile(args.profile, run_dir / "profile.used.yaml")
+        else:
+            (run_dir / "profile.used.yaml").write_text(composed, encoding="utf-8")
 
     parallel = _parallel_args(getattr(args, "pytest_args", None) or [])
     if parallel:

@@ -150,8 +150,11 @@ publishes however verification ends), `job_cmd.py`, `publish_cmd.py`, `notify_cm
 `schema.py` holds the dataclasses and two vocabularies: `Disposition` (what a layer does to a
 header, and what can verify it) and `SkipClass`. `loader.py` turns YAML into them, reports every
 problem with its path, and merges ingress overrides over profile defaults, so every `Ingress`
-carries a complete `model` and `capabilities`. `transport.py`, `fleet.py` and `evolution.py` parse
-per-ingress HTTP behaviour, fleet invariants and the evolution declarations.
+carries a complete `model` and `capabilities`. `compose.py` resolves `extends` and merges a
+profile over its parent by the same rule before anything is checked. `parse.py` holds the strict
+value shapes every parser uses, and `errors.py` the two ways a profile is reported wrong.
+`transport.py`, `fleet.py` and `evolution.py` parse per-ingress HTTP behaviour, fleet invariants
+and the evolution declarations.
 
 ### `ingress/`
 `base.py` defines the adapter and `ServedBy`, which endpoint answered, and `version_headers`, the headers whose value names the layer's build (recorded per run in `outcome.json`, see `evidence/stack.py`). `vllm.py`, `router.py` and

@@ -29,6 +29,19 @@ Conventions:
 | `fleet` | mapping | none | Configuration and metrics rules read from the cluster. See [FLEET.md](FLEET.md). |
 | `known_failures` | list | none | Failures already filed and traced to a pending fix. Labels, never excuses. See [known_failures](#known_failures). |
 
+## extends
+
+`extends: <path>` makes a profile a set of changes to another one, its parent. The path is relative to the file that names it. A parent may extend a further parent; each file names at most one.
+
+The loaded profile is the parent with the child merged over it, by the same rule as a [per-ingress override](#per-ingress-overrides):
+
+- A mapping merges key by key, so a child names only what it changes.
+- A list, or any other value, replaces the parent's.
+- `null` clears the parent's value.
+- `ingresses` is keyed by `id`, as every error path names it (`ingresses[0](engine)`), so it merges like a mapping: a child entry merges over the parent's entry with the same `id` by the rules above, and an entry with a new `id` is added after the parent's. A child cannot remove an inherited ingress; select columns with `-k` instead.
+
+The composed profile is what is validated, digested and written to `profile.used.yaml`, with a comment block naming the file that set each key. A problem is reported against the file that set the value at fault. A missing parent, or a chain that leads back to a file already in it, is an invalid profile (exit 2).
+
 ## environment
 
 Optional. Without it, llmdv works against bare URLs and never contacts a cluster. All cluster access is read-only: a verb allowlist leaves no path to `apply`, `delete`, `scale` or `exec`.

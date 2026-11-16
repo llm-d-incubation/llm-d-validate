@@ -44,6 +44,25 @@ One file covers one fleet from one place. An external profile and an in-cluster 
 
 To commit a real profile, drop the `.local` suffix, name the URL and the key by variable (`base_url_env`, `auth.key_env`) so no hostname or key enters the repository, and add a short guide beside it on how to run it.
 
+## Reuse a profile with `extends`
+
+To change a few declarations of a profile without copying it, write a file that names it and holds only the changes. This is how real cluster values stay out of a committed profile: the committed file names URLs and keys by variable, and a gitignored file beside it adds the namespace and port-forwards.
+
+```yaml
+# profiles/<system>/<model>.local.yaml
+extends: <model>.yaml           # relative to this file
+vantage: in-cluster
+environment:
+  namespace: my-namespace
+ingresses:
+  - id: engine                  # keyed by id: only setup changes on this ingress
+    setup:
+      requires:
+        - {kind: port_forward, namespace: my-namespace, selector: app=engine, local_port: 18100, remote_port: 8000}
+```
+
+Mappings merge, lists and other values replace, `null` clears a value, and ingresses are keyed by `id`, so they merge like mappings; [REFERENCE.md](REFERENCE.md#extends) has the rules. `llmdv profile show` and `llmdv profile validate` check the composed result, and a run's `profile.used.yaml` holds it whole, with a comment naming the file that set each key.
+
 ## The minimum
 
 A profile needs a model, one ingress, a URL and a key for it, the surfaces it serves, and the error statuses a correct stack returns:
