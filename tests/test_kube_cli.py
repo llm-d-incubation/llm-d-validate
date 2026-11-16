@@ -102,6 +102,28 @@ def test_both_clis_refuse_mutation(tmp_path, monkeypatch, cli, verb):
     assert not calls.exists()
 
 
+@pytest.mark.parametrize("cli", ["kubectl", "oc"])
+@pytest.mark.parametrize(
+    "rest",
+    [
+        ["set-context", "x", "--namespace=y"],
+        ["use-context", "x"],
+        ["set-credentials", "x", "--token=t"],
+        ["delete-context", "x"],
+        ["view", "--raw"],
+        [],
+    ],
+    ids=lambda rest: " ".join(rest) or "bare",
+)
+def test_config_is_limited_to_reading_the_current_context(tmp_path, monkeypatch, cli, rest):
+    """`config` can rewrite a kubeconfig or print its credentials; only current-context runs."""
+    _, calls = make_cli(tmp_path, cli)
+    monkeypatch.setenv("PATH", str(tmp_path))
+    with pytest.raises(KubeError, match="read-only"):
+        KubeContext(cli=cli)._run("config", *rest)
+    assert not calls.exists()
+
+
 @pytest.mark.parametrize("verb", sorted(READ_VERBS))
 def test_oc_can_execute_each_read_verb(tmp_path, monkeypatch, verb):
     _, calls = make_cli(tmp_path, "oc")

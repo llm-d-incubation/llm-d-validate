@@ -29,6 +29,10 @@ log = get_logger("kube")
 # changes nothing, so it belongs here; the allowlist exists to keep `apply`, `delete`, `scale`
 # and `exec` unreachable, not to keep llmdv from reading.
 READ_VERBS = frozenset({"get", "version", "config", "logs"})
+# `config` alone is not read-only: `set-context`, `use-context` and `set-credentials` rewrite
+# the operator's kubeconfig, and `view --raw` prints its credentials. Only these subcommands
+# are permitted under it.
+READ_SUBCOMMANDS = {"config": frozenset({"current-context"})}
 
 DEFAULT_TIMEOUT = 20.0
 NO_CLI_REASON = "neither kubectl nor oc is on PATH"
@@ -98,6 +102,12 @@ class KubeContext:
             raise KubeError(
                 f"refusing verb {verb!r}: llmdv is read-only "
                 f"(permitted: {', '.join(sorted(READ_VERBS))})"
+            )
+        allowed = READ_SUBCOMMANDS.get(verb)
+        if allowed is not None and (not rest or rest[0] not in allowed):
+            raise KubeError(
+                f"refusing {verb} {rest[0] if rest else '(no subcommand)'!s}: llmdv is "
+                f"read-only (permitted: {', '.join(f'{verb} {sub}' for sub in sorted(allowed))})"
             )
         if not self.available:
             raise KubeError(self.unavailable_reason)
