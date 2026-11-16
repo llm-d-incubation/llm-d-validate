@@ -154,3 +154,14 @@ def sink_for(uri: str, patience: Patience | None = None) -> ObjectSink:
 
         return S3Sink(target, patience=patience)
     return FileSink(target)
+
+
+def missing_credentials(uri: str) -> str | None:
+    """Why `uri` cannot be used with the credentials at hand, or None. Checked locally, before
+    anything is sent; only `s3://` needs credentials. Raises UnsupportedRemote for a URI or an
+    installation that can never work."""
+    if parse_remote_uri(uri).scheme != "s3":
+        return None
+    from .s3 import missing_credentials_reason
+
+    return missing_credentials_reason()

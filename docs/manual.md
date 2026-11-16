@@ -110,7 +110,7 @@ Separating environment problems from fleet problems is the point of having more 
 | `0` | `ok` | every selected case passed (skips do not fail a run) |
 | `1` | `fleet` | test failures: the fleet did not behave as the profile declares |
 | `2` | `usage` | bad usage, or an invalid profile; nothing was verified |
-| `3` | `environment` | preflight unsatisfied: your vantage point, not the fleet; nothing was tested |
+| `3` | `environment` | your environment, not the fleet: preflight unsatisfied (nothing was tested), or a results store that cannot be used as configured |
 | `4` | `internal` | an internal error: a defect in llmdv itself |
 | `5` | `ok` | verification passed, but results or the notification were not delivered |
 | `6` | `interrupted` | stopped by SIGINT or SIGTERM, e.g. a run budget or a pod being stopped; what finished is kept and published |

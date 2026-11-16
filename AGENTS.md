@@ -58,7 +58,7 @@ missing instrument, `excluded_by_policy` is a choice not to run on a shared flee
 `throttled` is our own quota. A matrix that merges them reads as coverage when it is not.
 
 **Exit codes separate blame.** `0` ok, `1` test failures (the fleet), `2` usage or invalid
-profile, `3` preflight unsatisfied (the operator's environment), `4` a llmdv defect, `5`
+profile, `3` the operator's environment (preflight unsatisfied, or a results store that cannot be used), `4` a llmdv defect, `5`
 verification passed but results or the notification were not delivered, `6` interrupted. Never
 widen `1` to cover an environment problem, and never let `5` mask a verification failure: the
 verification code takes precedence.

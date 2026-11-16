@@ -6,6 +6,7 @@ Neither belongs in the profile or on the command line.
 
 from __future__ import annotations
 
+import importlib
 import mimetypes
 import os
 from pathlib import Path
@@ -78,6 +79,19 @@ def missing_credentials_reason() -> str | None:
         return f"AWS credentials could not be resolved ({type(exc).__name__})"
     _register_credentials(credentials)
     return "no AWS credentials were found" if credentials is None else None
+
+
+def sdk_errors() -> tuple[type[Exception], ...]:
+    """What the S3 SDKs raise for a store that cannot be used: unreachable, refusing the
+    request, or without credentials. Empty when neither SDK is installed."""
+    errors: list[type[Exception]] = []
+    for module in ("botocore.exceptions", "ibm_botocore.exceptions"):
+        try:
+            exceptions = importlib.import_module(module)
+        except ImportError:
+            continue
+        errors += [exceptions.BotoCoreError, exceptions.ClientError]
+    return tuple(errors)
 
 
 class S3Sink:

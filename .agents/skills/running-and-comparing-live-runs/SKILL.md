@@ -91,7 +91,7 @@ llmdv compare --from "$PREFIX" --profile <profile name> --window 3          # th
 | `0` | no regression, or `--no-fail` was given |
 | `1` | a case went from pass to fail or error |
 | `2` | nothing to compare: no runs, one run, or an empty run |
-| `4` | the store could not be read (missing credentials or `AWS_ENDPOINT_URL_S3`, wrong bucket); llmdv reports it as an internal failure. Check that the credentials file was sourced with `set -a` |
+| `3` | the store could not be read (missing credentials or `AWS_ENDPOINT_URL_S3`, wrong bucket): your environment, not the runs. Check that the credentials file was sourced with `set -a` |
 
 Runs published to a local directory (`--remote-output file:///<dir>`) compare the same way with `--from file:///<dir>`. A plain local run (`runs/<timestamp>/`) has neither that layout nor a `MANIFEST.json`, so compare two of those case by case from their `results.jsonl`, keyed on `nodeid`.
 

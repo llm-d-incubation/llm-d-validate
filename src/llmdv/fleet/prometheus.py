@@ -10,6 +10,7 @@ from __future__ import annotations
 import math
 import os
 from dataclasses import dataclass, field
+from enum import Enum
 
 import httpx
 
@@ -22,18 +23,26 @@ log = get_logger("fleet.prometheus")
 QUERY_PATH = "/api/v1/query"
 
 
+class MetricsErrorKind(str, Enum):
+    """Whose problem an unanswered query is."""
+
+    # Transport, timeout or 5xx: the vantage point's problem.
+    UNREACHABLE = "unreachable"
+    # The source refused the query itself (400 bad_data, 422 execution): the declaration's.
+    REJECTED = "rejected"
+    # 401 or 403: the credential's.
+    DENIED = "denied"
+    # An answer carrying warnings, such as a federated querier with a store down. Missing
+    # series read as zero or as fewer endpoints, so the data proves nothing.
+    PARTIAL = "partial"
+
+
 class MetricsError(Exception):
     """The source did not answer a query. `kind` says whose problem that is."""
 
-    def __init__(self, message: str, kind: str = "unreachable") -> None:
+    def __init__(self, message: str, kind: MetricsErrorKind = MetricsErrorKind.UNREACHABLE) -> None:
         super().__init__(message)
-        # unreachable: transport, timeout or 5xx -- the vantage point's problem.
-        # rejected: the source refused the query itself (400 bad_data, 422 execution) -- the
-        #   declaration's problem.
-        # denied: 401 or 403 -- the credential's problem.
-        # partial: an answer carrying warnings, such as a federated querier with a store down.
-        #   Missing series read as zero or as fewer endpoints, so the data proves nothing.
-        self.kind = kind
+        self.kind = MetricsErrorKind(kind)
 
 
 @dataclass(frozen=True)
@@ -75,7 +84,7 @@ class PrometheusReader:
             raise MetricsError(redact.scrub(f"{type(exc).__name__}: {exc}")) from exc
         log.debug("metrics query %s -> %s", expr, response.status_code)
         if response.status_code in (401, 403):
-            raise MetricsError(f"HTTP {response.status_code}", kind="denied")
+            raise MetricsError(f"HTTP {response.status_code}", kind=MetricsErrorKind.DENIED)
         try:
             payload = response.json()
         except ValueError:
@@ -83,19 +92,26 @@ class PrometheusReader:
         if not isinstance(payload, dict):
             raise MetricsError(f"HTTP {response.status_code}, body is not an object")
         if payload.get("status") != "success":
-            kind = "rejected" if response.status_code in (400, 422) else "unreachable"
+            kind = (
+                MetricsErrorKind.REJECTED
+                if response.status_code in (400, 422)
+                else MetricsErrorKind.UNREACHABLE
+            )
             detail = f"{payload.get('errorType')}: {payload.get('error')}"
             raise MetricsError(redact.scrub(f"HTTP {response.status_code}, {detail}"), kind=kind)
         warnings = payload.get("warnings")
         if warnings:
-            raise MetricsError(redact.scrub(f"partial answer: {warnings}"[:500]), kind="partial")
+            raise MetricsError(
+                redact.scrub(f"partial answer: {warnings}"[:500]), kind=MetricsErrorKind.PARTIAL
+            )
         data = payload.get("data") or {}
         result = data.get("result")
         if data.get("resultType") == "scalar" and isinstance(result, list):
             return [Sample({}, _value(result))]
         if data.get("resultType") != "vector" or not isinstance(result, list):
             raise MetricsError(
-                f"expected an instant vector, got {data.get('resultType')!r}", kind="rejected"
+                f"expected an instant vector, got {data.get('resultType')!r}",
+                kind=MetricsErrorKind.REJECTED,
             )
         return [
             Sample(

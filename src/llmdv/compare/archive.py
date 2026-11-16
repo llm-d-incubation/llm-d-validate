@@ -14,6 +14,7 @@ import difflib
 import json
 from pathlib import Path
 
+from ..http.redact import scrub
 from ..output import manifest
 from ..output.remote import UnsupportedRemote, parse_remote_uri
 
@@ -24,6 +25,10 @@ class NoSuchRun(Exception):
 
 class InvalidRun(Exception):
     """Results cannot support a comparison because a record is malformed."""
+
+
+class ArchiveUnreadable(Exception):
+    """The store holding the runs cannot be read: the operator's environment, not the runs."""
 
 
 class UnsafeName(Exception):
@@ -68,7 +73,14 @@ def list_runs(uri: str, profile: str) -> list[str]:
     if target.scheme == "s3":
         # Results may arrive before another upload fails. Only the manifest, published last,
         # marks a complete publication; require both files under the same immediate run id.
-        keys = set(_s3(target).list_keys(profile))
+        from ..output.s3 import sdk_errors
+
+        try:
+            keys = set(_s3(target).list_keys(profile))
+        except sdk_errors() as exc:
+            raise ArchiveUnreadable(
+                scrub(f"cannot list runs under {uri}: {type(exc).__name__}: {exc}")
+            ) from exc
         names = {rest.rsplit("/", 1)[0] for rest in keys if rest.endswith("/results.jsonl")}
         return sorted(n for n in names if n and "/" not in n and f"{n}/{manifest.FILENAME}" in keys)
     raise UnsupportedRemote(f"cannot read runs from {target.scheme}://")

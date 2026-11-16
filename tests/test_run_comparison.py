@@ -153,6 +153,7 @@ from llmdv.compare.archive import (  # noqa: E402
     read_results,
 )
 from llmdv.output import manifest  # noqa: E402
+from tests.fakes import run_llmdv  # noqa: E402
 
 
 def archive(tmp_path, profile="p", runs=None, triggers=None):
@@ -1043,3 +1044,37 @@ def test_a_transient_failure_is_named_under_the_regressions_and_in_the_record():
 def test_a_case_that_kept_failing_is_not_called_transient():
     after = [_failed("a", "stream failed: ReadTimeout: timed out")]
     assert compare([rec("a", "fail")], after).transient == []
+
+
+# ----------------------------------------------------------------- an unreadable archive
+
+NO_STORE_CREDENTIALS = {
+    "LLMDV_S3_AUTH": "aws",
+    "AWS_ENDPOINT_URL": "http://127.0.0.1:9",
+    "AWS_CONFIG_FILE": "/nonexistent",
+    "AWS_SHARED_CREDENTIALS_FILE": "/nonexistent",
+    "AWS_EC2_METADATA_DISABLED": "true",
+}
+
+
+def test_missing_store_credentials_are_the_environment_not_a_defect():
+    pytest.importorskip("boto3", reason="the s3 extra is not installed")
+    result = run_llmdv(
+        "compare", "--from", "s3://results/nightly", "--profile", "p", "--list",
+        env=NO_STORE_CREDENTIALS,
+    )  # fmt: skip
+    assert result.returncode == 3, result.stderr
+    assert "no AWS credentials were found" in result.stderr
+    assert "failed internally" not in result.stderr
+
+
+def test_an_unreachable_store_is_the_environment_and_its_secret_is_scrubbed():
+    pytest.importorskip("boto3", reason="the s3 extra is not installed")
+    secret = "llmdv-compare-secret-key-1234"
+    env = NO_STORE_CREDENTIALS | {"AWS_ACCESS_KEY_ID": "llmdv-a", "AWS_SECRET_ACCESS_KEY": secret}
+    result = run_llmdv(
+        "compare", "--from", "s3://results/nightly", "--profile", "p", "-vv", env=env
+    )
+    assert result.returncode == 3, result.stderr
+    assert "cannot list runs under s3://results/nightly" in result.stderr
+    assert secret not in result.stderr + result.stdout

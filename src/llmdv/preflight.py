@@ -29,6 +29,7 @@ import os
 import shlex
 from dataclasses import dataclass, field
 from enum import Enum
+from typing import TYPE_CHECKING
 from urllib.parse import urlsplit
 
 from .http.client import RecordingClient
@@ -39,6 +40,10 @@ from .output.remote import UnsupportedRemote, parse_remote_uri, sink_for
 from .profile.loader import resolve_secret
 from .profile.schema import AuthType, Ingress, Profile, ProxyMode, Requirement
 from .profile.transport import plain_http_url
+
+if TYPE_CHECKING:
+    from .fleet.prometheus import MetricsErrorKind
+    from .profile.fleet import MetricsSource
 
 log = get_logger("preflight")
 
@@ -471,14 +476,33 @@ def _check_metrics(report: Report, profile: Profile) -> None:
     try:
         PrometheusReader(source, token).query("vector(1)")
     except MetricsError as exc:
+        kind, remedy = _metrics_problem(exc.kind, source)
         report.problems.append(
             Problem(
                 None,
-                "environment",
+                kind,
                 f"metrics source {source.url} did not answer an instant query: {exc}",
-                remedy="start the port-forward or tunnel to it, or remove environment.metrics",
+                remedy=remedy,
             )
         )
+
+
+def _metrics_problem(error: MetricsErrorKind, source: MetricsSource) -> tuple[str, str]:
+    """The problem kind and remedy for a metrics source that did not answer. Every one stops
+    the run; the kind says whose problem it is."""
+    from .fleet.prometheus import MetricsErrorKind
+
+    if error is MetricsErrorKind.DENIED:
+        if source.key_env:
+            return "credentials", f"export {source.key_env}=<a token the source accepts>"
+        return "credentials", "declare a bearer token: environment.metrics.auth.key_env"
+    if error is MetricsErrorKind.REJECTED:
+        return "environment", (
+            f"check that {source.url} is a Prometheus query API, or fix environment.metrics"
+        )
+    if error is MetricsErrorKind.PARTIAL:
+        return "environment", "a store behind the source is down; retry once it answers in full"
+    return "environment", "start the port-forward or tunnel to it, or remove environment.metrics"
 
 
 def _resolve_setup(ingress: Ingress, profile: Profile, kube: KubeContext | None) -> list[str]:

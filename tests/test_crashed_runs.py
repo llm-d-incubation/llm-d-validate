@@ -161,3 +161,26 @@ def test_a_corrupt_outcome_still_publishes_and_notifies(tmp_path):
     assert json.loads(store.objects[prefix + "outcome.json"])["verification"]["class"] == "crashed"
     assert notified.returncode == 0, notified.stderr
     assert "exit 137" in slack.received[0]["text"]
+
+
+def test_publish_without_store_credentials_is_the_environment(tmp_path):
+    """Nothing is sent, as when verify finds the same at preflight; the outcome says why."""
+    (tmp_path / "outcome.json").write_text(
+        json.dumps({"run_id": "r", "verification": {"exit_code": 0, "class": "ok"}})
+    )
+    env = {
+        "LLMDV_S3_AUTH": "aws",
+        "AWS_ENDPOINT_URL": "http://127.0.0.1:9",
+        "AWS_CONFIG_FILE": "/nonexistent",
+        "AWS_SHARED_CREDENTIALS_FILE": "/nonexistent",
+        "AWS_EC2_METADATA_DISABLED": "true",
+    }
+    result = run_llmdv("publish", str(tmp_path), "--remote-output", URI, env=env)
+
+    assert result.returncode == 3, result.stderr
+    publication = json.loads((tmp_path / "outcome.json").read_text())["publication"]
+    assert publication == {
+        "destination": URI,
+        "status": "failed",
+        "error": "no AWS credentials were found",
+    }

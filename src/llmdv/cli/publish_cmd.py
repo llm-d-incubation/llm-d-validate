@@ -15,8 +15,8 @@ from ..evidence import dashboard
 from ..evidence import outcome as outcome_file
 from ..evidence.outcome import now, read_results, summarise
 from ..log.setup import get_logger
-from ..output.remote import UnsupportedRemote, deliver, parse_remote_uri
-from .exit_codes import NOT_DELIVERED, OK, USAGE, class_of
+from ..output.remote import UnsupportedRemote, deliver, missing_credentials, parse_remote_uri
+from .exit_codes import NOT_DELIVERED, OK, PREFLIGHT, USAGE, class_of
 
 log = get_logger("cli.publish")
 
@@ -67,7 +67,10 @@ def publish_run(
     *,
     analyze: bool = False,
 ) -> int:
-    """Upload a run unless it is already published; OK, NOT_DELIVERED or USAGE.
+    """Upload a run unless it is already published; OK, NOT_DELIVERED, PREFLIGHT or USAGE.
+
+    PREFLIGHT means the destination needs credentials that are not configured, so nothing was
+    sent: the operator's environment, as it is when `llmdv verify` finds the same at preflight.
 
     `primary` records the destination that was unavailable when this is a fallback upload.
     """
@@ -107,6 +110,18 @@ def publish_run(
         # effort: it never stops the upload.
         dashboard.write_best_effort(run_dir)
 
+    reason = _missing_credentials(remote_output)
+    if reason:
+        body["publication"] = {
+            "destination": remote_output,
+            "status": "failed",
+            "error": reason,
+            **fallback,
+        }
+        outcome_file.write_dict(run_dir, body)
+        log.error("results were NOT published: %s", reason)
+        return PREFLIGHT
+
     name = f"{(body.get('profile') or {}).get('name') or 'unknown'}/{body['run_id']}"
     body["publication"] = {**deliver(run_dir, remote_output, name), **fallback}
     outcome_file.write_dict(run_dir, body)
@@ -115,6 +130,14 @@ def publish_run(
         return NOT_DELIVERED
     log.info("published to %s", body["publication"]["location"])
     return OK
+
+
+def _missing_credentials(remote_output: str) -> str | None:
+    try:
+        return missing_credentials(remote_output)
+    except UnsupportedRemote:
+        # A missing SDK or a bad auth mode: the upload attempt reports it as not delivered.
+        return None
 
 
 def _rebuilt_outcome(run_dir: Path) -> dict:

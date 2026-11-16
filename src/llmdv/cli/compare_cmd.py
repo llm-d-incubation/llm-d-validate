@@ -17,6 +17,7 @@ from pathlib import Path
 from ..compare.archive import (
     NIGHTLY_TRIGGER,
     PROFILE_FILE,
+    ArchiveUnreadable,
     EmptyRun,
     InvalidRun,
     NoSuchRun,
@@ -38,8 +39,8 @@ from ..evidence import outcome
 from ..evidence.stack import stack_from_run
 from ..http.redact import scrub
 from ..log.setup import emit, get_logger
-from ..output.remote import UnsupportedRemote
-from .exit_codes import OK, TEST_FAILURES, USAGE
+from ..output.remote import UnsupportedRemote, missing_credentials
+from .exit_codes import OK, PREFLIGHT, TEST_FAILURES, USAGE
 
 log = get_logger("cli.compare")
 
@@ -204,10 +205,19 @@ def _run_id(records: list[dict]) -> str | None:
 
 def run(args: argparse.Namespace) -> int:
     try:
-        runs = list_runs(args.source, args.profile)
+        reason = missing_credentials(args.source)
+        if reason is None:
+            runs = list_runs(args.source, args.profile)
     except UnsupportedRemote as exc:
         log.error("%s", exc)
         return USAGE
+    except ArchiveUnreadable as exc:
+        # The store, its endpoint or the credentials: the operator's environment.
+        log.error("%s", exc)
+        return PREFLIGHT
+    if reason is not None:
+        log.error("cannot read runs from %s: %s", args.source, reason)
+        return PREFLIGHT
 
     if args.list:
         if not runs:

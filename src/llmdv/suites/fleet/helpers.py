@@ -7,7 +7,7 @@ import pytest
 from ...assertions import fail
 from ...evidence import journal
 from ...fleet.config import object_name
-from ...fleet.prometheus import MetricsError, PrometheusReader, Sample
+from ...fleet.prometheus import MetricsError, MetricsErrorKind, PrometheusReader, Sample
 from ...kube import KubeContext, KubeError
 from ...profile.fleet import ConfigRule, MetricRule, ObjectRef
 from ...profile.schema import Profile, SkipClass
@@ -95,7 +95,7 @@ def query(reader: PrometheusReader, expr: str, what: str) -> list[Sample]:
     try:
         samples = reader.query(expr)
     except MetricsError as exc:
-        if exc.kind == "rejected":
+        if exc.kind is MetricsErrorKind.REJECTED:
             fail(what, str(exc), f"the metrics source accepts {expr!r}")
         pytest.skip(
             f"[{SkipClass.REQUIRES_INSTRUMENTATION.value}] metrics source "

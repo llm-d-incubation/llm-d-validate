@@ -12,7 +12,7 @@ import json
 import pytest
 
 from llmdv import preflight
-from llmdv.fleet.prometheus import MetricsError, PrometheusReader
+from llmdv.fleet.prometheus import MetricsError, MetricsErrorKind, PrometheusReader
 from llmdv.profile import loader
 from llmdv.profile.fleet import MetricsSource
 from tests.fleet_fakes import (
@@ -145,6 +145,38 @@ def test_preflight_fails_a_missing_token_as_credentials(tmp_path, monkeypatch):
     assert [p.kind for p in report.problems] == ["credentials"]
 
 
+def test_preflight_fails_a_refused_token_as_credentials(tmp_path, monkeypatch):
+    monkeypatch.setenv("LLMDV_TEST_METRICS_TOKEN", "not-the-token")
+    with FakePrometheus({}, token=TOKEN) as prom:
+        report = preflight.Report()
+        preflight._check_metrics(
+            report, profile_for(tmp_path, prom.base_url, "LLMDV_TEST_METRICS_TOKEN")
+        )
+    assert [p.kind for p in report.problems] == ["credentials"]
+    assert "LLMDV_TEST_METRICS_TOKEN" in report.problems[0].remedy
+
+
+@pytest.mark.parametrize(
+    "kind, problem, remedy",
+    [
+        (MetricsErrorKind.UNREACHABLE, "environment", "port-forward"),
+        (MetricsErrorKind.REJECTED, "environment", "Prometheus query API"),
+        (MetricsErrorKind.DENIED, "credentials", "bearer token"),
+        (MetricsErrorKind.PARTIAL, "environment", "store behind the source is down"),
+    ],
+)
+def test_preflight_names_whose_problem_an_unanswered_query_is(
+    tmp_path, monkeypatch, kind, problem, remedy
+):
+    def refuse(_reader, _expr):
+        raise MetricsError("no answer", kind=kind)
+
+    monkeypatch.setattr(PrometheusReader, "query", refuse)
+    report = preflight.Report()
+    preflight._check_metrics(report, profile_for(tmp_path, "http://127.0.0.1:9"))
+    assert [(p.kind, remedy in p.remedy) for p in report.problems] == [(problem, True)]
+
+
 def test_preflight_ignores_a_profile_without_a_source(tmp_path):
     report = preflight.Report()
     preflight._check_metrics(report, loader.load(fleet_profile(tmp_path / "p.yaml")))
@@ -163,6 +195,7 @@ def test_the_client_reads_vectors_and_classifies_errors():
             reader.query("BAD(")
     assert samples[0].labels == {"job": "a"} and samples[0].value == 1
     assert samples[1].value != samples[1].value  # NaN
+    assert rejected.value.kind is MetricsErrorKind.REJECTED
     assert rejected.value.kind == "rejected"
 
 

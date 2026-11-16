@@ -11,7 +11,7 @@ and the dashboard all read it; a test keeps the manual in step.
 OK = 0
 TEST_FAILURES = 1  # the fleet
 USAGE = 2  # bad arguments, or an invalid profile
-PREFLIGHT = 3  # the vantage point
+PREFLIGHT = 3  # the vantage point: preflight, or a results store without credentials
 INTERNAL = 4  # a defect in llmdv itself
 # Verification passed, but results or the notification were not delivered. Never returned for a
 # failed verification: the verification code always takes precedence.
@@ -28,7 +28,8 @@ EXITS = {
     USAGE: ("usage", "bad usage, or an invalid profile; nothing was verified"),
     PREFLIGHT: (
         "environment",
-        "preflight unsatisfied: your vantage point, not the fleet; nothing was tested",
+        "your environment, not the fleet: preflight unsatisfied (nothing was tested), "
+        "or a results store that cannot be used as configured",
     ),
     INTERNAL: ("internal", "an internal error: a defect in llmdv itself"),
     NOT_DELIVERED: (
