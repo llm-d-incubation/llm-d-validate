@@ -28,7 +28,7 @@ import yaml
 
 from ..http.redact import SECRET_HEADERS
 from ..surfaces import base as surfaces
-from . import evolution
+from . import evolution, parse
 from . import transport as transport_contract
 from .errors import Diagnostic, ProfileError
 from .fleet import (
@@ -376,7 +376,7 @@ def _known_failures(raw: Any) -> tuple[KnownFailure, ...]:
         unknown = set(item) - {"check", "issue", "cases", "ingress", "fix", "until"}
         if unknown:
             raise ProfileError(f"{where}: unknown keys {sorted(unknown)}")
-        check = _string(item.get("check", ""), f"{where}.check")
+        check = parse.string(item.get("check", ""), f"{where}.check")
         if not re.search(r"[^*?]", check):
             # `*` alone would label every failure in the run, which is the one thing this
             # block must never be able to do.
@@ -384,7 +384,7 @@ def _known_failures(raw: Any) -> tuple[KnownFailure, ...]:
                 f"{where}.check: the first failing check is required, with at least one literal "
                 f"character; got {check!r}"
             )
-        issue = _string(item.get("issue", ""), f"{where}.issue")
+        issue = parse.string(item.get("issue", ""), f"{where}.issue")
         if not _ISSUE.match(issue):
             raise ProfileError(
                 f"{where}.issue: expected 'owner/repo#N', '#N' or a URL, got {issue!r}"
@@ -394,7 +394,7 @@ def _known_failures(raw: Any) -> tuple[KnownFailure, ...]:
             raise ProfileError(f"{where}.until: expected a mapping of signal to value")
         until = {}
         for name, value in until_raw.items():
-            signal = _string(name, f"{where}.until").lower()
+            signal = parse.string(name, f"{where}.until").lower()
             if not isinstance(value, str) or not signal or not value:
                 # YAML reads `1.100` as the float 1.1 and `1.97` as 1.97: a version must be
                 # quoted, or the comparison is made against a number that is not the version.
@@ -406,9 +406,11 @@ def _known_failures(raw: Any) -> tuple[KnownFailure, ...]:
             KnownFailure(
                 check=check,
                 issue=issue,
-                cases=_strings(item.get("cases") or [], f"{where}.cases"),
+                cases=parse.strings(item.get("cases") or [], f"{where}.cases"),
                 ingresses=_one_or_more(item.get("ingress"), f"{where}.ingress"),
-                fix=_string(item["fix"], f"{where}.fix") if item.get("fix") is not None else None,
+                fix=parse.string(item["fix"], f"{where}.fix")
+                if item.get("fix") is not None
+                else None,
                 until=until,
             )
         )
@@ -420,7 +422,7 @@ def _one_or_more(value: Any, where: str) -> tuple[str, ...]:
         return ()
     if isinstance(value, str):
         return (value,)
-    return _strings(value, where)
+    return parse.strings(value, where)
 
 
 def contract_digest(path: str | Path) -> str | None:
@@ -450,25 +452,6 @@ def _stringify_keys(value: Any) -> Any:
     return value
 
 
-def _bool(value: Any, default: bool, where: str) -> bool:
-    """A declared boolean, rejecting anything that is not one.
-
-    `bool()` coerces, and that is the wrong behaviour for a declaration: every non-empty string is
-    truthy, so `rate_limited: "false"` and `count_tokens: "off"` both read as True. YAML only
-    produces a string here when the value was quoted or misspelled, and in both cases the author
-    meant something they did not get.
-
-    It matters most where a declaration RELAXES something -- `rate_limited: true` turns a 429 from
-    a failure into a skip -- because a typo would silently switch off a check rather than
-    switching one on.
-    """
-    if value is None:
-        return default
-    if isinstance(value, bool):
-        return value
-    raise ProfileError(f"{where}: expected true or false, got {value!r}")
-
-
 def _enum(enum_cls, value, default, where: str):
     if value is None:
         return default
@@ -492,30 +475,16 @@ def _environment(raw: dict[str, Any]) -> Environment:
 
 def _check_override_keys(raw, cls, where, nullable=(), renames=None) -> None:
     """Overrides are partial mappings, but misspellings and invalid clears are errors."""
-    if not isinstance(raw, dict):
-        raise ProfileError(f"{where}: expected a mapping, got {raw!r}")
-    names = {(renames or {}).get(item.name, item.name) for item in fields(cls)}
-    for name, value in raw.items():
-        if name not in names:
-            raise ProfileError(f"{where}.{name}: unknown field")
-        if value is None and name not in nullable:
-            raise ProfileError(f"{where}.{name}: cannot be null")
+    names = [(renames or {}).get(item.name, item.name) for item in fields(cls)]
+    parse.fields(raw, names, where, nullable=nullable)
 
 
-def _string(value: Any, where: str) -> str:
-    if not isinstance(value, str):
-        raise ProfileError(f"{where}: expected a string, got {value!r}")
-    return value
-
-
-def _strings(value: Any, where: str) -> tuple[str, ...]:
-    if not isinstance(value, (list, tuple)):
-        raise ProfileError(f"{where}: expected a list of strings, got {value!r}")
-    return tuple(_string(item, f"{where}[{index}]") for index, item in enumerate(value))
+def _optional_strings(value: Any, where: str) -> tuple[str, ...]:
+    return () if value is None else parse.strings(value, where)
 
 
 def _markup(value: Any, where: str) -> tuple[str, ...]:
-    markup = _strings(value, where)
+    markup = parse.strings(value, where)
     for index, item in enumerate(markup):
         if not item:
             raise ProfileError(f"{where}[{index}]: an empty string matches every answer")
@@ -526,22 +495,14 @@ def _https_url(value: Any, where: str) -> str | None:
     """An absolute https URL with a host, or None when undeclared."""
     if value is None:
         return None
-    url = _string(value, where)
+    url = parse.string(value, where)
     if not re.match(r"^https://[^/\s?#]+(/\S*)?$", url):
         raise ProfileError(f"{where}: expected an https:// URL with a host, got {value!r}")
     return url
 
 
 def _nullable_string(value: Any, where: str) -> str | None:
-    return None if value is None else _string(value, where) or None
-
-
-def _one_of(value: Any, allowed: tuple[str, ...], default: str, where: str) -> str:
-    if value is None:
-        return default
-    if not isinstance(value, str) or value not in allowed:
-        raise ProfileError(f"{where}: expected one of {list(allowed)}, got {value!r}")
-    return value
+    return None if value is None else parse.string(value, where) or None
 
 
 def _deep_merge(defaults: dict[str, Any], override: dict[str, Any]) -> dict[str, Any]:
@@ -592,8 +553,8 @@ def _model(raw: dict[str, Any], where: str = "model") -> Model:
     if limit is not None and type(limit) is not int:
         raise ProfileError(f"{where}.max_model_len: expected an integer or null, got {limit!r}")
     return Model(
-        public_id=_string(raw.get("public_id", ""), f"{where}.public_id"),
-        aliases=_strings(raw.get("aliases", ()), f"{where}.aliases"),
+        public_id=parse.string(raw.get("public_id", ""), f"{where}.public_id"),
+        aliases=parse.strings(raw.get("aliases", ()), f"{where}.aliases"),
         max_model_len=limit,
         answer_max_tokens=_opt_positive_int(
             raw.get("answer_max_tokens"), f"{where}.answer_max_tokens"
@@ -605,7 +566,7 @@ def _model(raw: dict[str, Any], where: str = "model") -> Model:
                 reasoning_raw.get("inline_tag"),
                 f"{where}.reasoning.inline_tag",
             ),
-            default_on=_bool(
+            default_on=parse.flag(
                 reasoning_raw.get("default_on"),
                 False,
                 f"{where}.reasoning.default_on",
@@ -613,23 +574,23 @@ def _model(raw: dict[str, Any], where: str = "model") -> Model:
         ),
         tools=Tools(
             parser=_nullable_string(tools_raw.get("parser"), f"{where}.tools.parser"),
-            auto_choice=_bool(
+            auto_choice=parse.flag(
                 tools_raw.get("auto_choice"),
                 False,
                 f"{where}.tools.auto_choice",
             ),
-            forced_finish_reason=_one_of(
+            forced_finish_reason=parse.one_of(
                 tools_raw.get("forced_finish_reason"),
                 CHAT_FORCED_TOOL_FINISHES,
-                "tool_calls",
                 f"{where}.tools.forced_finish_reason",
+                "tool_calls",
             ),
             markup=_markup(tools_raw.get("markup", ()), f"{where}.tools.markup"),
-            strict_level=_one_of(
+            strict_level=parse.one_of(
                 tools_raw.get("strict_level"),
                 TOOL_STRICT_LEVELS,
-                "auto",
                 f"{where}.tools.strict_level",
+                "auto",
             ),
         ),
     )
@@ -671,7 +632,7 @@ def _ingress(
             key_env=_opt_str(auth_raw.get("key_env")),
         ),
         health_path=str(raw.get("health_path") or "/health"),
-        surfaces=tuple(str(item) for item in (raw.get("surfaces") or [])),
+        surfaces=_optional_strings(raw.get("surfaces"), f"ingresses({ingress_id}).surfaces"),
         timeouts=Timeouts(
             connect=float(timeouts_raw.get("connect", 5.0)),
             request=float(timeouts_raw.get("request", 600.0)),
@@ -681,12 +642,14 @@ def _ingress(
             str(key): tuple(int(code) for code in _as_list(value))
             for key, value in (raw.get("error_status") or {}).items()
         },
-        unstructured_errors=tuple(str(item) for item in (raw.get("unstructured_errors") or [])),
-        rate_limited=_bool(
+        unstructured_errors=_optional_strings(
+            raw.get("unstructured_errors"), f"ingresses({ingress_id}).unstructured_errors"
+        ),
+        rate_limited=parse.flag(
             raw.get("rate_limited"), False, f"ingresses[{raw.get('id')}].rate_limited"
         ),
         logs=tuple(_log_source(item) for item in (raw.get("logs") or [])),
-        tls=Tls(verify=_bool((raw.get("tls") or {}).get("verify"), True, "tls.verify")),
+        tls=Tls(verify=parse.flag((raw.get("tls") or {}).get("verify"), True, "tls.verify")),
         transport=transport_contract.parse(
             raw.get("transport"), f"ingresses({ingress_id}).transport"
         ),
@@ -758,7 +721,7 @@ def _surface_capability(value: Any, where: str) -> bool | tuple[str, ...]:
 
 
 def _declared_values(value: Any, allowed: tuple[str, ...], where: str) -> tuple[str, ...]:
-    values = _strings(value, where)
+    values = parse.strings(value, where)
     if any(item not in allowed for item in values) or len(values) != len(set(values)):
         raise ProfileError(
             f"{where}: expected distinct values from {sorted(allowed)}, got {value!r}"
@@ -793,15 +756,15 @@ def _capabilities(raw: dict[str, Any], where: str = "capabilities") -> Capabilit
         prefix_stability=_surface_capability(
             raw.get("prefix_stability"), f"{where}.prefix_stability"
         ),
-        count_tokens=_bool(raw.get("count_tokens"), False, f"{where}.count_tokens"),
-        anthropic_betas=_strings(raw.get("anthropic_betas", ()), f"{where}.anthropic_betas"),
+        count_tokens=parse.flag(raw.get("count_tokens"), False, f"{where}.count_tokens"),
+        anthropic_betas=parse.strings(raw.get("anthropic_betas", ()), f"{where}.anthropic_betas"),
         messages_checks=_declared_values(
             raw.get("messages_checks", ()), MESSAGES_CHECKS, f"{where}.messages_checks"
         ),
-        background_responses=_bool(
+        background_responses=parse.flag(
             raw.get("background_responses"), False, f"{where}.background_responses"
         ),
-        stateful_responses=_bool(
+        stateful_responses=parse.flag(
             raw.get("stateful_responses"), False, f"{where}.stateful_responses"
         ),
         stateless_responses=_stateless_responses(raw, where),
@@ -809,17 +772,19 @@ def _capabilities(raw: dict[str, Any], where: str = "capabilities") -> Capabilit
         model_retrieval=(
             None
             if raw.get("model_retrieval") is None
-            else _bool(raw.get("model_retrieval"), False, f"{where}.model_retrieval")
+            else parse.flag(raw.get("model_retrieval"), False, f"{where}.model_retrieval")
         ),
         responses_compact=(
             None
             if raw.get("responses_compact") is None
-            else _bool(raw.get("responses_compact"), False, f"{where}.responses_compact")
+            else parse.flag(raw.get("responses_compact"), False, f"{where}.responses_compact")
         ),
         responses_input_tokens=(
             None
             if raw.get("responses_input_tokens") is None
-            else _bool(raw.get("responses_input_tokens"), False, f"{where}.responses_input_tokens")
+            else parse.flag(
+                raw.get("responses_input_tokens"), False, f"{where}.responses_input_tokens"
+            )
         ),
         responses_features=_responses_features(
             raw.get("responses_features", {}), f"{where}.responses_features"
@@ -830,7 +795,7 @@ def _capabilities(raw: dict[str, Any], where: str = "capabilities") -> Capabilit
         reasoning_tokens=_surface_capability(
             raw.get("reasoning_tokens"), f"{where}.reasoning_tokens"
         ),
-        vllm_options=_strings(raw.get("vllm_options", ()), f"{where}.vllm_options"),
+        vllm_options=parse.strings(raw.get("vllm_options", ()), f"{where}.vllm_options"),
         messages_thinking=_declared_values(
             raw.get("messages_thinking", ()), MESSAGES_THINKING_MODES, f"{where}.messages_thinking"
         ),
@@ -873,11 +838,11 @@ def _capabilities(raw: dict[str, Any], where: str = "capabilities") -> Capabilit
         effort_rendering=_effort_rendering(
             raw.get("effort_rendering"), f"{where}.effort_rendering"
         ),
-        client_reuse=_bool(raw.get("client_reuse"), False, f"{where}.client_reuse"),
+        client_reuse=parse.flag(raw.get("client_reuse"), False, f"{where}.client_reuse"),
         client_sessions=_declared_values(
             raw.get("client_sessions", ()), CLIENT_SESSIONS, f"{where}.client_sessions"
         ),
-        header_probe=_bool(raw.get("header_probe"), False, f"{where}.header_probe"),
+        header_probe=parse.flag(raw.get("header_probe"), False, f"{where}.header_probe"),
         header_rewrites=_header_rewrites(
             raw.get("header_rewrites", {}), f"{where}.header_rewrites"
         ),
@@ -920,7 +885,7 @@ def _quiet_efforts(raw: dict[str, Any], where: str) -> tuple[str, ...]:
 
 def _model_names(value: Any, where: str) -> tuple[str, ...]:
     """Distinct model names, each non-empty and without whitespace."""
-    names = _strings(value, where)
+    names = parse.strings(value, where)
     if any(not name or any(c.isspace() for c in name) for name in names):
         raise ProfileError(f"{where}: expected model names without whitespace")
     if len(set(names)) != len(names):
@@ -947,9 +912,9 @@ def _responses_features(raw: Any, where: str) -> dict[str, str]:
 
 
 def _stateless_responses(raw: dict[str, Any], where: str) -> bool:
-    stateless = _bool(raw.get("stateless_responses"), False, f"{where}.stateless_responses")
+    stateless = parse.flag(raw.get("stateless_responses"), False, f"{where}.stateless_responses")
     for name in ("stateful_responses", "background_responses"):
-        if stateless and _bool(raw.get(name), False, f"{where}.{name}"):
+        if stateless and parse.flag(raw.get(name), False, f"{where}.{name}"):
             raise ProfileError(f"{where}.stateless_responses: cannot be declared with {name}")
     return stateless
 
@@ -971,8 +936,8 @@ def _headers(raw: dict[str, Any]) -> dict[str, dict[str, Disposition]]:
 def _client(raw: dict[str, Any], base_dir: Path) -> Client:
     return Client(
         id=str(raw.get("id") or ""),
-        surfaces=tuple(str(item) for item in (raw.get("surfaces") or [])),
-        needs=tuple(str(item) for item in (raw.get("needs") or [])),
+        surfaces=_optional_strings(raw.get("surfaces"), f"clients({raw.get('id')}).surfaces"),
+        needs=_optional_strings(raw.get("needs"), f"clients({raw.get('id')}).needs"),
         binaries=_binaries(raw.get("binaries", []), f"clients({raw.get('id')}).binaries", base_dir),
     )
 
@@ -1222,14 +1187,14 @@ def _binaries(raw: Any, where: str, base_dir: Path) -> tuple[ClientBinary, ...]:
         path = f"{where}[{index}]"
         if not isinstance(item, dict) or set(item) != {"version", "executable"}:
             raise ProfileError(f"{path}: expected version and executable")
-        version = _string(item["version"], f"{path}.version")
+        version = parse.string(item["version"], f"{path}.version")
         if not re.fullmatch(r"[0-9]+\.[0-9]+\.[0-9]+", version):
             raise ProfileError(f"{path}.version: expected an exact numeric version")
         if tuple(map(int, version.split("."))) < CLAUDE_CODE_MIN_VERSION:
             raise ProfileError(
                 f"{path}.version: Claude Code harness requires version 2.1.0 or newer"
             )
-        executable = _string(item["executable"], f"{path}.executable")
+        executable = parse.string(item["executable"], f"{path}.executable")
         if not executable:
             raise ProfileError(f"{path}.executable: cannot be empty")
         executable = Path(executable).expanduser()
@@ -1248,7 +1213,7 @@ def _header_rewrites(raw: Any, where: str) -> dict[str, str]:
     for name, value in raw.items():
         if not isinstance(name, str) or not name or name.lower() in SECRET_HEADERS:
             raise ProfileError(f"{where}: expected non-credential header names")
-        result[name.lower()] = _string(value, f"{where}.{name}")
+        result[name.lower()] = parse.string(value, f"{where}.{name}")
     return result
 
 
@@ -1261,7 +1226,7 @@ def _model_info(raw: Any, where: str) -> dict[str, Any]:
         if not isinstance(name, str) or not name:
             raise ProfileError(f"{where}: expected non-empty field names, got {name!r}")
         if isinstance(value, list):
-            result[name] = _strings(value, f"{where}.{name}")
+            result[name] = parse.strings(value, f"{where}.{name}")
         elif isinstance(value, (bool, int, float, str)):
             result[name] = value
         else:

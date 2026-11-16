@@ -17,6 +17,7 @@ from typing import Any
 from urllib.parse import urlsplit
 
 from ..http.redact import SECRET_HEADERS
+from . import parse as shape
 from .errors import ProfileError
 
 # Error classes for transport-level requests. A case without a declared status for its class
@@ -129,7 +130,7 @@ def parse(raw: Any, where: str) -> TransportContract:
     """Parse one ingress's `transport` mapping, naming the field at fault."""
     if raw is None:
         return TransportContract()
-    _known_keys(raw, TransportContract, where)
+    shape.fields(raw, [item.name for item in fields(TransportContract)], where)
     if raw.get("http_url") is not None and raw.get("http_redirect") is not None:
         raise TransportError(f"{where}: declare http_url or http_redirect, not both")
     return TransportContract(
@@ -138,44 +139,31 @@ def parse(raw: Any, where: str) -> TransportContract:
         absent_paths=_paths(raw.get("absent_paths", []), f"{where}.absent_paths"),
         absent_status=_statuses(raw.get("absent_status", [403, 404]), f"{where}.absent_status"),
         http_url=_http_url(raw.get("http_url"), f"{where}.http_url"),
-        http_redirect=_choice(raw.get("http_redirect"), HTTP_REDIRECT, f"{where}.http_redirect"),
-        cors_preflight=_choice(
+        http_redirect=shape.one_of(
+            raw.get("http_redirect"), HTTP_REDIRECT, f"{where}.http_redirect"
+        ),
+        cors_preflight=shape.one_of(
             raw.get("cors_preflight"), CORS_PREFLIGHT, f"{where}.cors_preflight"
         ),
-        alpn=_choice(raw.get("alpn"), ALPN_PROTOCOLS, f"{where}.alpn"),
+        alpn=shape.one_of(raw.get("alpn"), ALPN_PROTOCOLS, f"{where}.alpn"),
         credential_headers=None
         if raw.get("credential_headers") is None
         else tuple(
-            _choice(item, CREDENTIAL_HEADERS, f"{where}.credential_headers[{index}]")
-            for index, item in enumerate(_list(raw["credential_headers"], where))
+            shape.one_of(item, CREDENTIAL_HEADERS, f"{where}.credential_headers[{index}]")
+            for index, item in enumerate(shape.items(raw["credential_headers"], where))
         ),
         model_rewrite_header=_header(
             raw.get("model_rewrite_header"), f"{where}.model_rewrite_header"
         ),
-        idempotency=_choice(raw.get("idempotency"), IDEMPOTENCY, f"{where}.idempotency"),
+        idempotency=shape.one_of(raw.get("idempotency"), IDEMPOTENCY, f"{where}.idempotency"),
         stream_budget=_budget(raw.get("stream_budget"), f"{where}.stream_budget"),
         max_body_bytes=_size(raw.get("max_body_bytes"), f"{where}.max_body_bytes"),
     )
 
 
-def _known_keys(raw: Any, cls: type, where: str) -> None:
-    if not isinstance(raw, dict):
-        raise TransportError(f"{where}: expected a mapping, got {raw!r}")
-    names = {item.name for item in fields(cls)}
-    for name in raw:
-        if name not in names:
-            raise TransportError(f"{where}.{name}: unknown field")
-
-
-def _list(value: Any, where: str) -> list[Any]:
-    if not isinstance(value, (list, tuple)):
-        raise TransportError(f"{where}: expected a list, got {value!r}")
-    return list(value)
-
-
 def _statuses(value: Any, where: str) -> tuple[int, ...]:
     out = []
-    for index, code in enumerate(_list(value, where)):
+    for index, code in enumerate(shape.items(value, where)):
         if type(code) is not int or not 100 <= code <= 599:
             raise TransportError(f"{where}[{index}]: expected an HTTP status, got {code!r}")
         out.append(code)
@@ -184,7 +172,7 @@ def _statuses(value: Any, where: str) -> tuple[int, ...]:
 
 def _paths(value: Any, where: str) -> tuple[str, ...]:
     out = []
-    for index, path in enumerate(_list(value, where)):
+    for index, path in enumerate(shape.items(value, where)):
         at = f"{where}[{index}]"
         if not isinstance(path, str) or not path.startswith("/") or any(c.isspace() for c in path):
             raise TransportError(f"{at}: expected a path starting with /, got {path!r}")
@@ -231,14 +219,6 @@ def plain_http_url(base_url: str) -> tuple[str | None, str | None]:
     return f"http://[{host}]" if ":" in host else f"http://{host}", None
 
 
-def _choice(value: Any, allowed: tuple[str, ...], where: str) -> str | None:
-    if value is None:
-        return None
-    if value not in allowed:
-        raise TransportError(f"{where}: expected one of {list(allowed)}, got {value!r}")
-    return value
-
-
 def _header(value: Any, where: str) -> str | None:
     if value is None:
         return None
@@ -252,7 +232,7 @@ def _header(value: Any, where: str) -> str | None:
 def _budget(raw: Any, where: str) -> StreamBudget | None:
     if raw is None:
         return None
-    _known_keys(raw, StreamBudget, where)
+    shape.fields(raw, [item.name for item in fields(StreamBudget)], where)
     values = {}
     for name, value in raw.items():
         if type(value) not in (int, float) or not math.isfinite(value) or value <= 0:

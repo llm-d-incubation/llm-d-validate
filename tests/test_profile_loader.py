@@ -442,3 +442,29 @@ def test_vantage_defaults_to_external(tmp_path):
         """)
     )
     assert loader.load(path).vantage is Vantage.EXTERNAL
+
+
+@pytest.mark.parametrize(
+    ("declaration", "path"),
+    [
+        ("clients:\n  - {id: ide, surfaces: [chat_completions], needs: tools}\n", "needs"),
+        ("clients:\n  - {id: ide, surfaces: chat_completions}\n", "surfaces"),
+    ],
+)
+def test_a_client_string_where_a_list_is_expected_is_refused(tmp_path, declaration, path):
+    """`needs: tools` once loaded as five one-letter needs."""
+    with pytest.raises(loader.ProfileError, match=rf"clients.*\.{path}: expected a list"):
+        loader.load(write(tmp_path, MINIMAL + declaration))
+
+
+@pytest.mark.parametrize("key", ["surfaces", "unstructured_errors"])
+def test_an_ingress_string_where_a_list_is_expected_is_refused(tmp_path, key):
+    text = MINIMAL.replace("surfaces: [chat_completions]", f"{key}: chat_completions")
+    with pytest.raises(loader.ProfileError, match=rf"ingresses.*\.{key}: expected a list"):
+        loader.load(write(tmp_path, text))
+
+
+def test_a_list_item_that_is_not_a_string_is_not_converted(tmp_path):
+    text = MINIMAL.replace("surfaces: [chat_completions]", "surfaces: [chat_completions, 7]")
+    with pytest.raises(loader.ProfileError, match=r"surfaces\[1\]: expected a string, got 7"):
+        loader.load(write(tmp_path, text))
