@@ -6,8 +6,11 @@ smaller set than anybody asked for. A narrower green run is worse than an error,
 same reasoning that makes `banner.finish` refuse to print `PASSED | 0 cases`.
 """
 
+import json
+import os
 import subprocess
 import sys
+import textwrap
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -15,7 +18,9 @@ import pytest
 
 from llmdv.plugin import (
     _ACTIVE,
+    PREFIX_EXCEPTIONS,
     _check_capability_names,
+    _check_case_prefixes,
     _suite_of,
     known_markers,
     register_artifact,
@@ -110,6 +115,156 @@ def test_boolean_expressions_are_still_accepted():
 def test_one_bad_name_in_a_compound_expression_is_still_caught():
     out = collect("contract or discovry")
     assert "no such marker" in out.stdout + out.stderr
+
+
+# ----------------------------------------------------------------- case_id prefixes
+
+# Prints, for every collected case, its case_id and markers. Read from a child process so the
+# markers are the ones the plugin applied during a real collection.
+_DUMP_MARKERS = """
+import json, sys, pytest
+
+class Dump:
+    def pytest_collection_finish(self, session):
+        rows = []
+        for item in session.items:
+            mark = item.get_closest_marker("case_id")
+            rows.append({
+                "nodeid": item.nodeid,
+                "case_id": mark.args[0] if mark and mark.args else None,
+                "markers": sorted({m.name for m in item.iter_markers()}),
+            })
+        sys.stdout.write("ROWS " + json.dumps(rows) + "\\n")
+
+pytest.main(sys.argv[1:], plugins=[Dump()])
+"""
+
+
+def collected(*args: str) -> list[dict]:
+    out = subprocess.run(
+        [sys.executable, "-c", _DUMP_MARKERS, "--llmdv-profile", str(PROFILE), str(SUITES)]
+        + ["-q", "--collect-only", "-p", "no:cacheprovider", *args],
+        capture_output=True,
+        text=True,
+    )
+    line = next((x for x in out.stdout.splitlines() if x.startswith("ROWS ")), None)
+    assert line, out.stdout + out.stderr
+    return json.loads(line[len("ROWS ") :])
+
+
+def test_a_prefix_naming_a_suite_selects_the_case_wherever_it_lives():
+    """The output shows `openai_chat.disconnect_recovery` under openai_chat; `-m` must agree."""
+    ids = {row["case_id"] for row in collected("-m", "openai_chat")}
+    assert "openai_chat.disconnect_recovery" in ids
+    assert not [i for i in ids if i.startswith("streaming.")], "the rest of streaming stays out"
+
+
+def test_the_package_still_selects_the_cases_it_selected_before():
+    """The prefix marker only adds: `-m streaming` keeps the disconnect cases."""
+    ids = {row["case_id"] for row in collected("-m", "streaming")}
+    assert "openai_chat.disconnect_recovery" in ids
+    assert "transport.stream_encoding" in ids
+
+
+def test_every_case_keeps_its_package_marker_and_gains_only_its_prefix_suite():
+    # `contract` is also a hand-written marker that cases outside contract/ carry on purpose.
+    suites = set(suite_markers()) - {"contract"}
+    rows = collected()
+    assert rows
+    for row in rows:
+        package = row["nodeid"].split("/suites/", 1)[1].split("/", 1)[0]
+        prefix = (row["case_id"] or "").split(".", 1)[0] if "." in (row["case_id"] or "") else None
+        assert package in row["markers"], f"{row['nodeid']} lost its package marker"
+        expected = ({package} | {prefix}) & suites
+        assert set(row["markers"]) & suites == expected, row
+
+
+def _case(module: str, case_id: str | None) -> SimpleNamespace:
+    marker = SimpleNamespace(args=(case_id,)) if case_id else None
+    return SimpleNamespace(
+        module=SimpleNamespace(__name__=module),
+        nodeid=f"{module.replace('.', '/')}.py::test_case",
+        get_closest_marker=lambda name: marker if name == "case_id" else None,
+    )
+
+
+def test_a_prefix_matching_its_package_passes():
+    _check_case_prefixes([_case("llmdv.suites.discovery.test_models", "discovery.lists_model")])
+
+
+def test_a_reviewed_mismatch_passes():
+    _check_case_prefixes(
+        [_case("llmdv.suites.streaming.test_disconnect", "openai_chat.disconnect_recovery")]
+    )
+
+
+def test_a_case_outside_the_suites_or_without_a_prefix_is_not_checked():
+    _check_case_prefixes([_case("tests.test_something", "cache.anything")])
+    _check_case_prefixes([_case("llmdv.suites.streaming.test_x", "no_dot")])
+    _check_case_prefixes([_case("llmdv.suites.streaming.test_x", None)])
+
+
+def test_a_new_mismatch_names_the_case_its_prefix_and_its_package():
+    """A reviewed pair does not license the same prefix in another package."""
+    assert "openai_chat" not in PREFIX_EXCEPTIONS.get("tools", {})
+    with pytest.raises(pytest.UsageError) as raised:
+        _check_case_prefixes([_case("llmdv.suites.tools.test_new", "openai_chat.drifted")])
+    message = str(raised.value)
+    assert "llmdv/suites/tools/test_new.py::test_case" in message
+    assert "'openai_chat'" in message and "'tools'" in message
+    assert "PREFIX_EXCEPTIONS" in message
+
+
+def test_every_reviewed_mismatch_has_a_reason():
+    for package, prefixes in PREFIX_EXCEPTIONS.items():
+        assert prefixes, package
+        for prefix, reason in prefixes.items():
+            assert prefix != package and reason.strip(), (package, prefix)
+
+
+def test_a_new_mismatch_fails_a_real_collection_even_when_m_would_deselect_it(tmp_path):
+    """Checked before `-m` filters, so narrowing a run cannot hide the drift."""
+    package = tmp_path / "fakepkg" / "suites" / "streaming"
+    package.mkdir(parents=True)
+    for directory in (tmp_path / "fakepkg", package.parent, package):
+        (directory / "__init__.py").write_text("")
+    (package / "test_new.py").write_text(
+        textwrap.dedent(
+            """
+            import pytest
+
+            @pytest.mark.case_id("cache.drifted")
+            def test_drifted():
+                pass
+
+            @pytest.mark.case_id("streaming.fine")
+            def test_fine():
+                pass
+            """
+        )
+    )
+    env = {**os.environ, "PYTHONPATH": str(Path(__file__).resolve().parents[1] / "src")}
+    out = subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "pytest",
+            "fakepkg",
+            "--collect-only",
+            "-q",
+            "-p",
+            "no:cacheprovider",
+        ]
+        + ["-m", "streaming"],
+        cwd=tmp_path,
+        env=env,
+        capture_output=True,
+        text=True,
+    )
+    assert out.returncode != 0
+    text = out.stdout + out.stderr
+    assert "test_new.py::test_drifted" in text
+    assert "'cache'" in text and "'streaming'" in text
 
 
 def _item(*needs: str) -> SimpleNamespace:

@@ -2,7 +2,8 @@
 
 This page answers three questions: does llmdv test X, what is missing or blocked, and which
 profile key turns a check on. Each row is one suite package under `src/llmdv/suites/`; the
-package name is also its pytest marker. Case counts are the distinct `case_id` declarations in
+package name is also its pytest marker, and a case whose `case_id` prefix names another suite
+carries that marker too. Case counts are the distinct `case_id` declarations in
 that package. Parametrized variants (surface, ingress, option) multiply them at run time.
 
 | Status | Meaning |
@@ -151,7 +152,8 @@ layers.
 - A profile's surface × ingress view, including what will skip and why:
   `llmdv profile show <profile.yaml> --matrix`.
 - The per-case list for one area:
-  `pytest --collect-only -q -m <marker>`, where the marker is the suite package name. See
+  `pytest --collect-only -q -m <marker>`, where the marker is the suite package name (or the
+  suite a case's `case_id` prefix names). See
   [Selecting what runs](manual.md#selecting-what-runs).
 - Every profile key: [profiles/REFERENCE.md](../profiles/REFERENCE.md).
 

@@ -20,6 +20,7 @@ so the class travels into results.jsonl with every record.
 from __future__ import annotations
 
 import dataclasses
+import functools
 import json
 import re
 import uuid
@@ -75,12 +76,15 @@ MARKERS = (
 # One marker per suite package, applied automatically, so the name a reader reaches for is a
 # selector that works: `-m discovery` selects the discovery suite. Without these the package
 # names look like markers and silently select nothing -- a narrower green run, which is worse
-# than an error.
+# than an error. A case whose case_id prefix names another suite carries that suite's marker
+# too, since the prefix is what the output shows: `-m openai_chat` selects
+# `openai_chat.disconnect_recovery`, which lives in `streaming/`.
 SUITES_DIR = Path(__file__).parent / "suites"
 
 
+@functools.cache
 def suite_markers() -> tuple[str, ...]:
-    """Suite package names that actually contain cases."""
+    """Suite package names that actually contain cases. Read once: every collected case asks."""
     if not SUITES_DIR.is_dir():
         return ()
     return tuple(
@@ -108,6 +112,62 @@ def _suite_of(item: pytest.Item) -> str | None:
         if index + 1 < len(parts):
             return parts[index + 1]
     return None
+
+
+def _prefix_of(item: pytest.Item) -> str | None:
+    """The group before the first dot of a case's case_id, or None without one."""
+    marker = item.get_closest_marker("case_id")
+    if marker and marker.args and "." in marker.args[0]:
+        return marker.args[0].split(".", 1)[0]
+    return None
+
+
+# The case_id prefixes allowed to differ from the package their cases live in, by package. A
+# prefix is the phase heading, the marker a reader reaches for and part of the compare key, so
+# moving a case or renaming its id is not free; these were reviewed and kept. A new mismatch
+# fails collection: either match the package, or add it here with its reason.
+PREFIX_EXCEPTIONS: dict[str, dict[str, str]] = {
+    "fleet": {
+        "config": "fleet config reads; a sub-area of fleet, not a suite",
+        "logs": "forbidden log lines; its own phase, ordered last in PHASE_ORDER",
+        "metrics": "Prometheus bounds; a sub-area of fleet, not a suite",
+    },
+    "streaming": {
+        "anthropic_messages": "disconnect then recover, reported under the surface it breaks",
+        "openai_chat": "disconnect then recover, reported under the surface it breaks",
+        "openai_responses": "disconnect then recover, reported under the surface it breaks",
+        "transport": "stream encoding is a transport property measured on a stream",
+    },
+    "tools": {
+        "anthropic_messages": "parallel tool calls in the Messages grammar",
+    },
+    "unhappy": {
+        "headers": "credential and auth header handling; a sub-area of unhappy, not a suite",
+    },
+}
+
+
+def _check_case_prefixes(items: list[pytest.Item]) -> None:
+    """A case_id prefix that differs from its package must be a reviewed exception.
+
+    The output groups a case under its prefix and `-m` selects by package and by a prefix that
+    names a suite. A prefix that drifts from both sends a case somewhere a reader does not look
+    for it, so a new mismatch fails collection rather than quietly growing the list.
+    """
+    problems = []
+    for item in items:
+        suite, prefix = _suite_of(item), _prefix_of(item)
+        if suite is None or prefix is None or prefix == suite:
+            continue
+        if prefix not in PREFIX_EXCEPTIONS.get(suite, {}):
+            problems.append(f"{item.nodeid}: case_id prefix {prefix!r} in package {suite!r}")
+    if problems:
+        raise pytest.UsageError(
+            "case_id prefix differs from its suite package: "
+            + "; ".join(sorted(set(problems)))
+            + ". Match the package, or add the pair to PREFIX_EXCEPTIONS in llmdv/plugin.py "
+            "with the reason it is kept."
+        )
 
 
 # ------------------------------------------------------------------ configuration
@@ -402,10 +462,7 @@ PHASE_ORDER = {"preflight": 0, "contract": 1, "discovery": 2, "logs": 99}
 
 def phase_of(item: pytest.Item) -> str:
     """The suite phase a case belongs to, taken from its case_id prefix."""
-    marker = item.get_closest_marker("case_id")
-    if marker and marker.args and "." in marker.args[0]:
-        return marker.args[0].split(".", 1)[0]
-    return Path(str(getattr(item, "fspath", ""))).parent.name or "other"
+    return _prefix_of(item) or Path(str(getattr(item, "fspath", ""))).parent.name or "other"
 
 
 def _phase_sort_key(item: pytest.Item, order: dict[str, int] | None = None) -> tuple:
@@ -433,7 +490,11 @@ def _phase_sort_key(item: pytest.Item, order: dict[str, int] | None = None) -> t
 
 
 def pytest_itemcollected(item: pytest.Item) -> None:
-    """Tag each case with its suite.
+    """Tag each case with its suite, and with the suite its case_id prefix names.
+
+    The second marker only ever adds: `-m streaming` still selects the disconnect cases, and
+    `-m openai_chat` now selects `openai_chat.disconnect_recovery` too, the group the output
+    shows it under. A prefix that names no suite (`fleet`'s `config.`) adds nothing.
 
     Done here rather than in `pytest_collection_modifyitems` because pytest applies `-m` in a
     `modifyitems` implementation of its own; a marker added there could be added after the
@@ -442,6 +503,9 @@ def pytest_itemcollected(item: pytest.Item) -> None:
     suite = _suite_of(item)
     if suite:
         item.add_marker(suite)
+        prefix = _prefix_of(item)
+        if prefix and prefix != suite and prefix in suite_markers():
+            item.add_marker(prefix)
 
 
 # Names `needs(...)` may use, beyond the fields on Capabilities: these two are read off the
@@ -500,6 +564,7 @@ def pytest_collection_modifyitems(config: pytest.Config, items: list[pytest.Item
     contract suite, for instance) and is never filtered out by a surface selector.
     """
     _check_capability_names(items)
+    _check_case_prefixes(items)
 
     profile: Profile | None = getattr(config, "_llmdv_profile", None)
     if profile is None:

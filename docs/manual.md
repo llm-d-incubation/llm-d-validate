@@ -78,9 +78,12 @@ column.
 `-m` accepts one marker per suite package under `src/llmdv/suites/`: `anthropic_messages`,
 `cache`, `contract`, `discovery`, `evolution`, `field_options`, `fleet`, `long_context`,
 `openai_chat`, `openai_completions`, `openai_responses`, `real_clients`, `render`, `scenarios`,
-`streaming`, `tools`, `transport` and `unhappy`. Cases also carry `disruptive`, `surface`,
-`surface_generic`, `case_id` and `needs`. A name that is not a marker exits `2` and lists the
-ones that exist, rather than deselecting everything and reporting `PASSED`.
+`streaming`, `tools`, `transport` and `unhappy`. A case whose `case_id` starts with another
+suite's name carries that marker too, so `-m openai_chat` also selects
+`openai_chat.disconnect_recovery`, which lives in `streaming/`; `-m streaming` still selects it.
+Cases also carry `disruptive`, `surface`, `surface_generic`, `case_id` and `needs`. A name that
+is not a marker exits `2` and lists the ones that exist, rather than deselecting everything and
+reporting `PASSED`.
 
 ### Driving a real Claude Code client
 

@@ -1,7 +1,8 @@
 # suites
 
 The functional tests. Each package is one suite, and its name is also its pytest marker
-(`llmdv verify -m <suite>`). Counts and status are in [docs/coverage.md](../../../docs/coverage.md).
+(`llmdv verify -m <suite>`); a case whose `case_id` prefix names another suite carries that
+marker too. Counts and status are in [docs/coverage.md](../../../docs/coverage.md).
 
 | Suite | What it checks | Enabled by |
 | --- | --- | --- |

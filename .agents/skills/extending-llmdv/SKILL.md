@@ -47,7 +47,7 @@ def test_something(client, surface, model, ingress):
 - The closest marker decides. Both markers on one function, or a feature outside `SURFACE_FEATURES`, fails collection as an llmdv defect. A known feature no drivable surface has yet gives one `skip:not_implemented` row.
 - Prefer `surface_generic`: a new surface then inherits the case.
 - A generic case builds every request through the surface (`minimal_body`, `stream_body`, `invalid_body`, `structured_output_body`) and never writes a wire field name. A body in one surface's shape is garbled on the others: refused for the wrong reason so it passes, or ignored so it fails and blames the fleet.
-- `case_id`'s prefix becomes the phase in the output. Reuse an existing group unless you mean to create one.
+- `case_id`'s prefix becomes the phase in the output. Use the package's own name. A prefix that names another suite also adds that suite's marker, so `-m openai_chat` selects `openai_chat.disconnect_recovery` in `streaming/`. A prefix that differs from its package fails collection unless the pair is listed, with its reason, in `PREFIX_EXCEPTIONS` in `plugin.py`; add one only when the output and `-m` should group the case away from its package.
 - Gate on a profile capability with `@pytest.mark.needs("<capability>")`, or on one value of a closed vocabulary with `needs("<field>:<value>")`. An unknown name is a usage error at collection, never a silent skip.
 - Mark a case that can disturb a shared fleet `@pytest.mark.disruptive("<reason>")`: it then skips as `excluded_by_policy` under `fleet_policy: shared`.
 - A new `suites/<dir>` becomes a pytest marker automatically; its place in the output order is `PHASE_ORDER` in `plugin.py`.
