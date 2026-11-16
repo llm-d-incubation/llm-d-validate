@@ -19,10 +19,11 @@ from statistics import median
 import pytest
 
 from ...assertions import assert_answer_only, fail
+from ...assertions.samples import draw, judge, sample
 from ...evidence import journal
 from ...profile.schema import CHAT_REASONING_EFFORTS
 from ...surfaces.base import REASONING_ANSWER, REASONING_PROMPT
-from ..conftest import budget_for, check_basic_completion, check_completion
+from ..conftest import budget_for, check_basic_completion, check_completion, last_seq
 from ..openai_contract import (
     assemble_stream,
     check_generation,
@@ -39,13 +40,6 @@ CUT_TOKENS = 40
 EFFORT_PROMPT = (
     'How many times does the letter r appear in "strawberry raspberry"? Reply with the number only.'
 )
-# Efforts that render the same template level differ only by batch noise at temperature 0;
-# this slack absorbs that noise and still catches a lower effort reasoning several times more.
-EFFORT_SLACK = 1.25
-# Requests per effort, each planned up front and none a retry. One sample per effort flaps
-# where temperature 0 is not deterministic; the median of three does not let one outlier
-# decide. Six efforts besides `none` are declarable, so the case sends at most 18 requests.
-EFFORT_SAMPLES = 3
 
 
 @pytest.mark.needs("reasoning")
@@ -141,10 +135,16 @@ def test_chat_reasoning_cut_by_length(client, surface, model, ingress, stream):
 
 
 @pytest.mark.needs("reasoning")
+# Requests per effort, each planned up front and none a retry. One sample per effort flaps
+# where temperature 0 is not deterministic; the median of three does not let one outlier
+# decide. Six efforts besides `none` are declarable, so the case sends at most 18 requests.
+# Efforts that render the same template level differ only by batch noise at temperature 0;
+# the slack absorbs that noise and still catches a lower effort reasoning several times more.
+@pytest.mark.samples("order", n=3, slack=1.25)
 @pytest.mark.case_id("openai_chat.reasoning_effort_order")
-def test_chat_reasoning_effort_order(client, surface, model, ingress):
-    """Over EFFORT_SAMPLES requests per effort, the lowest declared effort's median reasons
-    less than the highest's, and no effort's median is far above a higher one's."""
+def test_chat_reasoning_effort_order(client, surface, model, ingress, samples):
+    """Over n requests per effort, the lowest declared effort's median reasons less than the
+    highest's, and no effort's median is far above a higher one's."""
     require_contract(ingress, surface)
     declared = [
         effort
@@ -163,32 +163,23 @@ def test_chat_reasoning_effort_order(client, surface, model, ingress):
         )
         for effort in declared
     }
-    samples: dict[str, list[int]] = {effort: [] for effort in declared}
-    # Round-robin over the efforts, so drift in the fleet's load over the run spreads evenly.
-    for _ in range(EFFORT_SAMPLES):
-        for effort in declared:
-            completion = check_basic_completion(
-                client.post(surface.path, json_body=body[effort]), surface, model, ingress
-            )
-            samples[effort].append(completion.usage.completion_tokens)
-            journal.record(f"completion_tokens[{effort}]", samples[effort][-1])
-    tokens = {effort: median(counts) for effort, counts in samples.items()}
-    journal.record("completion_tokens_by_effort", samples, f"{EFFORT_SAMPLES} samples per effort")
-    journal.record("median_completion_tokens_by_effort", tokens)
-    if not tokens[declared[0]] < tokens[declared[-1]]:
-        fail("effort_order", tokens, f"median {declared[0]} below median {declared[-1]}")
-    inverted = [
-        (low, high)
-        for i, low in enumerate(declared)
-        for high in declared[i + 1 :]
-        if tokens[low] > tokens[high] * EFFORT_SLACK
-    ]
-    if inverted:
-        fail(
-            "effort_order",
-            {"medians": tokens, "inverted": inverted},
-            "no lower effort's median far above a higher one's",
-        )
-    journal.record(
-        "effort_order", tokens, "lower efforts' medians no more than higher ones'", ok=True
+    tokens: dict[str, list[int]] = {effort: [] for effort in declared}
+
+    def take(effort):
+        exchange = client.post(surface.path, json_body=body[effort])
+        completion = check_basic_completion(exchange, surface, model, ingress)
+        tokens[effort].append(completion.usage.completion_tokens)
+        journal.record(f"completion_tokens[{effort}]", tokens[effort][-1])
+        return sample(tokens[effort][-1], last_seq(client), effort)
+
+    rule = samples.over(declared)
+    drawn = draw(rule, take)
+    journal.record("completion_tokens_by_effort", tokens, f"{rule.n} samples per effort")
+    journal.record("median_completion_tokens_by_effort", {e: median(t) for e, t in tokens.items()})
+    judge(
+        "effort_order",
+        rule,
+        drawn,
+        f"median {declared[0]} below median {declared[-1]}, and no lower effort's median more "
+        f"than {rule.to_dict()['slack']} times a higher one's",
     )

@@ -20,6 +20,7 @@ so the class travels into results.jsonl with every record.
 from __future__ import annotations
 
 import dataclasses
+import difflib
 import functools
 import json
 import re
@@ -32,6 +33,7 @@ import pytest
 
 from . import __version__
 from . import surfaces as surfaces_pkg
+from .assertions import samples as sampling
 from .cli import style
 from .evidence import FailureContext, journal
 from .evidence import write as write_evidence
@@ -70,6 +72,8 @@ MARKERS = (
     "case_id(id): stable identifier for this case, used as the matrix row key",
     "contract: verifies a profile declaration against reality; runs before functional suites",
     "needs(*capabilities): capabilities the case requires, skipped as undeclared when absent",
+    "samples(kind, n, **bounds): the default statistical rule of the case's one check over n "
+    "samples, which the profile's capabilities.samples entry for the case may override",
     "disruptive(reason): costs the fleet real work or sends deliberately malformed input; "
     "skipped where the profile declares the fleet shared",
 )
@@ -558,6 +562,44 @@ def _check_capability_names(items: list[pytest.Item]) -> None:
         )
 
 
+def _check_sample_rules(profile: Profile, items: list[pytest.Item]) -> None:
+    """Refuse a `capabilities.samples` entry that names no statistical case, or that its case's
+    rule cannot take, before any request.
+
+    The keys are checked against every collected case, before `-k` and `-m` narrow the run, so a
+    valid entry for a case left out of this run is still valid. A key naming no case would
+    otherwise leave the defaults in force without a word. Which bounds an entry may set
+    depends on the case's rule kind, which only the case knows, so that is checked here too.
+    """
+    rules: dict[str, sampling.Rule] = {}
+    case_ids: set[str] = set()
+    for item in items:
+        case = item.get_closest_marker("case_id")
+        if not (case and case.args):
+            continue
+        case_ids.add(case.args[0])
+        marker = item.get_closest_marker("samples")
+        if marker is not None:
+            rules[case.args[0]] = sampling.Rule(*marker.args, **marker.kwargs)
+    problems: set[str] = set()
+    for ingress in profile.ingresses:
+        for case_id, override in ingress.capabilities.samples.items():
+            where = f"ingresses[{ingress.id}].capabilities.samples.{case_id}"
+            if case_id in rules:
+                try:
+                    sampling.resolve(rules[case_id], override, where)
+                except loader.ProfileError as exc:
+                    problems.add(str(exc))
+            elif case_id in case_ids:
+                problems.add(f"{where}: the case has no samples rule to set")
+            else:
+                close = difflib.get_close_matches(case_id, sorted(rules), n=1)
+                hint = f"; did you mean {close[0]}?" if close else ""
+                problems.add(f"{where}: no statistical case has this id{hint}")
+    if problems:
+        raise pytest.UsageError("; ".join(sorted(problems)))
+
+
 def pytest_collection_modifyitems(config: pytest.Config, items: list[pytest.Item]) -> None:
     """Apply --llmdv-client and --llmdv-surface as intersecting filters.
 
@@ -570,6 +612,7 @@ def pytest_collection_modifyitems(config: pytest.Config, items: list[pytest.Item
     profile: Profile | None = getattr(config, "_llmdv_profile", None)
     if profile is None:
         return
+    _check_sample_rules(profile, items)
 
     wanted: set[str] = set()
     for client_id in config.getoption("--llmdv-client") or []:

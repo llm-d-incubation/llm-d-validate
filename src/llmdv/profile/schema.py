@@ -825,6 +825,16 @@ CHAT_REPEATS = ("seed", "greedy", "fresh")
 
 
 @dataclass(frozen=True)
+class SampleRule:
+    """A profile's sample count and bounds for one statistical case; None keeps the case's."""
+
+    n: int | None = None
+    min: float | None = None
+    max: float | None = None
+    slack: float | None = None
+
+
+@dataclass(frozen=True)
 class Capabilities:
     anthropic_betas: tuple[str, ...] = ()
     background_responses: bool = False
@@ -835,6 +845,9 @@ class Capabilities:
     chat_options: tuple[str, ...] = ()
     chat_reasoning_efforts: tuple[str, ...] = ()
     chat_repeats: tuple[str, ...] = ()
+    # The configuration promises identical repeats (an engine in batch-invariant mode, say), so
+    # the repeat cases judge their rule rather than only measuring agreement.
+    deterministic_repeats: bool = False
     client_reuse: bool = False
     client_sessions: tuple[str, ...] = ()
     completions_fields: dict[str, str] = field(default_factory=dict)
@@ -890,6 +903,8 @@ class Capabilities:
         default_factory=dict
     )
     render_pins: dict[str, dict[str, str]] = field(default_factory=dict)
+    # Case id -> the sample count and bounds its statistical check uses instead of its defaults.
+    samples: dict[str, SampleRule] = field(default_factory=dict)
 
     def supports_option(self, name: str) -> bool:
         return name in self.vllm_options

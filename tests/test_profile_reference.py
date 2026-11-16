@@ -42,6 +42,7 @@ SECTIONS = {
     "capabilities": schema.Capabilities,
     "cache_reuse": schema.CacheReuse,
     "effort_rendering": schema.EffortRendering,
+    "samples": schema.SampleRule,
     "clients": schema.Client,
     "clients[].binaries[]": schema.ClientBinary,
     "known_failures": schema.KnownFailure,

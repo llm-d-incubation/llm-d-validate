@@ -17,6 +17,7 @@ from llmdv.profile.schema import (
     AuthType,
     Disposition,
     IngressKind,
+    SampleRule,
     SkipClass,
     Vantage,
     Verifiable,
@@ -554,3 +555,42 @@ def test_an_inherited_model_problem_is_validated_once(tmp_path):
     text += "  - {id: second, base_url: 'http://localhost:9998', surfaces: [chat_completions]}\n"
     errors = [d for d in loader.validate(loader.load(write(tmp_path, text))) if d.level == "error"]
     assert errors == [loader.Diagnostic("error", "model.public_id", "required")]
+
+
+def test_samples_and_deterministic_repeats_load_and_merge_per_ingress(tmp_path):
+    text = MINIMAL.replace(
+        "    surfaces: [chat_completions]\n",
+        "    surfaces: [chat_completions]\n"
+        "    capabilities:\n"
+        "      samples: {openai_chat.greedy_repeat: {min: 4}}\n",
+    )
+    text += (
+        "capabilities:\n"
+        "  deterministic_repeats: true\n"
+        "  samples:\n"
+        "    openai_chat.greedy_repeat: {n: 5, min: 5}\n"
+        "    openai_chat.reasoning_effort_order: {slack: 1.5}\n"
+    )
+    profile = loader.load(write(tmp_path, text))
+    capabilities = profile.ingress("direct").capabilities
+    assert capabilities.deterministic_repeats is True
+    assert capabilities.samples["openai_chat.greedy_repeat"] == SampleRule(n=5, min=4)
+    assert capabilities.samples["openai_chat.reasoning_effort_order"] == SampleRule(slack=1.5)
+    assert loader.load(write(tmp_path, MINIMAL)).capabilities.samples == {}
+
+
+@pytest.mark.parametrize(
+    ("entry", "message"),
+    [
+        ("{greedy_repeat: {n: 5}}", "expected a case id"),
+        ("{openai_chat.greedy_repeat: {n: 0}}", "greedy_repeat.n: expected a positive integer"),
+        ("{openai_chat.greedy_repeat: {n: true}}", "expected a positive integer"),
+        ("{openai_chat.greedy_repeat: {min: high}}", "greedy_repeat.min: expected a number"),
+        ("{openai_chat.greedy_repeat: {tries: 3}}", "unknown keys ['tries']"),
+        ("{openai_chat.greedy_repeat: 5}", "openai_chat.greedy_repeat"),
+    ],
+)
+def test_a_malformed_samples_entry_is_refused_naming_it(tmp_path, entry, message):
+    with pytest.raises(loader.ProfileError, match=re.escape(message)) as caught:
+        loader.load(write(tmp_path, MINIMAL + f"capabilities:\n  samples: {entry}\n"))
+    assert "capabilities.samples" in str(caught.value)

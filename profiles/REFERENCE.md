@@ -240,13 +240,14 @@ Optional features within the declared surfaces. Whether a route is served at all
 | `chat_options` | list | `[]` | Chat `n` and/or `logprobs`. |
 | `chat_quiet_efforts` | list | `[]` | Chat efforts answered with no reasoning. Disjoint from `chat_reasoning_efforts`. The cases that turn reasoning off send the first, else `none` from `chat_reasoning_efforts`, else the lowest declared Chat effort, recorded as reasoning that stays on. |
 | `chat_reasoning_efforts` | list | `[]` | Chat `reasoning_effort` values the fleet supports. |
-| `chat_repeats` | list | `[]` | `seed` (same seed, same text), `greedy` (temperature 0 repeats; also enables stream-against-JSON parity) and/or `fresh` (two sampled requests differ). |
+| `chat_repeats` | list | `[]` | `seed` (same seed, same text), `greedy` (temperature 0 repeats; also enables stream-against-JSON parity) and/or `fresh` (sampled requests differ). The seed and greedy cases record how many repeats agree and pass either way, unless `deterministic_repeats` is declared. |
 | `client_model_names` | list of string | `[]` | Model names clients send by default. Names in `public_id` or `aliases` must be served; every other must be refused as `unknown_model` with no generation. |
 | `client_reuse` | bool | `false` | The pinned client's three-turn cache case. Needs a pinned binary and `cache_reuse` on `messages`. |
 | `client_sessions` | list | `[]` | Real Claude Code sessions to run. See [Claude Code clients](#claude-code-clients). |
 | `completions_fields` | mapping | `{}` | Completions field probe to `accepted`, `ignored` or `rejected`. Names are `COMPLETIONS_FIELDS` in `schema.py`. |
 | `contract_baseline` | mapping | `{}` | Declared key paths and JSON types of responses, streams and errors, per surface. See [Change sentinels](#change-sentinels). |
 | `count_tokens` | bool | `false` | `/v1/messages/count_tokens` cases, on ingresses serving `messages`. |
+| `deterministic_repeats` | bool | `false` | The configuration promises identical repeats, as an engine in batch-invariant mode does. Then the `seed` and `greedy` repeat cases fail when their [samples](#samples) rule does not hold; without it they only measure agreement, since OpenAI documents `seed` as best effort and vLLM does not promise identical repeats across batches. |
 | `effort_rendering` | mapping or `null` | `null` | The effort marker the template renders for each requested effort, read back through `prompt_logprobs`. See [effort_rendering](#effort_rendering). |
 | `forward_compat` | mapping | `{}` | Declared outcome of each unknown request element. See [Change sentinels](#change-sentinels). |
 | `header_probe` | bool | `false` | An operator-run header instrument is reachable. See [headers](#headers). |
@@ -269,6 +270,7 @@ Optional features within the declared surfaces. Whether a route is served at all
 | `responses_input_tokens` | bool or `null` | `null` | `true`: `POST /v1/responses/input_tokens` counts. `false`: refused with a 4xx and an envelope. `null` accepts either, never a 5xx. |
 | `responses_options` | list | `[]` | Responses `metadata` and/or `logprobs`. |
 | `responses_reasoning_efforts` | list | `[]` | Responses `reasoning.effort` values the fleet supports. |
+| `samples` | mapping | `{}` | Case id to the sample count and bounds of its statistical check. See [samples](#samples). |
 | `scenario_checks` | list | `[]` | Opt-in session and scenario cases. See [Opt-in checks](#opt-in-checks). |
 | `stateful_responses` | bool | `false` | Stored response retrieval and cancellation. Only ids the case created are used. |
 | `stateless_responses` | bool | `false` | The fleet keeps no response state: retrieval, chaining and background generation of its own responses are refused. Exclusive with `stateful_responses` and `background_responses`. |
@@ -332,6 +334,38 @@ These declare what a fleet does so the first run after a fleet or client change 
 - **`prompt_pins`**: surface to `{conversation: <tokens>, tools: <tokens>}`. Any change to the template, tokenizer or a layer's translation fails the pin.
 - **`render_pins`**: render surface to `{conversation: <sha256>, tools: <sha256>}`, a 64-character lowercase hex digest. Each run records the observed digest as `canonical_render_digest`.
 - **`contract_baseline`**: surface to parts (`response`, `stream`, `error`, `invalid`, `tool_response`, `tool_stream`), each a key path to allowed JSON types: `string`, `integer`, `number`, `boolean`, `null`, `object`, `array`, `absent`. Array elements use `[]`, as in `choices[].message.content`; stream event paths are prefixed with the event type, as in `message_start:message.usage.input_tokens`.
+
+## samples
+
+A statistical case sends n requests, all declared before the first, never stopping early and never re-sending, and records one check holding its rule, the judged summary and every sample with its request's `seq` in `exchanges.jsonl`. The case fixes the rule's kind; `capabilities.samples`, keyed by case id, may set n and the bounds. An undeclared case keeps the defaults below.
+
+| Key | Type | Default | Meaning |
+| --- | --- | --- | --- |
+| `n` | integer | the case's | Samples per group. A `count` entry that sets `n` also sets `min` or `max`. |
+| `min` | number | the case's | Lower bound: of matching samples for `count` (an integer, default 0), of the median ratio for `ratio`. |
+| `max` | number | the case's | Upper bound, as `min`; a `count` maximum defaults to `n`. |
+| `slack` | number | the case's | `order` only: how far, as a factor of at least 1, a lower group's median may exceed a higher one's. |
+
+The rule kinds:
+
+- **`count`** holds when `min` <= the samples equal to the most common one <= `max`. All equal is `min: n`, k of n is `min: k`, all distinct is `max: 1`.
+- **`ratio`** holds when `min` <= median(a) / median(b) <= `max`.
+- **`order`** holds when the first group's median is below the last's, and no lower group's median exceeds a higher one's by more than `slack`.
+
+The statistical cases, their check and their defaults:
+
+- **`openai_chat.seed_repeat`, `openai_chat.greedy_repeat`**: `repeat_text`, `count` with n 2, min 2. A measurement unless `deterministic_repeats` is declared.
+- **`openai_completions.streaming_matches_json`**: `greedy_repeat`, `count` with n 2, min 2. A measurement unless `deterministic_repeats` is declared; without it, repeats that disagree skip the stream comparison as `undeclared`.
+- **`openai_chat.fresh_generation`**: `fresh_generation`, `count` with n 2, max 1, over the texts; the ids are checked as `fresh_ids`.
+- **`openai_chat.reasoning_effort_order`**: `effort_order`, `order` with n 3 per declared effort, slack 1.25.
+
+```yaml
+capabilities:
+  chat_repeats: [greedy]
+  samples:
+    openai_chat.greedy_repeat: {n: 5, min: 4}
+    openai_chat.reasoning_effort_order: {slack: 1.5}
+```
 
 ## cache_reuse
 

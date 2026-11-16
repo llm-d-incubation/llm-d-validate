@@ -11,8 +11,9 @@ from __future__ import annotations
 import pytest
 
 from ...assertions import assert_usage_present_and_consistent, fail
+from ...assertions.samples import draw, judge, sample
 from ...evidence import journal
-from ..conftest import budget_for, check_choice, check_completion, throttle_aware
+from ..conftest import budget_for, check_choice, check_completion, last_seq, throttle_aware
 from ..openai_contract import (
     assemble_stream,
     check_generation,
@@ -99,34 +100,46 @@ def _json_side(completion) -> list:
     ]
 
 
+@pytest.mark.samples("count", n=2, min=2)
 @pytest.mark.case_id("openai_completions.streaming_matches_json")
-def test_completions_streaming_matches_json(client, surface, model, ingress):
+def test_completions_streaming_matches_json(client, surface, model, ingress, samples):
     """At temperature 0 a stream carries the same text and counts as the JSON answer.
 
-    A stream can only be held to the JSON answer where greedy decoding repeats, so two JSON
-    requests go first. If they differ, the fleet is not deterministic: that fails as
-    `greedy_repeat`, the promise `chat_repeats: greedy` makes, and the stream is not judged.
+    A stream can only be held to the JSON answer where greedy decoding repeats, so the JSON
+    requests of the `samples` rule go first, and their agreement is recorded as `greedy_repeat`.
+    Where the profile declares `deterministic_repeats`, the rule is the verdict, a
+    disagreement beyond it fails as `greedy_repeat`, and the stream is held to the most common
+    answer. Otherwise the agreement is a measurement, and any disagreement skips the case: the
+    stream has no one answer to be held to.
     """
     require_contract(ingress, surface)
     if "greedy" not in ingress.capabilities.chat_repeats:
         pytest.skip(f"[undeclared] ingress {ingress.id!r} does not declare chat_repeats greedy")
     prompt = "The three primary colors are"
     body = surface.minimal_body(model.public_id, 24, prompt)
-    repeats = [
-        _json_side(
-            check_generation(client.post(surface.path, json_body=body), surface, model, ingress)
+    repeats = []
+
+    def take(_group):
+        exchange = client.post(surface.path, json_body=body)
+        repeats.append(_json_side(check_generation(exchange, surface, model, ingress)))
+        return sample(repeats[-1], last_seq(client), preview=repeats[-1][0])
+
+    expected = f"the same text and token counts for {samples.n} temperature-0 requests"
+    deterministic = ingress.capabilities.deterministic_repeats
+    agreement = judge(
+        "greedy_repeat", samples, draw(samples, take), expected, decides=deterministic
+    )
+    if agreement["distinct"] > 1 and not deterministic:
+        pytest.skip(
+            f"[undeclared] {agreement['count']} of {agreement['n']} temperature-0 answers agree "
+            "and the profile does not declare deterministic_repeats, so the stream has no one "
+            "answer to be held to"
         )
-        for _ in range(2)
-    ]
-    expected = "the same text and token counts for two temperature-0 requests"
-    if repeats[0] != repeats[1]:
-        fail("greedy_repeat", repeats, f"{expected}; the fleet is not deterministic")
-    journal.record("greedy_repeat", repeats[0], expected, ok=True)
     body = surface.stream_body(model.public_id, 24, include_usage=True, prompt=prompt)
     streamed = assemble_stream(surface, stream_frames(client, surface, body, ingress))
     check_completion(streamed, surface, model)
     pair = {
-        "json": repeats[0],
+        "json": max(repeats, key=repeats.count),
         "sse": [
             "".join(c.get("text") or "" for f in streamed.raw["chunks"] for c in f["choices"]),
             streamed.usage.prompt_tokens,

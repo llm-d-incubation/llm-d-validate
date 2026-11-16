@@ -89,6 +89,7 @@ from .schema import (
     ProxyMode,
     Reasoning,
     Requirement,
+    SampleRule,
     Setup,
     Timeouts,
     Tls,
@@ -972,6 +973,10 @@ def _capabilities(raw: dict[str, Any], where: str = "capabilities") -> Capabilit
             chat_repeats=lambda: _declared_values(
                 raw.get("chat_repeats", ()), CHAT_REPEATS, f"{where}.chat_repeats"
             ),
+            deterministic_repeats=lambda: parse.flag(
+                raw.get("deterministic_repeats"), False, f"{where}.deterministic_repeats"
+            ),
+            samples=lambda: _samples(raw.get("samples"), f"{where}.samples"),
             openai_contract=lambda: _contract_surfaces(
                 raw.get("openai_contract"), f"{where}.openai_contract"
             ),
@@ -1026,6 +1031,31 @@ def _capabilities(raw: dict[str, Any], where: str = "capabilities") -> Capabilit
             ),
         )
     )
+
+
+def _samples(value: Any, where: str) -> dict[str, SampleRule]:
+    """Case id -> sample count and bounds. Which bounds a case takes depends on its rule's
+    kind, so that is checked where the case resolves its rule (assertions/samples.py)."""
+    rules: dict[str, SampleRule] = {}
+    for case_id, entry in _block(value, where).items():
+        at = f"{where}.{case_id}"
+        if not isinstance(case_id, str) or "." not in case_id:
+            raise ProfileError(f"{at}: expected a case id such as openai_chat.greedy_repeat")
+        entry = parse.mapping(entry, at)
+        unknown = sorted(set(entry) - {"n", "min", "max", "slack"})
+        if unknown:
+            raise ProfileError(f"{at}: unknown keys {unknown}; known: n, min, max, slack")
+        n = entry.get("n")
+        if n is not None and (isinstance(n, bool) or not isinstance(n, int) or n < 1):
+            raise ProfileError(f"{at}.n: expected a positive integer, got {n!r}")
+        for name in ("min", "max", "slack"):
+            bound = entry.get(name)
+            if bound is not None and (
+                isinstance(bound, bool) or not isinstance(bound, int | float)
+            ):
+                raise ProfileError(f"{at}.{name}: expected a number, got {bound!r}")
+        rules[case_id] = SampleRule(**entry)
+    return rules
 
 
 def _quiet_efforts(raw: dict[str, Any], where: str) -> tuple[str, ...]:

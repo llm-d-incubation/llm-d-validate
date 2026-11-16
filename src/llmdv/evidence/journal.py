@@ -26,6 +26,9 @@ from ..log.setup import get_logger
 log = get_logger("evidence.checks")
 
 
+BASE = ("name", "observed", "expected", "ok")
+
+
 @dataclass
 class Check:
     """One observation an assertion made."""
@@ -34,9 +37,13 @@ class Check:
     observed: Any
     expected: str | None = None
     ok: bool = True
+    # A statistical check's declared rule and every sample behind it (assertions/samples.py);
+    # absent from the record for any other check.
+    rule: dict[str, Any] | None = None
+    samples: list[dict[str, Any]] | None = None
 
     def to_dict(self) -> dict[str, Any]:
-        return asdict(self)
+        return {k: v for k, v in asdict(self).items() if k in BASE or v is not None}
 
     def render(self) -> str:
         mark = "ok" if self.ok else "FAILED"
@@ -50,9 +57,15 @@ class Journal:
     checks: list[Check] = field(default_factory=list)
 
     def record(
-        self, name: str, observed: Any, expected: str | None = None, ok: bool = True
+        self,
+        name: str,
+        observed: Any,
+        expected: str | None = None,
+        ok: bool = True,
+        rule: dict[str, Any] | None = None,
+        samples: list[dict[str, Any]] | None = None,
     ) -> Check:
-        check = Check(name=name, observed=observed, expected=expected, ok=ok)
+        check = Check(name, observed, expected, ok, rule, samples)
         self.checks.append(check)
         log.debug("%s | %s", self.nodeid.split("::")[-1], check.render())
         return check
@@ -90,11 +103,18 @@ def deactivate() -> Journal | None:
     return finished
 
 
-def record(name: str, observed: Any, expected: str | None = None, ok: bool = True) -> None:
+def record(
+    name: str,
+    observed: Any,
+    expected: str | None = None,
+    ok: bool = True,
+    rule: dict[str, Any] | None = None,
+    samples: list[dict[str, Any]] | None = None,
+) -> None:
     """Record one observation against the active case, if there is one.
 
     A no-op outside a test, so the assertion helpers remain usable in isolation -- including
     from llmdv's own unit tests, which call them without a journal.
     """
     if _ACTIVE is not None:
-        _ACTIVE.record(name, observed, expected, ok)
+        _ACTIVE.record(name, observed, expected, ok, rule, samples)

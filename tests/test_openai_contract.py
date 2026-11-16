@@ -7,6 +7,7 @@ Each case runs against `FakeFleet(openai_contract=True)`, a spec-faithful engine
 from __future__ import annotations
 
 import json
+import re
 
 import pytest
 import yaml
@@ -15,7 +16,7 @@ from llmdv.profile.schema import CHAT_FIELDS, COMPLETIONS_FIELDS
 from llmdv.suites.openai_chat import fields as chat_fields
 from llmdv.suites.openai_completions import fields as completions_fields
 from tests.fakes import FakeFleet
-from tests.test_suites_against_fake import run_suites, write_profile
+from tests.test_suites_against_fake import SUITES, run_pytest, run_suites, write_profile
 
 
 def contract_records(tmp_path, selector, capabilities, surfaces=("chat_completions",), **fake):
@@ -423,12 +424,12 @@ def test_completions_stream_divergence_fails_on_a_deterministic_fleet(tmp_path, 
     assert code == 1
 
 
-def test_completions_nondeterminism_fails_as_greedy_repeat_not_stream_parity(tmp_path):
-    """Two JSON answers that differ blame the fleet's determinism; the stream is not judged."""
+def test_completions_nondeterminism_fails_as_greedy_repeat_where_declared(tmp_path):
+    """Two JSON answers that differ break the declared promise; the stream is not judged."""
     code, (record,) = contract_records(
         tmp_path,
         STREAM_PARITY,
-        PROMPT_CAPS,
+        {**PROMPT_CAPS, "deterministic_repeats": True},
         surfaces=("completions",),
         openai_contract_defect="greedy_unstable",
     )
@@ -437,6 +438,23 @@ def test_completions_nondeterminism_fails_as_greedy_repeat_not_stream_parity(tmp
     assert checks["greedy_repeat"] is False
     assert "stream_matches_json" not in checks
     assert code == 1
+
+
+def test_completions_nondeterminism_skips_the_stream_without_a_promise(tmp_path):
+    """Undeclared, the disagreement is measured and the stream has no one answer to match."""
+    code, (record,) = contract_records(
+        tmp_path,
+        STREAM_PARITY,
+        PROMPT_CAPS,
+        surfaces=("completions",),
+        openai_contract_defect="greedy_unstable",
+    )
+    assert record["outcome"] == "skip" and record["skip_class"] == "undeclared", record
+    checks = _checks(record)
+    assert checks["greedy_repeat"] is True
+    assert "stream_matches_json" not in checks
+    assert "1 of 2 temperature-0 answers agree" in record["reason"]
+    assert code == 0
 
 
 MESSAGES = "test_chat_developer_role or test_chat_content_parts or test_chat_unicode_round_trip"
@@ -538,6 +556,27 @@ def test_repeats_pass_on_a_healthy_fleet(tmp_path):
     assert code == 0
 
 
+def _check(record, name):
+    (check,) = [c for c in record["checks"] if c["name"] == name]
+    return check
+
+
+@pytest.mark.parametrize(
+    "defect,case",
+    [("seed_ignored", "test_chat_seed_repeat"), ("greedy_unstable", "test_chat_greedy_repeat")],
+)
+def test_repeat_disagreement_is_measured_not_failed(tmp_path, defect, case):
+    """Without a determinism promise, repeats that differ pass, with the agreement on record."""
+    code, (record,) = contract_records(tmp_path, case, REPEAT_CAPS, openai_contract_defect=defect)
+    assert record["outcome"] == "pass", record
+    check = _check(record, "repeat_text")
+    assert check["ok"] is True
+    assert check["observed"] == {"count": 1, "n": 2, "distinct": 2, "holds": False}
+    assert check["expected"].startswith("measured, not judged")
+    assert [s["exchange"] for s in check["samples"]] == [0, 1]
+    assert code == 0
+
+
 @pytest.mark.parametrize(
     "defect,failing",
     [
@@ -546,10 +585,119 @@ def test_repeats_pass_on_a_healthy_fleet(tmp_path):
         ("replay", "test_chat_fresh_generation"),
     ],
 )
-def test_repeat_defects_fail(tmp_path, defect, failing):
-    code, results = run_contract(tmp_path, REPEATS, REPEAT_CAPS, openai_contract_defect=defect)
+def test_repeat_defects_fail_where_determinism_is_declared(tmp_path, defect, failing):
+    caps = {**REPEAT_CAPS, "deterministic_repeats": True}
+    code, results = run_contract(tmp_path, REPEATS, caps, openai_contract_defect=defect)
     assert outcome(results, failing) == "fail", results
     assert code == 1
+
+
+def test_a_replayed_generation_fails_without_a_determinism_promise(tmp_path):
+    code, (record,) = contract_records(
+        tmp_path, "test_chat_fresh_generation", REPEAT_CAPS, openai_contract_defect="replay"
+    )
+    assert record["outcome"] == "fail", record
+    assert [c["name"] for c in record["checks"] if not c["ok"]] == ["fresh_generation"]
+    assert code == 1
+
+
+def test_repeat_check_names_are_unchanged(tmp_path):
+    caps = {**REPEAT_CAPS, "deterministic_repeats": True}
+    code, records = contract_records(tmp_path, REPEATS, caps)
+    names = {r["case_id"]: [c["name"] for c in r["checks"] if "rule" in c] for r in records}
+    assert names == {
+        "openai_chat.seed_repeat": ["repeat_text"],
+        "openai_chat.greedy_repeat": ["repeat_text"],
+        "openai_chat.fresh_generation": ["fresh_generation"],
+    }
+    fresh = next(r for r in records if r["case_id"] == "openai_chat.fresh_generation")
+    assert _check(fresh, "fresh_ids")["ok"] is True
+    assert code == 0
+
+
+def test_a_profile_sets_the_sample_count_and_every_sample_is_sent(tmp_path):
+    caps = {
+        **REPEAT_CAPS,
+        "deterministic_repeats": True,
+        "samples": {"openai_chat.greedy_repeat": {"n": 5, "min": 4}},
+    }
+    code, (record,) = contract_records(tmp_path, "test_chat_greedy_repeat", caps)
+    check = _check(record, "repeat_text")
+    assert check["rule"] == {"kind": "count", "n": 5, "target": "mode", "min": 4, "max": 5}
+    assert [s["exchange"] for s in check["samples"]] == [0, 1, 2, 3, 4]
+    assert len({s["value"] for s in check["samples"]}) == 1
+    exchanges = (tmp_path / "run" / "exchanges.jsonl").read_text().splitlines()
+    assert len(exchanges) == 5
+    assert record["outcome"] == "pass" and code == 0
+
+
+def test_a_profile_threshold_decides_a_declared_repeat(tmp_path):
+    """Five greedy samples that never repeat: at least 1 of 5 holds; at least 2 does not."""
+    for low, verdict in ((1, "pass"), (2, "fail")):
+        caps = {
+            **REPEAT_CAPS,
+            "deterministic_repeats": True,
+            "samples": {"openai_chat.greedy_repeat": {"n": 5, "min": low}},
+        }
+        _, (record,) = contract_records(
+            tmp_path / str(low),
+            "test_chat_greedy_repeat",
+            caps,
+            openai_contract_defect="greedy_unstable",
+        )
+        assert record["outcome"] == verdict, record
+        assert len(_check(record, "repeat_text")["samples"]) == 5
+
+
+def _refused(tmp_path, samples, selector=REPEATS):
+    """Run the selector with these capabilities.samples; return (exit code, output, records)."""
+    with FakeFleet(openai_contract=True) as fleet:
+        path = write_profile(tmp_path, fleet, responses=False)
+        raw = yaml.safe_load(path.read_text())
+        raw["capabilities"] = {**REPEAT_CAPS, "samples": samples}
+        path.write_text(yaml.safe_dump(raw))
+        result, records = run_pytest(SUITES, path, tmp_path / "run", "-k", selector)
+    exchanges = tmp_path / "run" / "exchanges.jsonl"
+    sent = exchanges.exists() and exchanges.read_text()
+    return result.returncode, result.stdout + result.stderr, records, sent
+
+
+def test_a_profile_entry_the_rule_cannot_take_is_refused_before_any_request(tmp_path):
+    code, output, records, sent = _refused(tmp_path, {"openai_chat.greedy_repeat": {"slack": 2}})
+    assert code == 4 and records == [] and not sent, output
+    assert (
+        "ingresses[fake].capabilities.samples.openai_chat.greedy_repeat: "
+        "slack: the count rule takes min and max"
+    ) in output
+
+
+def test_a_samples_key_naming_no_case_is_refused_with_the_likely_one(tmp_path):
+    code, output, records, sent = _refused(
+        tmp_path, {"openai_chat.greedy_repeats": {"n": 3, "min": 3}}
+    )
+    assert code == 4 and records == [] and not sent, output
+    assert (
+        "ingresses[fake].capabilities.samples.openai_chat.greedy_repeats: no statistical case "
+        "has this id; did you mean openai_chat.greedy_repeat?"
+    ) in output
+
+
+def test_a_samples_key_for_a_case_without_a_rule_is_refused(tmp_path):
+    code, output, records, sent = _refused(
+        tmp_path, {"openai_chat.streaming_matches_json": {"n": 3, "min": 3}}
+    )
+    assert code == 4 and records == [] and not sent, output
+    assert (
+        "ingresses[fake].capabilities.samples.openai_chat.streaming_matches_json: "
+        "the case has no samples rule to set"
+    ) in output
+
+
+def test_a_samples_key_for_a_case_deselected_by_k_is_still_valid(tmp_path):
+    entry = {"openai_chat.reasoning_effort_order": {"slack": 1.5}}
+    code, output, records, _ = _refused(tmp_path, entry, "test_chat_seed_repeat")
+    assert code == 0, output
+    assert [r["case_id"] for r in records] == ["openai_chat.seed_repeat"]
 
 
 FIDELITY = "test_chat_number_fidelity or test_chat_structured_key_order"
@@ -771,6 +919,30 @@ def test_effort_order_judges_medians_through_per_sample_noise(tmp_path):
         assert names.count(f"completion_tokens[{effort}]") == 3
     medians = next(c for c in record["checks"] if c["name"] == "median_completion_tokens_by_effort")
     assert medians["observed"] == {"low": 31, "medium": 41, "high": 51}
+    order = next(c for c in record["checks"] if c["name"] == "effort_order")
+    assert order["rule"] == {
+        "kind": "order",
+        "n": 3,
+        "slack": 1.25,
+        "groups": ["low", "medium", "high"],
+    }
+    assert [s["group"] for s in order["samples"]] == ["low", "medium", "high"] * 3
+    assert [s["exchange"] for s in order["samples"]] == list(range(9))
+    assert order["observed"]["medians"] == {"low": 31, "medium": 41, "high": 51}
+    assert code == 0
+
+
+def test_a_profile_sets_effort_order_samples_and_slack(tmp_path):
+    """effort_inverted has `medium` reason 100 tokens against `high`'s 50: past the default
+    slack of 1.25, within a declared 2.5. One sample per effort sends three requests."""
+    entry = {"n": 1, "slack": 2.5}
+    caps = {**EFFORT_CAPS, "samples": {"openai_chat.reasoning_effort_order": entry}}
+    code, (record,) = contract_records(
+        tmp_path, EFFORT_ORDER, caps, openai_contract_defect="effort_inverted"
+    )
+    order = next(c for c in record["checks"] if c["name"] == "effort_order")
+    assert record["outcome"] == "pass", record
+    assert order["rule"]["slack"] == 2.5 and len(order["samples"]) == 3
     assert code == 0
 
 
@@ -865,3 +1037,16 @@ def test_stop_reason_fails_when_missing(tmp_path):
     )
     assert set(results.values()) == {"fail"} and len(results) == 2, results
     assert code == 1
+
+
+def test_a_failed_statistical_check_lists_its_samples_in_the_verdict(tmp_path):
+    caps = {**REPEAT_CAPS, "deterministic_repeats": True}
+    contract_records(
+        tmp_path, "test_chat_greedy_repeat", caps, openai_contract_defect="greedy_unstable"
+    )
+    verdict = next((tmp_path / "run" / "failures").rglob("verdict.txt"))
+    lines = verdict.read_text().splitlines()
+    at = next(i for i, line in enumerate(lines) if "FAILED repeat_text" in line)
+    assert re.fullmatch(
+        r" +samples 2: \[0\] sha256:[0-9a-f]{12}, \[1\] sha256:[0-9a-f]{12}", lines[at + 1]
+    ), lines[at + 1]

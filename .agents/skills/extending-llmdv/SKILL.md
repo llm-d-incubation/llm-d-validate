@@ -60,6 +60,8 @@ A selector is one entry under `clients:` in a profile. A pinned Claude Code prob
 
 Put it in `assertions/`, not in a test. Record what it observed through `journal.record(..., ok=...)` **before** asserting, so a failure shows the value that caused it. For a deciding failure call `assertions.fail(name, observed, expected)`: it redacts the values, records the failed check and raises. Passing checks of large payloads record counts and lengths; the raw exchanges keep the detail.
 
+A claim that holds over many requests rather than per request (repeats agree, outputs differ, one effort reasons less than another) is one statistical check. Declare its default rule on the case with `@pytest.mark.samples("count" | "ratio" | "order", n=..., <bounds>)`, take the resolved rule from the `samples` fixture, send its requests through `assertions.samples.draw` and decide with `judge`. `draw` sends exactly n per group, never fewer and never a retry; `judge` records the rule and every sample with its exchange `seq`. A profile sets n and the bounds under `capabilities.samples`, keyed by case id; see `profiles/REFERENCE.md`.
+
 Return `Completion` from `parse_completion` and `assemble` so shared assertions apply. A parallel assertion stack is how streaming and non-streaming drift apart.
 
 ## Add a profile capability

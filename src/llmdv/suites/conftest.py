@@ -23,6 +23,7 @@ from ..assertions import (
     assert_not_throttled,
     assert_usage_present_and_consistent,
 )
+from ..assertions import samples as sampling
 from ..assertions.errors import _skip_throttled
 from ..assertions.tool_calls import assert_no_call_markup
 from ..evidence import journal
@@ -241,6 +242,25 @@ def check_model_echo(completion: Completion, model: Model) -> None:
         f"response echoed model {completion.model_echo!r}, expected {model.public_id!r} -- "
         f"a different model answered than was asked for"
     )
+
+
+@pytest.fixture
+def samples(request, ingress: Ingress) -> sampling.Rule:
+    """The case's statistical rule: its `samples` marker, with the profile's entry applied."""
+    marker = request.node.get_closest_marker("samples")
+    if marker is None:
+        raise pytest.UsageError(f"{request.node.nodeid} uses `samples` without the marker")
+    case = request.node.get_closest_marker("case_id")
+    case_id = case.args[0] if case and case.args else request.node.name
+    default = sampling.Rule(*marker.args, **marker.kwargs)
+    override = ingress.capabilities.samples.get(case_id)
+    return sampling.resolve(default, override, f"capabilities.samples.{case_id}")
+
+
+def last_seq(client) -> int:
+    """The `seq` in exchanges.jsonl of the request `client` sent last, for a case whose only
+    client it is."""
+    return len(client.exchanges) - 1
 
 
 def _sdk_secret(request, ingress: Ingress) -> str:

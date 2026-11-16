@@ -71,6 +71,18 @@ def case_slug(ingress_id: str, case: str, variant: str | None) -> str:
     return f"{slug(ingress_id)}/{slug(case)}"
 
 
+def _samples_line(samples: list[dict[str, Any]]) -> str:
+    """Every sample of a statistical check on one line: its request as numbered under
+    `exchanges` below, its group if it has one, and its value."""
+    shown = [
+        f"[{s.get('exchange')}]"
+        + (f" {s['group']}" if s.get("group") is not None else "")
+        + f" {s.get('value')}"
+        for s in samples
+    ]
+    return f"           samples {len(samples)}: " + ", ".join(shown)
+
+
 def write(run_dir: Path, context: FailureContext) -> str:
     """Write one failure directory and return its path relative to the run directory."""
     where = context.ingress.id if context.ingress else "noingress"
@@ -128,6 +140,8 @@ def write(run_dir: Path, context: FailureContext) -> str:
             mark = "ok    " if check.get("ok") else "FAILED"
             against = f"   expected {check['expected']}" if check.get("expected") else ""
             verdict.append(f"  {mark} {check['name']} = {check['observed']!r}{against}")
+            if check.get("samples") is not None:
+                verdict.append(_samples_line(check["samples"]))
     else:
         verdict.append("  (none recorded -- this case asserted nothing through the helpers)")
     if context.outcome in ("fail", "error") and all(c.get("ok") for c in context.checks):
