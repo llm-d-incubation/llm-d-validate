@@ -33,8 +33,11 @@ Attribution is a reading of that table, not a proof, so which endpoint each requ
 recorded on every result and exchange. Response identity headers are observations only: different
 layers may emit the same values, and correlation headers do not prove forwarding or backend
 logging. The ladder's rows come from the layers a profile declares, ordered by
-`kind` (`litellm` fronts `llmd_router` fronts `vllm`). With fewer than two reporting ingresses
-there is no ladder: one column is nothing to compare.
+`kind` (`litellm` fronts `llmd_router` fronts `vllm`). That order is a graph
+(`profile/topology.py`): two ingresses of one kind, such as a prefill and a decode engine, are
+peers, and a layer is compared only with the nearest layers it fronts that reported. The alert
+feed uses the same rule, from the graph the run records in `outcome.json`. With fewer than two
+reporting ingresses there is no ladder: one column is nothing to compare.
 
 ## How a request reaches the fleet
 
@@ -189,7 +192,7 @@ it asserts.
 
 ### `evidence/`
 `journal.py` records what each case checked; `bundle.py` writes case bundles; `reproduce.py`
-writes `reproduce.sh`; `outcome.py` writes `outcome.json`, with the builds each ingress answered from (`stack.py`, read from `exchanges.jsonl` when the run ends); `alerts.py` writes `alerts.json`.
+writes `reproduce.sh`; `outcome.py` writes `outcome.json`, with the builds each ingress answered from (`stack.py`, read from `exchanges.jsonl` when the run ends) and the layer graph (`topology`); `alerts.py` writes `alerts.json`.
 `dashboard.py` renders `dashboard.html` from recorded evidence only, refuses to write a page whose
 data holds a credential, and never changes how a run ends.
 

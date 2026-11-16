@@ -97,7 +97,7 @@ One entry per addressable layer. One ingress is a complete profile; each further
 | Key | Type | Default | Meaning |
 | --- | --- | --- | --- |
 | `id` | string | none | Short, unique name. It becomes the pytest parameter id, so `-k <id>` selects one column. |
-| `kind` | `vllm` \| `llmd_router` \| `litellm` | `vllm` | Selects the adapter. In reports it also orders the layers outermost first: `litellm`, `llmd_router`, `vllm`. |
+| `kind` | `vllm` \| `llmd_router` \| `litellm` | `vllm` | Selects the adapter. In reports it also orders the layers outermost first: `litellm`, `llmd_router`, `vllm`. Two ingresses of one kind are peers: reports never compare them with each other. |
 | `base_url` | string | **required** unless `base_url_env` is set | Must start with `http://` or `https://`. |
 | `base_url_env` | string | none | Environment variable holding the URL. A committed profile uses it so no hostname enters the repository. Declaring both is an error; an unset variable fails preflight. |
 | `auth` | mapping | `{type: none}` | See [ingresses[].auth](#ingressesauth). |

@@ -38,6 +38,9 @@ class Outcome:
     started: str = field(default_factory=now)
     finished: str | None = None
     profile: dict[str, str | None] = field(default_factory=dict)
+    # Which ingress fronts which (profile/topology.py), so the alert feed can attribute a
+    # failure without the profile. None until the profile has loaded.
+    topology: dict[str, Any] | None = None
     exit_code: int | None = None
     exit_class: str | None = None
     counts: dict[str, int] = field(default_factory=dict)

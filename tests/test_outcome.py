@@ -57,6 +57,8 @@ def test_a_passing_run_records_its_outcome_labels_and_one_run_id(tmp_path):
     # A later label overrides an earlier one, so a caller can replace the runner's default.
     assert outcome["labels"] == {"trigger": "rollout", "rollout": "r1"}
     assert outcome["publication"] == {"status": "not_requested"}
+    # The layer graph, so the alert feed can attribute without the profile.
+    assert outcome["topology"] == {"order": ["fake"], "fronts": {"fake": []}}
 
     results = [json.loads(line) for line in (run_dir / "results.jsonl").read_text().splitlines()]
     env = json.loads((run_dir / "env.json").read_text())

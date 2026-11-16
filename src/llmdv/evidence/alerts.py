@@ -21,9 +21,11 @@ failed in the window before it is `failing`, not news. Without a comparison ever
 `known_failures` had filed is `known`, and carries `known_failure` with the issue whether or
 not a comparison was made, so a pager can tell it from a new break on the first night.
 
-`points_at` is read off the declared chain, outermost first, the way the run summary's
-attribution ladder reads it: the innermost failing layer whose next layer in passed, or else the
-innermost layer that ran the case. It is a hypothesis; `basis` says what it rests on.
+`points_at` is read off the layer graph the run recorded in outcome.json, with the pairing rule
+the run summary's attribution ladder uses (`profile/topology.py`): from the failing layer, step
+to a failing layer it fronts, until every layer it fronts passed or there is none. It is a
+hypothesis; `basis` says what it rests on. A run recorded before outcome.json carried the graph
+is read by kind depth, as it was then, so an archived run's feed does not change.
 
 `publication` and `job_exit_code` are only set on the local copy, which `llmdv job` also prints as
 the last line of its output. Like `outcome.json`, the published copy cannot know how its own
@@ -41,6 +43,7 @@ from ..compare.diff import key
 from ..compare.report import COMPARISON_JSON
 from ..http import redact
 from ..profile.schema import depth
+from ..profile.topology import Topology
 from . import outcome
 
 SCHEMA = "llmdv.alerts/1"
@@ -69,6 +72,7 @@ def build(run_dir: Path) -> dict[str, Any] | None:
         for t in (comparison or {}).get("transitions") or []
     }
 
+    topology = Topology.from_record(body.get("topology"))
     columns: dict[tuple[str, str], dict[str, dict]] = {}
     for record in records:
         ingress, case, variant = key(record)
@@ -85,7 +89,7 @@ def build(run_dir: Path) -> dict[str, Any] | None:
             "transition": transitions.get((ingress, case, variant), "unbaselined"),
         }
         if record["outcome"] in _BAD:
-            points_at, basis = attribute(record, columns[(case, variant)])
+            points_at, basis = attribute(record, columns[(case, variant)], topology)
             reason = (record.get("reason") or "").strip().splitlines()
             entry.update(
                 ingress_kind=record.get("ingress_kind"),
@@ -125,11 +129,35 @@ def build(run_dir: Path) -> dict[str, Any] | None:
     }
 
 
-def attribute(record: dict, column: dict[str, dict]) -> tuple[dict, str]:
+def attribute(
+    record: dict, column: dict[str, dict], topology: Topology | None = None
+) -> tuple[dict, str]:
     """The layer a failing result points at, and the observation that points there.
 
-    `column` holds the same case's decided results by ingress. Only layers strictly inside this
-    one count, nearest first: two layers of one kind have no declared order between them.
+    `column` holds the same case's decided results by ingress. The walk starts at the failing
+    layer and steps to the first failing layer among its nearest reported descendants; it
+    stops where all of them passed, or where there are none. Peers are never compared. Without
+    a `topology` (a run recorded before outcome.json carried one) it reads kind depth instead.
+    """
+    if topology is None:
+        return _attribute_by_depth(record, column)
+    here = record.get("ingress") or "-"
+    culprit = record
+    while True:
+        inner = topology.nearest(culprit.get("ingress") or "-", column)
+        failing = [name for name in inner if column[name]["outcome"] in _BAD]
+        if inner and not failing:
+            return culprit, f"fails at {culprit.get('ingress')}, passes at {', '.join(inner)}"
+        if not failing:
+            return _innermost(culprit, here)
+        culprit = column[failing[0]]
+
+
+def _attribute_by_depth(record: dict, column: dict[str, dict]) -> tuple[dict, str]:
+    """`attribute` for a run with no recorded graph: the rule such runs were read with.
+
+    Only layers strictly inside this one count, nearest first. Kept unchanged so an archived
+    run's feed is the same bytes whenever it is rebuilt.
     """
     here = record.get("ingress") or "-"
     mine = _depth(record)
@@ -145,6 +173,10 @@ def attribute(record: dict, column: dict[str, dict]) -> tuple[dict, str]:
             culprit = other
             continue
         return culprit, f"fails at {culprit.get('ingress')}, passes at {other.get('ingress')}"
+    return _innermost(culprit, here)
+
+
+def _innermost(culprit: dict, here: str) -> tuple[dict, str]:
     where = culprit.get("ingress")
     if where == here:
         return culprit, f"fails at {where}, the innermost layer that ran this case"

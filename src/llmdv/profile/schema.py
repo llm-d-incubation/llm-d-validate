@@ -26,6 +26,7 @@ from pathlib import Path
 from typing import Any
 
 from .fleet import FleetChecks, MetricsSource, Signature
+from .topology import Topology
 from .transport import TRANSPORT_ERROR_CLASSES, TransportContract
 
 
@@ -36,12 +37,12 @@ class IngressKind(str, Enum):
 
 
 # How deep each kind sits in a stack, outermost first. Determined rather than declared: vLLM
-# generates rather than forwarding, so it is terminal, and LiteLLM is the front door. That is
-# why there is no topology field.
+# generates rather than forwarding, so it is terminal, and LiteLLM is the front door. The layer
+# graph (`topology.py`) is derived from these depths: each ingress fronts every ingress at the
+# next deeper depth present.
 #
-# Two ingresses of the same kind tie, and `sorted` being stable means they keep declaration
-# order. No profile has needed that; a second gateway or a second router would be the first,
-# and would be the point to add an explicit ordering here.
+# Two ingresses of the same kind tie: they keep declaration order in `Profile.chain`, and they
+# are peers in the graph, never compared with each other.
 _KIND_DEPTH = {IngressKind.LITELLM: 0, IngressKind.LLMD_ROUTER: 1, IngressKind.VLLM: 2}
 
 
@@ -1022,14 +1023,18 @@ class Profile:
     def ingress_ids(self) -> tuple[str, ...]:
         return tuple(item.id for item in self.ingresses)
 
+    def topology(self) -> Topology:
+        """Which ingress fronts which, derived from each ingress's kind."""
+        return Topology.derive((item.id, _KIND_DEPTH[item.kind]) for item in self.ingresses)
+
     def chain(self) -> list[str]:
-        """Declared ingress ids, outermost first.
+        """Declared ingress ids, outermost first: the topology's order.
 
         Ordered by what each `kind` fronts rather than by declaration order, so a profile that
         happens to list the engine first still reports the gateway as the outer layer. Two
-        ingresses of the same kind tie and keep declaration order, `sorted` being stable.
+        ingresses of the same kind tie and keep declaration order.
         """
-        return [item.id for item in sorted(self.ingresses, key=lambda i: _KIND_DEPTH[i.kind])]
+        return list(self.topology().order)
 
     def client(self, client_id: str) -> Client:
         for item in self.clients:

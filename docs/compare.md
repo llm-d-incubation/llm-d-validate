@@ -123,7 +123,7 @@ when it cannot be built the job logs a warning, keeps its exit code, and prints 
 | --- | --- |
 | `fleet_observed` | true only for verification class `ok` or `fleet`; any other run says nothing about the fleet |
 | `results[].transition` | `regressed`, `failing`, `recovered`, `passing`, `flaky`, `new` or `known`; `unbaselined` when no comparison was made |
-| `results[].points_at` | the layer the failure points at, read off the declared chain; `basis` says why |
+| `results[].points_at` | the layer the failure points at, read off the layer graph in `outcome.json` (by kind depth for a run that has none); `basis` says why |
 | `results[].evidence` | the failure bundle, relative to `publication.location` |
 | `comparison` | `made`, and the baseline and window, or the reason none was made |
 | `publication`, `job_exit_code` | as in `outcome.json` |

@@ -269,6 +269,7 @@ def _verify(args: argparse.Namespace, run: _Run) -> int:
         log.error("%s", exc)
         return USAGE
     run.outcome.profile["name"] = profile.name
+    run.outcome.topology = profile.topology().as_record()
     run.outcome.write(run_dir)
 
     diagnostics = loader.validate(profile)
@@ -658,16 +659,33 @@ def _attribution_section(ingresses: list[str], profile: Profile | None = None) -
     if len(declared) < 2:
         return _no_declared_order(ingresses, declared, profile is not None)
 
-    rows = [f"| {declared[-1]} fails | backend, model template, or fixture |"]
-    for outer, inner in zip(declared, declared[1:], strict=False):
+    # One row per pair the pairing rule compares, and one "fails" row per layer that fronts
+    # nothing that reported. Peers -- two engines, say -- are never paired.
+    pairs = profile.topology().pairs(declared)
+    outers = {outer for outer, _ in pairs}
+    rows = [
+        f"| {name} fails | backend, model template, or fixture |"
+        for name in declared
+        if name not in outers
+    ]
+    for outer, inner in pairs:
         rows.append(
             f"| {inner} passes, {outer} fails | "
             f"{outer} parsing, mutation, routing, auth, or timeout |"
         )
+    if pairs == list(zip(declared, declared[1:], strict=False)):
+        shape = ["chain, outermost first: " + " -> ".join(declared)]
+    else:
+        edges = ", ".join(f"{outer} -> {inner}" for outer, inner in pairs) or "none"
+        shape = [
+            "layers, outermost first: " + ", ".join(declared),
+            "",
+            f"compared along: {edges} (layers of one kind are peers and are never compared)",
+        ]
     return [
         "## attribution (a hypothesis, not a proof)",
         "",
-        "chain, outermost first: " + " -> ".join(declared),
+        *shape,
         "",
         "| pattern | suggests |",
         "| --- | --- |",
