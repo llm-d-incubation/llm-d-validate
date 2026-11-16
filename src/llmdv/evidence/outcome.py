@@ -44,6 +44,8 @@ class Outcome:
     skips: dict[str, int] = field(default_factory=dict)
     failures: list[dict[str, Any]] = field(default_factory=list)
     preflight_problems: list[str] = field(default_factory=list)
+    # Local ingresses whose connection was lost mid-run: see connection_lost() below.
+    connection_lost: list[dict[str, Any]] = field(default_factory=list)
     # Failures the profile's `known_failures` cover, by issue, and the ones whose fix should
     # already have landed. A subset of the failures above, never a deduction from them.
     known: dict[str, Any] = field(default_factory=dict)
@@ -57,6 +59,7 @@ class Outcome:
         profile's known_failures, so the ones that labelled nothing can be named."""
         self.counts, self.skips, self.failures = summarise(records)
         self.known = known_summary(records, entries)
+        self.connection_lost = connection_lost(records)
         self.partial_evidence = sum(1 for record in records if record.get("partial_evidence"))
 
     def to_dict(self) -> dict[str, Any]:
@@ -101,9 +104,48 @@ def summarise(records: list[dict[str, Any]]) -> tuple[dict, dict, list]:
                     "ingress": record.get("ingress"),
                     "reason": (record.get("reason") or "")[:MAX_REASON],
                     **_known_fields(record),
+                    **(
+                        {"connection_lost": record["connection_lost"]}
+                        if record.get("connection_lost")
+                        else {}
+                    ),
                 }
             )
     return counts, skips, failures
+
+
+def connection_lost(records: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Each local ingress whose connection was lost mid-run, and when, in the order it happened.
+
+    `cases_before` is how many cases had finished before the one that found it gone, and
+    `cases_skipped` how many later cases were not run because of it.
+    """
+    found: dict[str, dict[str, Any]] = {}
+    for index, record in enumerate(records):
+        ingress = record.get("connection_lost")
+        if not ingress:
+            continue
+        if record.get("outcome") == "error" and ingress not in found:
+            found[ingress] = {
+                "ingress": ingress,
+                "case_id": record.get("case_id"),
+                "variant": record.get("variant"),
+                "at": record.get("ts"),
+                "cases_before": index,
+                "cases_skipped": 0,
+            }
+        elif record.get("outcome") == "skip" and ingress in found:
+            found[ingress]["cases_skipped"] += 1
+    return list(found.values())
+
+
+def environment_only(records: list[dict[str, Any]]) -> bool:
+    """Whether every failed or errored case lost its local connection rather than failing.
+
+    True means the run tested nothing it could blame on the fleet: exit 3, not 1.
+    """
+    failed = [record for record in records if record.get("outcome") in ("fail", "error")]
+    return bool(failed) and all(record.get("connection_lost") for record in failed)
 
 
 def _known_fields(record: dict[str, Any]) -> dict[str, Any]:

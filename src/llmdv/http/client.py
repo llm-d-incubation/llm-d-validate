@@ -24,6 +24,17 @@ from . import redact, sse
 
 log = get_logger("http")
 
+# Failures before any response arrived: refused, a connect timeout, or a connection reset or
+# closed with nothing sent back. Against a local tunnel these are what a dead port-forward
+# looks like; the plugin decides with one health probe whether that is what happened.
+CONNECTION_ERRORS = (
+    httpx.ConnectError,
+    httpx.ConnectTimeout,
+    httpx.ReadError,
+    httpx.WriteError,
+    httpx.RemoteProtocolError,
+)
+
 
 @dataclass
 class Exchange:
@@ -49,6 +60,9 @@ class Exchange:
     # negotiated connection (HTTP version, TLS version, ALPN, local address).
     headers_s: float | None = None
     connection: dict[str, Any] | None = None
+    # Not serialised: transport_error says the same for a reader. Set when the request failed
+    # with one of CONNECTION_ERRORS before any response status arrived.
+    connection_failed: bool = field(default=False, repr=False)
 
     @property
     def ok(self) -> bool:
@@ -194,6 +208,7 @@ class RecordingClient:
         except httpx.HTTPError as exc:
             exchange.elapsed_s = time.monotonic() - started
             exchange.transport_error = f"{type(exc).__name__}: {exc}"
+            exchange.connection_failed = isinstance(exc, CONNECTION_ERRORS)
             log.debug("%s %s -> transport error: %s", method.upper(), url, exchange.transport_error)
             self.exchanges.append(exchange)
             return exchange
@@ -305,6 +320,9 @@ class RecordingClient:
                 transcript.framing["drain_error"] = f"{type(exc).__name__}: {exc}"
             else:
                 exchange.transport_error = f"{type(exc).__name__}: {exc}"
+                exchange.connection_failed = (
+                    isinstance(exc, CONNECTION_ERRORS) and exchange.status is None
+                )
 
         exchange.elapsed_s = time.monotonic() - started
         exchange.client_closed = transcript.client_closed

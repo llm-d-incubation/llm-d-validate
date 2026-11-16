@@ -129,13 +129,24 @@ Separating environment problems from fleet problems is the point of having more 
 | `0` | `ok` | every selected case passed (skips do not fail a run) |
 | `1` | `fleet` | test failures: the fleet did not behave as the profile declares |
 | `2` | `usage` | bad usage, or an invalid profile; nothing was verified |
-| `3` | `environment` | your environment, not the fleet: preflight unsatisfied (nothing was tested), or a results store that cannot be used as configured |
+| `3` | `environment` | your environment, not the fleet: preflight unsatisfied (nothing was tested), a local connection lost mid-run with no fleet failure, or a results store that cannot be used as configured |
 | `4` | `internal` | an internal error: a defect in llmdv itself |
 | `5` | `ok` | verification passed, but results or the notification were not delivered |
 | `6` | `interrupted` | stopped by SIGINT or SIGTERM, e.g. a run budget or a pod being stopped; what finished is kept and published |
 
 A delivery failure never hides a verification failure: failed tests and a failed upload exit
 `1`, and `outcome.json` records both. `5` is returned only when verification succeeded.
+
+A local connection lost mid-run is the environment too. When a request to an ingress on
+`localhost` or `127.0.0.1` is refused, times out connecting, or is reset before any response,
+llmdv reads that ingress's health path once. If it does not answer, the port-forward or tunnel
+behind it has died: that case is recorded as an `error` naming the lost connection, every later
+case on that ingress is skipped as `requires_instrumentation`, and the run exits `3`. llmdv does
+not restart the tunnel or retry the request. A real failure anywhere in the run still exits `1`,
+because the fleet result is the one that must not be hidden. `outcome.json` lists each lost
+ingress under `connection_lost`, with the case that found it gone, how many cases finished before
+it and how many were skipped after; `summary.md` and the closing summary say the same. An ingress
+reached any other way, and a local one that is only slow, keep their failures as fleet results.
 
 The class is what `outcome.json` records as `verification.class`. `5` is class `ok` because the
 verification passed; `publication` says what happened to the results. A code llmdv never returns
@@ -151,7 +162,7 @@ grey box reads as coverage. Every skip carries one of six classes:
 | --- | --- |
 | `undeclared` | the fleet does not expose this; nothing is wrong |
 | `not_implemented` | llmdv cannot drive it yet; a gap in the tool |
-| `requires_instrumentation` | needs an instrumented backend to observe |
+| `requires_instrumentation` | needs an instrumented backend to observe, or a local connection to the ingress that was lost mid-run |
 | `requires_load` | needs a load experiment, i.e. a system test |
 | `excluded_by_policy` | the profile declares the fleet shared, and this case is disruptive |
 | `throttled` | a layer declared `rate_limited` refused the request for being over quota |

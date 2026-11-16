@@ -31,7 +31,7 @@ from pathlib import Path
 from .. import __version__, preflight
 from ..collect import KubectlLogCollector, NoopCollector
 from ..evidence import dashboard, reproduce
-from ..evidence.outcome import Outcome, known_summary, now
+from ..evidence.outcome import Outcome, connection_lost, environment_only, known_summary, now
 from ..evidence.stack import stack_from_run
 from ..kube import KubeContext
 from ..log import setup as log_setup
@@ -378,7 +378,12 @@ def _verify(args: argparse.Namespace, run: _Run) -> int:
         run.outcome.run_id,
     )
     run.records, run.table = _summarise(run_dir, records, run.collected, run.profile)
-    return _map_pytest_exit(code, _SIGNALLED.is_set())
+    code = _map_pytest_exit(code, _SIGNALLED.is_set())
+    # Every failure was a local connection lost mid-run: the vantage point, not the fleet. A
+    # single real failure anywhere keeps exit 1.
+    if code == TEST_FAILURES and environment_only(records):
+        return PREFLIGHT
+    return code
 
 
 def _finish(args: argparse.Namespace, run: _Run, code: int) -> int:
@@ -451,6 +456,11 @@ def _finish(args: argparse.Namespace, run: _Run, code: int) -> int:
             layer_order(run.records, run.profile),
             known_unmatched=outcome.known.get("unmatched"),
         )
+    for lost in outcome.connection_lost:
+        emit(f"  {_lost_line(lost)}")
+    if code == PREFLIGHT and outcome.connection_lost:
+        emit("  Every failure was a lost local connection -- your environment, not the fleet.")
+        emit("")
     if code != OK:
         return code
     return NOT_DELIVERED if publication_failed else OK
@@ -996,6 +1006,31 @@ def _read_records(run_dir: Path) -> list[dict]:
     return [json.loads(line) for line in results.read_text().splitlines() if line.strip()]
 
 
+def _lost_line(lost: dict) -> str:
+    """One plain sentence on a local connection lost mid-run, and when."""
+    skipped = lost["cases_skipped"]
+    return (
+        f"the local connection to ingress {lost['ingress']!r} was lost after "
+        f"{lost['cases_before']} case(s), at {lost['case_id']}; {skipped} later case(s) on it "
+        "were skipped. Restart its port-forward or tunnel and re-run."
+    )
+
+
+def _lost_section(records: list[dict]) -> list[str]:
+    """summary.md's account of local connections lost mid-run, or nothing."""
+    lost = connection_lost(records)
+    if not lost:
+        return []
+    return [
+        "## local connection lost",
+        "",
+        *[f"- {_lost_line(entry)}" for entry in lost],
+        "",
+        "These rows say nothing about the fleet: the requests never reached it.",
+        "",
+    ]
+
+
 def _pod_log_section(collection) -> list[str]:
     """How to read the logs, or why there are none. Never both, and never neither.
 
@@ -1110,6 +1145,7 @@ def _summarise(
         *[f"- {outcome}: {count}" for outcome, count in sorted(counts.items())],
         *_known_lines(records, profile),
         "",
+        *_lost_section(records),
         *_per_layer_counts(records, ingresses),
         *_delta_section(grid, ingresses),
         *_pod_log_section(collection),

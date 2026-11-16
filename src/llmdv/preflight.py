@@ -227,8 +227,8 @@ def run(
             report.problems.append(proxy_problem)
             continue
 
-        reachable, elapsed_ms = _reachable(ingress)
-        if reachable:
+        answered, elapsed_ms = reachable(ingress)
+        if answered:
             report.reachable.add(ingress_id)
             report.latency_ms[ingress_id] = elapsed_ms
             _check_access(report, ingress)
@@ -266,8 +266,7 @@ def _check_proxy(ingress: Ingress) -> Problem | None:
     host = urlsplit(ingress.base_url).hostname or ""
     no_proxy = os.environ.get("NO_PROXY", "") + "," + os.environ.get("no_proxy", "")
     entries = {item.strip() for item in no_proxy.split(",") if item.strip()}
-    loopback = {"localhost", "127.0.0.1"}
-    if host in entries or (host in loopback and entries & loopback):
+    if host in entries or (is_local(ingress) and entries & LOOPBACK):
         return None
 
     return Problem(
@@ -280,12 +279,23 @@ def _check_proxy(ingress: Ingress) -> Problem | None:
     )
 
 
-def _reachable(ingress: Ingress) -> tuple[bool, float]:
+# The hosts that mean "this machine". An ingress reached through one is reached through
+# something the operator started, usually a port-forward, so losing it is their environment.
+LOOPBACK = frozenset({"localhost", "127.0.0.1"})
+
+
+def is_local(ingress: Ingress) -> bool:
+    """Whether the ingress is reached through this machine's loopback, as a tunnel is."""
+    return (urlsplit(ingress.base_url).hostname or "") in LOOPBACK
+
+
+def reachable(ingress: Ingress) -> tuple[bool, float]:
     """Whether the ingress answers its health path.
 
     A non-2xx still counts as reachable: LiteLLM's `/health/readiness` legitimately 401s under
     custom_auth, and "something is listening and speaking HTTP" is what preflight needs to
-    know. Only a transport error means nothing is there.
+    know. Only a transport error means nothing is there. The plugin asks again, once, when a
+    local ingress fails a case at the connection level.
     """
     with RecordingClient(
         ingress.base_url,

@@ -253,7 +253,7 @@ def test_missing_cli_warns_once_for_environment(tmp_path, monkeypatch, coordinat
         raw["ingresses"][0]["logs"] = [{"target": "pod/pod-a"}]
     path.write_text(yaml.safe_dump(raw))
     monkeypatch.setenv("PATH", "")
-    monkeypatch.setattr(preflight, "_reachable", lambda ingress: (True, 1.0))
+    monkeypatch.setattr(preflight, "reachable", lambda ingress: (True, 1.0))
     # No fleet stands behind the stub, so its model list cannot be read either.
     monkeypatch.setattr(preflight, "_check_access", lambda report, ingress: None)
     report = preflight.run(loader.load(path), kube=KubeContext())
@@ -269,7 +269,7 @@ def test_endpoint_only_profile_needs_no_cluster_cli(tmp_path, monkeypatch):
     path = tmp_path / "profile.yaml"
     path.write_text(profile_yaml("http://localhost:1"))
     monkeypatch.setenv("PATH", "")
-    monkeypatch.setattr(preflight, "_reachable", lambda ingress: (True, 1.0))
+    monkeypatch.setattr(preflight, "reachable", lambda ingress: (True, 1.0))
     # No fleet stands behind the stub, so its model list cannot be read either.
     monkeypatch.setattr(preflight, "_check_access", lambda report, ingress: None)
     report = preflight.run(loader.load(path), kube=KubeContext())
@@ -434,7 +434,7 @@ def test_setup_uses_short_cli_name_and_context_without_local_paths(tmp_path, mon
 @pytest.mark.parametrize("cli", [None, "oc", ""])
 def test_log_collection_reuses_the_preflight_reason(tmp_path, monkeypatch, cli):
     monkeypatch.setenv("PATH", "")
-    monkeypatch.setattr(preflight, "_reachable", lambda ingress: (True, 1.0))
+    monkeypatch.setattr(preflight, "reachable", lambda ingress: (True, 1.0))
     # No fleet stands behind the stub, so its model list cannot be read either.
     monkeypatch.setattr(preflight, "_check_access", lambda report, ingress: None)
     profile = selector_profile(tmp_path)

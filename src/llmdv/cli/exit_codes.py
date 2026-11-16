@@ -3,6 +3,8 @@
 A connection refused against localhost is almost never a fleet defect -- it is a port-forward
 that was never started or has died. Reporting that as a test failure teaches people to
 distrust the suite, so it gets its own code and CI can tell the two apart without parsing logs.
+That holds when the forward dies mid-run too: a run whose only failures are a lost local
+connection exits 3, while one real fleet failure anywhere keeps it at 1.
 
 `EXITS` is the one table of what each code means. The `--help` epilog, the manual's exit table
 and the dashboard all read it; a test keeps the manual in step.
@@ -29,6 +31,7 @@ EXITS = {
     PREFLIGHT: (
         "environment",
         "your environment, not the fleet: preflight unsatisfied (nothing was tested), "
+        "a local connection lost mid-run with no fleet failure, "
         "or a results store that cannot be used as configured",
     ),
     INTERNAL: ("internal", "an internal error: a defect in llmdv itself"),

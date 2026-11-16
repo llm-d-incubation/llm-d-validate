@@ -68,6 +68,10 @@ class ResultRecord:
     known_failure: dict[str, Any] | None = None
     # This describes stored evidence, not the verdict, which was computed from the full stream.
     partial_evidence: bool = False
+    # The ingress whose local connection was lost, on the case that found it gone (an error)
+    # and on each later case skipped for it. Set only for a loopback ingress whose health path
+    # stopped answering mid-run: these rows say nothing about the fleet.
+    connection_lost: str | None = None
 
     def __post_init__(self) -> None:
         if not self.ts:

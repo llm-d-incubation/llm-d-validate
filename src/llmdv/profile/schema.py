@@ -128,6 +128,7 @@ _VERIFIABLE_BY = {
 class SkipClass(str, Enum):
     UNDECLARED = "undeclared"
     NOT_IMPLEMENTED = "not_implemented"
+    # Also this vantage point's own path to an ingress, when a local tunnel dies mid-run.
     REQUIRES_INSTRUMENTATION = "requires_instrumentation"
     REQUIRES_LOAD = "requires_load"
     # Not a gap in the fleet or the tool: the case could run and we chose not to, because the

@@ -1175,6 +1175,7 @@ class FakeFleet:
         stream_before_validation: bool = False,
         plain_text_errors: bool = False,
         delay_s: float = 0.0,
+        go_dark_after: int | None = None,
         tls_cert: tuple[Path, Path] | None = None,
         max_model_len: int = MAX_MODEL_LEN,
         advertised_max_model_len: int | None = None,
@@ -1466,6 +1467,10 @@ class FakeFleet:
         self.plain_text_errors = plain_text_errors
         # Seconds every POST waits before answering, so a test can interrupt a run mid-flight.
         self.delay_s = delay_s
+        # Not a fleet defect: the local tunnel to it dying mid-run. The Nth POST is dropped
+        # unanswered and the listener closes, so every later connection is refused.
+        self.go_dark_after = go_dark_after
+        self.posts = 0
         self.seen: list[tuple[str, str, dict]] = []
 
         fleet = self
@@ -1968,6 +1973,11 @@ class FakeFleet:
                 self.path, _, query = self.path.partition("?")
                 path = self.path.rstrip("/")
                 fleet.seen.append((self.command, path, dict(self.headers)))
+                fleet.posts += 1
+                if fleet.go_dark_after is not None and fleet.posts >= fleet.go_dark_after:
+                    fleet.go_dark()
+                    self.close_connection = True
+                    return None
                 self.llmdv_body = body
                 self.llmdv_size = (
                     rendered_size(raw, fleet.byte_defect) if fleet.byte_probe else None
@@ -2766,6 +2776,11 @@ class FakeFleet:
     def __enter__(self) -> FakeFleet:
         self._thread.start()
         return self
+
+    def go_dark(self) -> None:
+        """Stop listening, as a port-forward that died: new connections are refused."""
+        self._server.shutdown()
+        self._server.server_close()
 
     def __exit__(self, *_: object) -> None:
         self._server.shutdown()

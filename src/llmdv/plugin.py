@@ -30,7 +30,7 @@ from typing import Any
 
 import pytest
 
-from . import __version__
+from . import __version__, preflight
 from . import surfaces as surfaces_pkg
 from .cli import style
 from .evidence import FailureContext, journal
@@ -319,6 +319,8 @@ def pytest_configure(config: pytest.Config) -> None:
         else "",
     )
     config._llmdv_results = None  # type: ignore[attr-defined]
+    # Ingress id -> how its local connection was lost, once a case found it gone mid-run.
+    config._llmdv_connection_lost = {}  # type: ignore[attr-defined]
     if config._llmdv_run_dir:  # type: ignore[attr-defined]
         config._llmdv_run_dir.mkdir(parents=True, exist_ok=True)  # type: ignore[attr-defined]
         config._llmdv_results = ResultsWriter(  # type: ignore[attr-defined]
@@ -691,6 +693,8 @@ def _gate(request: pytest.FixtureRequest) -> None:
         skip_class, reason = decided
         _mark_skip(request.node, skip_class)
         pytest.skip(reason)
+    # Decided during the run, so not in `gate`: `plan` must answer only what collection knows.
+    _skip_if_connection_lost(request)
 
 
 def gate(
@@ -786,6 +790,62 @@ def plan_row(item: pytest.Item) -> dict[str, Any]:
         "skip_class": skip_class,
         "reason": reason,
     }
+
+
+def _skip_if_connection_lost(request: pytest.FixtureRequest) -> None:
+    """Skip a case whose ingress this machine can no longer reach, rather than fail it.
+
+    Checked after `gate`, so a case it would skip anyway keeps its class. A case that would
+    have skipped itself in its own body never runs, so it is skipped here. The class is
+    `requires_instrumentation`: the instrument missing is this vantage point's own path to the
+    ingress, a port-forward that died, and the fleet behind it was never asked.
+    """
+    lost = getattr(request.config, "_llmdv_connection_lost", {})
+    if not lost:
+        return
+    if "ingress" in request.fixturenames:
+        target = request.getfixturevalue("ingress")
+    else:
+        target = _ingress_from_params(request.node, getattr(request.config, "_llmdv_profile", None))
+    if target is None or target.id not in lost:
+        return
+    _ACTIVE.setdefault(request.node.nodeid, {})["connection_lost"] = target.id
+    _mark_skip(request.node, SkipClass.REQUIRES_INSTRUMENTATION)
+    pytest.skip(
+        f"[{SkipClass.REQUIRES_INSTRUMENTATION.value}] the local connection to ingress "
+        f"{target.id!r} was lost at case {lost[target.id]['case']!r}; not run"
+    )
+
+
+def _connection_lost(
+    config: pytest.Config, state: dict[str, Any], http: Any, ingress: Ingress | None
+) -> tuple[Ingress, str] | None:
+    """The local ingress this failed case lost its connection to, with the error, or None.
+
+    Two things must both hold: a request to a loopback ingress failed at the connection level,
+    and the ingress's health path, asked once now, does not answer either. The health read is
+    not a retry of the case's request, and the case keeps its own exchanges as evidence. An
+    ingress that is slow, or that answers its health path, keeps the failure as a fleet result.
+    """
+    lost: dict[str, dict[str, Any]] = config._llmdv_connection_lost  # type: ignore[attr-defined]
+    client_ingresses = state.get("client_ingresses", {})
+    probed: set[str] = set()
+    for recorded in state.get("clients") or ([http] if http is not None else []):
+        owner: Ingress | None = client_ingresses.get(id(recorded), ingress)
+        if owner is None or owner.id in lost or owner.id in probed or not preflight.is_local(owner):
+            continue
+        failed = next(
+            (e for e in recorded.exchanges if getattr(e, "connection_failed", False)), None
+        )
+        if failed is None:
+            continue
+        probed.add(owner.id)
+        answered, _ = preflight.reachable(owner)
+        if answered:
+            log.debug("%s still answers its health path; the failure stands", owner.id)
+            continue
+        return owner, failed.transport_error or "no response"
+    return None
 
 
 def _has_capability(declared: Ingress | Profile, name: str, surface: str) -> bool:
@@ -963,13 +1023,30 @@ def pytest_runtest_makereport(item: pytest.Item, call: pytest.CallInfo):
     active = journal.current()
     checks = [check.to_dict() for check in active.checks] if active else []
 
+    verdict, reason = _outcome(report), _reason(report)
+    lost = _connection_lost(config, state, http, ingress) if report.failed else None
+    if lost is not None:
+        # The case did not test the fleet: the request never reached it. An error with the
+        # environment named, so the run's exit code can tell this from a fleet failure.
+        target, error = lost
+        case = case_marker.args[0] if case_marker and case_marker.args else item.nodeid
+        config._llmdv_connection_lost[target.id] = {"case": case}  # type: ignore[attr-defined]
+        verdict = "error"
+        state["connection_lost"] = target.id
+        reason = (
+            f"the local connection to ingress {target.id!r} ({target.base_url}) was lost: "
+            f"{error}; its health path no longer answers. Your environment, not the fleet: "
+            "a port-forward or tunnel that died. Later cases on it are skipped"
+        )
+        log.error("%s", reason)
+
     # The profile's triage of this result, if it has one. Computed from the same checks the
     # record carries, so a reader can verify the label against the evidence beside it.
     known_failure = None
     if profile is not None and profile.known_failures:
         known_failure = known.classify(
             profile.known_failures,
-            outcome=_outcome(report),
+            outcome=verdict,
             case_id=case_marker.args[0] if case_marker and case_marker.args else None,
             variant=_variant(item),
             ingress=ingress.id if ingress else None,
@@ -1042,20 +1119,20 @@ def pytest_runtest_makereport(item: pytest.Item, call: pytest.CallInfo):
                 captured_output=(report.capstdout or "") + (report.capstderr or ""),
                 longrepr=str(report.longrepr or ""),
                 checks=checks,
-                outcome=_outcome(report),
+                outcome=verdict,
                 variant=_variant(item),
                 known_failure=known_failure,
             ),
         )
 
-    _log_progress(report, state, ingress, case_marker, active, item, known_failure)
+    _log_progress(report, state, ingress, case_marker, active, item, known_failure, verdict)
 
     if writer is not None and profile is not None:
         writer.append(
             ResultRecord(
                 run_id=getattr(config, "_llmdv_run_id", "unknown"),
                 nodeid=item.nodeid,
-                outcome=_outcome(report),
+                outcome=verdict,
                 profile=profile.name,
                 profile_digest=getattr(config, "_llmdv_profile_digest", None),
                 case_id=case_marker.args[0] if case_marker and case_marker.args else None,
@@ -1064,8 +1141,8 @@ def pytest_runtest_makereport(item: pytest.Item, call: pytest.CallInfo):
                 ingress=ingress.id if ingress else None,
                 ingress_kind=ingress.kind.value if ingress else None,
                 surface=surface,
-                skip_class=state.get("skip_class") or _skip_class_from_reason(_reason(report)),
-                reason=_reason(report),
+                skip_class=state.get("skip_class") or _skip_class_from_reason(reason),
+                reason=reason,
                 duration_s=round(report.duration, 4),
                 http_status=http_status,
                 served_by=served_by,
@@ -1073,6 +1150,7 @@ def pytest_runtest_makereport(item: pytest.Item, call: pytest.CallInfo):
                 evidence=evidence_ref,
                 known_failure=known_failure,
                 partial_evidence=partial_evidence,
+                connection_lost=state.get("connection_lost"),
             )
         )
     _ACTIVE.pop(item.nodeid, None)
@@ -1226,6 +1304,7 @@ def _log_progress(
     active: journal.Journal | None = None,
     item: pytest.Item | None = None,
     known_failure: dict[str, Any] | None = None,
+    outcome: str | None = None,
 ) -> None:
     """One line per case: verdict, ingress, case, and timing or skip reason.
 
@@ -1234,7 +1313,7 @@ def _log_progress(
     with --llmdv-show-checks (which -v sets); they are always in results.jsonl and llmdv.log, so
     keeping them off by default costs no evidence and keeps the column alignment intact.
     """
-    outcome = _outcome(report)
+    outcome = outcome or _outcome(report)
     config = item.config if item is not None else None
     if config is not None:
         _phase_heading(config, phase_of(item))
