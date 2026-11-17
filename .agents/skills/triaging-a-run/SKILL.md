@@ -119,7 +119,7 @@ Name a layer only as far as the evidence goes (writing-an-infra-profile Rule 2),
 | Evidence | Points at |
 |---|---|
 | fails at the `litellm` ingress, passes at the `llmd_router` ingress of the same run (`summary.md`); with a single ingress, the same case against the next layer's endpoint | the gateway |
-| the error body's shape: LiteLLM's (`litellm.BadRequestError`, `litellm.APIConnectionError`, …), the EPP's plain text or `inference error: <Kind>`, vLLM's JSON error (a 500 from vLLM says only `Internal server error`; its log has the traceback) | the layer that wrote it |
+| the error body's shape: LiteLLM's (`litellm.BadRequestError`, `litellm.APIConnectionError`, …), the EPP's (`error extracting request body: …` or `inference error: <Kind>`, as plain text on older builds and inside a JSON envelope on newer ones), vLLM's JSON error (a 500 from vLLM says only `Internal server error`; its log has the traceback) | the layer that wrote it |
 | the same case fails on other models through the same layer | that layer, not the model |
 | fails on one deployment, passes on another with the same image and arguments | state (what the pod served first, a stuck engine) before configuration |
 | fails only with this model's template, parser or tool format | the model package (template, parser plugin) |
