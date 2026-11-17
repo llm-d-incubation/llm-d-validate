@@ -1,0 +1,95 @@
+# Part: vLLM's own request extensions, for a stack whose replicas run vLLM or a build derived
+# from it. Not a profile on its own; a combination file lists it after the topology part. Never
+# extends anything.
+#
+# Used by every vLLM overlay of optimized-baseline. Their builds differ (FROM values:
+# guides/optimized-baseline/modelserver/*/vllm/): the upstream vllm-openai v0.31.0 images (CUDA,
+# ROCm, CPU, TPU), vllm-torchtpu v0.29.0, and vendor builds derived from vLLM (a v0.28.0 fork, a
+# 0.24.0 fork, rbln-serve 0.12.0 as a vLLM plugin, and two vendor images whose vLLM version the
+# config does not state). They share vLLM's OpenAI-compatible server, so they share its request
+# vocabulary; an older or forked build that lacks an extension fails that field's case, which is
+# the measurement.
+#
+# Not declared here, and why:
+#   the engine ingress          llmdv reaches each replica only by a URL, and a committed profile
+#                               names no pod; the per-replica layer waits for lane-provided URLs.
+#                               When it lands it is `kind: vllm`
+#   tools.strict_level          vLLM's --tool-strict-level; no overlay passes it, so the default
+#                               (`auto`, the schema default) applies and nothing is declared
+
+capabilities:
+  # INTENT: every vLLM extension field of the Chat API is accepted.
+  chat_fields:
+    add_generation_prompt: accepted
+    add_special_tokens: accepted
+    allowed_token_ids: accepted
+    bad_words: accepted
+    cache_salt: accepted
+    # FROM values: no overlay passes --trust-request-chat-template, and vLLM refuses a
+    # request-supplied template without it.
+    chat_template: rejected
+    chat_template_kwargs: accepted
+    continuous_usage_stats: accepted
+    documents: accepted
+    guided_choice: accepted
+    guided_decoding_backend: accepted
+    guided_grammar: accepted
+    guided_json: accepted
+    guided_regex: accepted
+    include_reasoning: accepted
+    length_penalty: accepted
+    logprob_token_ids: accepted
+    min_p: accepted
+    prompt_logprobs: accepted
+    repetition_detection: accepted
+    repetition_penalty: accepted
+    request_id: accepted
+    return_prompt_text: accepted
+    return_token_offsets: accepted
+    routed_experts_prompt_start: accepted
+    session_id: accepted
+    skip_special_tokens: accepted
+    spaces_between_special_tokens: accepted
+    stop_token_ids: accepted
+    stream_interval: accepted
+    structured_outputs: accepted
+    thinking_token_budget: accepted
+    top_k: accepted
+    truncation_side: accepted
+    use_beam_search: accepted
+
+  # INTENT: every vLLM extension field of the Completions API is accepted.
+  completions_fields:
+    add_special_tokens: accepted
+    allowed_token_ids: accepted
+    bad_words: accepted
+    cache_salt: accepted
+    ignore_eos: accepted
+    include_stop_str_in_output: accepted
+    length_penalty: accepted
+    logprob_token_ids: accepted
+    min_p: accepted
+    min_tokens: accepted
+    prompt_logprobs: accepted
+    repetition_detection: accepted
+    repetition_penalty: accepted
+    request_id: accepted
+    response_format_json_object: accepted
+    return_token_ids: accepted
+    return_token_offsets: accepted
+    return_tokens_as_token_ids: accepted
+    routed_experts_prompt_start: accepted
+    session_id: accepted
+    skip_special_tokens: accepted
+    spaces_between_special_tokens: accepted
+    stop_token_ids: accepted
+    stream_interval: accepted
+    structured_outputs: accepted
+    thinking_token_budget: accepted
+    top_k: accepted
+    truncate_prompt_tokens: accepted
+    truncation_side: accepted
+    use_beam_search: accepted
+
+  # INTENT: every vLLM request option, each judged by its effect.
+  vllm_options: [return_token_ids, min_tokens, ignore_eos, truncate_prompt_tokens, include_stop_str_in_output, continue_final_message, echo, continuous_usage_stats, structured_outputs, guided_choice, return_tokens_as_token_ids, prompt_logprobs, allowed_token_ids, bad_words, logit_bias, enable_thinking, include_reasoning, stop_reason, cache_salt, chat_template_kwargs]

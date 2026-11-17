@@ -1,0 +1,289 @@
+# Part: what every llm-d guide's stack shares, whatever the engine, the model or the topology.
+# Not a profile on its own: it declares no ingress and no model. A combination file under
+# profiles/llm-d/<guide>/ lists it first in `extends`, then a topology part, an engine part, a
+# model part and the guide part. A part never extends anything, so no file is reached by two
+# routes. See profiles/llm-d/README.md.
+#
+# Everything here is either an API's own definition (INTENT) or a fact of the llm-d stack that
+# does not depend on the engine. Engine extensions (vLLM's request fields and options) are in
+# engines/, the model and its parsers in models/, the router's ingress, error statuses and
+# header dispositions in topology/, because llmdv keys those by ingress id.
+#
+# Provenance tags, one per declaration (profiles/llm-d/README.md has the full table):
+#   FROM values: <path>   the guide's shipped config at llm-d 565373b
+#   FROM docs: <path>     the llm-d documentation at that commit, or profiles/REFERENCE.md here
+#   INTENT                how a correct stack behaves, as the API itself defines it (Rule 1)
+#   MEASURED 2026-11-16 on kind (real EPP, simulator engine)
+#                         observed through a real endpoint picker in front of llm-d-inference-sim;
+#                         a fact about the ROUTER layer only, never about an engine
+#
+# Not declared here, and why (each stays skip:undeclared by design):
+#   vision, reasoning efforts, thinking modes, reasoning_tokens   model facts; see models/
+#   vllm_options, vLLM extension fields   engine facts; see engines/vllm.yaml
+#   cache_reuse                  a guide decision; see guides/
+#   model_info                   GET /v1/model/info is a LiteLLM route; no layer here serves it
+#   header_probe, header_rewrites   need the header-echo instrument deployed behind the router,
+#                                which no lane does
+#   effort_rendering, answer_max_tokens   model facts nobody has measured; see models/
+#   client_reuse                 needs cache_reuse on messages, which this guide leaves undeclared
+#   image_url_fixture            needs an image hosted where the deployment can fetch it; no lane
+#                                hosts one, so messages_features.image_url skips as
+#                                requires_instrumentation
+#   client_sessions multi_file_fix   executes model-written code on the operator's machine
+#   fleet (config, metrics, logs)   needs cluster access, which a committed profile does not
+#                                carry; a lane adds an `environment` block in its own local file
+
+schema: llmdv.profile/1
+
+# INTENT: a lane runs llmdv from outside the cluster and reaches the router by a URL. A lane that
+# runs llmdv in a pod overrides this with `in-cluster` in its own local file.
+vantage: external
+
+# INTENT: a guide lane deploys the guide for the run and tears it down, so nobody else depends on
+# it and the disruptive families (malformed input, disconnects, long context) run.
+fleet_policy: dedicated
+
+capabilities:
+  # Rule 3: every value llmdv's vocabularies define for the four surfaces, declared as the API
+  # defines it. Not probed is never a reason to leave one out; the run is the measurement.
+
+  # INTENT: the full spec-derived Chat and Completions contract.
+  openai_contract: true
+
+  # INTENT: every Chat field the OpenAI API defines is accepted, except where the API itself
+  # refuses it. The engine extension fields are declared by the engine part.
+  chat_fields:
+    assistant_content_parts: accepted
+    assistant_last: accepted
+    assistant_refusal: accepted
+    audio: accepted
+    consecutive_users: accepted
+    # INTENT, on every content part: accepted. A text-only model is expected to fail these; the
+    # team marks them (Rule 1, red flags).
+    content_file: accepted
+    content_image_url: accepted
+    content_input_audio: accepted
+    empty_user_content: accepted
+    frequency_penalty: accepted
+    functions: accepted
+    include_obfuscation: accepted
+    logit_bias: accepted
+    message_name: accepted
+    metadata: accepted
+    modalities: accepted
+    moderation: accepted
+    parallel_tool_calls: accepted
+    prediction: accepted
+    presence_penalty: accepted
+    prompt_cache_key: accepted
+    prompt_cache_options: accepted
+    prompt_cache_retention: accepted
+    response_format_text: accepted
+    role_assistant: accepted
+    role_developer: accepted
+    role_function: accepted
+    role_system: accepted
+    role_tool: accepted
+    safety_identifier: accepted
+    seed: accepted
+    service_tier: accepted
+    store: accepted
+    # INTENT: the OpenAI API allows stream_options only with stream: true.
+    stream_options_alone: rejected
+    system_content_parts: accepted
+    system_only: accepted
+    temperature: accepted
+    tools: accepted
+    # INTENT: the OpenAI API requires logprobs: true with top_logprobs.
+    top_logprobs_alone: rejected
+    top_p: accepted
+    user: accepted
+    verbosity: accepted
+    web_search_options: accepted
+
+  # INTENT: every Completions field the OpenAI API defines is accepted, except where the API
+  # refuses it. The engine extension fields are declared by the engine part.
+  completions_fields:
+    best_of: accepted
+    frequency_penalty: accepted
+    logit_bias: accepted
+    presence_penalty: accepted
+    seed: accepted
+    # INTENT: the OpenAI API allows stream_options only with stream: true.
+    stream_options_alone: rejected
+    suffix: accepted
+    temperature: accepted
+    top_p: accepted
+    user: accepted
+
+  # INTENT: n and logprobs are part of the Chat API.
+  chat_options: [n, logprobs]
+  # INTENT: a seeded or temperature-0 repeat is identical, a fresh sample differs. Behind a router
+  # that balances across replicas, repeats may land on different replicas and batches, and
+  # neither OpenAI (seed is best effort) nor any engine here promises identical repeats, so the
+  # seed and greedy cases record how many repeats agree and pass either way. The default sample
+  # counts apply; nothing here sets capabilities.samples.
+  chat_repeats: [seed, greedy, fresh]
+  # INTENT: no shipped configuration promises determinism (no engine runs in batch-invariant mode,
+  # FROM values: guides/optimized-baseline/modelserver/), so repeat agreement is measured, not
+  # judged. Set true only for a configuration that promises it.
+  deterministic_repeats: false
+
+  # INTENT: JSON-object mode and JSON Schema output on every surface that defines them.
+  json_object: [chat_completions, responses]
+  structured_output: [chat_completions, messages, responses]
+  structured_output_streaming: [chat_completions, messages, responses]
+
+  # INTENT: GET /v1/models/{id} returns the model, as the OpenAI API defines it.
+  # MEASURED 2026-11-16 on kind (real EPP, simulator engine): through the router's Envoy listener,
+  # GET /v1/models/Qwen%2FQwen3-32B answers 307 with Location /v1/models/Qwen/Qwen3-32B (Envoy
+  # normalizes the encoded slash), so a client that does not follow the redirect gets no model.
+  # Expected to fail until the team triages it.
+  model_retrieval: true
+
+  # INTENT: the Responses API stores responses and can cancel a background one. Through a router
+  # that balances across replicas, a retrieval may reach a replica that never saw the response;
+  # that is a finding for the team, not a reason to leave the case out.
+  stateful_responses: true
+  background_responses: true
+  # INTENT: both are Responses API routes. The EPP's supported-API list (FROM docs:
+  # docs/api-reference/epp-http-apis.md) names only /v1/responses itself, so these may be refused.
+  responses_compact: true
+  responses_input_tokens: true
+  responses_options: [metadata, logprobs]
+  # INTENT: request options accepted; references to stored state and built-in tools ignored, as a
+  # self-hosted backend has no built-in tools (references accept only ignored or rejected).
+  responses_features:
+    access_programs: accepted
+    additional_tools: accepted
+    apply_patch: ignored
+    background_false: accepted
+    code_interpreter: ignored
+    computer_use_preview: ignored
+    context_management: accepted
+    conversation: ignored
+    encrypted_reasoning: accepted
+    file_search: ignored
+    image_generation: ignored
+    include_tool_outputs: accepted
+    include_web_search_sources: accepted
+    input_file: accepted
+    input_image: accepted
+    item_reference: ignored
+    local_shell: ignored
+    max_tool_calls: accepted
+    mcp: ignored
+    moderation: accepted
+    namespace_tools: ignored
+    parallel_tool_calls: accepted
+    programmatic_tool_calling: ignored
+    prompt_cache_key: accepted
+    prompt_cache_options: accepted
+    prompt_cache_retention: accepted
+    prompt_template: ignored
+    reasoning_context: accepted
+    reasoning_generate_summary: accepted
+    reasoning_mode: accepted
+    reasoning_summary: accepted
+    safety_identifier: accepted
+    service_tier: accepted
+    shell: ignored
+    stream_obfuscation_off: accepted
+    temperature: accepted
+    text_format_text: accepted
+    text_verbosity: accepted
+    tool_search: ignored
+    top_p: accepted
+    truncation_auto: accepted
+    user: accepted
+    web_search: ignored
+    web_search_preview: ignored
+
+  # INTENT: /v1/messages/count_tokens is part of the Messages API.
+  # MEASURED 2026-11-16 on kind (real EPP, simulator engine): the router passes it to a replica,
+  # which answers 200. Whether each engine serves it is the engine's to show.
+  count_tokens: true
+  # INTENT: every opt-in Messages check. parallel_tool_calls needs a tool parser and effort_effect
+  # needs Messages efforts; each skips where the model part declares neither.
+  messages_checks: [block_forms, context_management, count_tokens_parts, effort_effect, error_types, incremental_streaming, max_tokens_limit, mid_conversation_system, parallel_tool_calls, prompt_accounting, response_shape, stop_sequences, tool_result_error]
+  # INTENT: every Messages feature accepted. image_url needs image_url_fixture, which no lane
+  # hosts, so it skips as requires_instrumentation.
+  messages_features:
+    assistant_prefill: accepted
+    cache_breakpoints_five: accepted
+    cache_control_message_block: accepted
+    cache_control_tool: accepted
+    cache_control_ttl_1h: accepted
+    consecutive_assistant_turns: accepted
+    consecutive_user_turns: accepted
+    container: accepted
+    diagnostics: accepted
+    document_citations: accepted
+    document_content: accepted
+    document_pdf: accepted
+    document_text: accepted
+    image_base64: accepted
+    image_url: accepted
+    inference_geo: accepted
+    leading_assistant: accepted
+    max_tokens_large: accepted
+    max_tokens_over_window: accepted
+    max_tokens_zero: accepted
+    mcp_servers: accepted
+    metadata_user_id: accepted
+    redacted_thinking_passback: accepted
+    search_result: accepted
+    server_tool_history: accepted
+    service_tier: accepted
+    speed_fast: accepted
+    stop_sequences_five: accepted
+    text_citations_passback: accepted
+    thinking_between_tools: accepted
+    thinking_display_omitted: accepted
+    thinking_display_updates: accepted
+    tool_result_blocks: accepted
+    tool_result_image: accepted
+    top_k: accepted
+    top_level_cache_control: accepted
+    top_p: accepted
+  # INTENT: a published beta value is accepted.
+  anthropic_betas: ["prompt-caching-2024-07-31"]
+
+  # INTENT: every scenario. long_context and inline_system need cache_reuse, which the guide part
+  # decides; parallel_subagents and long_context are disruptive, allowed by `dedicated`.
+  scenario_checks: [blank_turns, cache_hints, inline_system, long_context, output_overflow, parallel_subagents]
+
+  # INTENT: names a coding agent sends by default must be refused as unknown models, never served
+  # by another model.
+  client_model_names: [claude-sonnet-4-5, claude-haiku-4-5]
+
+  # INTENT: real client sessions, each needing a tool parser (they skip without one).
+  # multi_file_fix is left out: it executes model-written code (Rule 3). image_read needs vision
+  # on Messages, which the model part decides.
+  client_sessions: [skill, hook, parallel_reads, nested_subagent, compaction, image_read]
+
+  # INTENT: every forward-compatibility probe, declared `either` (no 5xx, and the plain request
+  # afterwards succeeds); tighten to accepted or rejected from the recorded outcomes.
+  forward_compat:
+    count_tokens_block: either
+    unknown_beta: either
+    unknown_block: either
+    unknown_enum_value: either
+    unknown_header: either
+    unknown_item: either
+    unknown_message_field: either
+    unknown_tool_type: either
+  # INTENT: a request reaches the model unchanged. big_integer and big_integer_history need a tool
+  # parser and skip without one.
+  byte_fidelity: [big_integer, big_integer_history, key_order, unicode_escapes]
+
+clients:
+  # FROM docs: profiles/REFERENCE.md, "Claude Code clients": the runner image ships Claude Code
+  # 2.1.289 at /usr/local/bin/claude. Where it is absent, the real-client cases skip as
+  # requires_instrumentation.
+  - id: claude-code
+    surfaces: [messages]
+    needs: [streaming]
+    binaries:
+      - version: "2.1.289"
+        executable: /usr/local/bin/claude

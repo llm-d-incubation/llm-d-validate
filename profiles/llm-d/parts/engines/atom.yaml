@@ -1,0 +1,17 @@
+# Part: Atom, for a stack whose replicas run `atom.entrypoints.openai_server`. Not a profile on its
+# own; a combination file lists it after the topology part. Never extends anything.
+#
+# Used by the amd/atom overlays of optimized-baseline (FROM values:
+# guides/optimized-baseline/modelserver/amd/atom/): atom-dev v0.1.7-rc0 with an fp8 KV cache and
+# --enable_prefix_caching set explicitly. The router uses the same values as vLLM and SGLang.
+#
+# DECLARES NOTHING YET, on purpose: llmdv's extension vocabularies are vLLM's, and which of them
+# Atom's OpenAI server serves is not established by the shipped config or by any run. See
+# engines/sglang.yaml for the reasoning; the same holds here.
+#
+# Unknown, and left to the first run: which of the four surfaces Atom serves (the guide claims
+# the EPP's API list, which the topology part declares); its context window (no flag sets one);
+# its error envelope; its metric names.
+#
+# Not declared here, and why:
+#   the engine ingress          as for vLLM (engines/vllm.yaml); llmdv has no Atom kind

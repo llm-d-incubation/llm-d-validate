@@ -1,0 +1,55 @@
+# Part: llm-d-inference-sim answering as Qwen/Qwen3-32B, for a kind or CI cluster with no
+# accelerators. Not a profile on its own; sim-qwen3-32b-standalone.yaml lists it after the
+# topology part and no engine part, because the simulator is both the engine and the model here.
+# Never extends anything.
+#
+# THIS VALIDATES THE ROUTER, NOT AN ENGINE. The simulator returns canned text, tokenizes
+# approximately and implements only part of each API, so every case that judges what the model
+# wrote, or an engine extension, says nothing about any shipped overlay. What a run of it does
+# show is the router layer: routing every surface, error envelopes the EPP writes itself, header
+# handling, path handling, streaming pass-through. Its failures are still findings (Rule 4): most
+# will be the simulator's, and the team marks them once.
+#
+# Simulator settings this part assumes, which the lane passes to the simulator: --model
+# Qwen/Qwen3-32B and --max-model-len=40960 (so the window matches the real parts), the vLLM
+# engine mode (the default), and render routes left on (no --enable-legacy-render). Its tool calls
+# are synthetic, so no tool parser is declared.
+#
+# The simulator also serves vLLM's four render routes. Surfaces are an ingress key, and this part
+# names no ingress, so sim-qwen3-32b-standalone.yaml declares them.
+#
+# Excluded, and why:
+#   vision, reasoning efforts, thinking modes, reasoning_tokens   the simulator neither reads
+#                       images nor reasons
+#   stored responses, background responses   the simulator keeps no response state worth
+#                       asserting; compact and input_tokens are left to accept either answer
+#   engine extensions   no engine part: which vLLM extensions the simulator honours is not
+#                       established
+
+model:
+  # The lane's simulator flag --model.
+  public_id: Qwen/Qwen3-32B
+  aliases: []
+  # The lane's simulator flag --max-model-len.
+  max_model_len: 40960
+  reasoning:
+    # The simulator does not reason: no parser and no inline block.
+    parser: null
+    field: null
+    inline_tag: null
+    default_on: false
+  tools:
+    # Synthetic tool calls; no parser to declare.
+    parser: null
+    auto_choice: false
+
+capabilities:
+  # The simulator reads no images.
+  vision: false
+  # Overrides parts/base.yaml: no response state is asserted on the simulator.
+  stateful_responses: false
+  background_responses: false
+  responses_compact: null
+  responses_input_tokens: null
+  # INTENT: the synthetic token-prefix checks on every render surface the simulator serves.
+  prefix_stability: [chat_render, completions_render, messages_render, responses_render]

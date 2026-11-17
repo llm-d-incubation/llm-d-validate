@@ -1,0 +1,47 @@
+# Part: Qwen/Qwen3-32B capped at a 16384-token window, served WITH a reasoning parser and a
+# tool-call parser with automatic tool choice. Not a profile on its own; a combination file lists
+# it after the engine part. Never extends anything.
+#
+# Used by (overlays as ACCELERATOR_TYPE/MODEL_SERVER/INFRA_PROVIDER, at llm-d 565373b):
+#   tpu/v6/vllm/{base,gke}            vllm-torchtpu --max-model-len=16384 --reasoning-parser=qwen3
+#                                     --tool-call-parser=hermes --enable-auto-tool-choice
+#   tpu/{v5p,v6,v7}/sglang/{base,gke} sglang --context-length=16384 --reasoning-parser=qwen3
+#                                     --tool-call-parser=qwen
+# FROM values: guides/optimized-baseline/modelserver/tpu/*/{vllm,sglang}/base/patch-*.yaml.
+#
+# The same shape as qwen3-32b-parsers.yaml at a smaller window. The parser NAMES are the engine's
+# flag values, so each combination file states them.
+#
+# Excluded, and why:
+#   answer_max_tokens, effort_rendering   as in qwen3-32b-parsers.yaml
+
+model:
+  # FROM values: the first argument of `vllm serve` and SGLang's --model-path.
+  public_id: Qwen/Qwen3-32B
+  aliases: []
+  # FROM values: --max-model-len=16384 (vLLM, tpu/v6/vllm/base/patch-vllm.yaml) and
+  # --context-length=16384 (SGLang, tpu/*/sglang/base/patch-sglang.yaml).
+  max_model_len: 16384
+  reasoning:
+    # INTENT: the parser's separate field, named reasoning_content by both engines.
+    field: reasoning_content
+    # INTENT: Qwen3 thinks unless asked not to.
+    default_on: true
+  tools:
+    # FROM values: --enable-auto-tool-choice (vLLM); SGLang chooses automatically once a tool
+    # parser is set (inferred).
+    auto_choice: true
+    # INTENT: Qwen3 wraps each call in <tool_call> tags.
+    markup: ["<tool_call>"]
+
+capabilities:
+  # INTENT: every effort each API defines; see qwen3-32b-parsers.yaml.
+  chat_reasoning_efforts: [minimal, low, medium, high, xhigh, max]
+  chat_quiet_efforts: [none]
+  responses_reasoning_efforts: [none, minimal, low, medium, high, xhigh, max]
+  messages_thinking: [enabled, adaptive, disabled]
+  messages_efforts: [low, medium, high, xhigh, max]
+  # INTENT: a reasoning parser lets the engine count reasoning tokens apart from the answer.
+  reasoning_tokens: [chat_completions, responses]
+  # INTENT: declared accepted on a text-only model; expected to fail until the team marks it.
+  vision: [chat_completions, messages, responses]

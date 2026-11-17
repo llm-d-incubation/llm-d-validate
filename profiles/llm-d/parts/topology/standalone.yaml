@@ -1,0 +1,181 @@
+# Part: the standalone topology. The client reaches the endpoint picker's own HTTP listener (the
+# Envoy sidecar beside the EPP) through the `<GUIDE_NAME>-epp` Service on port 80. This is how a
+# guide is deployed by default and how today's guide lanes deploy it. Not a profile on its own;
+# a combination file lists it after parts/base.yaml. Never extends anything.
+#
+# It owns everything llmdv keys by ingress id: the ingress itself, its error statuses and its
+# header dispositions. The gateway topology (gateway.yaml) declares the same behaviour under its
+# own id; keep the two in step.
+#
+# No `setup.requires` is committed: the namespace is cluster detail, and how the URL comes to
+# exist (Service DNS from inside the cluster, a route, a port-forward the lane runs) is the lane's
+# concern. For example:
+#   export LLMDV_EPP_URL=http://<GUIDE_NAME>-epp.<namespace>.svc.cluster.local   # in-cluster
+#   kubectl port-forward -n <namespace> svc/<GUIDE_NAME>-epp 18080:80 &          # or from outside
+#   export LLMDV_EPP_URL=http://localhost:18080
+#
+# What is NOT declared, and why (these rows stay skip:undeclared by design):
+#   embeddings, /inference/v1/generate   routed by the EPP (FROM docs:
+#                                docs/api-reference/epp-http-apis.md) and MEASURED 2026-11-16 on
+#                                kind (real EPP, simulator engine): /v1/embeddings 200;
+#                                /inference/v1/generate 200 with token_ids, and the EPP itself
+#                                answers 400 "must have non-empty token_ids field" without them.
+#                                llmdv has no surface for either yet
+#   render surfaces              whether an engine serves its render routes is an existence fact
+#                                no run has measured on these engines. The router does not stand
+#                                in the way: MEASURED 2026-11-16 on kind (real EPP, simulator
+#                                engine), render routes, /tokenize, /metrics and /health all reach
+#                                a replica, as the EPP restricts no path. If an engine serves them,
+#                                contract.undeclared_surfaces_absent fails and says which; declare
+#                                them then. The simulator part declares them, since it serves them
+#   bad_credentials, credential_headers, auth   the EPP and its Envoy sidecar authenticate nothing
+#                                (FROM values: guides/recipes/router/base.values.yaml sets no auth
+#                                filter)
+#   transport.http_redirect, http_url, alpn   the listener is plain HTTP; there is no TLS listener
+#                                to redirect to
+#   transport.max_body_bytes     no layer sets a request-body limit (FROM values: the Envoy args in
+#                                guides/recipes/router/base.values.yaml set none)
+#   transport.cors_preflight     neither API nor the shipped config defines a CORS policy
+#   transport.absent_paths       nothing defines a path the router must hide; it forwards every
+#                                path (measured above)
+#   transport.model_rewrite_header   the EPP overrides the body's model with
+#                                x-llm-d-model-name-rewrite (FROM docs:
+#                                docs/api-reference/epp-http-headers.md), but this case requires
+#                                the answer to echo the client's name, which the EPP does not
+#                                promise. A schema gap; see profiles/llm-d/README.md
+#   engine metrics paths         /metrics (vLLM, SGLang, Atom) and /prometheus/metrics
+#                                (TensorRT-LLM) reach a replica through the router, but the path is
+#                                the engine's and transport is keyed by ingress, so a present_paths
+#                                line here would be wrong for some engine
+
+ingresses:
+  # The EPP's HTTP listener. FROM values: guides/optimized-baseline/router/
+  # optimized-baseline.values.yaml (and -trtllm.values.yaml) router.extraServicePorts, port 80 to
+  # targetPort 8081; guides/optimized-baseline/guide.yaml verify.endpoint.standalone reads the
+  # Service `${GUIDE_NAME}-epp`. Every guide names that Service after itself.
+  #
+  # Rule 2 evidence for `llmd_router`: confirmed for the router layer by
+  # MEASURED 2026-11-16 on kind (real EPP, simulator engine): EPP-generated errors carry the EPP's
+  # own "error extracting request body: ..." text, and responses carry
+  # x-went-into-resp-headers: true. No response header names the serving pod
+  # (served_by.backend_pod stays empty).
+  - id: epp
+    kind: llmd_router
+    # INTENT: the URL comes from the environment so no hostname is committed.
+    base_url_env: LLMDV_EPP_URL
+    # FROM values: guides/recipes/router/base.values.yaml configures no authentication.
+    auth: {type: none}
+    # MEASURED 2026-11-16 on kind (real EPP, simulator engine): /health through the router is
+    # answered by whichever replica receives it.
+    health_path: /health
+
+    # FROM docs: docs/api-reference/epp-http-apis.md lists these four among the APIs the EPP
+    # routes; it is the guide's claim that the stack serves them. Which ones an engine serves is
+    # the engine's to show: the contract suite checks each one both ways.
+    # MEASURED 2026-11-16 on kind (real EPP, simulator engine): all four answer 200 through the
+    # router when the engine serves them.
+    surfaces: [chat_completions, completions, messages, responses]
+
+    # INTENT: generous for the largest shipped models (up to a 262144-token window): a near-limit
+    # prompt prefills for a long time before the first event.
+    timeouts: {connect: 10, request: 900, stream_idle: 120}
+
+    # INTENT: the statuses each API defines. A class not listed accepts any 4xx, which is what the
+    # APIs define for request validation. Two transport classes are left undeclared on purpose,
+    # so a 2xx or a 4xx both pass and only a 5xx or a dropped connection fails:
+    #   header_underscore   MEASURED 2026-11-16 on kind (real EPP, simulator engine): a request
+    #                       header whose name has an underscore (e.g. session_id) makes the
+    #                       router's Envoy close the connection with no response; the same
+    #                       request straight to a replica answers 200. Expected to fail until
+    #                       the team triages it.
+    #   path_variant        no API defines how a router normalizes a path
+    error_status:
+      # INTENT: OpenAI and Anthropic both answer an unknown model 404 (model_not_found,
+      # not_found_error).
+      unknown_model: [404]
+      # INTENT: an unknown path is not found.
+      unknown_path: [404]
+      # INTENT: GET on a POST-only path is 405.
+      wrong_method: [405]
+      # INTENT: OpenAI refuses an unrecognized request argument with 400. Engines commonly ignore
+      # unknown fields (see .agents/GROUND-TRUTH.md), so expect this to fail until the team
+      # triages it.
+      unsupported_option: [400]
+      # INTENT: a Messages endpoint refuses a nonsense anthropic-version, as Anthropic's API does.
+      invalid_api_version: [400]
+      # INTENT: a body without `model` is refused with 400.
+      # MEASURED 2026-11-16 on kind (real EPP, simulator engine): the EPP answers 400
+      # "model not found in request body" itself, with a JSON envelope.
+      missing_model: [400]
+
+    # INTENT: every error carries a parseable envelope (Rule 1).
+    # MEASURED 2026-11-16 on kind (real EPP, simulator engine): errors the EPP generates itself are
+    # structured JSON. A malformed body answers 400
+    # {"error":{"message":"error extracting request body: ...","type":"invalid_request_error",
+    # "code":400}}; on /v1/messages the Anthropic shape {"type":"error","error":{"type":
+    # "invalid_request_error",...}}. Older router builds answered these in plain text
+    # (.agents/GROUND-TRUTH.md); this build does not, so nothing is listed.
+    unstructured_errors: []
+
+    # INTENT: no quota layer sits in front of the router, so a 429 is a finding, not a skip.
+    # FROM docs: docs/api-reference/epp-http-headers.md, the EPP answers 429 itself only when flow
+    # control rejects or evicts a request.
+    rate_limited: false
+
+    setup:
+      # INTENT: a URL to a local forward must not go through an HTTP proxy.
+      proxy: bypass
+
+    transport:
+      # MEASURED 2026-11-16 on kind (real EPP, simulator engine): /health answers 200 through the
+      # router.
+      health_status: [200]
+      # INTENT: GET /v1/models is part of the OpenAI API every engine here serves.
+      # MEASURED 2026-11-16 on kind (real EPP, simulator engine): answered by whichever replica
+      # receives it, 200.
+      present_paths: [/v1/models]
+      # INTENT: neither API nor any layer here implements Idempotency-Key, so a repeat generates
+      # again.
+      idempotency: ignored
+      # INTENT: loose bounds for a large model under no other load. Tighten from recorded stream
+      # timings.
+      stream_budget: {first_event_s: 60, max_gap_s: 30, min_tokens_per_s: 5, next_request_s: 120}
+
+headers:
+  # FROM docs: docs/api-reference/epp-http-headers.md, "Request Classification and Flow Control".
+  # The EPP reads these and acts on them; their effect shows only under contention, so they skip
+  # as requires_load until load mode exists (#23).
+  # MEASURED 2026-11-16 on kind (real EPP, simulator engine): an objective that names no
+  # InferenceObjective (none exists there) is served normally, 200, with no dropped-reason header,
+  # through both the canonical name and its alias.
+  x-llm-d-inference-objective:
+    epp: consumed
+  x-llm-d-inference-fairness-id:
+    epp: consumed
+  # FROM docs: the same page, "Deprecated Aliases": read as aliases of the canonical names by llm-d
+  # Router v0.9.0 and later. Precedence when both are sent needs a new case variant.
+  x-gateway-inference-objective:
+    epp: consumed
+  x-gateway-inference-fairness-id:
+    epp: consumed
+  # FROM docs: the same page, "Response Headers": present only on 429, 503 and 500 answers the
+  # EPP generates itself, so never on a success.
+  x-llm-d-request-dropped-reason:
+    epp: absent
+  # The SLO headers. FROM docs: the same page, "Service Level Objectives": read only by SLO
+  # admission plugins. They are declared here and not in the guide part because llmdv keys
+  # header dispositions by ingress id, which differs between topologies. `ignored` holds for a
+  # router configured with no SLO plugin, which is every optimized-baseline router config
+  # (guides/optimized-baseline.yaml says why); a guide that configures one overrides these in its
+  # combination files.
+  x-llm-d-slo-ttft-ms:
+    epp: ignored
+  x-llm-d-slo-tpot-ms:
+    epp: ignored
+  # FROM docs: the same page, "Deprecated Aliases"; ignored for the same reason.
+  x-slo-ttft-ms:
+    epp: ignored
+  x-slo-tpot-ms:
+    epp: ignored
+  # Not declared: x-llm-d-model-name-rewrite and its alias; see transport.model_rewrite_header in
+  # the header of this file.

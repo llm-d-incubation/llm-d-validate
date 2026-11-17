@@ -1,0 +1,56 @@
+# Part: Qwen/Qwen3-32B at the model's own 40960-token window, served WITH a reasoning parser and a
+# tool-call parser with automatic tool choice. Not a profile on its own; a combination file lists
+# it after the engine part. Never extends anything.
+#
+# Used by (overlays as ACCELERATOR_TYPE/MODEL_SERVER/INFRA_PROVIDER, at llm-d 565373b):
+#   gpu/vllm/{base,gke,ocp}     vllm --reasoning-parser=qwen3 --tool-call-parser=hermes
+#                               --enable-auto-tool-choice
+#   gpu/sglang/{base,gke}       sglang --reasoning-parser=qwen3 --tool-call-parser=qwen
+# FROM values: guides/optimized-baseline/modelserver/gpu/{vllm,sglang}/base/patch-*.yaml.
+#
+# The parser NAMES are the engine's own flag values, so each combination file states them; this
+# part states the shape a client sees, which is the same for both engines.
+#
+# Excluded, and why:
+#   answer_max_tokens   opt-in, and no source states the budget Qwen3 needs for a one-word answer
+#                       with thinking on; set it from the first run's recorded usage
+#   effort_rendering    no source states an effort marker in Qwen3's chat template
+
+model:
+  # FROM values: the first argument of `vllm serve` and SGLang's --model-path. The ocp overlay
+  # loads from a local path but keeps this id with --served-model-name
+  # (modelserver/gpu/vllm/ocp/kustomization.yaml).
+  public_id: Qwen/Qwen3-32B
+  aliases: []
+  # FROM values: no overlay here sets a window, so the engine uses the model's own.
+  # DERIVED: 40960 is max_position_embeddings in the model's config.json, not a guide value. The
+  # first run's GET /v1/models (vLLM's max_model_len) confirms it.
+  max_model_len: 40960
+  reasoning:
+    # INTENT: a reasoning parser moves the <think> block out of `content` into its own field,
+    # which vLLM's and SGLang's OpenAI servers both name reasoning_content.
+    field: reasoning_content
+    # INTENT: Qwen3 thinks unless asked not to (its template's enable_thinking defaults to
+    # true).
+    default_on: true
+  tools:
+    # FROM values: --enable-auto-tool-choice (vLLM); SGLang chooses automatically once a tool
+    # parser is set (inferred).
+    auto_choice: true
+    # INTENT: Qwen3 wraps each call in <tool_call> tags; a tag left in the answer text is a call
+    # the parser missed.
+    markup: ["<tool_call>"]
+
+capabilities:
+  # INTENT: every effort each API defines. `none` is the quiet one: the OpenAI API defines it as no
+  # reasoning. Whether the efforts differ on this model is for the effort-order case to measure.
+  chat_reasoning_efforts: [minimal, low, medium, high, xhigh, max]
+  chat_quiet_efforts: [none]
+  responses_reasoning_efforts: [none, minimal, low, medium, high, xhigh, max]
+  messages_thinking: [enabled, adaptive, disabled]
+  messages_efforts: [low, medium, high, xhigh, max]
+  # INTENT: a reasoning parser lets the engine count reasoning tokens apart from the answer.
+  reasoning_tokens: [chat_completions, responses]
+  # INTENT: the model reads images on every surface. Qwen3-32B is text-only, so these are expected
+  # to fail until the team marks them (Rule 1, red flags: declare accepted, say so).
+  vision: [chat_completions, messages, responses]

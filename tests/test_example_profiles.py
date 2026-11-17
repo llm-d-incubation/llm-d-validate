@@ -15,13 +15,34 @@ from pathlib import Path
 
 import pytest
 
-from llmdv.profile import loader
+from llmdv.profile import compose, loader
 
 PROFILES = Path(__file__).resolve().parents[1] / "profiles"
 EXAMPLES = sorted((PROFILES / "examples").glob("*.yaml"))
-# Every committed profile, at any depth. Local variants are gitignored and never checked here.
-COMMITTED = sorted(p for p in PROFILES.rglob("*.yaml") if not p.name.endswith(".local.yaml"))
+# Every committed file, at any depth. Local variants are gitignored and never checked here.
+FILES = sorted(p for p in PROFILES.rglob("*.yaml") if not p.name.endswith(".local.yaml"))
+# A part is a file another file extends that is not a profile on its own: it lacks a model or an
+# ingress (a model part has no ingress, a topology part no model). It is checked through every
+# profile that extends it, never alone. A complete parent, such as an example a staging variant
+# extends, is still a profile and is checked alone too.
+PARTS = sorted(
+    {
+        layer.path.resolve()
+        for path in FILES
+        for layer in compose.layers(path)[:-1]
+        if not ("model" in layer.raw and "ingresses" in layer.raw)
+    }
+)
+COMMITTED = [p for p in FILES if p.resolve() not in PARTS]
 REAL = [p for p in COMMITTED if p not in EXAMPLES]
+
+
+@pytest.mark.parametrize("path", FILES, ids=lambda p: str(p.relative_to(PROFILES)))
+def test_a_committed_file_carries_no_credential_value(path: Path):
+    """Parts included: a literal key must never be committed anywhere under profiles/."""
+    text = path.read_text(encoding="utf-8")
+    for marker in ("sk-", "Bearer ", "api_key:", "apikey:"):
+        assert marker not in text, f"{path.name} contains {marker!r}, which looks like a secret"
 
 
 def test_there_are_examples_to_check():

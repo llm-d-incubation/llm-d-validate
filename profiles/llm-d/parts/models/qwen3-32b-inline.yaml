@@ -1,0 +1,54 @@
+# Part: Qwen/Qwen3-32B at the model's own 40960-token window, served WITHOUT reasoning or tool-call
+# parsers: reasoning arrives inline as a <think> block, and no tool call is parsed. Not a profile
+# on its own; a combination file lists it after the engine part. Never extends anything.
+#
+# Used by (overlays as ACCELERATOR_TYPE/MODEL_SERVER/INFRA_PROVIDER, at llm-d 565373b):
+#   amd/vllm/{base,amd-ci}      vllm-openai-rocm v0.31.0
+#   tpu/v5p/vllm/{base,gke}     vllm-tpu v0.31.0
+#   amd/sglang/{base,amd-ci}    sglang v0.5.22 (ROCm build)
+# FROM values: guides/optimized-baseline/modelserver/{amd,tpu/v5p}/*/base/patch-*.yaml pass no
+# parser flag and no window.
+#
+# Excluded, and why:
+#   model.tools         no tool parser
+#   reasoning_tokens    without a reasoning parser the engine cannot count reasoning apart from
+#                       the answer
+#   answer_max_tokens   opt-in, and no source states the budget this model needs for a one-word
+#                       answer with thinking on; set it from the first run's recorded usage
+#   effort_rendering    no source states an effort marker in the chat template
+
+model:
+  # FROM values: the first argument of `vllm serve` and SGLang's --model-path.
+  public_id: Qwen/Qwen3-32B
+  aliases: []
+  # FROM values: no overlay here sets a window, so the engine uses the model's own.
+  # DERIVED: 40960 is max_position_embeddings in the model's config.json, not a guide value; the
+  # first run's GET /v1/models confirms it.
+  max_model_len: 40960
+  reasoning:
+    # FROM values: no --reasoning-parser in any overlay listed above.
+    parser: null
+    field: null
+    # INTENT: without a parser, the reasoning reaches the client as a literal <think> block in
+    # `content`.
+    inline_tag: think
+    # INTENT: Qwen3 thinks unless asked not to (its template's enable_thinking defaults to
+    # true).
+    default_on: true
+  tools:
+    # FROM values: no --tool-call-parser and no --enable-auto-tool-choice in any overlay listed
+    # above, so the tool cases skip as undeclared: the parser they need does not exist here.
+    parser: null
+    auto_choice: false
+
+capabilities:
+  # INTENT: every effort each API defines. The API defines what an effort asks for, whatever shape
+  # the reasoning arrives in. `none` is the quiet one.
+  chat_reasoning_efforts: [minimal, low, medium, high, xhigh, max]
+  chat_quiet_efforts: [none]
+  responses_reasoning_efforts: [none, minimal, low, medium, high, xhigh, max]
+  messages_thinking: [enabled, adaptive, disabled]
+  messages_efforts: [low, medium, high, xhigh, max]
+  # INTENT: declared accepted on a text-only model; expected to fail until the team marks it
+  # (Rule 1, red flags).
+  vision: [chat_completions, messages, responses]

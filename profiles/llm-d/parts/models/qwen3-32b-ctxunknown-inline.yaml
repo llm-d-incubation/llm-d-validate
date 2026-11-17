@@ -1,0 +1,56 @@
+# Part: Qwen/Qwen3-32B served WITHOUT reasoning or tool-call parsers, by an engine whose context
+# window no flag sets and no source states. Not a profile on its own; a combination file lists it
+# after the engine part. Never extends anything.
+#
+# Used by (overlays as ACCELERATOR_TYPE/MODEL_SERVER/INFRA_PROVIDER, at llm-d 565373b):
+#   amd/atom/{base,amd-ci}      atom-dev v0.1.7-rc0
+#   gpu/trtllm/{base,gke}       trtllm-serve 1.3.0rc29
+# FROM values: guides/optimized-baseline/modelserver/{amd/atom,gpu/trtllm}/base/ pass no parser
+# flag and no window.
+#
+# The same shape as qwen3-32b-inline.yaml, except the window: vLLM and SGLang take the model's own
+# window by default, but neither Atom's nor TensorRT-LLM's default is established here, so
+# max_model_len is left unset and the context-overflow and long-context cases skip as undeclared.
+# Set it from the first run (an over-limit 4xx names the window).
+#
+# Excluded, and why:
+#   model.tools         no tool parser
+#   reasoning_tokens    without a reasoning parser the engine cannot count reasoning apart from
+#                       the answer
+#   answer_max_tokens   opt-in, and no source states the budget this model needs for a one-word
+#                       answer with thinking on; set it from the first run's recorded usage
+#   effort_rendering    no source states an effort marker in the chat template
+
+model:
+  # FROM values: --model Qwen/Qwen3-32B (Atom) and the first argument of `trtllm-serve serve`.
+  public_id: Qwen/Qwen3-32B
+  aliases: []
+  # Unknown: no flag sets a window and the engines' defaults are not established here.
+  max_model_len: null
+  reasoning:
+    # FROM values: no --reasoning-parser in any overlay listed above.
+    parser: null
+    field: null
+    # INTENT: without a parser, the reasoning reaches the client as a literal <think> block in
+    # `content`.
+    inline_tag: think
+    # INTENT: Qwen3 thinks unless asked not to (its template's enable_thinking defaults to
+    # true).
+    default_on: true
+  tools:
+    # FROM values: no --tool-call-parser and no --enable-auto-tool-choice in any overlay listed
+    # above, so the tool cases skip as undeclared: the parser they need does not exist here.
+    parser: null
+    auto_choice: false
+
+capabilities:
+  # INTENT: every effort each API defines. The API defines what an effort asks for, whatever shape
+  # the reasoning arrives in. `none` is the quiet one.
+  chat_reasoning_efforts: [minimal, low, medium, high, xhigh, max]
+  chat_quiet_efforts: [none]
+  responses_reasoning_efforts: [none, minimal, low, medium, high, xhigh, max]
+  messages_thinking: [enabled, adaptive, disabled]
+  messages_efforts: [low, medium, high, xhigh, max]
+  # INTENT: declared accepted on a text-only model; expected to fail until the team marks it
+  # (Rule 1, red flags).
+  vision: [chat_completions, messages, responses]

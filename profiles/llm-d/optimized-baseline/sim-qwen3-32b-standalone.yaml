@@ -1,0 +1,82 @@
+# The optimized-baseline guide in standalone mode, with llm-d-inference-sim in place of every
+# model server: the guide's real router (EPP and its Envoy sidecar, this guide's router values) in
+# front of simulated replicas answering as Qwen/Qwen3-32B. For a kind or CI cluster with no
+# accelerators. Not a shipped overlay; the guide has no simulator overlay.
+#
+# IT VALIDATES THE ROUTER, NOT AN ENGINE. See ../models/qwen3-32b-sim.yaml for what a run of it
+# shows and what it does not. No engine part is listed: the simulator is both engine and model.
+#
+# MEASURED 2026-11-16 on kind (real EPP, simulator engine): the router-layer facts quoted in
+# ../topology/standalone.yaml come from this setup (llm-d-router-endpoint-picker main, chart
+# llm-d-router-standalone, Envoy v1.40.2, llm-d-inference-sim v1.2.0, two replicas).
+#
+# How a lane runs it: deploy the guide's router in standalone mode, and in place of the
+# model-server overlay two simulator replicas that carry the guide's model-server label, started
+# with --model Qwen/Qwen3-32B --max-model-len=40960 (see the model part). Then:
+#   export LLMDV_EPP_URL=http://<GUIDE_NAME>-epp.<namespace>.svc.cluster.local
+#   # or from outside the cluster:
+#   #   kubectl port-forward -n <namespace> svc/<GUIDE_NAME>-epp 18080:80 &
+#   #   export LLMDV_EPP_URL=http://localhost:18080
+#   llmdv profile validate profiles/llm-d/optimized-baseline/sim-qwen3-32b-standalone.yaml
+#   llmdv verify --profile profiles/llm-d/optimized-baseline/sim-qwen3-32b-standalone.yaml \
+#     --label overlay=kind/sim
+
+extends:
+  - ../parts/base.yaml
+  - ../parts/topology/standalone.yaml
+  - ../parts/models/qwen3-32b-sim.yaml
+  - ../parts/guides/optimized-baseline.yaml
+
+name: optimized-baseline-sim-qwen3-32b-standalone
+
+ingresses:
+  # Overrides ../topology/standalone.yaml on purpose: the simulator serves vLLM's four render
+  # routes and the EPP passes them through, MEASURED 2026-11-16 on kind (real EPP, simulator
+  # engine). Declared here, not in the model part, because surfaces are keyed by ingress id and
+  # only this file knows the topology.
+  - id: epp
+    surfaces: [chat_completions, completions, messages, responses, chat_render, completions_render, messages_render, responses_render]
+
+capabilities:
+  # Change sentinels: placeholders, as .agents/skills/writing-an-infra-profile/SKILL.md step 6
+  # describes. The first run with --evidence all supplies the values; replace these with them and
+  # cite the simulator version.
+  prompt_pins:
+    chat_completions: {conversation: 1, tools: 1}
+    completions: {conversation: 1}
+    messages: {conversation: 1, tools: 1}
+    responses: {conversation: 1, tools: 1}
+  # INTENT: 64 zeros under each declared render surface, the placeholder validate accepts.
+  render_pins:
+    chat_render:
+      conversation: "0000000000000000000000000000000000000000000000000000000000000000"
+      tools: "0000000000000000000000000000000000000000000000000000000000000000"
+    completions_render:
+      conversation: "0000000000000000000000000000000000000000000000000000000000000000"
+    messages_render:
+      conversation: "0000000000000000000000000000000000000000000000000000000000000000"
+      tools: "0000000000000000000000000000000000000000000000000000000000000000"
+    responses_render:
+      conversation: "0000000000000000000000000000000000000000000000000000000000000000"
+      tools: "0000000000000000000000000000000000000000000000000000000000000000"
+  contract_baseline:
+    chat_completions:
+      response: {llmdv_seed: [absent]}
+      stream: {llmdv_seed: [absent]}
+      error: {llmdv_seed: [absent]}
+      invalid: {llmdv_seed: [absent]}
+    completions:
+      response: {llmdv_seed: [absent]}
+      stream: {llmdv_seed: [absent]}
+      error: {llmdv_seed: [absent]}
+      invalid: {llmdv_seed: [absent]}
+    messages:
+      response: {llmdv_seed: [absent]}
+      stream: {llmdv_seed: [absent]}
+      error: {llmdv_seed: [absent]}
+      invalid: {llmdv_seed: [absent]}
+    responses:
+      response: {llmdv_seed: [absent]}
+      stream: {llmdv_seed: [absent]}
+      error: {llmdv_seed: [absent]}
+      invalid: {llmdv_seed: [absent]}

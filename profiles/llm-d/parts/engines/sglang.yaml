@@ -1,0 +1,25 @@
+# Part: SGLang, for a stack whose replicas run `sglang.launch_server`. Not a profile on its own; a
+# combination file lists it after the topology part. Never extends anything.
+#
+# Used by the SGLang overlays of optimized-baseline (FROM values:
+# guides/optimized-baseline/modelserver/*/sglang/): sglang v0.5.22 (CUDA, and a ROCm build),
+# sglang v0.1.0-tpu, an Intel XPU build and a vendor build for DeepSeek-V4. The NVIDIA GPU overlay
+# also runs SGLang's Rust HTTP frontend (SGLANG_RUST_SERVER=1, guides/optimized-baseline/README.md,
+# "Tuning"); its combination file says so, since that is an overlay fact, not an engine-wide one.
+#
+# DECLARES NOTHING YET, on purpose. Everything engine-independent comes from parts/base.yaml; what is
+# left is SGLang's own request extensions, and llmdv's extension vocabularies (`vllm_options` and
+# the extension entries of `chat_fields` and `completions_fields`) are vLLM's. Which of them SGLang
+# also serves, and with what effect, is not established by the shipped config or by any run, so
+# they stay skip:undeclared rather than borrowing vLLM's answers. The first run against an SGLang
+# lane settles them: add the fields it accepts here, each with its MEASURED note.
+#
+# Unknown, and left to the first run (each surfaces as a failure or a skip there, never a guess
+# here): whether SGLang serves /v1/messages, /v1/messages/count_tokens, /v1/responses and its
+# compact and input_tokens routes; whether it reports reasoning token counts; its error envelope
+# for its own validation errors.
+#
+# Not declared here, and why:
+#   the engine ingress          as for vLLM (engines/vllm.yaml). llmdv has no SGLang kind; a
+#                               per-replica SGLang layer would be `kind: vllm` until one exists,
+#                               which is wrong for SGLang's error envelopes and metric names
