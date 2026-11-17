@@ -163,7 +163,7 @@ headers:
   x-llm-d-request-dropped-reason:
     epp: absent
   # The SLO headers. FROM docs: the same page, "Service Level Objectives": read only by SLO
-  # admission plugins. They are declared here and not in the guide part because llmdv keys
+  # admission plugins. They are declared here and not in a guide's common part because llmdv keys
   # header dispositions by ingress id, which differs between topologies. `ignored` holds for a
   # router configured with no SLO plugin, which is every optimized-baseline router config
   # (guides/optimized-baseline.yaml says why); a guide that configures one overrides these in its

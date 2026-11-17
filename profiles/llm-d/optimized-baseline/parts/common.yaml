@@ -1,5 +1,5 @@
-# Part: what the optimized-baseline guide adds. Not a profile on its own; a combination file lists
-# it last in `extends`. Never extends anything.
+# Part: what every optimized-baseline profile shares. Not a profile on its own; a combination file
+# beside this folder lists it last in `extends`. Never extends anything.
 #
 # G = guides/optimized-baseline, R = guides/recipes, at llm-d 565373b.
 #

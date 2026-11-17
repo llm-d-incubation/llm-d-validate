@@ -1,6 +1,6 @@
 # llm-d guide profiles
 
-Profiles that validate the [llm-d](https://github.com/llm-d/llm-d) well-lit-path guides. Each combination states what a correct stack does when a guide is deployed as shipped, with one model-server overlay, so a lane that deploys the guide can run `llmdv verify` against it. Only `optimized-baseline` is written so far.
+Profiles that validate the [llm-d](https://github.com/llm-d/llm-d) guides (llm-d's docs also call them well-lit paths; this repository says guide). Each combination states what a correct stack does when a guide is deployed as shipped, with one model-server overlay, so a lane that deploys the guide can run `llmdv verify` against it. Only `optimized-baseline` is written so far.
 
 They are data on top of llmdv, not part of it: nothing in `src/` knows about them, and a stack with no llm-d guide is described by its own profile exactly as before.
 
@@ -23,23 +23,26 @@ A guide ships one router configuration, several engines, many model configuratio
 
 ```
 profiles/llm-d/
-  parts/                               building blocks; never run on their own
+  parts/                               building blocks every guide shares; never run on their own
     base.yaml                          what every guide's stack shares: API intent, engine-independent
     topology/standalone.yaml           the EPP's own listener: the ingress, error statuses, header dispositions
     engines/<engine>.yaml              an engine's own request extensions (vllm, sglang, atom)
     models/<model-config>.yaml         model id, context window, reasoning and tool-call shape, vision
-    guides/<guide>.yaml                what one guide adds: its claims, cache decisions, block sizes
-  <guide>/<engine>-<model-config>-<topology>.yaml   a combination: what you run
+  <guide>/                             one folder per guide, named as llm-d names it
+    parts/common.yaml                  what every profile of this guide shares: its claims, cache decisions, block sizes
+    <engine>-<model-config>-<topology>.yaml   a combination: what you run
 ```
 
-A combination is `extends: [../parts/base.yaml, ../parts/topology/<t>.yaml, ../parts/engines/<e>.yaml, ../parts/models/<m>.yaml, ../parts/guides/<g>.yaml]`, then its `name`, the parser names (the engine's own flag values, where the model part has parsers) and its change sentinels, whose values only a run of that exact stack supplies.
+Anything inside a `parts/` folder is a building block; every other file is a profile you can run.
+
+A combination is `extends: [../parts/base.yaml, ../parts/topology/<t>.yaml, ../parts/engines/<e>.yaml, ../parts/models/<m>.yaml, parts/common.yaml]`, then its `name`, the parser names (the engine's own flag values, where the model part has parsers) and its change sentinels, whose values only a run of that exact stack supplies.
 
 Rules that keep this simple:
 
 - **Parts never extend anything.** Only combinations name parents. A file reached by two routes is an error ([REFERENCE.md](../REFERENCE.md#extends)), and with flat parts it cannot happen.
 - **No key is set by two parts,** so the order of the list changes nothing. The one exception is the simulator, whose model part overrides four `base.yaml` keys and whose combination overrides the standalone surfaces, on purpose; each says so in a comment. A run's `profile.used.yaml` names the file that set each key.
 - **A part is not a profile.** It has no ingress or no model of its own. Validate a combination, never a part; `tests/test_example_profiles.py` checks every part through the combinations that list it.
-- **Ingress-keyed facts live in the topology part.** llmdv keys surfaces, error statuses and header dispositions by ingress id, and the ids differ by topology (`epp`, `gateway`). So the SLO headers, which this guide leaves without effect, are declared there rather than in the guide part.
+- **Ingress-keyed facts live in the topology part.** llmdv keys surfaces, error statuses and header dispositions by ingress id, and the ids differ by topology (`epp`, `gateway`). So the SLO headers, which this guide leaves without effect, are declared there rather than in the guide's `parts/common.yaml`.
 - **Model parts are named by the configuration a client sees** (`qwen3-32b-ctx16k-parsers`), never by accelerator; their headers list the overlays that use them.
 
 ## Which source owns which fact
