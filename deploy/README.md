@@ -225,7 +225,7 @@ separate process so that `llmdv job` outlives it:
 | passes or fails | verify publishes it |
 | hits an invalid profile or a failed preflight | verify publishes the bundle, with `outcome.json` saying which |
 | runs out of budget, or the pod is stopped | verify gets SIGTERM, stops testing, publishes and notifies within the grace period; exit `6` |
-| is killed outright (OOM) | `llmdv job` uploads what it left, recorded as crashed with its exit code (137) |
+| is killed outright (OOM) | `llmdv job` records it as crashed with its exit code (137) in `outcome.json`, notifies, and uploads what it left when there is somewhere to publish |
 
 Exit codes are those of [`llmdv verify`](../docs/manual.md#exit-codes); 137 and other signal codes mean
 verify was killed and `llmdv job` uploaded what it left.
@@ -252,9 +252,14 @@ stopped; `llmdv publish` uploads the run again, manifest last.
 The two delivery steps are also ordinary commands:
 
 ```sh
-llmdv publish runs/<run> --remote-output s3://bucket/llmdv   # records a killed run as crashed; no-op if already published
+llmdv publish runs/<run> --remote-output s3://bucket/llmdv   # records a killed run as crashed; no-op if already published there
 llmdv notify runs/<run>                                      # posts outcome.json to $LLMDV_NOTIFY_WEBHOOK
 ```
+
+A run is published to one destination: `llmdv publish` to a different one is refused (exit 2).
+A failed upload never replaces the run's own verdict: `llmdv publish` then exits with the
+verification's code when it did not pass, and with 3 (the store cannot be used) or 5 (the upload
+failed) only for a run that passed. See [exit codes](../docs/manual.md#exit-codes).
 
 `llmdv notify` retries a failing webhook within bounds and never logs its URL. Everything published
 is redacted at capture, in the logging layer and in every run-file writer.

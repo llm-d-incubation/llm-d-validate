@@ -46,7 +46,10 @@ def test_messages_are_plain_text():
 
 def test_a_passing_run_names_its_trigger_counts_skips_and_where_results_are():
     text = notify.message(outcome())
-    assert text.splitlines()[0] == "llmdv fleet-a: PASSED, all selected cases passed (exit 0)"
+    headline = (
+        "llmdv fleet-a: PASSED, every selected case passed (skips do not fail a run) (exit 0)"
+    )
+    assert text.splitlines()[0] == headline
     assert "trigger=rollout, rollout=r-42" in text
     # Skips are spelled out, so a run whose coverage quietly shrank does not read as clean.
     assert "skipped 2 (2 undeclared)" in text
@@ -70,7 +73,7 @@ def test_failed_tests_and_failed_publication_are_both_reported():
             publication={"status": "failed", "error": "AccessDenied"},
         )
     )  # fmt: skip
-    assert text.startswith("llmdv fleet-a: FAILED, test failures")
+    assert text.startswith("llmdv fleet-a: FAILED, test failures: the fleet did not behave")
     assert "- c.one[chat_completions] at router: AssertionError: x &lt; y\n" in text
     assert "second line of the traceback" not in text
     assert "results NOT published: AccessDenied" in text
@@ -85,7 +88,7 @@ def test_notifying_from_a_published_copy_does_not_claim_it_was_unpublished():
 
 def test_a_run_that_left_no_outcome_reports_the_exit_code_it_had():
     text = notify.message(None, exit_code=4)
-    assert "llmdv failed internally" in text and "exit 4" in text
+    assert text.startswith("llmdv: ERROR, an internal error") and "exit 4" in text
 
 
 def test_a_rate_limit_is_retried_after_the_delay_slack_asks_for():
@@ -156,3 +159,51 @@ def test_a_fallback_upload_names_the_destination_that_was_unavailable():
     )
     assert "results: /results/fleet-a/run" in text
     assert "saved to the fallback: s3://bucket/p was unavailable (AccessDenied)" in text
+
+
+def crashed_outcome(**verification):
+    """What a killed verify leaves: an outcome written at the start, with no verdict in it."""
+    return outcome(verification={"exit_code": None, "class": None, "counts": {}, **verification})
+
+
+def test_a_run_without_a_recorded_class_is_never_reported_as_an_internal_error():
+    """A missing verdict means the process died; it says nothing about a defect in llmdv."""
+    text = notify.message(crashed_outcome(), exit_code=137)
+    assert text.startswith("llmdv fleet-a: CRASHED") and "(exit 137)" in text
+    assert notify.message(crashed_outcome()).startswith("llmdv fleet-a: CRASHED")
+    # A recorded code decides the class when the class itself is missing or not one we know.
+    assert notify.message(crashed_outcome(exit_code=1)).startswith("llmdv fleet-a: FAILED")
+    unknown = notify.message(crashed_outcome(**{"exit_code": 137, "class": "novel"}))
+    assert unknown.startswith("llmdv fleet-a: CRASHED")
+    for text in (unknown, notify.message(crashed_outcome())):
+        assert "ERROR" not in text and "internal" not in text
+
+
+def test_the_headline_states_each_exit_code_as_the_table_does():
+    from llmdv.cli.exit_codes import EXITS
+
+    for code, (klass, meaning) in EXITS.items():
+        verification = {"exit_code": code, "class": klass, "counts": {}}
+        headline = notify.message(outcome(verification=verification)).splitlines()[0]
+        assert headline.endswith(f"{meaning} (exit {code})"), headline
+        assert (
+            notify.message(None, exit_code=code)
+            .splitlines()[0]
+            .endswith(f"{meaning} (exit {code})")
+        )
+
+
+def test_a_preflight_failure_is_not_run_but_a_connection_lost_mid_run_says_what_ran():
+    nothing = {"exit_code": 3, "class": "environment", "counts": {}}
+    text = notify.message(outcome(verification=nothing, preflight_problems=["gateway: refused"]))
+    assert text.startswith("llmdv fleet-a: NOT RUN,") and "- gateway: refused" in text
+
+    partial = {"exit_code": 3, "class": "environment", "counts": {"pass": 2, "error": 1, "skip": 4}}
+    lost = [{"ingress": "gateway", "case_id": "c.three", "cases_before": 2, "cases_skipped": 4}]
+    text = notify.message(outcome(verification=partial, connection_lost=lost))
+    assert text.startswith("llmdv fleet-a: INCOMPLETE,")
+    assert "NOT RUN" not in text
+    assert "passed 2, failed 1, skipped 4" in text
+    assert (
+        "- connection to gateway lost at c.three after 2 case(s); 4 later case(s) not run" in text
+    )

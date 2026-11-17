@@ -17,7 +17,7 @@ from pathlib import Path
 from ..http.redact import scrub
 from ..output import manifest
 from ..output.remote import UnsupportedRemote, parse_remote_uri
-from ..results.read import UnreadableSchema, check_schema
+from ..results.read import OUTCOMES, UnreadableSchema, check_schema
 
 
 class NoSuchRun(Exception):
@@ -64,13 +64,16 @@ def list_runs(uri: str, profile: str) -> list[str]:
     target = parse_remote_uri(uri)
     if target.scheme == "file":
         base = Path(target.location) / profile
-        if not base.is_dir():
-            return []
-        return sorted(
-            d.name
-            for d in base.iterdir()
-            if (d / "results.jsonl").is_file() and (d / manifest.FILENAME).is_file()
-        )
+        try:
+            if not base.is_dir():
+                return []
+            return sorted(
+                d.name
+                for d in base.iterdir()
+                if (d / "results.jsonl").is_file() and (d / manifest.FILENAME).is_file()
+            )
+        except OSError as exc:
+            raise ArchiveUnreadable(_unreadable(f"list runs under {uri}", exc)) from exc
     if target.scheme == "s3":
         # Results may arrive before another upload fails. Only the manifest, published last,
         # marks a complete publication; require both files under the same immediate run id.
@@ -79,33 +82,53 @@ def list_runs(uri: str, profile: str) -> list[str]:
         try:
             keys = set(_s3(target).list_keys(profile))
         except sdk_errors() as exc:
-            raise ArchiveUnreadable(
-                scrub(f"cannot list runs under {uri}: {type(exc).__name__}: {exc}")
-            ) from exc
+            raise ArchiveUnreadable(_unreadable(f"list runs under {uri}", exc)) from exc
         names = {rest.rsplit("/", 1)[0] for rest in keys if rest.endswith("/results.jsonl")}
         return sorted(n for n in names if n and "/" not in n and f"{n}/{manifest.FILENAME}" in keys)
     raise UnsupportedRemote(f"cannot read runs from {target.scheme}://")
 
 
+def _unreadable(action: str, exc: Exception) -> str:
+    return scrub(f"cannot {action}: {type(exc).__name__}: {exc}")
+
+
+def _not_found(exc: Exception) -> bool:
+    """Whether a store's error says the object is not there, rather than that it cannot be read."""
+    error = (getattr(exc, "response", None) or {}).get("Error") or {}
+    return str(error.get("Code")) in {"NoSuchKey", "NotFound", "404"}
+
+
 def read_results(uri: str, profile: str, run_id: str) -> list[dict]:
-    """One run's results.jsonl, as records."""
+    """One run's results.jsonl, as records.
+
+    A run that is not there is NoSuchRun. A file that is there and cannot be read, or is not
+    text, is ArchiveUnreadable: the store or its permissions, not the run."""
     profile = safe(profile, "profile name")
     run_id = safe(run_id, "run id")
     target = parse_remote_uri(uri)
-    if target.scheme == "file":
-        path = Path(target.location) / profile / run_id / "results.jsonl"
-        if not path.is_file():
-            raise NoSuchRun(f"no results.jsonl for {profile}/{run_id} under {uri}")
-        text = path.read_text(encoding="utf-8")
-    elif target.scheme == "s3":
-        sink = _s3(target)
-        try:
-            text = sink.get_bytes(profile, run_id, "results.jsonl").decode("utf-8")
-        except Exception as exc:  # the store's own not-found, whichever flavour it is
-            raise NoSuchRun(f"cannot read {profile}/{run_id}/results.jsonl: {exc}") from exc
-    else:
-        raise UnsupportedRemote(f"cannot read runs from {target.scheme}://")
-    return _records(text, run_id, f"{profile}/{run_id}/results.jsonl")
+    name = f"{profile}/{run_id}/results.jsonl"
+    try:
+        if target.scheme == "file":
+            path = Path(target.location) / profile / run_id / "results.jsonl"
+            if not path.is_file():
+                raise NoSuchRun(f"no results.jsonl for {profile}/{run_id} under {uri}")
+            text = path.read_text(encoding="utf-8")
+        elif target.scheme == "s3":
+            from ..output.s3 import sdk_errors
+
+            try:
+                text = _s3(target).get_bytes(profile, run_id, "results.jsonl").decode("utf-8")
+            except sdk_errors() as exc:
+                if _not_found(exc):
+                    raise NoSuchRun(f"no results.jsonl for {profile}/{run_id} under {uri}") from exc
+                raise
+        else:
+            raise UnsupportedRemote(f"cannot read runs from {target.scheme}://")
+    except (NoSuchRun, UnsupportedRemote):
+        raise
+    except Exception as exc:  # noqa: BLE001 -- OSError, UnicodeError, or whatever the SDK raises
+        raise ArchiveUnreadable(_unreadable(f"read {name} under {uri}", exc)) from exc
+    return _records(text, run_id, name)
 
 
 def read_local_results(run_dir: Path) -> list[dict]:
@@ -128,12 +151,7 @@ def _records(text: str, run_id: str, source: str) -> list[dict]:
             record = json.loads(line)
         except ValueError as exc:
             raise InvalidRun(f"{where}: invalid JSON") from exc
-        if not isinstance(record, dict) or record.get("outcome") not in (
-            "pass",
-            "fail",
-            "skip",
-            "error",
-        ):
+        if not isinstance(record, dict) or record.get("outcome") not in OUTCOMES:
             raise InvalidRun(f"{where}: expected a result with outcome pass, fail, skip or error")
         try:
             check_schema(record, f"{source}, line {line_number}")

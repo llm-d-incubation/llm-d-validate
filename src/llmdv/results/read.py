@@ -3,6 +3,8 @@
 Archives keep old runs, so a reader meets records from older and newer llmdv releases side by
 side. Every reader accepts the majors in `READABLE` and refuses any other, naming the file, the
 line and the schema, rather than guessing at a record whose fields may have changed meaning.
+A line that parses as JSON but is not a result -- a bare string, a record without an `outcome`
+-- is refused the same way, since counting it would mean guessing too.
 
 `llmdv.results/1` grows only by optional fields; a reader never requires one:
 
@@ -24,10 +26,19 @@ from typing import Any
 
 NAME = "llmdv.results"
 READABLE = (1,)
+OUTCOMES = ("pass", "fail", "skip", "error")
 
 
-class UnreadableSchema(ValueError):
+class Unreadable(ValueError):
+    """A line of a results file that this llmdv refuses to read as a result."""
+
+
+class UnreadableSchema(Unreadable):
     """A record written under a results schema this llmdv cannot read."""
+
+
+class NotAResult(Unreadable):
+    """A line that is valid JSON but not a result record."""
 
 
 def major(schema: object) -> int | None:
@@ -58,9 +69,22 @@ def check_schema(record: Any, where: str) -> None:
         )
 
 
-def records(path: Path, lines: Iterable[str]) -> Iterator[Any]:
-    """Each parsed line of a results file, schema-checked; a line that is not JSON (the torn
-    last line of a killed run) is passed over."""
+def check_result(record: Any, where: str) -> None:
+    """Refuse a line that is not a result record. `where` names the file and line."""
+    if not isinstance(record, dict) or record.get("outcome") not in OUTCOMES:
+        raise NotAResult(
+            f"{where}: not a result record (expected an object with outcome "
+            f"{', '.join(OUTCOMES[:-1])} or {OUTCOMES[-1]})"
+        )
+
+
+def records(
+    path: Path, lines: Iterable[str], refused: list[str] | None = None
+) -> Iterator[dict[str, Any]]:
+    """Each result a results file holds. A line that is not JSON (the torn last line of a
+    killed run) is passed over. A line that is not a result, or is written under a schema this
+    llmdv cannot read, raises `Unreadable` -- or, when `refused` is given, is described there
+    and left out, for a caller that must deliver what a crashed run left."""
     for number, line in enumerate(lines, start=1):
         line = line.strip()
         if not line:
@@ -69,15 +93,24 @@ def records(path: Path, lines: Iterable[str]) -> Iterator[Any]:
             record = json.loads(line)
         except ValueError:
             continue
-        check_schema(record, f"{path}, line {number}")
+        where = f"{path}, line {number}"
+        try:
+            check_result(record, where)
+            check_schema(record, where)
+        except Unreadable as exc:
+            if refused is None:
+                raise
+            refused.append(str(exc))
+            continue
         yield record
 
 
-def read(path: Path) -> list[Any]:
-    """The records a local results file holds, or none if it is missing or unreadable."""
+def read(path: Path, refused: list[str] | None = None) -> list[dict[str, Any]]:
+    """The records a local results file holds, or none if it is missing or unreadable.
+    `refused` is as for `records`."""
     path = Path(path)
     try:
         text = path.read_text(encoding="utf-8", errors="replace")
     except OSError:
         return []
-    return list(records(path, text.splitlines()))
+    return list(records(path, text.splitlines(), refused))

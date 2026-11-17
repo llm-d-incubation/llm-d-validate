@@ -33,7 +33,7 @@ from . import (
     style,
     verify_cmd,
 )
-from .exit_codes import INTERNAL, USAGE
+from .exit_codes import INTERNAL, INTERRUPTED, USAGE
 
 log = get_logger("cli")
 
@@ -149,7 +149,7 @@ def main(argv: list[str] | None = None) -> int:
         return int(args.func(args))
     except KeyboardInterrupt:
         log.warning("interrupted")
-        return INTERNAL
+        return INTERRUPTED
     except argparse.ArgumentError as exc:
         log.error("%s", exc)
         return USAGE

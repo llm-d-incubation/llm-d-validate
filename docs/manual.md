@@ -137,6 +137,24 @@ Separating environment problems from fleet problems is the point of having more 
 A delivery failure never hides a verification failure: failed tests and a failed upload exit
 `1`, and `outcome.json` records both. `5` is returned only when verification succeeded.
 
+`llmdv publish`, `notify` and `compare` verify nothing themselves and follow the same table:
+
+- `llmdv publish` exits `0` when the run is delivered. When it is not, a run whose verification
+  did not pass keeps that verification's code (`1` for failed tests, `137` for a killed run
+  published with `--exit-code 137`), and `outcome.json` records the publication as `failed`.
+  For a run that passed, or whose code nobody recorded, a store that cannot be used at all
+  (no credentials, not writable, authentication refused) is `3`, as it is at `verify`'s
+  preflight, and an upload that fails partway is `5`.
+- A run is published to one destination. Publishing it there again does nothing; naming a
+  different destination is refused with `2`, and nothing is sent.
+- A line of `results.jsonl` that is not a result, or an `outcome.json` that is not an outcome,
+  is invalid input, `2`, with the file named. A run that died before recording its verdict is
+  still published, and the notification is still sent: the lines that could not be read are
+  left out of the counts and listed in `outcome.json` under `verification.unreadable_results`.
+- `llmdv compare` exits `3` when the archive cannot be read: see
+  [docs/compare.md](compare.md#exit-codes).
+- Ctrl-C exits `6` in every command.
+
 A local connection lost mid-run is the environment too, on one piece of evidence only: the local
 port itself refuses connections. When a request to an ingress on `localhost`, `127.0.0.1` or
 `[::1]` fails before any response (refused, a connect timeout, a reset, or closed with nothing
@@ -248,8 +266,8 @@ runs/<utc-timestamp>/            # echoed in the banner and the summary
 
 `llmdv compare`, `analyze`, `publish` and `job` read `results.jsonl` records written as
 `llmdv.results/1`, which grows only by optional fields, so older and newer runs compare as one
-history. A record under any other schema is refused, with the file and line named, rather than
-read as something it may not be.
+history. A record under any other schema, and a line that is valid JSON but not a result, is
+refused, with the file and line named, rather than read as something it may not be.
 
 The run directory is created before the profile is read, so an invalid profile, a failed
 preflight and an interrupted run leave the same bundle, with `outcome.json` saying which.

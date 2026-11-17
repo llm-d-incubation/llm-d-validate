@@ -3073,6 +3073,7 @@ class FakeS3(_Server):
         deny_once: tuple[str, ...] = (),
         bearer_tokens: tuple[str, ...] = (),
         deny_message: str = "denied",
+        deny_get: tuple[str, ...] = (),
     ) -> None:
         self.deny_after = deny_after
         # Refuse any key ending with one of these, and accept the rest.
@@ -3114,6 +3115,15 @@ class FakeS3(_Server):
                         (
                             '<ListBucketResult xmlns="http://s3.amazonaws.com/doc/2006-03-01/">'
                             f"<IsTruncated>false</IsTruncated>{contents}</ListBucketResult>"
+                        ).encode(),
+                    )
+                if any(key.endswith(suffix) for suffix in deny_get):
+                    # Listing is allowed and reading an object is not: a list-only credential.
+                    return self._reply(
+                        403,
+                        (
+                            "<Error><Code>AccessDenied</Code>"
+                            f"<Message>{escape(deny_message)}</Message></Error>"
                         ).encode(),
                     )
                 if key not in store.objects:

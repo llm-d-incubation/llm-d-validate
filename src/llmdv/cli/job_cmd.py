@@ -23,7 +23,7 @@ from ..output.s3 import missing_credentials_reason
 from .compare_cmd import compare_run
 from .exit_codes import NOT_DELIVERED, OK, TEST_FAILURES, USAGE
 from .notify_cmd import WEBHOOK_ENV, notify_run
-from .publish_cmd import publish_run
+from .publish_cmd import publish_run, record_verdict
 
 log = get_logger("cli.job")
 
@@ -234,13 +234,19 @@ def cmd_job(args: argparse.Namespace) -> int:
         )
 
     body = outcome.read(run_dir)
-    if publication_skipped and body is not None and not tried_fallback:
-        body["publication"] = {
-            "status": PublicationStatus.SKIPPED,
-            "destination": requested_remote,
-            "reason": publication_skipped,
-        }
-        outcome.write_dict(run_dir, body)
+    if body is not None:
+        # A killed verify recorded no verdict. Publishing fills it in, but the verdict must not
+        # depend on there being somewhere to publish: the notification and the job log read it.
+        changed = record_verdict(run_dir, body, verify_code) is not None
+        if publication_skipped and not tried_fallback:
+            body["publication"] = {
+                "status": PublicationStatus.SKIPPED,
+                "destination": requested_remote,
+                "reason": publication_skipped,
+            }
+            changed = True
+        if changed:
+            outcome.write_dict(run_dir, body)
 
     notify_code = OK
     if (os.environ.get(WEBHOOK_ENV) or "").strip():
@@ -298,7 +304,8 @@ def _write_alert_feed(run_dir: Path, feed: dict) -> None:
 
 
 def _exit_code(verify_code: int, compare_code: int, publish_code: int, notify_code: int) -> int:
-    # A verification failure always wins. Verify's own NOT_DELIVERED (its upload failed) is
+    # A verification failure always wins, as it does in `llmdv publish`: the publish code is
+    # only ever asked whether it is OK. Verify's own NOT_DELIVERED (its upload failed) is
     # superseded by the fallback publish above, which always runs when results go anywhere.
     if verify_code not in (OK, NOT_DELIVERED):
         return verify_code

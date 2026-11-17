@@ -11,7 +11,7 @@ from typing import Any
 import httpx
 
 from . import __version__
-from .cli.exit_codes import class_of
+from .cli.exit_codes import CRASHED_MEANING, EXITS, MEANING, class_of
 
 TIMEOUT = 10.0
 MAX_ATTEMPTS = 4
@@ -19,15 +19,19 @@ MAX_ATTEMPTS = 4
 MAX_WAIT = 30.0
 MAX_FAILURES_SHOWN = 10
 
+# The status word for each exit class. What the code means is said in the exit table's own
+# words (cli/exit_codes.py), so the notification cannot drift from the manual.
 STATUS = {
-    "ok": ("PASSED", "all selected cases passed"),
-    "fleet": ("FAILED", "test failures"),
-    "environment": ("NOT RUN", "preflight failed, nothing was tested"),
-    "usage": ("NOT RUN", "bad usage or an invalid profile"),
-    "internal": ("ERROR", "llmdv failed internally"),
-    "interrupted": ("INTERRUPTED", "stopped before completion, results are partial"),
-    "crashed": ("CRASHED", "llmdv died before recording its outcome, results are partial"),
+    "ok": "PASSED",
+    "fleet": "FAILED",
+    "environment": "NOT RUN",
+    "usage": "NOT RUN",
+    "internal": "ERROR",
+    "interrupted": "INTERRUPTED",
+    "crashed": "CRASHED",
 }
+# An environment problem that struck after cases had run: a local connection lost mid-run.
+INCOMPLETE = "INCOMPLETE"
 
 
 class NotifyError(Exception):
@@ -39,6 +43,18 @@ def _escape(text: str) -> str:
     return text.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
 
 
+def _headline(klass: str | None, code: int | None, ran: bool = False) -> str:
+    """The status word and the table's meaning. A class that is missing or unknown is read from
+    the code, so a run that died without a verdict is crashed, never an llmdv defect."""
+    if klass not in STATUS:
+        klass = class_of(code)
+    meaning = MEANING.get(code) or next(
+        (text for name, text in EXITS.values() if name == klass), CRASHED_MEANING
+    )
+    status = INCOMPLETE if klass == "environment" and ran else STATUS[klass]
+    return f"{status}, {meaning} (exit {code})"
+
+
 def message(
     outcome: dict[str, Any] | None,
     exit_code: int | None = None,
@@ -46,25 +62,26 @@ def message(
 ) -> str:
     """The Slack text for a run: plain lines, no formatting."""
     if outcome is None:
-        status, meaning = STATUS[class_of(exit_code)]
         return (
-            f"llmdv: {status}, {meaning} (exit {exit_code})\n"
+            f"llmdv: {_headline(None, exit_code)}\n"
             "The run ended before recording an outcome, so no results are available. "
             "See the job log."
         )
 
     verification = outcome.get("verification") or {}
-    status, meaning = STATUS.get(verification.get("class") or "internal", STATUS["internal"])
+    code = verification.get("exit_code")
+    if code is None:
+        code = exit_code
+    counts = verification.get("counts") or {}
+    lost = outcome.get("connection_lost") or []
+    ran = bool(lost) or any(counts.values())
     profile = (outcome.get("profile") or {}).get("name") or "?"
-    lines = [
-        f"llmdv {_escape(profile)}: {status}, {meaning} (exit {verification.get('exit_code')})"
-    ]
+    lines = [f"llmdv {_escape(profile)}: {_headline(verification.get('class'), code, ran)}"]
 
     labels = outcome.get("labels") or {}
     if labels:
         lines.append(", ".join(f"{key}={_escape(value)}" for key, value in labels.items()))
 
-    counts = verification.get("counts") or {}
     if counts:
         skips = verification.get("skips") or {}
         skip_detail = ", ".join(f"{count} {name}" for name, count in sorted(skips.items()))
@@ -72,6 +89,13 @@ def message(
         lines.append(
             f"passed {counts.get('pass', 0)}, failed {failed}, skipped {counts.get('skip', 0)}"
             + (f" ({skip_detail})" if skip_detail else "")
+        )
+
+    for entry in lost:
+        lines.append(
+            f"- connection to {_escape(str(entry.get('ingress') or '?'))} lost at "
+            f"{_escape(str(entry.get('case_id') or '?'))} after {entry.get('cases_before', 0)} "
+            f"case(s); {entry.get('cases_skipped', 0)} later case(s) not run"
         )
 
     for problem in (outcome.get("preflight_problems") or [])[:3]:

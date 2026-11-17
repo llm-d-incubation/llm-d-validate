@@ -21,6 +21,7 @@ from ..compare.archive import (
     EmptyRun,
     InvalidRun,
     NoSuchRun,
+    UnsafeName,
     declaration_diff,
     list_runs,
     pick_pair,
@@ -154,14 +155,18 @@ def _compare_baselines(
     source: str, profile: str, chosen: list[str], after: list[dict]
 ) -> tuple[Delta, str]:
     """Discard unusable archived runs whole; tonight's results remain strict."""
-    history, errors = {}, {}
+    history, errors, unreadable = {}, {}, False
     for run_id in chosen:
         try:
             history[run_id] = require_records(read_results(source, profile, run_id), run_id)
-        except (InvalidRun, EmptyRun, NoSuchRun, OSError, UnicodeError) as exc:
+        except (InvalidRun, EmptyRun, NoSuchRun, ArchiveUnreadable) as exc:
             errors[run_id] = " ".join(scrub(str(exc)).split())
+            unreadable = unreadable or isinstance(exc, ArchiveUnreadable)
     if not history:
-        raise NoSuchRun("no usable baseline runs: " + "; ".join(errors.values()))
+        # One baseline the store would not hand over makes this the store's failure, not a
+        # statement about the runs.
+        kind = ArchiveUnreadable if unreadable else NoSuchRun
+        raise kind("no usable baseline runs: " + "; ".join(errors.values()))
     delta = compare_window(list(history.values()), after)
     delta.window_errors = errors
     delta.window_dropped += len(errors)
@@ -208,7 +213,7 @@ def run(args: argparse.Namespace) -> int:
         reason = missing_credentials(args.source)
         if reason is None:
             runs = list_runs(args.source, args.profile)
-    except UnsupportedRemote as exc:
+    except (UnsupportedRemote, UnsafeName) as exc:
         log.error("%s", exc)
         return USAGE
     except ArchiveUnreadable as exc:
@@ -233,10 +238,14 @@ def run(args: argparse.Namespace) -> int:
         after = require_records(read_results(args.source, args.profile, after_id), after_id)
         chosen = pick_window(runs, exclude=after_id, baseline=args.baseline, size=args.window)
         delta, before_id = _compare_baselines(args.source, args.profile, chosen, after)
-    except (NoSuchRun, EmptyRun, InvalidRun) as exc:
+    except (NoSuchRun, EmptyRun, InvalidRun, UnsafeName) as exc:
         # Not having a comparison is a usage answer, never a passing one.
         log.error("%s", exc)
         return USAGE
+    except ArchiveUnreadable as exc:
+        # A run that is there and cannot be read: the store or its permissions.
+        log.error("%s", exc)
+        return PREFLIGHT
 
     if delta.digest_changed:
         delta.profile_diff = declaration_diff(

@@ -78,7 +78,7 @@ def test_a_run_directory_is_read_through_a_torn_last_line(tmp_path):
     lines = [json.dumps(exchange()), json.dumps(exchange(fingerprint=NEW)), '{"ingress": "lit']
     (tmp_path / "exchanges.jsonl").write_text("\n".join(lines))
     (tmp_path / "results.jsonl").write_text(
-        json.dumps({"ingress": "litellm", "ingress_kind": "litellm"})
+        json.dumps({"outcome": "pass", "ingress": "litellm", "ingress_kind": "litellm"})
     )
     stack = stack_from_run(tmp_path)
     assert stack["litellm"]["system_fingerprint"] == {OLD: 1, NEW: 1}

@@ -38,7 +38,13 @@ def cmd_notify(args: argparse.Namespace) -> int:
     if getattr(args, "pytest_args", None):
         log.error("unrecognised arguments: %s", " ".join(args.pytest_args))
         return USAGE
-    return notify_run(args.run_dir, args.exit_code)
+    code = notify_run(args.run_dir, args.exit_code)
+    problem = outcome.malformed(args.run_dir)
+    if problem and code == OK:
+        # Sent all the same, as for a run that left no outcome; but the input was not one.
+        log.error("%s; the notification reports only the exit code", problem)
+        return USAGE
+    return code
 
 
 def notify_run(run_dir: Path, exit_code: int | None) -> int:

@@ -184,10 +184,11 @@ def known_summary(records: list[dict[str, Any]], entries: Iterable = ()) -> dict
     }
 
 
-def read_results(run_dir: Path) -> list[dict[str, Any]]:
+def read_results(run_dir: Path, refused: list[str] | None = None) -> list[dict[str, Any]]:
     """The records results.jsonl holds so far; a crashed run may have cut its last line short.
-    Raises UnreadableSchema for a record written under a results schema this llmdv cannot read."""
-    return results_file.read(Path(run_dir) / "results.jsonl")
+    Raises `results.read.Unreadable` for a line that is not a result or is written under a
+    results schema this llmdv cannot read; with `refused`, describes it there and leaves it out."""
+    return results_file.read(Path(run_dir) / "results.jsonl", refused)
 
 
 def write_dict(run_dir: Path, body: dict[str, Any]) -> None:
@@ -205,11 +206,55 @@ def write_dict(run_dir: Path, body: dict[str, Any]) -> None:
     os.replace(temporary, path)
 
 
-def read(run_dir: Path) -> dict[str, Any] | None:
-    """The outcome a run left behind, or None when there is none or it cannot be read."""
-    path = Path(run_dir) / FILENAME
+def _load(run_dir: Path) -> Any:
     try:
-        body = json.loads(path.read_text(encoding="utf-8"))
+        return json.loads((Path(run_dir) / FILENAME).read_text(encoding="utf-8"))
     except (OSError, ValueError):
         return None
-    return body if isinstance(body, dict) else None
+
+
+# The parts of an outcome every reader walks into, and the JSON type each must have.
+_MAPPINGS = ("profile", "labels", "verification", "publication")
+_VERIFICATION = {"counts": dict, "skips": dict, "failures": list}
+
+
+def _shape_problem(body: Any) -> str | None:
+    if not isinstance(body, dict):
+        return "it is not a JSON object"
+    for name in _MAPPINGS:
+        if body.get(name) is not None and not isinstance(body[name], dict):
+            return f"`{name}` is not an object"
+    verification = body.get("verification") or {}
+    for name, kind in _VERIFICATION.items():
+        if verification.get(name) is not None and not isinstance(verification[name], kind):
+            return f"`verification.{name}` is not {'an object' if kind is dict else 'a list'}"
+    if not all(isinstance(failure, dict) for failure in verification.get("failures") or []):
+        return "`verification.failures` holds an entry that is not an object"
+    lost = body.get("connection_lost")
+    if lost is not None and not (
+        isinstance(lost, list) and all(isinstance(entry, dict) for entry in lost)
+    ):
+        return "`connection_lost` is not a list of objects"
+    problems = body.get("preflight_problems")
+    if problems is not None and not (
+        isinstance(problems, list) and all(isinstance(problem, str) for problem in problems)
+    ):
+        return "`preflight_problems` is not a list of strings"
+    return None
+
+
+def malformed(run_dir: Path) -> str | None:
+    """Why outcome.json is valid JSON yet not an outcome, naming the file; None when it is one,
+    is missing, or was cut short (a killed run, which is not the reader's mistake)."""
+    body = _load(run_dir)
+    if body is None:
+        return None
+    problem = _shape_problem(body)
+    return f"{Path(run_dir) / FILENAME} is not a usable outcome: {problem}" if problem else None
+
+
+def read(run_dir: Path) -> dict[str, Any] | None:
+    """The outcome a run left behind, or None when there is none or it cannot be read: missing,
+    cut short, or not shaped as an outcome (`malformed` says why)."""
+    body = _load(run_dir)
+    return body if _shape_problem(body) is None else None

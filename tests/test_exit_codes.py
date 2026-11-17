@@ -3,8 +3,11 @@ from exit_codes."""
 
 from __future__ import annotations
 
+import importlib.util
 import itertools
+import json
 import re
+import sys
 
 import pytest
 
@@ -59,6 +62,45 @@ def test_the_dashboard_names_codes_as_exit_codes_does():
     assert dashboard.EXIT_MEANING == {
         code: (exit_codes.class_of(code), meaning) for code, meaning in exit_codes.MEANING.items()
     }
+
+
+def live_summary():
+    """The CI job summary script, which must run where llmdv is not installed."""
+    path = SRC.parent / ".github" / "scripts" / "live_summary.py"
+    spec = importlib.util.spec_from_file_location("live_summary", path)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def test_the_ci_job_summary_keeps_its_copy_of_the_meanings_equal_to_the_table():
+    assert live_summary().MEANING == exit_codes.MEANING
+
+
+def test_the_ci_job_summary_says_what_ran_before_a_connection_was_lost(
+    tmp_path, monkeypatch, capsys
+):
+    body = {
+        "run_id": "r",
+        "verification": {"exit_code": 3, "class": "environment", "counts": {"pass": 2, "error": 1}},
+        "connection_lost": [{"ingress": "gateway", "cases_before": 2, "cases_skipped": 4}],
+    }
+    (tmp_path / "outcome.json").write_text(json.dumps(body))
+    monkeypatch.setattr(sys, "argv", ["live_summary.py", str(tmp_path), "--code", "3"])
+    assert live_summary().main() == 0
+    out = capsys.readouterr().out
+    assert exit_codes.MEANING[3] in out
+    assert "2 passed, 1 failed, 0 skipped" in out
+    assert (
+        "local connection to `gateway` was lost after 2 case(s); 4 later case(s) were not run"
+        in out
+    )
+
+    # A preflight failure ran nothing, and the summary does not suggest otherwise.
+    body = {"run_id": "r", "verification": {"exit_code": 3, "class": "environment", "counts": {}}}
+    (tmp_path / "outcome.json").write_text(json.dumps(body))
+    assert live_summary().main() == 0
+    assert "What ran" not in capsys.readouterr().out
 
 
 # ----------------------------------------------------------------- llmdv job's precedence

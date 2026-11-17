@@ -231,11 +231,11 @@ def test_the_run_budget_stops_the_run_and_still_publishes_it(tmp_path):
     assert slack.received[0]["text"].startswith("llmdv fake: INTERRUPTED")
 
 
-def start_slow_job(tmp_path, fleet, store, slack):
+def start_slow_job(tmp_path, fleet, store, slack, env=None):
     process = subprocess.Popen(  # noqa: S603 - fixed interpreter and args
         job_command(tmp_path, fleet, "-k", "unhappy"),
         cwd=SRC.parent,
-        env=job_env(store, slack),
+        env=job_env(store, slack) if env is None else env,
         stdout=subprocess.DEVNULL,
         stderr=subprocess.DEVNULL,
     )
@@ -293,6 +293,29 @@ def test_a_killed_verify_is_still_published_and_notified_as_crashed(tmp_path):
     assert outcome_of(tmp_path)["verification"]["class"] == "crashed"
     assert len(manifests(store)) == 1
     assert slack.received[0]["text"].startswith("llmdv fake: CRASHED")
+
+
+@pytest.mark.skipif(shutil.which("pgrep") is None, reason="needs pgrep to find the child")
+def test_a_killed_verify_is_recorded_and_notified_as_crashed_with_nowhere_to_publish(tmp_path):
+    """The verdict does not depend on publication: it is recorded without credentials too."""
+    with FakeFleet(delay_s=1.0) as fleet, FakeS3() as store, FakeSlack() as slack:
+        env = without_aws_credentials(job_env(store, slack))
+        process = start_slow_job(tmp_path, fleet, store, slack, env=env)
+        child = subprocess.run(  # noqa: S603, S607 - fixed command
+            ["pgrep", "-P", str(process.pid)], capture_output=True, text=True
+        ).stdout.split()[0]
+        subprocess.run(["kill", "-9", child], check=True)  # noqa: S603, S607
+        code = process.wait(timeout=60)
+
+    assert code == 137
+    outcome = outcome_of(tmp_path)
+    assert outcome["verification"]["exit_code"] == 137
+    assert outcome["verification"]["class"] == "crashed"
+    assert sum(outcome["verification"]["counts"].values()) >= 1
+    assert outcome["publication"]["status"] == "skipped"
+    assert store.order == []
+    assert slack.received[0]["text"].startswith("llmdv fake: CRASHED")
+    assert "(exit 137)" in slack.received[0]["text"]
 
 
 @pytest.mark.parametrize("arg", ["--local-output=/tmp/x", "--local", "--remote=s3://b/p"])

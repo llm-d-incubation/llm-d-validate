@@ -83,8 +83,10 @@ def missing_credentials_reason() -> str | None:
 
 def sdk_errors() -> tuple[type[Exception], ...]:
     """What the S3 SDKs raise for a store that cannot be used: unreachable, refusing the
-    request, or without credentials. Empty when neither SDK is installed."""
-    errors: list[type[Exception]] = []
+    request, or without credentials -- and what our IBM IAM sign-in raises for the same."""
+    from .ibm_cos import AuthenticationFailed
+
+    errors: list[type[Exception]] = [AuthenticationFailed]
     for module in ("botocore.exceptions", "ibm_botocore.exceptions"):
         try:
             exceptions = importlib.import_module(module)

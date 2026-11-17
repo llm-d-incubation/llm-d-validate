@@ -29,14 +29,24 @@ import sys
 from pathlib import Path
 from urllib.parse import urlsplit
 
+# What each exit code means, word for word as llmdv's own table has it (src/llmdv/cli/
+# exit_codes.py). A copy, because this script must also run where llmdv is not installed;
+# tests/test_exit_codes.py keeps the two equal.
 MEANING = {
-    0: "every selected case passed",
-    1: "the gateway failed cases: findings for triage",
-    2: "usage or profile error",
-    3: "preflight failed: gateway, key or bucket unreachable; nothing was tested",
-    4: "llmdv defect",
-    5: "verification passed but the run was not published",
-    6: "interrupted; what finished is kept",
+    0: "every selected case passed (skips do not fail a run)",
+    1: "test failures: the fleet did not behave as the profile declares",
+    2: "bad usage, or an invalid profile; nothing was verified",
+    3: (
+        "your environment, not the fleet: preflight unsatisfied (nothing was tested), "
+        "a local connection lost mid-run with no fleet failure, "
+        "or a results store that cannot be used as configured"
+    ),
+    4: "an internal error: a defect in llmdv itself",
+    5: "verification passed, but results or the notification were not delivered",
+    6: (
+        "stopped by SIGINT or SIGTERM, e.g. a run budget or a pod being stopped; "
+        "what finished is kept and published"
+    ),
 }
 MAX_GROUPS = 12
 # The results schemas this summary reads, the same majors llmdv's own readers accept.
@@ -112,6 +122,24 @@ def read_results(run: Path) -> list[dict]:
     return records
 
 
+def what_ran(outcome: dict, code, passed: int, failed: int, skipped: int) -> list[str]:
+    """For an environment exit that came after cases had run, say so: exit 3 is also what a
+    preflight failure returns, and that one tested nothing."""
+    lost = [entry for entry in outcome.get("connection_lost") or [] if isinstance(entry, dict)]
+    if code != 3 or not (lost or passed or failed or skipped):
+        return []
+    lines = [
+        f"What ran before the run stopped: {passed} passed, {failed} failed, {skipped} skipped."
+    ]
+    for entry in lost:
+        lines.append(
+            f"The local connection to `{entry.get('ingress') or '?'}` was lost after "
+            f"{entry.get('cases_before', 0)} case(s); {entry.get('cases_skipped', 0)} later "
+            "case(s) were not run."
+        )
+    return [" ".join(lines), ""]
+
+
 def failure_groups(run: Path) -> list[dict]:
     """The same groups `llmdv analyze` prints; empty if llmdv cannot be imported."""
     try:
@@ -166,6 +194,7 @@ def main() -> int:
     out += [
         f"{verdict}: {MEANING.get(code, 'no exit code recorded')}",
         "",
+        *what_ran(outcome, code, passed, failed, skipped),
         "| Run | Started | Gateway | Folder | Passed | Failed | Skipped |",
         "| --- | --- | --- | --- | ---: | ---: | ---: |",
         (

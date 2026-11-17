@@ -13,6 +13,10 @@ INSTANCE_ENV = "IBM_COS_SERVICE_INSTANCE_ID"
 AUTH_ENDPOINT = "https://iam.cloud.ibm.com/identity/token"
 
 
+class AuthenticationFailed(RuntimeError):
+    """IAM refused the API key or could not be reached. The message is already scrubbed."""
+
+
 def _register_secrets(values: list[str]) -> None:
     # IAM sends form-encoded credentials; errors can echo either representation.
     redact.install_secrets(values + [quote_plus(value) for value in values])
@@ -68,7 +72,9 @@ def create_client(patience=None):
         try:
             data = authenticate()
         except Exception as exc:
-            raise RuntimeError(f"IBM IAM authentication failed: {redact.scrub(str(exc))}") from None
+            raise AuthenticationFailed(
+                f"IBM IAM authentication failed: {redact.scrub(str(exc))}"
+            ) from None
         _register_secrets([data.get("access_token", ""), data.get("refresh_token", "")])
         return data
 

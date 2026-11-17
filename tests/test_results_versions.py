@@ -22,7 +22,7 @@ from pathlib import Path
 
 import pytest
 
-from llmdv.cli import publish_cmd, verify_cmd
+from llmdv.cli import verify_cmd
 from llmdv.cli.exit_codes import USAGE
 from llmdv.cli.main import main
 from llmdv.compare import archive
@@ -320,13 +320,15 @@ def test_compare_refuses_an_unknown_major_naming_the_run_file(tmp_path):
     assert main(["compare", "--from", uri, "--profile", "p"]) == USAGE
 
 
-def test_analyze_and_publish_refuse_an_unknown_major(tmp_path):
+def test_analyze_refuses_an_unknown_major_and_publish_reports_it(tmp_path):
     run = run_dir(tmp_path, "v3", unknown(v1_records()))
     assert main(["analyze", str(run)]) == USAGE
     assert not (run / "dashboard.html").exists()
     (run / "outcome.json").unlink()  # a crashed run: publish rebuilds its outcome from results
-    assert publish_cmd.publish_run(run, f"file://{tmp_path / 'store'}", 137) == USAGE
-    assert not (tmp_path / "store").exists()
+    # Its evidence still goes out; the lines it cannot read are named and the command exits 2.
+    store = tmp_path / "store"
+    assert main(["publish", str(run), "--remote-output", f"file://{store}"]) == USAGE
+    assert list(store.rglob("MANIFEST.json"))
 
 
 def test_the_ci_job_summary_names_an_unknown_major_instead_of_counting_it(

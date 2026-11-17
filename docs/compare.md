@@ -76,8 +76,8 @@ fleets. Internal service names are never recorded. `comparison.json` carries the
 | --- | --- |
 | `0` | no regression, or `--no-fail` |
 | `1` | a case that passed now fails |
-| `2` | no usable baseline, a single run, the latest run has empty or malformed results, or `--from` names a scheme or store setup that can never work |
-| `3` | the archive cannot be read: no store credentials, or the store refuses or cannot be reached |
+| `2` | no usable baseline, a single run, the latest run has empty or malformed results, a profile name or run id that is not a single path segment, or `--from` names a scheme or store setup that can never work |
+| `3` | the archive cannot be read: no store credentials, the store or its sign-in refuses or cannot be reached, or a run's results are there but unreadable (permissions, or not UTF-8 text) |
 
 A comparison against nothing is never a clean bill of health, so a first run or a mistyped
 profile name exits `2`, never `0`.

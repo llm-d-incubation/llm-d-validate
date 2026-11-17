@@ -53,14 +53,20 @@ EXITS = {
 }
 CLASS = {code: name for code, (name, _) in EXITS.items()}
 MEANING = {code: meaning for code, (_, meaning) in EXITS.items()}
-# The class of a code llmdv never returns itself.
+# The class of a code llmdv never returns itself, and what such a code means.
 CRASHED = "crashed"
+CRASHED_MEANING = "llmdv died before recording its outcome; results are partial"
 
 
 def class_of(code: int | None) -> str:
     """The class for an exit code. Anything llmdv never returns itself -- 137 after an OOM kill,
     say -- means the process died before it could record how the run ended."""
     return CLASS.get(code, CRASHED) if code is not None else CRASHED
+
+
+def meaning_of(code: int | None) -> str:
+    """What an exit code means, in the table's words."""
+    return MEANING.get(code, CRASHED_MEANING) if code is not None else CRASHED_MEANING
 
 
 def epilog() -> str:

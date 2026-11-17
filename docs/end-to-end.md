@@ -185,7 +185,7 @@ an issue, use [`filing-a-fleet-finding`](../.agents/skills/filing-a-fleet-findin
 | `aws` asks for credentials, or says access denied | the credentials file was sourced without `set -a`, so nothing was exported |
 | `InvalidAccessKeyId` or `NoSuchBucket` | the store is S3-compatible and `--endpoint-url` (or `AWS_ENDPOINT_URL_S3`) is missing |
 | `llmdv compare --list` finds no runs | wrong prefix, or the profile *path* was given instead of its name; or the run has not finished publishing |
-| exit `3` | the gateway, a key or the bucket was unreachable; nothing was tested |
+| exit `3` | the gateway, a key or the bucket was unreachable at preflight, so nothing was tested; or a local port-forward died mid-run, and the summary says what ran before it |
 | a run is not in the bucket after exit `0` | look for exit `5`: the upload failed, and the log says why |
 | `trigger.sh` is refused | the caller lacks the `llmdv-trigger` Role, or `--profile-file` is not an in-cluster profile (`vantage: in-cluster`) |
 | many timeouts in a run from your machine | the machine slept, or another live run hit the same gateway at the same time |
