@@ -29,7 +29,7 @@ extends:
   - ../parts/topology/standalone.yaml
   - ../parts/engines/sglang.yaml
   - ../parts/models/qwen3-32b-parsers.yaml
-  - ../parts/guides/optimized-baseline.yaml
+  - parts/common.yaml
 
 name: optimized-baseline-sglang-qwen3-32b-parsers-standalone
 

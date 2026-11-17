@@ -1,8 +1,8 @@
 # Part: what every llm-d guide's stack shares, whatever the engine, the model or the topology.
 # Not a profile on its own: it declares no ingress and no model. A combination file under
 # profiles/llm-d/<guide>/ lists it first in `extends`, then a topology part, an engine part, a
-# model part and the guide part. A part never extends anything, so no file is reached by two
-# routes. See profiles/llm-d/README.md.
+# model part and the guide's own parts/common.yaml. A part never extends anything, so no file is
+# reached by two routes. See profiles/llm-d/README.md.
 #
 # Everything here is either an API's own definition (INTENT) or a fact of the llm-d stack that
 # does not depend on the engine. Engine extensions (vLLM's request fields and options) are in
@@ -249,8 +249,8 @@ capabilities:
   # INTENT: a published beta value is accepted.
   anthropic_betas: ["prompt-caching-2024-07-31"]
 
-  # INTENT: every scenario. long_context and inline_system need cache_reuse, which the guide part
-  # decides; parallel_subagents and long_context are disruptive, allowed by `dedicated`.
+  # INTENT: every scenario. long_context and inline_system need cache_reuse, which the guide's
+  # common part decides; parallel_subagents and long_context are disruptive, allowed by `dedicated`.
   scenario_checks: [blank_turns, cache_hints, inline_system, long_context, output_overflow, parallel_subagents]
 
   # INTENT: names a coding agent sends by default must be refused as unknown models, never served

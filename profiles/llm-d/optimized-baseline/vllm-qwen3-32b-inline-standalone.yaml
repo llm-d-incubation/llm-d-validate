@@ -31,7 +31,7 @@ extends:
   - ../parts/topology/standalone.yaml
   - ../parts/engines/vllm.yaml
   - ../parts/models/qwen3-32b-inline.yaml
-  - ../parts/guides/optimized-baseline.yaml
+  - parts/common.yaml
 
 name: optimized-baseline-vllm-qwen3-32b-inline-standalone
 

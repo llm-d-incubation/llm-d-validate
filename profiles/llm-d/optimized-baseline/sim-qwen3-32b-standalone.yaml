@@ -25,7 +25,7 @@ extends:
   - ../parts/base.yaml
   - ../parts/topology/standalone.yaml
   - ../parts/models/qwen3-32b-sim.yaml
-  - ../parts/guides/optimized-baseline.yaml
+  - parts/common.yaml
 
 name: optimized-baseline-sim-qwen3-32b-standalone
 
