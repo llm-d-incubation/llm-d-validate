@@ -70,7 +70,7 @@ To combine independent parts, list them. Each is merged over the ones before it,
 extends: [../base.yaml, ../engines/vllm.yaml, ../gateways/none.yaml, ../guides/optimized-baseline.yaml]
 ```
 
-Mappings merge, lists and other values replace, `null` clears a value, and ingresses are keyed by `id`, so they merge like mappings; [REFERENCE.md](REFERENCE.md#extends) has the rules. `llmdv profile show` and `llmdv profile validate` check the composed result, and a run's `profile.used.yaml` holds it whole, with a comment naming the file that set each key.
+Mappings merge, lists and other values replace, `null` clears a value, and ingresses are keyed by `id`, so they merge like mappings; [REFERENCE.md](REFERENCE.md#extends) has the rules. A `name` is not inherited: a file that sets none is named after itself. `llmdv profile show` and `llmdv profile validate` check the composed result, and a run's `profile.used.yaml` holds it whole, with a comment naming the file that set each key.
 
 ## The minimum
 

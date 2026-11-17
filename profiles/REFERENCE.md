@@ -8,7 +8,8 @@ Conventions:
 - Booleans and `model` values are parsed strictly: `"false"` is not `false`, `max_model_len: "8192"` is an error, and a numeric model id must be quoted.
 - A list in an enumerated field rejects unknown values. The capability vocabularies (efforts,
   thinking, checks, sessions, options, repeats, `byte_fidelity`) also reject repeats.
-- Unknown keys in a per-ingress override, in `cache_reuse` and in `transport` are errors.
+- Unknown keys at the top level, in a per-ingress override, in `cache_reuse` and in `transport` are errors. The top-level keys are the table below and [`extends`](#extends); the error names the file and the closest known key.
+- A profile file is UTF-8 text.
 
 `tests/test_profile_reference.py` checks that every table below matches the schema in `src/llmdv/profile/schema.py`.
 
@@ -17,7 +18,7 @@ Conventions:
 | Key | Type | Default | Meaning |
 | --- | --- | --- | --- |
 | `schema` | string | `llmdv.profile/1` | Schema version. Any other value is an error. |
-| `name` | string | the file name, without `.yaml` | Profile name, shown in output and `results.jsonl`. |
+| `name` | string | the file name, without `.yaml` | Profile name, shown in output and `results.jsonl`. Never inherited through [`extends`](#extends). |
 | `vantage` | `external` \| `in-cluster` | `external` | Where the client ran, relative to the cluster. `external` covers a laptop, a CI runner or a jump host; what drove the run goes in `--label`. `laptop` is read as `external`. |
 | `environment` | mapping | none | Cluster coordinates for read-only lookups. See [environment](#environment). |
 | `model` | mapping | **required** | The model the fleet serves. See [model](#model). |
@@ -31,7 +32,7 @@ Conventions:
 
 ## extends
 
-`extends: <path>` makes a profile a set of changes to another one, its parent. The path is relative to the file that names it. `extends` may instead be a non-empty list of paths, to combine independent parts such as an engine, a gateway and a guide. A parent may extend further parents, by a path or a list.
+`extends: <path>` makes a profile a set of changes to another one, its parent. The path is relative to the file that names it, as that file was named: a symbolic link is not followed first. `extends` may instead be a non-empty list of paths, to combine independent parts such as an engine, a gateway and a guide. A parent may extend further parents, by a path or a list.
 
 The files form one sequence, resolved depth first: a parent's own parents come before it, list entries left to right, and the file itself comes last. `extends: x.yaml` and `extends: [x.yaml]` mean the same.
 
@@ -40,9 +41,16 @@ The loaded profile is each file of that sequence merged over everything before i
 - A mapping merges key by key, so a child names only what it changes.
 - A list, or any other value, replaces the parent's.
 - `null` clears the parent's value.
-- `ingresses` is keyed by `id`, as every error path names it (`ingresses[0](engine)`), so it merges like a mapping: a child entry merges over the parent's entry with the same `id` by the rules above, and an entry with a new `id` is added after the parent's. A child cannot remove an inherited ingress; select columns with `-k` instead.
+- `ingresses` is keyed by `id`, as every error path names it (`ingresses[0](engine)`), so it merges like a mapping: a child entry merges over the parent's entry with the same `id` by the rules above, and an entry with a new `id` is added after the parent's. A child cannot remove an inherited ingress, so `ingresses: null` in a child is an error; select columns with `-k` instead.
 
-The composed profile is what is validated, digested and written to `profile.used.yaml`, with a comment block naming the file that set each key. A problem is reported against the file that set the value at fault. A missing parent, a chain that leads back to a file already in it, a file reached by two routes, an empty list, or a list that names a file twice is an invalid profile (exit 2), and the error names the entry, such as `extends[1]`.
+Two values are not merged, because they depend on which file is which:
+
+- `name` is never inherited. A profile's name is the `name` in the file that was loaded, or else that file's name, whatever its parents declare, so two profiles never share a name by accident.
+- A relative client `executable` resolves against the folder of the file that declares it.
+
+Each file is checked on its own before it is merged: an unknown top-level key, an ingress with no `id`, or an `id` named twice in one file's `ingresses` is an error in that file.
+
+The composed profile is what is validated, digested and written to `profile.used.yaml`, with a comment block naming the file that set each key. That file stands on its own: it holds the name and each client executable as an absolute path, so a run from it loads the same profile and records the same digest. A problem, at load or from validation, is reported against the file that set the value at fault. A missing parent, a chain that leads back to a file already in it, a file reached by two routes, an `extends` with no value, an empty list, or a list that names a file twice is an invalid profile (exit 2), and the error names the entry, such as `extends[1]`.
 
 ## environment
 
@@ -96,7 +104,7 @@ One entry per addressable layer. One ingress is a complete profile; each further
 
 | Key | Type | Default | Meaning |
 | --- | --- | --- | --- |
-| `id` | string | none | Short, unique name. It becomes the pytest parameter id, so `-k <id>` selects one column. |
+| `id` | string | **required** | Short, unique name: letters, digits, `.`, `_` and `-`, starting with a letter or a digit. It becomes the pytest parameter id, so `-k <id>` selects one column. |
 | `kind` | `vllm` \| `llmd_router` \| `litellm` | `vllm` | Selects the adapter. In reports it also orders the layers outermost first: `litellm`, `llmd_router`, `vllm`. Two ingresses of one kind are peers: reports never compare them with each other. |
 | `base_url` | string | **required** unless `base_url_env` is set | Must start with `http://` or `https://`. |
 | `base_url_env` | string | none | Environment variable holding the URL. A committed profile uses it so no hostname enters the repository. Declaring both is an error; an unset variable fails preflight. |
@@ -446,7 +454,7 @@ A real consumer and what it depends on. `--client <id>` selects the relevant cas
 | Key | Type | Default | Meaning |
 | --- | --- | --- | --- |
 | `version` | string | **required** | Exact version, `2.1.0` or newer, quoted. Distinct within a client. |
-| `executable` | path | **required** | Path to the binary; relative paths resolve against the profile's folder. |
+| `executable` | path | **required** | Path to the binary; a relative path resolves against the folder of the file that declares it. |
 
 ### Claude Code clients
 
@@ -510,7 +518,7 @@ What a run reports:
 - `verdict.txt` in a failure bundle, `alerts.json` and the dashboard's failure groups carry the
   label too, so a reader who starts anywhere learns the failure is filed.
 
-Editing this block, or a comment, does not change the profile digest. Only declarations do, so a
+Editing this block, a comment, or the path of a client `executable` does not change the profile digest. Only declarations do, so a
 comparison window is not dropped each time a finding is filed.
 
 ## fleet

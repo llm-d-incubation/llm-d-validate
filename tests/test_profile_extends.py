@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import random
 from dataclasses import replace
 from functools import reduce
@@ -11,7 +12,7 @@ import pytest
 import yaml
 
 from llmdv.profile import compose, loader
-from tests.fakes import run_llmdv
+from tests.fakes import FakeFleet, profile_yaml, run_llmdv
 
 PARENT = {
     "schema": "llmdv.profile/1",
@@ -92,7 +93,7 @@ def test_a_chain_of_three_resolves_root_first_and_relative_to_each_file(tmp_path
     assert profile.model.public_id == "org/other"
     assert profile.model.aliases == ("a",)
     assert profile.model.reasoning.parser == "deepseek_r1"
-    assert profile.name == "shared"
+    assert profile.name == "leaf"  # its own file's: a name is not inherited
 
 
 def test_a_cycle_is_refused_naming_the_chain(tmp_path):
@@ -115,7 +116,7 @@ def test_a_missing_parent_names_the_child_the_key_and_the_resolved_path(tmp_path
     assert str(exc.value) == expected
 
 
-@pytest.mark.parametrize("value", [3, "", [], {"a": "shared.yaml"}])
+@pytest.mark.parametrize("value", [3, "", [], {"a": "shared.yaml"}, None, False])
 def test_extends_must_name_a_file_or_a_list_of_them(tmp_path, value):
     child = write(tmp_path / "local.yaml", {"extends": value})
     with pytest.raises(loader.ProfileError, match="extends: expected the path of a parent"):
@@ -159,7 +160,7 @@ def test_the_composed_profile_is_written_whole_with_where_each_key_was_set(tmp_p
         "#   local.yaml",
         "# Where each key was set:",
         "#   schema: shared.yaml",
-        "#   name: shared.yaml",
+        "#   name: (file name)",
         "#   model: shared.yaml, local.yaml",
         "#   capabilities: shared.yaml",
         "#   ingresses: shared.yaml, local.yaml",
@@ -189,7 +190,7 @@ def test_a_name_left_to_the_file_name_is_kept_in_the_composed_record(tmp_path):
 
 def test_verify_writes_the_composed_profile_into_the_run_directory(tmp_path):
     """Written even when the profile is refused, as a single file is copied."""
-    path = child_of(tmp_path, {"ingresses": None})
+    path = child_of(tmp_path, {"schema": "llmdv.profile/0"})
     run_dir = tmp_path / "run"
     result = run_llmdv("verify", "--profile", str(path), "--local-output", str(run_dir))
     assert result.returncode == 2, result.stderr
@@ -199,7 +200,8 @@ def test_verify_writes_the_composed_profile_into_the_run_directory(tmp_path):
 def test_the_digest_covers_the_composed_declarations(tmp_path):
     path = child_of(tmp_path, {"model": {"max_model_len": 4096}})
     same = write(
-        tmp_path / "flat.yaml", {**PARENT, "model": {**PARENT["model"], "max_model_len": 4096}}
+        tmp_path / "flat.yaml",
+        {**PARENT, "name": "local", "model": {**PARENT["model"], "max_model_len": 4096}},
     )
     assert loader.contract_digest(path) == loader.contract_digest(same)
     assert loader.contract_digest(path) != loader.contract_digest(tmp_path / "shared.yaml")
@@ -212,7 +214,7 @@ def test_the_digest_covers_the_composed_declarations(tmp_path):
 
 def test_a_list_of_one_composes_as_the_single_path(tmp_path):
     write(tmp_path / "shared.yaml", PARENT)
-    child = {"model": {"max_model_len": 4096}, "ingresses": [{"id": "engine", "tls": {}}]}
+    child = {"name": "one", "model": {"max_model_len": 4096}}
     single = write(tmp_path / "single.yaml", {"extends": "shared.yaml", **child})
     listed = write(tmp_path / "listed.yaml", {"extends": ["shared.yaml"], **child})
     assert compose.layers(listed)[0] == compose.layers(single)[0]
@@ -232,7 +234,7 @@ def test_a_list_merges_left_to_right_and_the_file_last(tmp_path):
     )
     profile = loader.load(leaf)
     assert profile.model.max_model_len == 2
-    assert profile.name == "small"
+    assert profile.name == "leaf"
     assert profile.model.public_id == "org/model"
     write(leaf, {"extends": ["../base.yaml", "../guides/small.yaml", "../engines/vllm.yaml"]})
     assert loader.load(leaf).model.max_model_len == 1
@@ -337,6 +339,286 @@ def test_the_composed_record_lists_every_file_in_the_order_it_merged(tmp_path):
 
 def _with_source(profile, path):
     return replace(profile, source_path=path)
+
+
+# ------------------------------------------------------------------- what one file may hold
+
+
+@pytest.mark.parametrize("extends", [{"extends": "shared.yaml"}, {}])
+def test_an_ingress_id_named_twice_in_one_file_is_refused_before_composing(tmp_path, extends):
+    """Composing merges entries by id, so a repeat would otherwise fold into one ingress."""
+    write(tmp_path / "shared.yaml", PARENT)
+    twice = [
+        {"id": "extra", "base_url": "http://localhost:7", "surfaces": ["chat_completions"]},
+        {"id": "extra", "base_url": "http://localhost:8"},
+    ]
+    document = {**extends, "name": "twice", "model": {"public_id": "m"}, "ingresses": twice}
+    path = write(tmp_path / "local.yaml", document)
+    with pytest.raises(loader.ProfileError) as exc:
+        loader.load(path)
+    assert str(exc.value) == f"{path}: ingresses[1](extra): duplicate ingress id 'extra'"
+    result = run_llmdv("profile", "validate", str(path))
+    assert result.returncode == 2, result.stderr
+
+
+def test_an_ingress_id_named_twice_in_a_parent_names_the_parent(tmp_path):
+    parent = {**PARENT, "ingresses": [PARENT["ingresses"][0], PARENT["ingresses"][0]]}
+    path = child_of(tmp_path, {"name": "local"}, parent)
+    with pytest.raises(loader.ProfileError) as exc:
+        loader.load(path)
+    assert str(exc.value) == (
+        f"{tmp_path / 'shared.yaml'}: ingresses[1](gateway): duplicate ingress id 'gateway'"
+    )
+
+
+@pytest.mark.parametrize("extends", [{"extends": "shared.yaml"}, {}])
+@pytest.mark.parametrize(
+    ("entry", "message"),
+    [
+        ({"base_url": "http://localhost:7"}, "ingresses[0].id: required"),
+        ({"id": "", "base_url": "http://localhost:7"}, "ingresses[0].id: expected a name"),
+        ({"id": 1, "base_url": "http://localhost:7"}, "ingresses[0].id: expected a name"),
+        ({"id": "x\ny: 1", "base_url": "http://localhost:7"}, "ingresses[0].id: expected a name"),
+        ({"id": "a b", "base_url": "http://localhost:7"}, "ingresses[0].id: expected a name"),
+        ({"id": "a)b", "base_url": "http://localhost:7"}, "ingresses[0].id: expected a name"),
+    ],
+)
+def test_an_ingress_needs_an_id_that_is_a_plain_name(tmp_path, extends, entry, message):
+    """An id keys the merge and becomes a pytest id, a column and a file name."""
+    write(tmp_path / "shared.yaml", PARENT)
+    document = {**extends, "name": "odd", "model": {"public_id": "m"}, "ingresses": [entry]}
+    path = write(tmp_path / "local.yaml", document)
+    with pytest.raises(loader.ProfileError) as exc:
+        loader.load(path)
+    assert str(exc.value).startswith(f"{path}: {message}")
+    assert loader.composed_text(path) is None
+
+
+def test_a_child_cannot_remove_the_inherited_ingresses_with_null(tmp_path):
+    path = child_of(tmp_path, {"ingresses": None})
+    with pytest.raises(loader.ProfileError) as exc:
+        loader.load(path)
+    assert str(exc.value).startswith(f"{path}: ingresses: null would remove every inherited")
+    result = run_llmdv("profile", "validate", str(path))
+    assert result.returncode == 2, result.stderr
+
+
+@pytest.mark.parametrize(
+    "document",
+    [
+        {"extend": "shared.yaml", "name": "typo", "model": {"public_id": "m"}},
+        {"extends": "shared.yaml", "modle": {"public_id": "other"}},
+        {"extends": "shared.yaml", "ingress": [{"id": "new"}]},
+    ],
+)
+def test_an_unknown_top_level_key_is_refused_naming_the_file_and_the_closest_key(
+    tmp_path, document
+):
+    """`extend:` would otherwise run the profile without its parent."""
+    write(tmp_path / "shared.yaml", PARENT)
+    document = {"ingresses": PARENT["ingresses"], **document}
+    path = write(tmp_path / "local.yaml", document)
+    key = next(key for key in document if key in ("extend", "modle", "ingress"))
+    meant = {"extend": "extends", "modle": "model", "ingress": "ingresses"}[key]
+    with pytest.raises(loader.ProfileError) as exc:
+        loader.load(path)
+    assert str(exc.value) == f"{path}: {key}: unknown top-level key; did you mean {meant}?"
+    result = run_llmdv("profile", "validate", str(path))
+    assert result.returncode == 2, result.stderr
+    assert f"did you mean {meant}?" in result.stderr
+
+
+def test_an_unknown_top_level_key_in_a_parent_names_the_parent(tmp_path):
+    path = child_of(tmp_path, {"name": "local"}, {**PARENT, "zzz": 1})
+    with pytest.raises(loader.ProfileError) as exc:
+        loader.load(path)
+    message = str(exc.value)
+    assert message.startswith(f"{tmp_path / 'shared.yaml'}: zzz: unknown top-level key; known: ")
+    for key in ("schema", "name", "model", "ingresses", "known_failures", "extends"):
+        assert key in message
+
+
+def test_the_known_top_level_keys_are_the_profile_s_fields_and_extends():
+    """One list: what REFERENCE.md documents (test_profile_reference.py) is what loads."""
+    assert set(loader.TOP_LEVEL_KEYS) == {
+        "schema", "name", "vantage", "environment", "model", "ingresses", "capabilities",
+        "headers", "clients", "fleet_policy", "fleet", "known_failures", "extends",
+    }  # fmt: skip
+
+
+@pytest.mark.parametrize("where", ["local.yaml", "shared.yaml"])
+def test_a_file_that_is_not_utf8_is_an_invalid_profile_naming_the_file(tmp_path, where):
+    path = child_of(tmp_path, {"name": "local"})
+    (tmp_path / where).write_bytes((tmp_path / where).read_bytes() + b"# \xff\xfe\n")
+    with pytest.raises(loader.ProfileError) as exc:
+        loader.load(path)
+    assert str(exc.value).startswith(f"{tmp_path / where}: not UTF-8 text: ")
+    assert loader.contract_digest(path) is None
+    result = run_llmdv("profile", "validate", str(path))
+    assert result.returncode == 2, result.stderr
+    assert str(tmp_path / where) in result.stderr
+
+
+# ------------------------------------------------------------------- the name
+
+
+def test_a_name_is_never_inherited(tmp_path):
+    """Two profiles sharing a name would be one profile in results."""
+    assert loader.load(child_of(tmp_path, {})).name == "local"
+    assert loader.load(child_of(tmp_path, {"name": "mine"})).name == "mine"
+    assert loader.load(tmp_path / "shared.yaml").name == "shared"
+
+
+def test_a_rerun_from_the_composed_record_keeps_the_name_and_the_digest(tmp_path):
+    for parent in (PARENT, {key: value for key, value in PARENT.items() if key != "name"}):
+        for child in ({}, {"name": "mine"}):
+            path = child_of(tmp_path, child, parent)
+            used = tmp_path / "run" / "profile.used.yaml"
+            used.parent.mkdir(exist_ok=True)
+            used.write_text(loader.composed_text(path))
+            assert loader.load(used).name == loader.load(path).name == child.get("name", "local")
+            assert loader.contract_digest(used) == loader.contract_digest(path)
+
+
+def test_a_run_from_the_composed_record_reports_the_same_profile(tmp_path):
+    """The record of a run must repeat it: same name and same digest in results.jsonl."""
+
+    def records(*args):
+        run_dir = tmp_path / f"run-{len(list(tmp_path.glob('run-*')))}"
+        result = run_llmdv("verify", *args, "--local-output", str(run_dir), "-m", "discovery")
+        assert result.returncode == 0, result.stderr
+        lines = next(run_dir.rglob("results.jsonl")).read_text().splitlines()
+        used = next(run_dir.rglob("profile.used.yaml"))
+        return used, {(row["profile"], row["profile_digest"]) for row in map(json.loads, lines)}
+
+    with FakeFleet() as fleet:
+        parent = profile_yaml(fleet.base_url).replace("name: fake\n", "")
+        assert "name:" not in parent
+        (tmp_path / "base.yaml").write_text(parent)
+        path = write(tmp_path / "kid.yaml", {"extends": "base.yaml", "fleet_policy": "shared"})
+        used, first = records("--profile", str(path))
+        _, second = records("--profile", str(used))
+    assert first == second
+    assert {name for name, _ in first} == {"kid"}
+
+
+def test_the_composed_record_says_which_file_named_the_profile(tmp_path):
+    assert "#   name: (file name)" in loader.composed_text(child_of(tmp_path, {}))
+    assert "#   name: local.yaml" in loader.composed_text(child_of(tmp_path, {"name": "mine"}))
+
+
+# ------------------------------------------------------------------- the record reloads
+
+
+def test_a_relative_executable_in_a_parent_reloads_from_the_composed_record(tmp_path):
+    binary = {"version": "2.1.0", "executable": "./claude"}
+    client = {"id": "cc", "surfaces": ["chat_completions"], "binaries": [binary]}
+    write(tmp_path / "base.yaml", PARENT)
+    write(tmp_path / "parts" / "clients.yaml", {"clients": [client]})
+    path = write(
+        tmp_path / "local.yaml", {"extends": ["base.yaml", "parts/clients.yaml"], "name": "bins"}
+    )
+    profile = loader.load(path)
+    assert profile.clients[0].binaries[0].executable == tmp_path / "parts" / "claude"
+
+    used = tmp_path / "run" / "profile.used.yaml"
+    used.parent.mkdir()
+    used.write_text(loader.composed_text(path))
+    assert loader.load(used) == _with_source(profile, used)
+    assert loader.contract_digest(used) == loader.contract_digest(path)
+
+
+def test_the_digest_is_the_same_wherever_the_profile_is_checked_out(tmp_path):
+    """A binary's path is where it sits on one machine, not a declaration."""
+    binary = {"version": "2.1.0", "executable": "./claude"}
+    client = {"id": "cc", "surfaces": ["chat_completions"], "binaries": [binary]}
+    digests = set()
+    for checkout in ("one", "two"):
+        root = tmp_path / checkout
+        write(root / "base.yaml", PARENT)
+        write(root / "parts" / "clients.yaml", {"clients": [client]})
+        path = write(root / "local.yaml", {"extends": ["base.yaml", "parts/clients.yaml"]})
+        digests.add(loader.contract_digest(path))
+    assert len(digests) == 1 and None not in digests
+
+    newer = {**client, "binaries": [{**binary, "version": "2.2.0"}]}
+    write(root / "parts" / "clients.yaml", {"clients": [newer]})
+    assert loader.contract_digest(path) not in digests  # the version is a declaration
+
+
+@pytest.mark.parametrize("odd", ["x\ny: 1", "a\rb", "a: b #", " x"])
+def test_the_composed_record_parses_whatever_an_id_or_a_key_holds(tmp_path, odd):
+    """The header is comments, so nothing a file names may end a comment line."""
+    entry = {"id": odd, "base_url": "http://localhost:7"}
+    path = child_of(tmp_path, {"name": "odd", odd: 1, "ingresses": [entry]})
+    chain = compose.layers(path)
+    text = compose.render(chain)
+    assert yaml.safe_load(text) == compose.resolved(chain)
+    assert loader.contract_digest(path).startswith("sha256:")
+    assert loader.composed_text(path) is None  # refused, so verify copies the file as written
+
+
+# ------------------------------------------------------------------- validation names the file
+
+
+def test_a_validation_problem_names_the_file_that_set_the_value(tmp_path):
+    parent = {
+        **PARENT,
+        "headers": {"x-request-id": {"nowhere": "ignored"}},
+        "ingresses": [{**PARENT["ingresses"][0], "surfaces": ["bogus"]}, PARENT["ingresses"][1]],
+    }
+    path = child_of(
+        tmp_path,
+        {"name": "kid", "clients": [{"id": "agent", "surfaces": ["responses"]}]},
+        parent,
+    )
+    found = {item.path: item for item in loader.validate(loader.load(path))}
+    shared = tmp_path / "shared.yaml"
+    assert found["ingresses[0](gateway).surfaces"].file == shared
+    assert found["headers.x-request-id"].file == shared
+    assert found["clients[0](agent).surfaces"].file == path
+    assert str(found["headers.x-request-id"]) == (
+        f"ERROR   {shared}: headers.x-request-id: names ingress 'nowhere', which is not declared"
+    )
+    result = run_llmdv("profile", "validate", str(path))
+    assert result.returncode == 2, result.stderr
+    assert f"{shared}: ingresses[0](gateway).surfaces: unknown surface 'bogus'" in result.stdout
+    assert f"{path}: clients[0](agent).surfaces: needs 'responses'" in result.stdout
+
+
+def test_a_model_problem_names_the_file_that_set_the_value(tmp_path):
+    path = child_of(
+        tmp_path, {"name": "kid"}, {**PARENT, "model": {"public_id": "m", "max_model_len": -1}}
+    )
+    assert [str(item) for item in loader.validate_models(loader.load(path))] == [
+        f"ERROR   {tmp_path / 'shared.yaml'}: model.max_model_len: must not be negative"
+    ]
+
+
+def test_a_single_file_s_validation_problems_read_as_before(tmp_path):
+    path = write(tmp_path / "plain.yaml", {**PARENT, "schema": "llmdv.profile/0"})
+    (found,) = [item for item in loader.validate(loader.load(path)) if item.level == "error"]
+    assert found.file is None
+    assert str(found).startswith("ERROR   schema: unsupported schema")
+
+
+# ------------------------------------------------------------------- a linked file
+
+
+def test_a_linked_profile_resolves_extends_from_where_the_link_is(tmp_path):
+    """Relative to the file as it was named, which is the path every message shows."""
+    write(tmp_path / "real" / "shared.yaml", {**PARENT, "fleet_policy": "shared"})
+    real = write(tmp_path / "real" / "local.yaml", {"extends": "shared.yaml", "name": "local"})
+    (tmp_path / "links").mkdir()
+    link = tmp_path / "links" / "local.yaml"
+    link.symlink_to(real)
+    with pytest.raises(loader.ProfileError) as exc:
+        loader.load(link)
+    assert str(exc.value) == (
+        f"{link}: extends: no such profile file: {tmp_path / 'links' / 'shared.yaml'}"
+    )
+    write(tmp_path / "links" / "shared.yaml", PARENT)
+    assert loader.load(link).fleet_policy.value == "dedicated"
 
 
 # ------------------------------------------------------------------- composition is a fold

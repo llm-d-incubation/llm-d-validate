@@ -8,6 +8,10 @@ each naming the file and the path. `validate` runs on a loaded profile and retur
 cross-field and cross-section problems as `Diagnostic`s. A value an ingress inherits is checked
 once, where it was declared.
 
+Before any of that, each file of an `extends` chain is checked on its own for what composing
+would hide: a top-level key that is not one, and an ingress id that is missing, is not a plain
+name, or is named twice. Those are reported against the file that holds them.
+
 `validate` is offline by design. It resolves no secrets and contacts no cluster, so a profile
 can be written and checked on a laptop with no access to the fleet it describes. Missing
 credentials and unreachable endpoints are preflight's job, and keeping them there is what
@@ -17,13 +21,14 @@ wrong" (exit 3) meaningful.
 
 from __future__ import annotations
 
+import difflib
 import hashlib
 import json
 import math
 import os
 import re
 from collections.abc import Callable, Iterable
-from dataclasses import fields
+from dataclasses import fields, replace
 from functools import partial
 from pathlib import Path
 from typing import Any
@@ -100,17 +105,28 @@ from .schema import (
 
 SUPPORTED_SCHEMA = "llmdv.profile/1"
 
+# Every key a profile file may hold at its top level: the fields of `Profile` that a file sets,
+# and `extends`. REFERENCE.md documents the same fields (tests/test_profile_reference.py).
+TOP_LEVEL_KEYS = (
+    "extends",
+    *(item.name for item in fields(Profile) if item.name != "source_path"),
+)
+
+# An ingress id keys the merge of `extends` and becomes a pytest id, a report column, a
+# diagnostic path and a file name.
+_INGRESS_ID = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]*")
+
 
 def load(path: str | Path) -> Profile:
     """Parse a profile file, and the files it extends, into a Profile.
 
     Raises ProfileError on unusable input, naming for each problem the file that set the value.
     """
-    chain = compose.layers(path)
+    chain = _layers(path)
     try:
-        # A relative client executable resolves against the file that declared it.
-        clients_dir = compose.origin(chain, "clients").parent
-        return _build(compose.composed(chain), chain[-1].path, clients_dir)
+        # A file that extends nothing resolves a relative client executable against its folder;
+        # a chain's are already absolute.
+        return _build(compose.resolved(chain), chain[-1].path, chain[-1].path.parent)
     except ProfileError as exc:
         raise ProfileError(
             *(
@@ -127,15 +143,79 @@ def composed_text(path: str | Path) -> str | None:
     composed, which the loader reports.
     """
     try:
-        chain = compose.layers(path)
+        chain = _layers(path)
     except ProfileError:
         return None
     return compose.render(chain) if len(chain) > 1 else None
 
 
+def _layers(path: str | Path) -> list[compose.Layer]:
+    """The chain `path` names, each file checked for what composing would hide."""
+    chain = compose.layers(path)
+    problems = [problem for layer in chain for problem in _file_problems(layer)]
+    inherited = False
+    for layer in chain:
+        if inherited and "ingresses" in layer.raw and layer.raw["ingresses"] is None:
+            problems.append(
+                f"{layer.path}: ingresses: null would remove every inherited ingress, and a "
+                "child cannot remove one; select columns with -k instead"
+            )
+        inherited = inherited or isinstance(layer.raw.get("ingresses"), list)
+    if problems:
+        raise ProfileError(*problems)
+    return chain
+
+
+def _file_problems(layer: compose.Layer) -> list[str]:
+    problems = []
+    for key in layer.raw:
+        if key not in TOP_LEVEL_KEYS:
+            close = difflib.get_close_matches(str(key), TOP_LEVEL_KEYS, n=1)
+            hint = f"did you mean {close[0]}?" if close else f"known: {', '.join(TOP_LEVEL_KEYS)}"
+            shown = key if isinstance(key, str) and key.isprintable() else repr(key)
+            problems.append(f"{layer.path}: {shown}: unknown top-level key; {hint}")
+    entries = layer.raw.get("ingresses")
+    seen: set[str] = set()
+    for index, entry in enumerate(entries if isinstance(entries, list) else ()):
+        if not isinstance(entry, dict):
+            continue  # reported when the profile is built
+        at = f"{layer.path}: ingresses[{index}]"
+        ingress_id = entry.get("id")
+        if "id" not in entry:
+            problems.append(f"{at}.id: required")
+        elif not isinstance(ingress_id, str) or not _INGRESS_ID.fullmatch(ingress_id):
+            problems.append(
+                f"{at}.id: expected a name of letters, digits, '.', '_' and '-' that starts "
+                f"with a letter or a digit, got {ingress_id!r}"
+            )
+        elif ingress_id in seen:
+            problems.append(f"{at}({ingress_id}): duplicate ingress id {ingress_id!r}")
+        else:
+            seen.add(ingress_id)
+    return problems
+
+
+def _attributed(profile: Profile, found: list[Diagnostic]) -> list[Diagnostic]:
+    """Each finding with the file that set its value, for a profile that extends another."""
+    try:
+        chain = _layers(profile.source_path) if profile.source_path else []
+    except ProfileError:
+        return found
+    if len(chain) < 2:
+        return found
+    return [replace(item, file=compose.origin(chain, item.path)) for item in found]
+
+
 def validate(profile: Profile) -> list[Diagnostic]:
-    """Offline checks across the whole profile. Errors block a run; warnings do not."""
-    out = validate_models(profile)
+    """Offline checks across the whole profile. Errors block a run; warnings do not.
+
+    For a profile that extends another, each finding names the file that set the value.
+    """
+    return _attributed(profile, _diagnostics(profile))
+
+
+def _diagnostics(profile: Profile) -> list[Diagnostic]:
+    out = _models(profile)
 
     if profile.schema != SUPPORTED_SCHEMA:
         out.append(
@@ -311,6 +391,10 @@ def validate_models(profile: Profile) -> list[Diagnostic]:
     A problem is reported where it was declared: at `model` for a value every ingress inherits,
     and at an ingress only for a value that ingress overrides.
     """
+    return _attributed(profile, _models(profile))
+
+
+def _models(profile: Profile) -> list[Diagnostic]:
     out = _model_diagnostics("model", profile.model, None)
     for index, ingress in enumerate(profile.ingresses):
         where = f"ingresses[{index}]({ingress.id}).model"
@@ -541,22 +625,39 @@ def contract_digest(path: str | Path) -> str | None:
     Hashes the parsed document rather than its bytes, with `known_failures` left out: comments
     carry probes, and the known-failure list carries triage, and neither changes what a run
     asserts. A digest that moved with them would drop every earlier run from a comparison
-    window (`compare/diff.py`) each time a finding was filed or a comment updated.
+    window (`compare/diff.py`) each time a finding was filed or a comment updated. Where a
+    client binary sits on this machine is left out for the same reason: its `version` is the
+    declaration, and its path differs between two checkouts of one profile.
     """
     try:
         raw = yaml.safe_load(Path(path).read_text(encoding="utf-8"))
-    except (OSError, yaml.YAMLError):
+    except (OSError, UnicodeDecodeError, yaml.YAMLError):
         return None
     if isinstance(raw, dict) and "extends" in raw:
         # The declarations a run is judged against are the composed ones.
         try:
-            raw = compose.composed(compose.layers(path))
+            raw = compose.resolved(compose.layers(path))
         except ProfileError:
             return None
     if isinstance(raw, dict):
         raw = {name: value for name, value in raw.items() if name != "known_failures"}
+        if isinstance(raw.get("clients"), list):
+            raw["clients"] = [_without_executables(client) for client in raw["clients"]]
     canonical = json.dumps(_stringify_keys(raw), sort_keys=True, default=str, separators=(",", ":"))
     return f"sha256:{hashlib.sha256(canonical.encode('utf-8')).hexdigest()[:16]}"
+
+
+def _without_executables(client: Any) -> Any:
+    """`client` with each binary's path dropped; any other shape is returned as it is."""
+    if not isinstance(client, dict) or not isinstance(client.get("binaries"), list):
+        return client
+    binaries = [
+        {key: value for key, value in binary.items() if key != "executable"}
+        if isinstance(binary, dict)
+        else binary
+        for binary in client["binaries"]
+    ]
+    return {**client, "binaries": binaries}
 
 
 def _stringify_keys(value: Any) -> Any:

@@ -272,10 +272,13 @@ def pytest_configure(config: pytest.Config) -> None:
     expression = (getattr(config.option, "markexpr", "") or "").strip()
     if expression:
         allowed = known_markers()
+        # pytest reads `True`, `False` and `None` as marker names too, so `not True` would
+        # select everything. Only the arguments of `name(key=value)` are not names.
+        bare = re.sub(r"\b(?!(?:and|or|not)\()(\w+)\([^()]*\)", r"\1", expression)
         named = {
             token
-            for token in re.findall(r"[A-Za-z_][A-Za-z0-9_]*", expression)
-            if token not in {"and", "or", "not", "True", "False", "None"}
+            for token in re.findall(r"[A-Za-z_][A-Za-z0-9_]*", bare)
+            if token not in {"and", "or", "not"}
         }
         unknown = sorted(named - allowed)
         if unknown:

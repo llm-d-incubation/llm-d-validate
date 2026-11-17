@@ -10,12 +10,16 @@ path use, so it merges like a mapping: a child entry merges over the parent's en
 id by the same rule, and an entry with a new id is added at the end. A child can then add `setup`
 to one ingress without restating the others. A file may appear in the sequence only once.
 
-The composed mapping is what the loader validates, so a profile is checked exactly as it runs,
-and a problem is reported against the file that set the value at fault.
+Two values depend on which file is which, so they are settled here and not merged: a profile's
+name is its own or its file's, never a parent's, and a relative client executable belongs to
+the folder of the file that declared it. `resolved` is the mapping the loader validates,
+digests and writes to a run directory, so a profile is checked exactly as it runs, and a
+problem is reported against the file that set the value at fault.
 """
 
 from __future__ import annotations
 
+import json
 import os
 import re
 from dataclasses import dataclass
@@ -81,7 +85,11 @@ def read(path: Path) -> dict[str, Any]:
     if not path.is_file():
         raise ProfileError(f"no such profile file: {path}")
     try:
-        raw = yaml.safe_load(path.read_text()) or {}
+        raw = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
+    except UnicodeDecodeError as exc:
+        raise ProfileError(f"{path}: not UTF-8 text: {exc}") from exc
+    except OSError as exc:
+        raise ProfileError(f"{path}: cannot be read: {exc}") from exc
     except yaml.YAMLError as exc:
         raise ProfileError(f"{path}: invalid YAML: {exc}") from exc
     if not isinstance(raw, dict):
@@ -101,7 +109,7 @@ def layers(path: str | Path) -> list[Layer]:
     def visit(current: Path, route: list[Path]) -> None:
         raw = read(current)
         reached[current.resolve()] = route
-        for key, resolved in _parents(current, raw.get("extends")):
+        for key, resolved in _parents(current, raw) if "extends" in raw else ():
             if not resolved.is_file():
                 raise ProfileError(f"{current}: {key}: no such profile file: {resolved}")
             if any(resolved.resolve() == step.resolve() for step in route):
@@ -122,10 +130,9 @@ def layers(path: str | Path) -> list[Layer]:
     return chain
 
 
-def _parents(current: Path, value: Any) -> list[tuple[str, Path]]:
+def _parents(current: Path, raw: dict[str, Any]) -> list[tuple[str, Path]]:
     """Each parent `extends` names, with the key an error about it names."""
-    if value is None:
-        return []
+    value = raw["extends"]
     if isinstance(value, str) and value:
         return [("extends", Path(os.path.normpath(current.parent / value)))]
     if not isinstance(value, list) or not value:
@@ -148,7 +155,44 @@ def _parents(current: Path, value: Any) -> list[tuple[str, Path]]:
 
 
 def composed(chain: list[Layer]) -> dict[str, Any]:
+    """Every file of the chain merged over the ones before it."""
     return reduce(compose, (layer.raw for layer in chain[1:]), chain[0].raw)
+
+
+def resolved(chain: list[Layer]) -> dict[str, Any]:
+    """The profile a chain declares: `composed`, with what depends on the files settled.
+
+    A name is never inherited: it is the loaded file's own `name`, or else that file's name
+    without its suffix, written out so the mapping means the same from any other file. A
+    relative client executable is written as the absolute path it resolves to, against the
+    folder of the file that declared it. A file that extends nothing is returned as it is: its
+    own path already settles both.
+    """
+    profile = composed(chain)
+    if len(chain) == 1:
+        return profile
+    leaf = chain[-1]
+    name = leaf.raw.get("name") or leaf.path.stem
+    profile = {**profile, "name": name} if "name" in profile else {"name": name, **profile}
+    # A list replaces whole, so the last file to set `clients` declared every entry.
+    declared = next((layer for layer in reversed(chain) if "clients" in layer.raw), None)
+    if declared is not None and isinstance(profile.get("clients"), list):
+        folder = declared.path.parent
+        profile["clients"] = [_anchored(client, folder) for client in profile["clients"]]
+    return profile
+
+
+def _anchored(client: Any, folder: Path) -> Any:
+    """`client` with each relative executable made absolute against `folder`."""
+    if not isinstance(client, dict) or not isinstance(client.get("binaries"), list):
+        return client  # a shape the loader refuses
+    binaries = []
+    for binary in client["binaries"]:
+        path = binary.get("executable") if isinstance(binary, dict) else None
+        if isinstance(path, str) and path and not path.startswith("~") and not os.path.isabs(path):
+            binary = {**binary, "executable": os.path.abspath(folder / path)}
+        binaries.append(binary)
+    return {**client, "binaries": binaries}
 
 
 # A diagnostic path such as `ingresses[0](engine).model.reasoning`, one part at a time.
@@ -194,16 +238,19 @@ def render(chain: list[Layer]) -> str:
     It loads exactly as the chain does, so a run directory needs no other file to repeat the
     run. Comments in the source files are not carried over.
     """
-    profile = composed(chain)
-    if "name" not in profile:
-        profile = {"name": chain[-1].path.stem, **profile}
+    profile = resolved(chain)
     leaf = chain[-1].path.parent
 
     def named(layer: Layer) -> str:
         return os.path.relpath(layer.path, leaf)
 
     def setters(found) -> str:
-        return ", ".join(named(layer) for layer in chain if found(layer.raw)) or "(file name)"
+        return ", ".join(named(layer) for layer in chain if found(layer.raw))
+
+    def shown(value: Any) -> str:
+        """A key or an id on one comment line, whatever characters it holds."""
+        text = str(value)
+        return text if text.isprintable() else json.dumps(text)
 
     lines = [
         "# Composed by llmdv from these profiles, each merged over the one before it:",
@@ -211,7 +258,11 @@ def render(chain: list[Layer]) -> str:
         "# Where each key was set:",
     ]
     for key in profile:
-        lines.append(f"#   {key}: {setters(lambda raw, key=key: key in raw)}")
+        if key == "name":  # never inherited: the loaded file's own, or else its file name
+            own = chain[-1].raw.get("name")
+            lines.append(f"#   name: {named(chain[-1]) if own else '(file name)'}")
+            continue
+        lines.append(f"#   {shown(key)}: {setters(lambda raw, key=key: key in raw)}")
         if key == "ingresses" and isinstance(profile[key], list):
             for index, entry in enumerate(profile[key]):
                 if not isinstance(entry, dict):
@@ -223,6 +274,6 @@ def render(chain: list[Layer]) -> str:
                         and _position(raw["ingresses"], entry_id) is not None
                     )
                 )
-                lines.append(f"#     ingresses[{index}]({entry_id}): {found}")
+                lines.append(f"#     ingresses[{index}]({shown(entry_id)}): {found}")
     body = yaml.safe_dump(profile, sort_keys=False, allow_unicode=True, width=100)
     return "\n".join(lines) + "\n" + body

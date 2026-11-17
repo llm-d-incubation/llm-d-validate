@@ -117,6 +117,18 @@ def test_one_bad_name_in_a_compound_expression_is_still_caught():
     assert "no such marker" in out.stdout + out.stderr
 
 
+@pytest.mark.parametrize("expression", ["not True", "False or None", "not(discovry)"])
+def test_a_constant_is_a_marker_name_like_any_other(expression):
+    """pytest reads `True`, `False` and `None` as marker names, so `not True` selects everything."""
+    out = collect(expression)
+    assert out.returncode != 0
+    assert "no such marker" in out.stdout + out.stderr
+
+
+def test_a_constant_passed_to_a_marker_is_not_a_marker_name():
+    assert "no such marker" not in collect("not disruptive(strict=True)").stderr
+
+
 # ----------------------------------------------------------------- case_id prefixes
 
 # Prints, for every collected case, its case_id and markers. Read from a child process so the
