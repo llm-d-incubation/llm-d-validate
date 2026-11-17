@@ -17,7 +17,7 @@ Each lives at `.agents/skills/<name>/SKILL.md`. Load the one that matches before
 
 | Skill | Use it when |
 |---|---|
-| [writing-an-infra-profile](.agents/skills/writing-an-infra-profile/SKILL.md) | writing, updating or reviewing a profile; choosing any declaration; naming a component behind an ingress |
+| [writing-an-infra-profile](.agents/skills/writing-an-infra-profile/SKILL.md) | writing, updating or reviewing a profile; choosing any declaration; naming a component behind an ingress; several profiles for one stack or an llm-d guide; publishing a profile written against a private stack |
 | [probing-a-fleet-before-asserting](.agents/skills/probing-a-fleet-before-asserting/SKILL.md) | writing or changing an assertion about a live response, or a live case fails |
 | [extending-llmdv](.agents/skills/extending-llmdv/SKILL.md) | adding a surface, ingress kind, case, client, assertion or capability |
 | [testing-a-model-deployment](.agents/skills/testing-a-model-deployment/SKILL.md) | testing a model you were handed endpoints for (a LiteLLM gateway, a router or EPP route, or both): picking and pointing a profile, first checks, the run, the comparison |

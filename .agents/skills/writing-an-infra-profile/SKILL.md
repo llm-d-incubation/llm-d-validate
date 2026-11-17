@@ -1,6 +1,6 @@
 ---
 name: writing-an-infra-profile
-description: Use when writing, updating or reviewing an llmdv infra-profile; when choosing error_status, unstructured_errors, header dispositions, efforts, capabilities or change sentinels; when deciding which case families to leave out; when tempted to declare what a probe returned; or before naming LiteLLM, an llm-d router or EPP, or vLLM behind an ingress.
+description: Use when writing, updating or reviewing an llmdv infra-profile; when choosing error_status, unstructured_errors, header dispositions, efforts, capabilities or change sentinels; when deciding which case families to leave out; when tempted to declare what a probe returned; before naming LiteLLM, an llm-d router or EPP, or vLLM behind an ingress; when one stack needs several profiles (models, engines, an llm-d guide's CI lanes); or when publishing a profile that was written against a private stack.
 ---
 
 # Writing an infra-profile
@@ -21,17 +21,17 @@ Field reference: [`profiles/REFERENCE.md`](../../../profiles/REFERENCE.md). Guid
    | `examples/example-three-ingress.yaml` | `litellm` + `llmd_router` + `vllm` | all three layers; a template to measure against |
    | `examples/custom-llm-d/glm-5.3.yaml` | `litellm` + `llmd_router` | a full profile for a custom llm-d stack, built from shared parts with `extends` |
 
-   A variant of an existing profile (another namespace, an in-cluster copy) is a short file with `extends: <parent>.yaml` that names only what differs; see `examples/example-two-ingress-staging.yaml`.
+   A variant of an existing profile (another namespace, an in-cluster copy) is a short file with `extends: <parent>.yaml` that names only what differs; see `examples/example-two-ingress-staging.yaml`. Several configurations of one stack (models, engines, an llm-d guide's CI lanes) share parts; see [More than one configuration](#more-than-one-configuration-parts-and-combinations).
 
    Declare only the layers you can reach. One ingress is a complete profile; a declared but unreachable layer fails preflight.
 
 2. **Put it at `profiles/<system>/<model>.yaml`.** A copy with real cluster detail is `profiles/<system>/<model>.local.yaml`, which is gitignored. A committed profile names its URL and key by variable (`base_url_env`, `auth.key_env`) and never stores either; a `.local.yaml` may write `base_url` inline, but declaring both is an error. An unset variable passes `llmdv profile validate` and fails preflight (exit 3). No namespace, cluster name, context, hostname, pod or Service name in a committed file. A committed profile gets a short run guide next to it (`<model>.md`).
 
-3. **Fill what exists by measuring it.** Model id and context length from the gateway's `GET /v1/models` (a gateway's ids are usually not the engine's). If you have cluster access, the `environment` block (`cluster`, `context`, `namespace`, `kubeconfig`, `metrics`; optional, and no gateway-only profile has one); check the kubeconfig holds the context, or `profile show --setup` prints `-l <selector>` instead of a pod. Selectors, never pod names, in `setup.requires`. The reasoning shape from one request: a populated `reasoning_content` means declare `parser` and `field`; an inline `<think>` block means `parser: null`. Surfaces by sending a **shape-valid** body to each path at each layer (an empty `{}` answers 400 on an absent route).
+3. **Fill what exists by measuring it.** Model id and context length from the gateway's `GET /v1/models` (a gateway's ids are usually not the engine's). If you have cluster access, the `environment` block (`cluster`, `context`, `namespace`, `kubeconfig`, `metrics`; optional, and no gateway-only profile has one); check the kubeconfig holds the context, or `profile show --setup` prints `-l <selector>` instead of a pod. Selectors, never pod names, in `setup.requires`. The reasoning shape from one request: a populated reasoning field means declare `parser` and the `field` you saw (`reasoning` on recent vLLM; `reasoning_content` on older vLLM, on SGLang and through LiteLLM, which renames it); an inline `<think>` block means `parser: null`. Surfaces by sending a **shape-valid** body to each path at each layer (an empty `{}` answers 400 on an absent route).
 
    Per layer:
    - **`litellm`:** `rate_limited: true` (a 429 then skips as `throttled`), `health_path: /health/liveliness`, `capabilities.model_info` from its `GET /v1/model/info`. Its model id is the gateway's (often prefixed, e.g. `<provider>/…`, and suffixed per gateway, e.g. `-staging`), not the engine's.
-   - **`llmd_router`:** no auth (`{type: none}`), the engine's model id, and no `/v1/model/info`. The EPP answers some malformed bodies with plain text (`error extracting request body: …`); see [`.agents/GROUND-TRUTH.md`](../../GROUND-TRUTH.md) before declaring `unstructured_errors`.
+   - **`llmd_router`:** no auth (`{type: none}`), the engine's model id, and no `/v1/model/info`. Older EPP builds answer some malformed bodies with plain text (`error extracting request body: …`) and newer ones with a JSON envelope, so measure yours and see [`.agents/GROUND-TRUTH.md`](../../GROUND-TRUTH.md) before declaring `unstructured_errors`.
 
    Declare `fleet_policy: dedicated` (the default): it runs the disruptive families too, and they have not disturbed the deployments they ran against. Use `shared`, which skips them as `excluded_by_policy`, only when the deployment's owner asks for it, and say so in a comment.
 
@@ -72,6 +72,31 @@ Field reference: [`profiles/REFERENCE.md`](../../../profiles/REFERENCE.md). Guid
    Expect the first contract run to find errors. That is the suite working.
 
 8. **List every empty capability field.** Each must be an exclusion named in the profile header with its reason.
+
+## More than one configuration: parts and combinations
+
+When one stack needs several profiles, write each fact once in a **part** and list parts in a **combination**, the file you run. Worked examples: [`profiles/llm-d/`](../../../profiles/llm-d/README.md) and [`profiles/examples/custom-llm-d/`](../../../profiles/examples/custom-llm-d/).
+
+- A part holds one kind of fact (what the APIs promise, a layer, an engine, a model configuration, a guide's additions) and lives under `parts/`. It is not a profile, and it never extends anything: a file reached by two routes is an error.
+- A combination is `extends: [parts/…, …]`, a `name`, and only what belongs to that one stack: the engine's own names (parser names, the reasoning field), block size, per-layer differences and the change sentinels.
+- Name a model part by what a client sees (model, context window, parsers), never by accelerator or cluster. Configurations that give a client the same model, window, parsers and engine share one combination; tell their runs apart with `--label`.
+- Tag every line with where its value came from: `FROM values: <path>` (shipped configuration), `FROM docs: <path>`, `INTENT` (Rule 1), `DERIVED`, or `MEASURED on <where>`. Nothing unmeasured is tagged measured; a profile no run has exercised says `WRITTEN, NOT RUN` in its header.
+- Validate and plan a combination, never a part: `llmdv profile validate <combination>` and `llmdv plan --profile <combination> -q`.
+
+### Profiles for an llm-d guide
+
+Write a profile for each configuration one of the guide's CI lanes deploys, and none for a configuration no lane runs.
+
+1. List the guide's nightly workflows in llm-d. For each lane read its accelerator, engine, provider and gateway class.
+2. Render the overlay that lane applies, locally (`kubectl kustomize <path>`, never against a cluster). A lane that sets no provider applies the accelerator and engine folder's own kustomization. Read the model, context window, parsers and engine build, for each role (prefill and decode can differ).
+3. Group lanes that look the same to a client. Each group is one combination; its header names its lanes, and the directory's README maps every lane to its profile and lists what no lane runs.
+
+### Publishing a profile written against a private stack
+
+1. **Scrub the comments, keep the values.** Remove hostnames and URLs, namespaces, cluster and context names, pod and Service names, company, team and people's names, dates, ticket and issue references, run ids and internal model aliases. Rewrite a measurement as `MEASURED on one deployment`. A measured value is a fact of the stack: replacing it with a generic default makes a different profile.
+2. **Replace** addresses and keys with `base_url_env` and `auth.key_env`, internal model aliases with the public model id, and pins and baselines with the placeholders of step 6. Drop `known_failures` entries that cite private tickets.
+3. **Keep a private overlay.** A gitignored `<name>.local.yaml` that `extends` the public file restores the model ids your layers serve, your variable names, and your pins and `known_failures`.
+4. **Prove it before the PR.** `PYTHONPATH=src python .agents/skills/writing-an-infra-profile/compare_profiles.py <private profile> <name>.local.yaml <ingress id>` prints every effective setting that differs, for each ingress; nothing should. Then search the diff, the commit message and the PR text for each kind of identifier in step 1.
 
 ## Rule 1: declare intent; probes go in comments
 
@@ -137,3 +162,6 @@ comment beside the line and, if the declaration changes, cite the decision.
 | "The sentinels need baselines first" | Declare the placeholders; the first run supplies the values. |
 | "They need green for sign-off" | A sign-off lists failures and their triage. |
 | "It's a private repo, the namespace is fine" | It goes in `*.local.yaml`. |
+| "To publish it, I'll swap our values for sensible defaults" | Scrub comments, keep values, and prove it with `compare_profiles.py`. |
+| "The guide's table lists it, so it needs a profile" | Only what a CI lane deploys gets one. |
+| "One file per accelerator" | Name by what a client sees; lanes that look the same share a profile. |
