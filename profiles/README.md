@@ -64,11 +64,11 @@ ingresses:
         - {kind: port_forward, namespace: my-namespace, selector: app=engine, local_port: 18100, remote_port: 8000}
 ```
 
-To combine independent parts, list them. Each is merged over the ones before it, and the file's own keys last, so one file per engine, gateway and guide replaces one file per combination:
+To combine independent parts, list them. Each is merged over the ones before it, and the file's own keys last, so one file per engine and model replaces one file per combination. Parts live in a `parts/` folder; every other file is a profile you can run:
 
 ```yaml
-# profiles/<system>/vllm-none-optimized-baseline.yaml
-extends: [../base.yaml, ../engines/vllm.yaml, ../gateways/none.yaml, ../guides/optimized-baseline.yaml]
+# profiles/<system>/<group>/vllm-<model>.yaml
+extends: [../parts/base.yaml, ../parts/engines/vllm.yaml, ../parts/models/<model>.yaml, parts/common.yaml]
 ```
 
 Mappings merge, lists and other values replace, `null` clears a value, and ingresses are keyed by `id`, so they merge like mappings; [REFERENCE.md](REFERENCE.md#extends) has the rules. `llmdv profile show` and `llmdv profile validate` check the composed result, and a run's `profile.used.yaml` holds it whole, with a comment naming the file that set each key.

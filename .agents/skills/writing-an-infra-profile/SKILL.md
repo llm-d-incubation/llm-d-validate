@@ -77,7 +77,8 @@ Field reference: [`profiles/REFERENCE.md`](../../../profiles/REFERENCE.md). Guid
 
 When one stack needs several profiles, write each fact once in a **part** and list parts in a **combination**, the file you run. Worked examples: [`profiles/llm-d/`](../../../profiles/llm-d/README.md) and [`profiles/examples/custom-llm-d/`](../../../profiles/examples/custom-llm-d/).
 
-- A part holds one kind of fact (what the APIs promise, a layer, an engine, a model configuration, a guide's additions) and lives under `parts/`. It is not a profile, and it never extends anything: a file reached by two routes is an error.
+- A part holds one kind of fact (what the APIs promise, a layer, an engine, a model configuration) and lives under `parts/`. It is not a profile, and it never extends anything: a file reached by two routes is an error.
+- Anything inside a `parts/` folder is a building block; every other file is a profile you can run. What only one group of profiles shares goes in that group's own `parts/common.yaml` (`profiles/llm-d/<guide>/parts/common.yaml`), so the group's name appears once, as its folder.
 - A combination is `extends: [parts/…, …]`, a `name`, and only what belongs to that one stack: the engine's own names (parser names, the reasoning field), block size, per-layer differences and the change sentinels.
 - Name a model part by what a client sees (model, context window, parsers), never by accelerator or cluster. Configurations that give a client the same model, window, parsers and engine share one combination; tell their runs apart with `--label`.
 - Tag every line with where its value came from: `FROM values: <path>` (shipped configuration), `FROM docs: <path>`, `INTENT` (Rule 1), `DERIVED`, or `MEASURED on <where>`. Nothing unmeasured is tagged measured; a profile no run has exercised says `WRITTEN, NOT RUN` in its header.
@@ -85,7 +86,7 @@ When one stack needs several profiles, write each fact once in a **part** and li
 
 ### Profiles for an llm-d guide
 
-Write a profile for each configuration one of the guide's CI lanes deploys, and none for a configuration no lane runs.
+Write a profile for each configuration one of the guide's CI lanes deploys, and none for a configuration no lane runs. Say "guide", the word llm-d's own files use (`guides/`, `guide.yaml`, `GUIDE_NAME`), and name the folder exactly as llm-d names the guide; do not write "well-lit path" or invent a second term.
 
 1. List the guide's nightly workflows in llm-d. For each lane read its accelerator, engine, provider and gateway class.
 2. Render the overlay that lane applies, locally (`kubectl kustomize <path>`, never against a cluster). A lane that sets no provider applies the accelerator and engine folder's own kustomization. Read the model, context window, parsers and engine build, for each role (prefill and decode can differ).
