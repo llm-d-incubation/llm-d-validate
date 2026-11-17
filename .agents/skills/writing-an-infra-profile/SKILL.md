@@ -86,7 +86,7 @@ When one stack needs several profiles, write each fact once in a **part** and li
 
 ### Profiles for an llm-d guide
 
-Write a profile for each configuration one of the guide's CI lanes deploys, and none for a configuration no lane runs. Say "guide", the word llm-d's own files use (`guides/`, `guide.yaml`, `GUIDE_NAME`), and name the folder exactly as llm-d names the guide; do not write "well-lit path" or invent a second term.
+Write a profile for each configuration that is both deployed by one of the guide's CI lanes and marked `validated` in the guide's own table (its `guide.yaml` and README), and none for any other: not a `community` overlay, and not a configuration no lane runs. Say "guide", the word llm-d's own files use (`guides/`, `guide.yaml`, `GUIDE_NAME`), and name the folder exactly as llm-d names the guide; do not write "well-lit path" or invent a second term.
 
 1. List the guide's nightly workflows in llm-d. For each lane read its accelerator, engine, provider and gateway class.
 2. Render the overlay that lane applies, locally (`kubectl kustomize <path>`, never against a cluster). A lane that sets no provider applies the accelerator and engine folder's own kustomization. Read the model, context window, parsers and engine build, for each role (prefill and decode can differ).
@@ -164,5 +164,5 @@ comment beside the line and, if the declaration changes, cite the decision.
 | "They need green for sign-off" | A sign-off lists failures and their triage. |
 | "It's a private repo, the namespace is fine" | It goes in `*.local.yaml`. |
 | "To publish it, I'll swap our values for sensible defaults" | Scrub comments, keep values, and prove it with `compare_profiles.py`. |
-| "The guide's table lists it, so it needs a profile" | Only what a CI lane deploys gets one. |
+| "The guide's table lists it, so it needs a profile" | Only what the table marks `validated` and a CI lane deploys gets one. |
 | "One file per accelerator" | Name by what a client sees; lanes that look the same share a profile. |
