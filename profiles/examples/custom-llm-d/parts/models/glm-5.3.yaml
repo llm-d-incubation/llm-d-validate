@@ -1,0 +1,113 @@
+# Part: GLM-5.3 served by vLLM. Not a profile on its own: it declares the model and what the
+# model and its chat template do, and no ingress. A part never extends anything.
+#
+# Assumed engine flags (check them against your model server's arguments; prefill and decode
+# containers can differ): --reasoning-parser glm45, --tool-call-parser glm47,
+# --enable-auto-tool-choice, --max-model-len 1048576, no --tool-strict-level, and
+# --reasoning-effort-map {"none":"low","minimal":"low","medium":"low","xhigh":"max"}.
+#
+# Facts of the model and its chat template, MEASURED on one deployment:
+#   - it always reasons: the template opens <think> on every generation;
+#   - the template writes a system line "Reasoning Effort: <Level>" and knows only Low, High and
+#     Max. Every other effort, `none` included, renders as Max. At temperature 0, unset, none,
+#     minimal, medium, xhigh and max gave the identical answer; high reasoned less; low not at
+#     all;
+#   - it is served text-only: vLLM answers any image or audio input 400 "zai-org/GLM-5.3 is not
+#     a multimodal model".
+#
+# Leads that follow from always-on reasoning, left declared so they fail until you triage them:
+#   continue_final_message   the continuation lands in the reasoning field, not content
+#   tool_choice none         the model reasons about calling the tool, then stops with no answer
+
+model:
+  public_id: zai-org/GLM-5.3
+  aliases: []
+  # MEASURED on one deployment: max_tokens 50000000 answered 400 "cannot be greater than
+  # max_model_len=1048576". GET /v1/models may report null for it.
+  max_model_len: 1048576
+  reasoning:
+    parser: glm45
+    # MEASURED on one deployment: vLLM 0.32 answers message.reasoning and leaves
+    # reasoning_content absent. A proxy part may override this for its own ingress.
+    field: reasoning
+    default_on: true
+  tools:
+    parser: glm47
+    # MEASURED on one deployment: tool_choice "auto" returned finish_reason "tool_calls" and a
+    # well-formed call.
+    auto_choice: true
+    # GLM-5.3 writes calls as <tool_call>...</tool_call> with <arg_key>/<arg_value> pairs.
+    # Declaring the markup arms the markup-leak checks and tools.result_quotes_markup.
+    markup: ["<tool_call>", "<arg_key>", "<arg_value>"]
+    # The glm47 parser's default --tool-strict-level is `function`: a tool's argument schema is
+    # enforced only when the client sends `strict: true`. Change to `parameter` if your
+    # deployment raises it.
+    strict_level: function
+  # MEASURED on one deployment: the Chat and Messages answer-budget cases passed at 128.
+  answer_max_tokens: 128
+
+capabilities:
+  # The two efforts that reason at distinct levels, high below max. minimal, medium and xhigh
+  # render as Max and stay undeclared, because listing them makes the effort-order case compare
+  # max with itself. The quiet effort is low, which answers with no reasoning; none reasons in
+  # full.
+  chat_reasoning_efforts: [high, max]
+  chat_quiet_efforts: [low]
+  # Every value is echoed on Responses; none is left out because it reasons, and the case
+  # requires no reasoning for it.
+  responses_reasoning_efforts: [minimal, low, medium, high, xhigh, max]
+
+  # The effort the model is given, read from the rendered prompt (Chat prompt_logprobs).
+  # INTENT: the engine's --reasoning-effort-map sends none, minimal and medium to Low, so they
+  # render as Low. Without a map an effort the template does not know falls through to Max
+  # (MEASURED on one deployment before the map: none, minimal and medium rendered Max). Unset
+  # stays the template default, Max. Declare your own map's result if it differs.
+  effort_rendering:
+    pattern: 'Reasoning Effort: (\w+)'
+    surfaces: [chat_completions]
+    efforts: {unset: Max, none: Low, minimal: Low, low: Low, medium: Low, high: High, xhigh: Max, max: Max}
+
+  # `disabled` is undeclared: GLM-5.3's thinking cannot be turned off, and vLLM serves it as
+  # effort low, so a thinking block appears at random.
+  messages_thinking: [enabled, adaptive]
+  # INTENT: every effort produces thinking. MEASURED on one deployment: low returned an empty
+  # thinking block, which fails until you triage it.
+  messages_efforts: [low, medium, high, xhigh, max]
+
+  # The template has no enable_thinking variable and always opens <think>: sending it changed
+  # neither the prompt nor the output, so it is left out of base.yaml's list.
+  vllm_options: [ignore_eos, min_tokens, truncate_prompt_tokens, cache_salt, include_stop_str_in_output, continue_final_message, echo, continuous_usage_stats, structured_outputs, return_tokens_as_token_ids, prompt_logprobs, allowed_token_ids, bad_words, include_reasoning, stop_reason, chat_template_kwargs, return_token_ids, logit_bias]
+
+  # Text-only, so image, audio, document and file input are declared `rejected`, which still
+  # requires a clean 4xx in each API's error shape. This is a decision about the deployment,
+  # not a probe result: confirm it with the deployment's owner, or declare `accepted` and let
+  # the run show the refusals (Rule 1).
+  chat_fields:
+    audio: rejected
+    content_image_url: rejected
+    content_input_audio: rejected
+  messages_features:
+    document_citations: rejected
+    document_content: rejected
+    document_pdf: rejected
+    document_text: rejected
+    image_base64: rejected
+    image_url: rejected
+    tool_result_image: rejected
+  responses_features:
+    input_file: rejected
+    input_image: rejected
+
+  cache_reuse:
+    # INTENT: one conversation renders alike across APIs at matching settings, so a session
+    # moved between them stays warm. low and medium name the template's Low and Max.
+    equivalent_settings:
+      # MEASURED on one deployment: 0 cached tokens. vLLM's Messages path converts `disabled`
+      # thinking with effort none while the server renders low, so the router scores a
+      # different prompt. Kept declared so the defect stays visible.
+      - [chat_completions:low, messages:disabled]
+      - [chat_completions:low, responses:low]
+      # A Messages `enabled` budget maps onto an effort in tiers (1024 low, 2048 medium, 4096 and
+      # above high), so 2048 is the budget that renders like Chat medium.
+      - [chat_completions:medium, messages:enabled:2048]
+      - [chat_completions:medium, responses:medium]

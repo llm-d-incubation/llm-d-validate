@@ -1,0 +1,135 @@
+# Part: a LiteLLM proxy as the outermost layer, forwarding to whatever is behind it. Not a
+# profile on its own: it declares one ingress and no model. A part never extends anything.
+#
+# The URL and the key come from the environment, so no hostname or credential is written here:
+#   export LLMDV_LITELLM_URL=<your LiteLLM base URL>  LLMDV_LITELLM_KEY=<a virtual key>
+#
+# What identifies this layer (Rule 2): its own headers on every answer, x-litellm-version and
+# x-litellm-model-name (hosted_vllm/<engine id> when it forwards to vLLM or a router in front of
+# it); x-litellm-model-api-base and GET /v1/model/info name the next hop. Describe that hop, never
+# quote its URL.
+#
+# The model id. A LiteLLM model_list names models in its own vocabulary (often with a provider
+# prefix), and llmdv asserts the id this ingress advertises. This part assumes your model_list
+# names the model by its public id, as the model part declares it. If it does not, override it
+# for this ingress only, in your local file:
+#   ingresses:
+#     - id: litellm
+#       model: {public_id: <the id GET /v1/models lists here>}
+#
+# MEASURED on one deployment (LiteLLM 1.97 to 1.105 in front of an llm-d router and vLLM), each
+# declared below as a correct stack behaves, so each fails until you triage it:
+#   - the terminal usage frame of a Chat stream carries a choice instead of an empty choices
+#     array;
+#   - streamed Messages and Responses echo the engine's model name, not the requested one;
+#   - the Responses stream carries no SSE `event:` lines;
+#   - errors LiteLLM raises itself on /v1/messages come back in the OpenAI envelope;
+#   - integers beyond 2^53 are re-encoded as floats (byte_fidelity big_integer);
+#   - vLLM's per-choice fields (stop_reason, token_ids) move into provider_specific_fields;
+#   - cache_salt and ignore_eos are not forwarded on Responses, nor cache_salt on Messages;
+#   - /v1/messages/count_tokens counted half the input tokens a generation reported for one
+#     body shape.
+#
+# Not declared here, and why:
+#   render surfaces            LiteLLM does not route vLLM's render paths (404/405)
+#   transport.max_body_bytes   measure your configured limit before declaring it
+#   headers the proxy rewrites or strips   need an instrumented backend; add them only if you
+#                              have the header-echo instrument
+
+ingresses:
+  - id: litellm
+    kind: litellm
+    base_url_env: LLMDV_LITELLM_URL
+    auth: {type: bearer, key_env: LLMDV_LITELLM_KEY}
+
+    # MEASURED on one deployment: /health answers 401 without a key and 403 with a key scoped to
+    # the inference routes. /health/liveliness is auth-exempt and answers 200.
+    health_path: /health/liveliness
+
+    # MEASURED on one deployment: all four answer 200 to a shape-valid body.
+    surfaces: [chat_completions, completions, messages, responses]
+
+    timeouts: {connect: 10, request: 600, stream_idle: 120}
+
+    error_status:
+      # MEASURED on one deployment: 400 from LiteLLM's own model_list validation; 403 for a key
+      # restricted to other models (before any validation); 404 for GET
+      # /v1/models/{id} with a slashed id, which never matches the route.
+      unknown_model: [400, 403, 404]
+      unknown_path: [404]
+      wrong_method: [405]
+      # LiteLLM is the only authenticating layer in this stack.
+      bad_credentials: [401]
+      # INTENT: an unknown request field is forwarded and ignored by the engine; the case
+      # requires 200.
+      unsupported_option: [200]
+      # INTENT: a Messages endpoint refuses a nonsense anthropic-version, as Anthropic's API
+      # does. MEASURED on one deployment: 200, normal generation. Fails until you triage it.
+      invalid_api_version: [400]
+      # INTENT: vLLM clamps an output budget the window cannot hold and generates within it
+      # (profiles/REFERENCE.md, Error classes); LiteLLM relays that.
+      output_overflow: [200]
+
+    # INTENT: every error carries a parseable envelope.
+    # MEASURED on one deployment: an unknown path answers {"detail": "Not Found"}, FastAPI's
+    # default, with no envelope; no case checks that class's envelope.
+    unstructured_errors: []
+
+    # A LiteLLM virtual key is usually metered, so a 429 may be our own quota: it skips as
+    # throttled, with the rate-limit headers recorded.
+    rate_limited: true
+
+    setup:
+      # An external TLS endpoint, so a proxy hop on your side is legitimate.
+      proxy: allow
+
+    # MEASURED on one deployment, one request each. Measure yours: these are the proxy's own
+    # configuration, not LiteLLM defaults.
+    transport:
+      health_status: [200]
+      # /v1/models and /openapi.json answer 200 with the key; vLLM's own routes are not routed.
+      present_paths: [/v1/models, /openapi.json]
+      absent_paths: [/docs, /tokenize, /detokenize, /version]
+      absent_status: [403, 404]
+      # OPTIONS with a browser origin answered 200 with access-control-allow-origin: *.
+      cors_preflight: allowed
+      alpn: h2
+      # A plain-HTTP request to the proxy's host answered 301 to the TLS address.
+      http_redirect: expected
+      # Both alternate headers carried the same key to a 200.
+      credential_headers: [x-api-key, api-key]
+      # Two requests with the same Idempotency-Key got two different completion ids.
+      idempotency: ignored
+      # Deliberately loose; tighten from recorded stream timings once a few runs exist.
+      stream_budget: {first_event_s: 30, max_gap_s: 15, min_tokens_per_s: 5, next_request_s: 60}
+
+    model:
+      reasoning:
+        # MEASURED on one deployment: LiteLLM relays vLLM's reasoning as `reasoning_content`,
+        # whatever field the engine answered.
+        field: reasoning_content
+
+    capabilities:
+      # MEASURED on one deployment from GET /v1/model/info: every supports_* field is null (a
+      # model outside LiteLLM's built-in table), so only these are declared. Adjust
+      # supported_endpoints to your model_list entry.
+      model_info:
+        supported_endpoints: ["/v1/messages", "/v1/chat/completions"]
+        litellm_provider: hosted_vllm
+        # This proxy's model_list entry carries a custom llm_d_headers field. Remove the line if
+        # yours does not.
+        llm_d_headers: true
+      # MEASURED on one deployment: GET /v1/models/<id> is refused here. A key limited to the
+      # inference routes answers 403, and an id with a slash never matches the route (404). Set
+      # true if your key may call the route and your ids have no slash.
+      model_retrieval: false
+      responses_features:
+        # MEASURED on one deployment: through LiteLLM a Responses `conversation` field is
+        # accepted and has no effect, whatever the router behind it does with one.
+        conversation: ignored
+
+headers:
+  # MEASURED on one deployment: a client x-request-id is not echoed; LiteLLM mints
+  # x-litellm-call-id instead.
+  x-request-id:
+    litellm: ignored

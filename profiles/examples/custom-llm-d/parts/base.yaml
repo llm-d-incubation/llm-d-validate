@@ -1,0 +1,340 @@
+# Part: what every custom stack in this folder promises, whatever the layers and the model.
+# Not a profile on its own: it declares no ingress and no model. A combination file lists it
+# first in `extends`, then the layer parts outermost first, then a model part. A part never
+# extends anything, so no file is reached by two routes.
+#
+# Everything here is either an API's own definition (INTENT, Rule 1) or a fact of vLLM, the
+# engine at the bottom of every stack here, that does not depend on the model. Layer facts are
+# in proxy-litellm.yaml and router-llm-d.yaml, model facts in models/.
+#
+# Provenance tags:
+#   INTENT                 how a correct stack behaves, as the API itself defines it
+#   MEASURED on one deployment
+#                          observed on one real deployment of this shape; the reason for a
+#                          comment, never for a declaration. Your run is your measurement.
+#
+# Not declared here, and why (each stays skip:undeclared by design):
+#   image_url_fixture        needs an image hosted where your deployment can fetch it; without
+#                            one, messages_features.image_url skips as requires_instrumentation
+#   header_probe, header_rewrites   need the header-echo instrument deployed behind a layer
+#   client_sessions multi_file_fix   executes model-written code on the operator's machine
+#   fleet, environment       need cluster access; add them in your own *.local.yaml
+
+schema: llmdv.profile/1
+
+# INTENT: llmdv runs from outside the cluster and reaches each layer by URL. Override with
+# `in-cluster` in a local file if you run it in a pod.
+vantage: external
+
+# INTENT: the disruptive families (malformed input, disconnects, long context, parallel
+# subagents) run. Use `shared` only when the deployment's owner asks for it, and say so here.
+fleet_policy: dedicated
+
+capabilities:
+  # INTENT: the full spec-derived Chat and Completions contract.
+  openai_contract: true
+
+  # INTENT: every Chat field the OpenAI API and vLLM define is accepted, except where the API
+  # itself refuses it. Model parts override the content parts a model cannot read.
+  chat_fields:
+    add_generation_prompt: accepted
+    add_special_tokens: accepted
+    allowed_token_ids: accepted
+    assistant_content_parts: accepted
+    assistant_last: accepted
+    assistant_refusal: accepted
+    audio: accepted
+    bad_words: accepted
+    cache_salt: accepted
+    # vLLM refuses a request-supplied chat template unless it is started with
+    # --trust-request-chat-template (its secure default): 400 "Chat template is passed with
+    # request, but --trust-request-chat-template is not set". Declare `accepted` if you pass it.
+    chat_template: rejected
+    chat_template_kwargs: accepted
+    consecutive_users: accepted
+    # vLLM implements no `file` content part for any model: 400 "Unsupported chat content part
+    # type: 'file'".
+    content_file: rejected
+    content_image_url: accepted
+    content_input_audio: accepted
+    continuous_usage_stats: accepted
+    documents: accepted
+    empty_user_content: accepted
+    frequency_penalty: accepted
+    functions: accepted
+    guided_choice: accepted
+    guided_decoding_backend: accepted
+    guided_grammar: accepted
+    guided_json: accepted
+    guided_regex: accepted
+    include_obfuscation: accepted
+    include_reasoning: accepted
+    length_penalty: accepted
+    logit_bias: accepted
+    logprob_token_ids: accepted
+    message_name: accepted
+    metadata: accepted
+    min_p: accepted
+    modalities: accepted
+    moderation: accepted
+    parallel_tool_calls: accepted
+    prediction: accepted
+    presence_penalty: accepted
+    prompt_cache_key: accepted
+    prompt_cache_options: accepted
+    prompt_cache_retention: accepted
+    prompt_logprobs: accepted
+    repetition_detection: accepted
+    repetition_penalty: accepted
+    request_id: accepted
+    response_format_text: accepted
+    return_prompt_text: accepted
+    return_token_offsets: accepted
+    role_assistant: accepted
+    role_developer: accepted
+    role_function: accepted
+    role_system: accepted
+    role_tool: accepted
+    routed_experts_prompt_start: accepted
+    safety_identifier: accepted
+    seed: accepted
+    service_tier: accepted
+    session_id: accepted
+    skip_special_tokens: accepted
+    spaces_between_special_tokens: accepted
+    stop_token_ids: accepted
+    store: accepted
+    stream_interval: accepted
+    # INTENT: the OpenAI API allows stream_options only with stream: true.
+    stream_options_alone: rejected
+    structured_outputs: accepted
+    system_content_parts: accepted
+    system_only: accepted
+    temperature: accepted
+    thinking_token_budget: accepted
+    tools: accepted
+    top_k: accepted
+    # INTENT: the OpenAI API requires logprobs: true with top_logprobs.
+    top_logprobs_alone: rejected
+    top_p: accepted
+    truncation_side: accepted
+    use_beam_search: accepted
+    user: accepted
+    verbosity: accepted
+    web_search_options: accepted
+
+  # INTENT: every Completions field is accepted, except where the API refuses it.
+  completions_fields:
+    add_special_tokens: accepted
+    allowed_token_ids: accepted
+    bad_words: accepted
+    best_of: accepted
+    cache_salt: accepted
+    frequency_penalty: accepted
+    ignore_eos: accepted
+    include_stop_str_in_output: accepted
+    length_penalty: accepted
+    logit_bias: accepted
+    logprob_token_ids: accepted
+    min_p: accepted
+    min_tokens: accepted
+    presence_penalty: accepted
+    prompt_logprobs: accepted
+    repetition_detection: accepted
+    repetition_penalty: accepted
+    request_id: accepted
+    response_format_json_object: accepted
+    return_token_ids: accepted
+    return_token_offsets: accepted
+    return_tokens_as_token_ids: accepted
+    routed_experts_prompt_start: accepted
+    seed: accepted
+    session_id: accepted
+    skip_special_tokens: accepted
+    spaces_between_special_tokens: accepted
+    stop_token_ids: accepted
+    stream_interval: accepted
+    # INTENT: the OpenAI API allows stream_options only with stream: true.
+    stream_options_alone: rejected
+    structured_outputs: accepted
+    suffix: accepted
+    temperature: accepted
+    thinking_token_budget: accepted
+    top_k: accepted
+    top_p: accepted
+    truncate_prompt_tokens: accepted
+    truncation_side: accepted
+    use_beam_search: accepted
+    user: accepted
+
+  # INTENT: n and logprobs are part of the Chat API.
+  chat_options: [logprobs, n]
+  # INTENT: a seeded or temperature-0 repeat is identical, a fresh sample differs. Without
+  # `deterministic_repeats` the seed and greedy cases record how many repeats agree and pass
+  # either way: vLLM promises identical repeats only in batch-invariant mode.
+  # MEASURED on one deployment (tensor and expert parallel, speculative decoding): two
+  # temperature-0 requests returned different text.
+  chat_repeats: [seed, greedy, fresh]
+
+  # INTENT: JSON-object mode and JSON Schema output on every surface that defines them.
+  json_object: [chat_completions, responses]
+  structured_output: [chat_completions, messages, responses]
+  structured_output_streaming: [chat_completions, messages, responses]
+  # INTENT: a reasoning parser reports reasoning tokens in usage on Chat and Responses.
+  reasoning_tokens: [chat_completions, responses]
+
+  # INTENT: GET /v1/models/{id} returns the model, as the OpenAI API defines it. A model id with
+  # a slash makes this route fragile at every layer; see the layer parts for what each did.
+  model_retrieval: true
+  # MEASURED on one deployment: POST /v1/responses/compact answers 400 with an envelope ("no
+  # parser registered"); the route does not exist on vLLM here.
+  responses_compact: false
+  responses_options: [metadata, logprobs]
+  # INTENT: request options accepted; references to stored state and built-in tools ignored, as
+  # a self-hosted backend has no built-in tools. Model parts override the input parts a model
+  # cannot read, and router-llm-d.yaml the stored-state references the router refuses.
+  # MEASURED on one deployment (vLLM 0.31 and 0.32): the prompt-cache hints and
+  # safety_identifier are served but not echoed, reasoning summaries come back empty, encrypted
+  # reasoning is not produced and the web-search include values answer 400. Each fails until you
+  # triage it.
+  responses_features:
+    access_programs: accepted
+    additional_tools: accepted
+    apply_patch: ignored
+    background_false: accepted
+    code_interpreter: ignored
+    computer_use_preview: ignored
+    context_management: accepted
+    conversation: ignored
+    encrypted_reasoning: accepted
+    file_search: ignored
+    image_generation: ignored
+    include_tool_outputs: accepted
+    include_web_search_sources: accepted
+    input_file: accepted
+    input_image: accepted
+    item_reference: ignored
+    local_shell: ignored
+    max_tool_calls: accepted
+    mcp: ignored
+    moderation: accepted
+    namespace_tools: ignored
+    parallel_tool_calls: accepted
+    programmatic_tool_calling: ignored
+    prompt_cache_key: accepted
+    prompt_cache_options: accepted
+    prompt_cache_retention: accepted
+    prompt_template: ignored
+    reasoning_context: accepted
+    reasoning_generate_summary: accepted
+    reasoning_mode: accepted
+    reasoning_summary: accepted
+    safety_identifier: accepted
+    service_tier: accepted
+    shell: ignored
+    stream_obfuscation_off: accepted
+    temperature: accepted
+    text_format_text: accepted
+    text_verbosity: accepted
+    tool_search: ignored
+    top_p: accepted
+    truncation_auto: accepted
+    user: accepted
+    web_search: ignored
+    web_search_preview: ignored
+
+  # INTENT: /v1/messages/count_tokens is part of the Messages API.
+  # MEASURED on one deployment: on a four-turn conversation the count sat within 1% of the
+  # generation's input_tokens.
+  count_tokens: true
+  # INTENT: every opt-in Messages check. parallel_tool_calls needs a tool parser and
+  # effort_effect needs Messages efforts; both come from the model part.
+  messages_checks: [block_forms, context_management, count_tokens_parts, effort_effect, error_types, incremental_streaming, max_tokens_limit, mid_conversation_system, parallel_tool_calls, prompt_accounting, response_shape, stop_sequences, tool_result_error]
+  # INTENT: every Messages feature accepted. Model parts override what a model cannot read.
+  messages_features:
+    assistant_prefill: accepted
+    cache_breakpoints_five: accepted
+    cache_control_message_block: accepted
+    cache_control_tool: accepted
+    cache_control_ttl_1h: accepted
+    consecutive_assistant_turns: accepted
+    consecutive_user_turns: accepted
+    container: accepted
+    diagnostics: accepted
+    document_citations: accepted
+    document_content: accepted
+    document_pdf: accepted
+    document_text: accepted
+    image_base64: accepted
+    image_url: accepted
+    inference_geo: accepted
+    leading_assistant: accepted
+    max_tokens_large: accepted
+    max_tokens_over_window: accepted
+    max_tokens_zero: accepted
+    mcp_servers: accepted
+    metadata_user_id: accepted
+    redacted_thinking_passback: accepted
+    search_result: accepted
+    server_tool_history: accepted
+    service_tier: accepted
+    speed_fast: accepted
+    stop_sequences_five: accepted
+    text_citations_passback: accepted
+    thinking_between_tools: accepted
+    thinking_display_omitted: accepted
+    thinking_display_updates: accepted
+    tool_result_blocks: accepted
+    tool_result_image: accepted
+    top_k: accepted
+    top_level_cache_control: accepted
+    top_p: accepted
+  # INTENT: a published beta value is accepted.
+  anthropic_betas: ["prompt-caching-2024-07-31"]
+
+  # INTENT: every vLLM request option, each enabling a Chat case judged by its effect.
+  # MEASURED on one deployment: min_tokens was not honored by one model and logit_bias was
+  # refused with 400 by the engine for another. Both fail until you triage them.
+  vllm_options: [ignore_eos, min_tokens, truncate_prompt_tokens, cache_salt, include_stop_str_in_output, continue_final_message, echo, continuous_usage_stats, structured_outputs, return_tokens_as_token_ids, prompt_logprobs, allowed_token_ids, bad_words, include_reasoning, stop_reason, chat_template_kwargs, return_token_ids, logit_bias, enable_thinking]
+
+  # INTENT: every scenario. inline_system and long_context need cache_reuse (router-llm-d.yaml);
+  # long_context and parallel_subagents are disruptive, allowed by `dedicated`.
+  scenario_checks: [blank_turns, cache_hints, inline_system, long_context, output_overflow, parallel_subagents]
+
+  # INTENT: names a coding agent sends by default must be refused as unknown models, never
+  # served by another model.
+  client_model_names: [claude-sonnet-4-5, claude-haiku-4-5-20251001, claude-opus-4-1]
+
+  # INTENT: real client sessions, each needing a tool parser. multi_file_fix is left out: it
+  # executes model-written code (Rule 3). image_read needs vision on Messages, which the model
+  # part decides.
+  client_sessions: [skill, hook, parallel_reads, nested_subagent, compaction]
+
+  # INTENT: every forward-compatibility probe, declared `either` (no 5xx, and the plain request
+  # afterwards succeeds); tighten to accepted or rejected from the recorded outcomes.
+  forward_compat:
+    count_tokens_block: either
+    unknown_beta: either
+    unknown_block: either
+    unknown_enum_value: either
+    unknown_header: either
+    unknown_item: either
+    unknown_message_field: either
+    unknown_tool_type: either
+  # INTENT: a request reaches the model unchanged. big_integer and big_integer_history need a
+  # tool parser.
+  byte_fidelity: [big_integer, big_integer_history, key_order, unicode_escapes]
+
+clients:
+  - id: smoke
+    surfaces: [chat_completions]
+    needs: [streaming]
+  # The runner image ships Claude Code 2.1.289 at /usr/local/bin/claude (profiles/REFERENCE.md,
+  # "Claude Code clients"). Where it is absent, the real-client cases skip as
+  # requires_instrumentation.
+  - id: claude-code
+    surfaces: [messages]
+    needs: [streaming]
+    binaries:
+      - version: "2.1.289"
+        executable: /usr/local/bin/claude

@@ -28,6 +28,7 @@ profiles/
 | `examples/example-two-ingress.yaml` | An llm-d fleet without LiteLLM: a `vllm` engine and an `llmd_router` gateway. Captured from a live stack; the environment and service names are placeholders. |
 | `examples/example-three-ingress.yaml` | The full shape with LiteLLM in front of the router and engine, including header dispositions. A template: replace each value with what you measure. |
 | `examples/example-two-ingress-staging.yaml` | The two-ingress stack in a second namespace, written with [`extends`](#reuse-a-profile-with-extends) as only its changes. |
+| `examples/custom-llm-d/` | A custom llm-d stack (LiteLLM, the llm-d router, vLLM) for two models, built from shared parts with `extends`. |
 | `**/*.local.yaml` | Your own profiles, anywhere under `profiles/`. Gitignored. |
 
 ## Start from the closest example

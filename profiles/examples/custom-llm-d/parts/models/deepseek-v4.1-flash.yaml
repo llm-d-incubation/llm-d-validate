@@ -1,0 +1,90 @@
+# Part: DeepSeek-V4.1-Flash served by vLLM. Not a profile on its own: it declares the model and
+# what the model and its encoder do, and no ingress. A part never extends anything.
+#
+# Assumed engine flags (check them against your model server's arguments): --reasoning-parser
+# deepseek_v41, --tool-call-parser deepseek_v41, --enable-auto-tool-choice, --max-model-len
+# 1048576, a multimodal processor cache (image input on), no --tool-strict-level, and
+# --reasoning-effort-map '{"minimal": "low", "medium": "low"}'. Without that map, minimal and
+# medium answer 400 "reasoning_effort must be low, high, xhigh, max, ..." and their cases fail.
+#
+# Facts of the model and its encoder, MEASURED on one deployment:
+#   - thinking is on by default; chat_template_kwargs {thinking: false} or effort none turns it
+#     off (0 reasoning tokens, same answer);
+#   - the encoder writes "Reasoning Effort: N" with low 50, high 75, max 100; vLLM adds xhigh at
+#     75, the same as high, so high and xhigh send identical prompts; none writes no effort line;
+#   - the encoder serializes each tool without sorting keys, so the client's key order reaches
+#     the prompt;
+#   - it reads images; it takes no audio (400 "At most 0 audio(s) may be provided in one
+#     prompt"), and vLLM refuses the deprecated `function` role on it (400 "Invalid role:
+#     function").
+#
+# If your deployment refuses images given by URL (vLLM's --allowed-media-domains set to match no
+# host), declare messages_features.image_url `rejected` in your combination file.
+
+model:
+  # The id the router serves is the engine's --served-model-name. Use what GET /v1/models lists.
+  public_id: deepseek-ai/DeepSeek-V4.1-Flash
+  aliases: []
+  max_model_len: 1048576
+  reasoning:
+    parser: deepseek_v41
+    # MEASURED on one deployment: vLLM 0.32 answers message.reasoning and leaves
+    # reasoning_content absent. A proxy part may override this for its own ingress.
+    field: reasoning
+    default_on: true
+  tools:
+    parser: deepseek_v41
+    # INTENT: auto tool choice works. MEASURED on one deployment: it does, except when the
+    # model's call markup is malformed and the parser drops the block.
+    auto_choice: true
+    # MEASURED on one deployment: with thinking on, answer text carried "<｜DSML｜ parameter>",
+    # DeepSeek's call-markup delimiter.
+    markup: ["<｜DSML｜"]
+    # The deepseek_v41 parser has no default strict level, so under `auto` no grammar
+    # constrains a call unless the tool is sent with `strict: true`. Change to `function` if your
+    # deployment passes --tool-strict-level function.
+    strict_level: auto
+  # MEASURED on one deployment: "17 times 23" cost 17 reasoning tokens and 21 in total.
+  # Re-measure from the first run's recorded usage.
+  answer_max_tokens: 128
+
+capabilities:
+  # INTENT: the levels are distinct; the effort-order case measures it. none suppresses
+  # reasoning, so it is the quiet effort.
+  chat_reasoning_efforts: [minimal, low, medium, high, xhigh, max]
+  chat_quiet_efforts: [none]
+  responses_reasoning_efforts: [none, minimal, low, medium, high, xhigh, max]
+
+  # The effort the model is given, read from the rendered prompt (Chat prompt_logprobs).
+  # minimal and medium render 50 through the effort map assumed above.
+  effort_rendering:
+    pattern: 'Reasoning Effort: (\d+)'
+    surfaces: [chat_completions]
+    efforts: {unset: '75', none: null, minimal: '50', low: '50', medium: '50', high: '75', xhigh: '75', max: '100'}
+
+  # MEASURED on one deployment: enabled and adaptive return a signed thinking block first;
+  # disabled returns text only.
+  messages_thinking: [enabled, adaptive, disabled]
+  # INTENT: every effort produces thinking.
+  messages_efforts: [low, medium, high, xhigh, max]
+
+  # The model reads images: the image cases send a freshly drawn picture on each surface and
+  # require the answer to describe it.
+  vision: [chat_completions, messages, responses]
+  # image_read is added because vision is declared on Messages.
+  client_sessions: [skill, hook, parallel_reads, nested_subagent, compaction, image_read]
+
+  chat_fields:
+    content_input_audio: rejected
+    role_function: rejected
+
+  cache_reuse:
+    # INTENT: one conversation renders alike across APIs at matching settings. MEASURED on one
+    # deployment through the render surfaces: Messages thinking disabled renders like Chat none,
+    # and thinking enabled (budget 1024) like Chat high. Messages thinking against a low or
+    # medium Chat effort differs from the first token, by design of the encoder.
+    equivalent_settings:
+      - [chat_completions:low, responses:low]
+      - [chat_completions:high, responses:high]
+      - [messages:disabled, chat_completions:none]
+      - [messages:enabled, chat_completions:high]

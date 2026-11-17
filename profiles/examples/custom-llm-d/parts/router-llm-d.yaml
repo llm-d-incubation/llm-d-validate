@@ -1,0 +1,141 @@
+# Part: the llm-d router (an Envoy proxy whose ext_proc filter calls the endpoint picker, the
+# EPP) in front of vLLM, reached directly through a route. Not a profile on its own: it declares
+# one ingress and no model. A part never extends anything.
+#
+# The URL comes from the environment, so no hostname is written here:
+#   export LLMDV_ROUTER_URL=<your router's route URL>
+# If the route's certificate comes from a private CA, also export SSL_CERT_FILE=<a bundle that
+# holds it>. Keep tls.verify true.
+#
+# What identifies this layer (Rule 2):
+#   llm-d router   its own x-llm-d-flow-queue-duration-ms header on every inference answer, and
+#                  a JSON 400 "error extracting request body: ..." on a truncated body. With
+#                  prefill/decode disaggregation, also x-llm-d-disagg-revision, and a 503 "The
+#                  decode node is not ready" when a decode worker fails a request.
+#   vLLM behind it system_fingerprint vllm-..., and GET /version. The fingerprint passes through
+#                  every layer, so it names the engine, not the ingress.
+# Backend headers (x-gateway-destination-endpoint, x-envoy-upstream-host) were absent on the
+# deployment this was measured on, so the serving pod is not attributed.
+#
+# MEASURED on one deployment, from the router stack's Envoy configuration rather than the EPP;
+# both are declared as a correct stack behaves and fail until you triage them:
+#   - a request carrying a header with an underscore (`session_id`) gets a 502 from the route's
+#     edge, not a 400 (Envoy headers_with_underscores_action: REJECT_REQUEST);
+#   - GET /v1/models/<org>%2F<model> answers 307 to the unescaped path (Envoy
+#     path_with_escaped_slashes_action: UNESCAPE_AND_REDIRECT), so discovery.model_retrieve
+#     fails for any slashed model id.
+#
+# Not declared here, and why:
+#   model_info                 GET /v1/model/info is a LiteLLM route (404 here)
+#   bad_credentials, credential_headers   the router authenticates nothing
+#   render surfaces            vLLM serves them only when started with scale-out enabled (403
+#                              "Scale-out endpoints are disabled" otherwise); a combination file
+#                              adds them where the engine serves them
+#   cache_reuse.shared_with    needs a second ingress on the same engines that bypasses the
+#                              router; not part of this shape
+
+ingresses:
+  - id: router
+    kind: llmd_router
+    base_url_env: LLMDV_ROUTER_URL
+    # MEASURED on one deployment: /v1/models, /health and every inference surface answer
+    # without credentials.
+    auth: {type: none}
+    # MEASURED on one deployment: /health answers 200 with an empty body.
+    health_path: /health
+
+    surfaces: [chat_completions, completions, messages, responses]
+
+    timeouts: {connect: 10, request: 600, stream_idle: 120}
+
+    error_status:
+      # MEASURED on one deployment: 404 "The model `...` does not exist", in the engine's envelope
+      # on Chat and in Anthropic's shape on Messages.
+      unknown_model: [404]
+      unknown_path: [404]
+      wrong_method: [405]
+      # INTENT: an unknown request field is forwarded and ignored by the engine; the case
+      # requires 200.
+      unsupported_option: [200]
+      # INTENT: a Messages endpoint refuses a nonsense anthropic-version, as Anthropic's API
+      # does. MEASURED on one deployment: 200, normal generation. Fails until you triage it.
+      invalid_api_version: [400]
+      # INTENT: vLLM clamps an output budget the window cannot hold and generates within it.
+      output_overflow: [200]
+
+    # INTENT: every error carries a parseable envelope.
+    # MEASURED on one deployment: a truncated JSON body answers 400 {"error": {"message": "error
+    # extracting request body: unexpected end of JSON input", "type": "invalid_request_error"}}.
+    # Older router builds answered such errors as plain text ("inference error: BadRequest -
+    # ..."); see .agents/GROUND-TRUTH.md before declaring unstructured_errors.
+    unstructured_errors: []
+
+    # No quota layer in front of the router, so a 429 fails. The EPP's flow control answers 429
+    # when it cannot dispatch within its queue-wait limit: that is a finding, not our quota.
+    rate_limited: false
+
+    setup:
+      proxy: allow
+
+    # MEASURED on one deployment, one request each.
+    transport:
+      health_status: [200]
+      # vLLM's own routes are exposed through the router.
+      present_paths: [/v1/models, /openapi.json, /docs, /metrics, /version]
+      absent_paths: [/v1/model/info]
+      absent_status: [404]
+      # OPTIONS with a browser origin answered 400 "Disallowed CORS origin".
+      cors_preflight: refused
+      alpn: http/1.1
+      # INTENT where the route redirects plain HTTP. MEASURED: one route answered 302 to TLS;
+      # another accepted no plain-HTTP connection at all, which fails this line.
+      http_redirect: expected
+      idempotency: ignored
+      # Deliberately loose; tighten from recorded stream timings once a few runs exist.
+      stream_budget: {first_event_s: 30, max_gap_s: 15, min_tokens_per_s: 5, next_request_s: 60}
+
+    capabilities:
+      # MEASURED on one deployment: GET /v1/models/<id> does not answer the model for an id with
+      # a slash. Set true if your stack serves it.
+      model_retrieval: false
+
+capabilities:
+  # Declared at the top, not under the ingress: the router is on every path in this stack, so
+  # what it refuses, a proxy in front of it relays.
+
+  # MEASURED on one deployment: store: true returns an id, GET /v1/responses/<id> answers 404,
+  # and background: true answers 400 "does not support store=True". The engine keeps no response
+  # state, and replicas behind a router share none.
+  stateless_responses: true
+
+  responses_features:
+    # MEASURED on one deployment: a recent llm-d router build refuses Responses fields that
+    # depend on state it does not keep (previous_response_id, conversation, background, file ids)
+    # with a 400 naming the field, by design. An older build passed `conversation` through and
+    # the engine ignored it. Declare `ignored` if your router build passes it.
+    conversation: rejected
+
+  # INTENT: placing a repeat on a replica that holds its prefix is the EPP's job (a prefix-aware
+  # scorer), so a cold read on a repeat is a routing failure, not a skip.
+  # MEASURED on one deployment: every warm repeat hit on all three surfaces, and a salted repeat
+  # read nothing on all three (the router keys prefix hashes by model and cache_salt).
+  # The model part adds the settings each model renders alike; a combination file adds the
+  # engine's block size.
+  # canonical_tool_keys stays false (the default): the router forwards fields it does not modify
+  # byte for byte, so tool schemas reach the template in the order the client sent them, and
+  # two key orders render two prompts.
+  cache_reuse:
+    min_ratio: 0.9
+    cold_max_ratio: 0.1
+    # Large enough that the turn cases fill several whole blocks at a 512-token block size.
+    prefix_words: 2048
+    surfaces: [chat_completions, responses, messages]
+    affinity: routed
+
+  # INTENT: the pinned client's three-turn cache case; needs cache_reuse on messages.
+  client_reuse: true
+
+headers:
+  # MEASURED on one deployment: a client x-request-id is not echoed on the answer.
+  x-request-id:
+    router: ignored

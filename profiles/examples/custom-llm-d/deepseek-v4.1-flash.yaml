@@ -1,0 +1,120 @@
+# DeepSeek-V4.1-Flash on a custom llm-d deployment: LiteLLM in front of the llm-d router in
+# front of vLLM (aggregated: no prefill/decode split here); not one of llm-d's guides.
+#
+# Run it:
+#   export LLMDV_LITELLM_URL=<your LiteLLM base URL>  LLMDV_LITELLM_KEY=<a virtual key>
+#   export LLMDV_ROUTER_URL=<your router's route URL>
+#   llmdv profile validate <this file>
+#   llmdv plan --profile <this file>            # what would run and skip, offline
+#   llmdv verify --profile <this file> -m contract
+#   llmdv verify --profile <this file> --evidence all
+# Each ingress is a column: `-k litellm` or `-k router` runs one layer. If you can reach only
+# one of them, write a combination that leaves the other part out of `extends`.
+#
+# How it is built. Each file in `extends` is merged over the ones before it, and this file's own
+# keys last:
+#   parts/base.yaml                       what the APIs promise, and vLLM facts that do not depend
+#                                   on the model
+#   parts/proxy-litellm.yaml              the outermost layer: the LiteLLM ingress, its auth and quirks
+#   parts/router-llm-d.yaml               the llm-d router ingress, and what it does on every path
+#   parts/models/deepseek-v4.1-flash.yaml the model, its parsers, efforts and what it reads
+# This file adds only what belongs to this one deployment: the engine's block size, the render
+# surfaces this engine serves at the router, and the change sentinels.
+#
+# Put real hostnames, cluster coordinates or port-forwards in a gitignored
+# deepseek-v4.1-flash.local.yaml that extends this file, never here.
+
+name: custom-llm-d-deepseek-v4.1-flash
+extends: [parts/base.yaml, parts/proxy-litellm.yaml, parts/router-llm-d.yaml, parts/models/deepseek-v4.1-flash.yaml]
+
+ingresses:
+  # This deployment starts vLLM with scale-out enabled, so its render routes answer through the
+  # router (MEASURED on one deployment: all four return token ids). A list replaces the part's
+  # whole list, so all eight surfaces are named. LiteLLM does not route them.
+  - id: router
+    surfaces: [chat_completions, completions, messages, responses, chat_render, completions_render, messages_render, responses_render]
+    capabilities:
+      # INTENT: a synthetic token prefix renders stably on each render surface.
+      prefix_stability: [chat_render, completions_render, messages_render, responses_render]
+      cache_reuse:
+        # INTENT: the chat-shaped APIs render one plain conversation alike; the render surfaces
+        # let cache.cross_api check it.
+        render_equivalent: [chat_completions, messages, responses]
+      responses_features:
+        # MEASURED on one deployment: this router build passes `conversation` through and the
+        # engine ignores it (the router part declares what a newer build does).
+        conversation: ignored
+  - id: litellm
+    error_status:
+      # MEASURED on one deployment: this key belongs to a team, and LiteLLM answers an unknown
+      # model 403 ("team not allowed to access model") before any model_list validation; 404 is
+      # GET /v1/models/<id> with a slashed id.
+      unknown_model: [403, 404]
+    transport:
+      # MEASURED on one deployment: this proxy answers /metrics/ (with the slash).
+      present_paths: [/v1/models, /openapi.json, /metrics/]
+    capabilities:
+      cache_reuse:
+        # The pairs LiteLLM serves alike. The Messages pairs are left to the router, where the
+        # render surfaces show why they differ.
+        equivalent_settings:
+          - [chat_completions:high, responses:high]
+          - [chat_completions:low, responses:low]
+          - [chat_completions:medium, responses:medium]
+
+capabilities:
+  cache_reuse:
+    # The engine's --block-size in this deployment. MEASURED on one deployment: every warm read
+    # was a multiple of 64. Replace with yours.
+    block_size: 64
+
+  messages_features:
+    # This deployment never downloads media: vLLM's --allowed-media-domains matches no host, so
+    # an image given by URL is refused 400 and images must arrive inline (image_base64).
+    image_url: rejected
+
+  # Change sentinels: placeholders, never another stack's values. Run once with
+  # `--evidence all` against a known-good build; each pin fails with the observed value in its
+  # canonical_input_tokens or canonical_render_digest check, and each contract part passes with
+  # its exchange recorded in exchanges.jsonl, which llmdv.assertions.contract (shape,
+  # stream_shape, baseline) turns into a baseline. Replace these with what that run shows.
+  prompt_pins:
+    chat_completions: {conversation: 1, tools: 1}
+    completions: {conversation: 1}
+    messages: {conversation: 1, tools: 1}
+    responses: {conversation: 1, tools: 1}
+  render_pins:
+    chat_render: {conversation: "0000000000000000000000000000000000000000000000000000000000000000", tools: "0000000000000000000000000000000000000000000000000000000000000000"}
+    completions_render: {conversation: "0000000000000000000000000000000000000000000000000000000000000000"}
+    messages_render: {conversation: "0000000000000000000000000000000000000000000000000000000000000000", tools: "0000000000000000000000000000000000000000000000000000000000000000"}
+    responses_render: {conversation: "0000000000000000000000000000000000000000000000000000000000000000", tools: "0000000000000000000000000000000000000000000000000000000000000000"}
+  contract_baseline:
+    chat_completions:
+      response: {llmdv_seed: [absent]}
+      stream: {llmdv_seed: [absent]}
+      error: {llmdv_seed: [absent]}
+      invalid: {llmdv_seed: [absent]}
+      tool_response: {llmdv_seed: [absent]}
+      tool_stream: {llmdv_seed: [absent]}
+    completions:
+      response: {llmdv_seed: [absent]}
+      stream: {llmdv_seed: [absent]}
+      error: {llmdv_seed: [absent]}
+      invalid: {llmdv_seed: [absent]}
+    messages:
+      response: {llmdv_seed: [absent]}
+      stream: {llmdv_seed: [absent]}
+      error: {llmdv_seed: [absent]}
+      invalid: {llmdv_seed: [absent]}
+      tool_response: {llmdv_seed: [absent]}
+      tool_stream: {llmdv_seed: [absent]}
+    responses:
+      response: {llmdv_seed: [absent]}
+      stream: {llmdv_seed: [absent]}
+      error: {llmdv_seed: [absent]}
+      invalid: {llmdv_seed: [absent]}
+      tool_response: {llmdv_seed: [absent]}
+      tool_stream: {llmdv_seed: [absent]}
+
+# known_failures: none. Add an entry only for a failure you have filed and traced to a fix that
+# has not reached this deployment (profiles/REFERENCE.md, known_failures).

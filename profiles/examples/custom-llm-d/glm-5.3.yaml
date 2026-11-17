@@ -1,0 +1,101 @@
+# GLM-5.3 on a custom llm-d deployment: LiteLLM in front of the llm-d router in front of
+# disaggregated vLLM (prefill/decode); not one of llm-d's guides.
+#
+# Run it:
+#   export LLMDV_LITELLM_URL=<your LiteLLM base URL>  LLMDV_LITELLM_KEY=<a virtual key>
+#   export LLMDV_ROUTER_URL=<your router's route URL>
+#   llmdv profile validate <this file>
+#   llmdv plan --profile <this file>            # what would run and skip, offline
+#   llmdv verify --profile <this file> -m contract
+#   llmdv verify --profile <this file> --evidence all
+# Each ingress is a column: `-k litellm` or `-k router` runs one layer. If you can reach only
+# one of them, write a combination that leaves the other part out of `extends`.
+#
+# How it is built. Each file in `extends` is merged over the ones before it, and this file's own
+# keys last:
+#   parts/base.yaml            what the APIs promise, and vLLM facts that do not depend on the model
+#   parts/proxy-litellm.yaml   the outermost layer: the LiteLLM ingress, its auth and its quirks
+#   parts/router-llm-d.yaml    the llm-d router ingress, and what the router does on every path
+#   parts/models/glm-5.3.yaml  the model, its parsers, efforts and what it cannot read
+# This file adds only what belongs to this one deployment: the engine's block size, the
+# model's error status per ingress (ingresses merge by id), and the change sentinels.
+#
+# Put real hostnames, cluster coordinates or port-forwards in a gitignored glm-5.3.local.yaml that
+# extends this file, never here.
+
+name: custom-llm-d-glm-5.3
+extends: [parts/base.yaml, parts/proxy-litellm.yaml, parts/router-llm-d.yaml, parts/models/glm-5.3.yaml]
+
+ingresses:
+  # The model is served text-only, so an image is refused at every layer (see the model part).
+  - id: litellm
+    error_status:
+      image_input: [400]
+    transport:
+      # MEASURED on one deployment: this proxy does not expose /metrics either. A list replaces
+      # the part's whole list.
+      absent_paths: [/docs, /tokenize, /detokenize, /metrics, /version]
+    capabilities:
+      cache_reuse:
+        # MEASURED on one deployment: through LiteLLM two key orders of one tool schema read the
+        # same cached prefix, so the proxy hands the engine tool schemas in one canonical order.
+        canonical_tool_keys: true
+  - id: router
+    error_status:
+      image_input: [400]
+
+capabilities:
+  # A small public PNG the engine can fetch, for the cases that send an image by URL. GLM-5.3 is
+  # text-only and refuses any image, so whether it is fetched is moot here; the line keeps the
+  # case's image if the model changes. Use any stable public image your deployment can reach.
+  image_url_fixture: https://www.python.org/static/img/python-logo.png
+  cache_reuse:
+    # The engine's KV block size in this deployment. MEASURED on one deployment from four
+    # prompt lengths (only 512 fits floor((P - 1) / B) * B at all four), and matching the
+    # router's own block-size setting. Replace with your --block-size.
+    block_size: 512
+    # This deployment runs GLM-5.3's MTP draft for speculative decoding: vLLM recomputes the
+    # draft's KV for the last chunk of every hit, so a warm hit reads one block fewer than the
+    # floor. Set 0 without a draft model.
+    withheld_blocks: 1
+
+  # Change sentinels: placeholders, never another stack's values. Run once with
+  # `--evidence all` against a known-good build; each pin fails with the observed value in its
+  # canonical_input_tokens check, and each contract part passes with its exchange recorded in
+  # exchanges.jsonl, which llmdv.assertions.contract (shape, stream_shape, baseline) turns into a
+  # baseline. Replace these with what that run shows.
+  prompt_pins:
+    chat_completions: {conversation: 1, tools: 1}
+    completions: {conversation: 1}
+    messages: {conversation: 1, tools: 1}
+    responses: {conversation: 1, tools: 1}
+  contract_baseline:
+    chat_completions:
+      response: {llmdv_seed: [absent]}
+      stream: {llmdv_seed: [absent]}
+      error: {llmdv_seed: [absent]}
+      invalid: {llmdv_seed: [absent]}
+      tool_response: {llmdv_seed: [absent]}
+      tool_stream: {llmdv_seed: [absent]}
+    completions:
+      response: {llmdv_seed: [absent]}
+      stream: {llmdv_seed: [absent]}
+      error: {llmdv_seed: [absent]}
+      invalid: {llmdv_seed: [absent]}
+    messages:
+      response: {llmdv_seed: [absent]}
+      stream: {llmdv_seed: [absent]}
+      error: {llmdv_seed: [absent]}
+      invalid: {llmdv_seed: [absent]}
+      tool_response: {llmdv_seed: [absent]}
+      tool_stream: {llmdv_seed: [absent]}
+    responses:
+      response: {llmdv_seed: [absent]}
+      stream: {llmdv_seed: [absent]}
+      error: {llmdv_seed: [absent]}
+      invalid: {llmdv_seed: [absent]}
+      tool_response: {llmdv_seed: [absent]}
+      tool_stream: {llmdv_seed: [absent]}
+
+# known_failures: none. Add an entry only for a failure you have filed and traced to a fix that
+# has not reached this deployment (profiles/REFERENCE.md, known_failures).
