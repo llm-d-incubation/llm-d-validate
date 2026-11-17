@@ -96,7 +96,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="llmdv",
         parents=[parent],
-        description="Functional validation for deployed llm-d model serving stacks. "
+        description="Functional validation for deployed model serving stacks. "
         "Tests already-deployed stacks; never deploys or mutates anything.",
         epilog=exit_codes.epilog(),
         formatter_class=argparse.RawDescriptionHelpFormatter,
