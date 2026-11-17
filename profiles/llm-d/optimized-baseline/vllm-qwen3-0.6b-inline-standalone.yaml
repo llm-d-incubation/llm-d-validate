@@ -7,7 +7,8 @@
 #
 # CI lane that deploys this configuration (llm-d's nightly-e2e-optimized-baseline-<lane>
 # workflow; it runs in standalone mode):
-#   intel-acc-xpu-vllm-x              xpu/vllm/base (the lane sets no provider)
+#   intel-acc-xpu-vllm-x              xpu/vllm (the lane sets no provider, so it applies that
+#                                     folder's own kustomization, which includes `base`)
 #
 # How a lane runs it, after deploying the guide in standalone mode (guide.yaml deploy.standalone)
 # with one of the overlays above:

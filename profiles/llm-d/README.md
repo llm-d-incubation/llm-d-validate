@@ -76,12 +76,14 @@ These profiles follow llm-d's CI: there is one for every configuration a nightly
 | `gke-acc-gpu-vllm-x` | `gpu/vllm/gke` | `vllm-qwen3-32b-parsers-standalone` |
 | `ibm-acc-gpu-vllm-x` | `gpu/vllm/ocp` | `vllm-qwen3-32b-parsers-standalone` |
 | `amd-acc-rocm-vllm-x` | `amd/vllm/amd-ci` | `vllm-qwen3-32b-inline-standalone` |
-| `gke-acc-tpu-vllm-x` | `tpu/v5p/vllm` (no provider set) | `vllm-qwen3-32b-inline-standalone` |
-| `intel-acc-xpu-vllm-x` | `xpu/vllm/base` (no provider set) | `vllm-qwen3-0.6b-inline-standalone` |
+| `gke-acc-tpu-vllm-x` | `tpu/v5p/vllm` | `vllm-qwen3-32b-inline-standalone` |
+| `intel-acc-xpu-vllm-x` | `xpu/vllm` | `vllm-qwen3-0.6b-inline-standalone` |
 | `gke-acc-gpu-sglang-x` | `gpu/sglang/gke` | `sglang-qwen3-32b-parsers-standalone` |
-| `gke-acc-tpu-sglang-x` | `tpu/v5p/sglang` (no provider set) | `sglang-qwen3-32b-ctx16k-parsers-standalone` |
+| `gke-acc-tpu-sglang-x` | `tpu/v5p/sglang` | `sglang-qwen3-32b-ctx16k-parsers-standalone` |
 | `amd-acc-rocm-sglang-x` | `amd/sglang/amd-ci` | `sglang-qwen3-32b-inline-standalone` |
 | `amd-acc-rocm-atom-x` | `amd/atom/amd-ci` | `atom-qwen3-32b-ctxunknown-inline-standalone` |
+
+Three lanes set no provider. They apply the accelerator and engine folder's own kustomization, which includes only `base`, so they deploy what the `base` overlay does.
 
 Lanes share a profile when the overlays they deploy give a client the same model, context window, parsers and engine: a provider overlay changes only node, cache and NCCL settings. Pass the lane or overlay as `--label` to keep their runs apart. `sim-qwen3-32b-standalone` is not a lane: it runs the guide's router in front of llm-d-inference-sim, for kind or CI without accelerators.
 

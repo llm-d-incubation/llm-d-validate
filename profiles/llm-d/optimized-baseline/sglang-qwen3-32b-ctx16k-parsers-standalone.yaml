@@ -8,8 +8,9 @@
 #
 # CI lane that deploys this configuration (llm-d's nightly-e2e-optimized-baseline-<lane>
 # workflow; it runs in standalone mode):
-#   gke-acc-tpu-sglang-x              tpu/v5p/sglang (the lane sets no provider; the base and gke
-#                                     overlays render the same engine arguments)
+#   gke-acc-tpu-sglang-x              tpu/v5p/sglang (the lane sets no provider, so it applies
+#                                     that folder's own kustomization, which includes `base`;
+#                                     `gke` renders the same engine arguments)
 # Same to a client, but run by no lane: tpu/v6/sglang and tpu/v7/sglang (community).
 #
 # How a lane runs it, after deploying the guide in standalone mode (guide.yaml deploy.standalone)

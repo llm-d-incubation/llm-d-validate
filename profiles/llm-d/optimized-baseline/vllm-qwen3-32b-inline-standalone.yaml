@@ -8,8 +8,9 @@
 # CI lanes that deploy this configuration (llm-d's nightly-e2e-optimized-baseline-<lane>
 # workflows; each runs in standalone mode):
 #   amd-acc-rocm-vllm-x               amd/vllm/amd-ci
-#   gke-acc-tpu-vllm-x                tpu/v5p/vllm (the lane sets no provider; the base and gke
-#                                     overlays render the same engine arguments)
+#   gke-acc-tpu-vllm-x                tpu/v5p/vllm (the lane sets no provider, so it applies
+#                                     that folder's own kustomization, which includes `base`;
+#                                     `gke` renders the same engine arguments)
 # Same to a client, but run by no lane: amd/vllm/base.
 #
 # The two accelerators run the same vLLM release (v0.31.0, ROCm and TPU builds) with the same
