@@ -168,8 +168,10 @@ Within one run, the summary reads a ladder off the profile: which layer failed w
 inside it passed. The rows come from the declared layers, ordered by `kind` (proxy, router,
 engine), and a run that cannot establish an order offers none. Every result records
 `served_by`. The summary and the alert feed pair layers by one rule: a layer is compared only
-with the nearest layers it fronts that reported. Two layers of one kind are peers and are never
-compared.
+with the nearest layers behind it that reported. Going inward one kind at a time, the first kind
+with any layer that reported is where the comparison stops; a layer of that kind that did not
+report is left out, and nothing is compared through it. Two layers of one kind are peers and
+are never compared. A recorded graph that misses a layer that reported is read as no graph.
 
 *Why:* the ladder assumes the layers are in series and otherwise identical, and they are not.
 Direct access reaches one replica; a router load-balances across many with different

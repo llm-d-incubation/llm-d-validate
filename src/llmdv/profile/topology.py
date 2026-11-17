@@ -7,10 +7,12 @@ two ingresses at one depth -- two engines, say a prefill and a decode pool -- ar
 edge between them.
 
 There is one pairing rule, and both the summary's attribution ladder and the alert feed use
-it: among the ingresses that reported, an ingress is compared only with its nearest reported
-descendants -- those it reaches without passing through another ingress that reported. Peers
-are never compared, so "prefill fails where decode passes" can no longer be printed as if
-decode sat behind prefill.
+it: an ingress is compared only with the nearest ingresses behind it that reported. From the
+ingress, step to the ones it fronts; if any of them reported, compare it with each of those and
+go no further; only if none did, step on through them to the ones they front. So a gateway in
+front of two routers, one of which reported, is compared with that router and not with the
+engine behind it, which is that router's to be compared with. Peers are never compared, so
+"prefill fails where decode passes" can no longer be printed as if decode sat behind prefill.
 
 A run records its graph in outcome.json (`as_record`), so the alert feed reads the run without
 the profile. A run recorded before the graph existed has none, and its readers keep the depth
@@ -53,7 +55,10 @@ class Topology:
 
     @classmethod
     def from_record(cls, body: Any) -> Topology | None:
-        """The graph a run recorded, or None when it recorded none or something unreadable."""
+        """The graph a run recorded, or None when it recorded none or something unreadable.
+
+        A readable graph can still be the wrong one for a run: see `covers`.
+        """
         if not isinstance(body, dict):
             return None
         order, fronts = body.get("order"), body.get("fronts")
@@ -75,26 +80,33 @@ class Topology:
         """The graph as outcome.json carries it."""
         return {"order": list(self.order), "fronts": {n: list(self.fronts[n]) for n in self.order}}
 
-    def nearest(self, name: str, reported: Iterable[str]) -> list[str]:
-        """The reported ingresses `name` reaches without passing another reported one.
+    def covers(self, names: Iterable[str]) -> bool:
+        """Whether every one of `names` is in the graph.
 
-        Outermost first, in `order`. Empty when `name` is not in the graph or fronts nothing
-        that reported.
+        A graph that misses an ingress that reported does not describe the run, and a reader
+        treats it as no graph at all rather than read the missing ingress as fronting nothing.
+        """
+        return set(names) <= set(self.order)
+
+    def nearest(self, name: str, reported: Iterable[str]) -> list[str]:
+        """The reported ingresses the fewest steps behind `name`.
+
+        One step at a time: the ingresses `name` fronts, then the ones those front, and so on.
+        The walk stops at the first step where any ingress reported and returns the ones that
+        did; an ingress at that step that did not report is left out, and nothing behind it is
+        looked at. Outermost first, in `order`. Empty when `name` is not in the graph or
+        nothing behind it reported.
         """
         members = set(reported)
-        found: set[str] = set()
         seen: set[str] = set()
-        stack = list(self.fronts.get(name, ()))
-        while stack:
-            current = stack.pop()
-            if current in seen:
-                continue
-            seen.add(current)
-            if current in members:
-                found.add(current)
-            else:
-                stack.extend(self.fronts.get(current, ()))
-        return [item for item in self.order if item in found]
+        level = set(self.fronts.get(name, ()))
+        while level:
+            found = level & members
+            if found:
+                return [item for item in self.order if item in found]
+            seen |= level
+            level = {t for item in level for t in self.fronts.get(item, ())} - seen
+        return []
 
     def pairs(self, reported: Iterable[str]) -> list[tuple[str, str]]:
         """Every (outer, inner) the pairing rule compares among `reported`, outermost first."""

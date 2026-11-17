@@ -246,6 +246,99 @@ def test_an_archived_run_without_a_graph_keeps_the_depth_reading(tmp_path):
     assert epp["basis"] == "fails at prefill, passes at decode"
 
 
+# ------------------------------------------------------------- a peer that did not report
+
+# A gateway, two routers and an engine. `rb` is the router that reports nothing below.
+WIDE = stack(("lite", KINDS[0]), ("ra", KINDS[1]), ("rb", KINDS[1]), ("e1", KINDS[2]))
+
+
+def test_a_layer_is_not_compared_past_a_reported_layer_through_its_silent_peer():
+    topology = WIDE.topology()
+    assert topology.nearest("lite", ["lite", "ra", "e1"]) == ["ra"]
+    assert topology.pairs(["lite", "ra", "e1"]) == [("lite", "ra"), ("ra", "e1")]
+    # With both routers reporting, each is compared with the gateway and with the engine.
+    assert topology.pairs(["lite", "ra", "rb", "e1"]) == [
+        ("lite", "ra"),
+        ("lite", "rb"),
+        ("ra", "e1"),
+        ("rb", "e1"),
+    ]
+    # With neither reporting, the gateway is compared with the engine behind them.
+    assert topology.pairs(["lite", "e1"]) == [("lite", "e1")]
+
+
+def test_the_ladder_with_a_silent_peer_reads_as_the_chain_that_reported():
+    text = "\n".join(_attribution_section(["lite", "ra", "e1"], WIDE))
+    assert "chain, outermost first: lite -> ra -> e1" in text
+    assert "| e1 passes, lite fails |" not in text
+    assert "| ra passes, lite fails |" in text
+    assert "| e1 passes, ra fails |" in text
+
+
+@pytest.mark.parametrize("outcomes", list(itertools.product(OUTCOMES, repeat=3)))
+def test_the_feed_with_a_silent_peer_reads_as_the_chain_that_reported(outcomes):
+    col = column(WIDE, dict(zip(("lite", "ra", "e1"), outcomes, strict=True)))
+    for record in col.values():
+        if record["outcome"] != "pass":
+            want = alerts._attribute_by_depth(record, col)
+            assert alerts.attribute(record, col, WIDE.topology()) == want
+
+
+# Two of every kind: every reported subset of it has peers, silent peers, or skipped layers.
+TWO_EACH = stack(*((f"{kind.value}{n}", kind) for kind in KINDS for n in (1, 2)))
+
+
+@pytest.mark.parametrize("reported", list(subsets(TWO_EACH.chain())), ids=",".join)
+def test_the_feed_and_the_ladder_agree_for_every_reported_subset(reported):
+    """The feed's walk only ever takes a step the ladder prints as a row.
+
+    And where no two reported layers share a kind, both read as the depth order did.
+    """
+    topology = TWO_EACH.topology()
+    kinds = {item.id: item.kind for item in TWO_EACH.ingresses}
+    pairs = topology.pairs(reported)
+    compared: dict[str, list[str]] = {name: [] for name in reported}
+    for outer, inner in pairs:
+        compared[outer].append(inner)
+    # The rule, stated by depth: the reported layers at the nearest deeper depth that has any.
+    for name in reported:
+        inside = [other for other in reported if depth(kinds[other]) > depth(kinds[name])]
+        nearest = min((depth(kinds[other]) for other in inside), default=None)
+        assert compared[name] == [o for o in inside if depth(kinds[o]) == nearest]
+    if len(reported) > 1:
+        text = "\n".join(_attribution_section(list(reported), TWO_EACH))
+        assert text.count(" passes, ") == len(pairs)
+        for outer, inner in pairs:
+            assert f"| {inner} passes, {outer} fails |" in text
+        for name in reported:
+            assert (f"| {name} fails |" in text) == (not compared[name])
+
+    chain = len({kinds[name] for name in reported}) == len(reported)
+    for outcomes in itertools.product(OUTCOMES, repeat=len(reported)):
+        col = column(TWO_EACH, dict(zip(reported, outcomes, strict=True)))
+        for record in col.values():
+            if record["outcome"] == "pass":
+                continue
+            culprit, basis = alerts.attribute(record, col, topology)
+            assert culprit["outcome"] in ("fail", "error")
+            # The culprit is reached from the failing layer along compared pairs that fail.
+            reached, frontier = {record["ingress"]}, [record["ingress"]]
+            while frontier:
+                for inner in compared[frontier.pop()]:
+                    if col[inner]["outcome"] != "pass" and inner not in reached:
+                        reached.add(inner)
+                        frontier.append(inner)
+            assert culprit["ingress"] in reached
+            inner = compared[culprit["ingress"]]
+            if inner:
+                assert basis == f"fails at {culprit['ingress']}, passes at {', '.join(inner)}"
+                assert all(col[name]["outcome"] == "pass" for name in inner)
+            else:
+                assert "the innermost layer that ran this case" in basis
+            if chain:
+                assert (culprit, basis) == alerts._attribute_by_depth(record, col)
+
+
 # ------------------------------------------------------------------------- the recorded graph
 
 
@@ -273,6 +366,26 @@ def test_an_unreadable_recorded_graph_is_read_as_none(body):
     assert Topology.from_record(body) is None
 
 
+@pytest.mark.parametrize(
+    "recorded",
+    [
+        {"order": [], "fronts": {}},
+        {"order": ["router", "engine"], "fronts": {"router": ["engine"]}},
+        {"order": ["gateway"], "fronts": {}},
+    ],
+)
+def test_a_recorded_graph_that_misses_a_reported_layer_is_read_as_none(tmp_path, recorded):
+    """Such a graph does not describe this run, so the feed is the depth reading."""
+    profile = stack(("gateway", KINDS[0]), ("router", KINDS[1]), ("engine", KINDS[2]))
+    outcomes = {"gateway": "fail", "router": "fail", "engine": "pass"}
+    records = [{**r, "case_id": "c", "variant": "chat"} for r in column(profile, outcomes).values()]
+    with_graph = alerts.build(run_dir(tmp_path, records, recorded))
+    without = alerts.build(run_dir(tmp_path, records, None))
+    assert json.dumps(with_graph) == json.dumps(without)
+    (gateway,) = [r for r in with_graph["results"] if r["ingress"] == "gateway"]
+    assert gateway["basis"] == "fails at router, passes at engine"
+
+
 # ----------------------------------------------------------------------------- graph properties
 
 
@@ -285,14 +398,15 @@ def random_dag(rng: random.Random) -> Topology:
     return Topology(order=tuple(names), fronts=fronts)
 
 
-def reachable(topology: Topology, start: str, avoid: set[str]) -> set[str]:
-    found, stack_ = set(), list(topology.fronts[start])
-    while stack_:
-        current = stack_.pop()
-        if current not in found:
-            found.add(current)
-            if current not in avoid:
-                stack_.extend(topology.fronts[current])
+def steps(topology: Topology, start: str, reported: set[str]) -> dict[str, int]:
+    """Fewest edges from `start` to each layer, walking on only through layers not reported."""
+    found: dict[str, int] = {}
+    level, distance = list(topology.fronts[start]), 1
+    while level:
+        fresh = [name for name in level if name not in found]
+        found.update(dict.fromkeys(fresh, distance))
+        level = [t for name in fresh if name not in reported for t in topology.fronts[name]]
+        distance += 1
     return found
 
 
@@ -304,11 +418,11 @@ def test_random_graphs_keep_the_pairing_rule(seed):
     position = {name: i for i, name in enumerate(topology.order)}
     for outer, inner in topology.pairs(reported):
         assert position[outer] < position[inner]
-        # A nearest reported descendant: reached without passing another reported layer.
-        assert inner in reachable(topology, outer, reported)
     for name in reported:
-        nearest = set(topology.nearest(name, reported))
-        assert nearest == reachable(topology, name, reported) & reported
+        # The reported layers the fewest steps away, and none further once one is found.
+        away = {n: d for n, d in steps(topology, name, reported).items() if n in reported}
+        closest = {n for n, d in away.items() if d == min(away.values())}
+        assert set(topology.nearest(name, reported)) == closest
 
     col = {name: {"ingress": name, "outcome": rng.choice(OUTCOMES)} for name in sorted(reported)}
     for record in col.values():

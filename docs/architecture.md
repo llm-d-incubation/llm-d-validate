@@ -35,9 +35,13 @@ layers may emit the same values, and correlation headers do not prove forwarding
 logging. The ladder's rows come from the layers a profile declares, ordered by
 `kind` (`litellm` fronts `llmd_router` fronts `vllm`). That order is a graph
 (`profile/topology.py`): two ingresses of one kind, such as a prefill and a decode engine, are
-peers, and a layer is compared only with the nearest layers it fronts that reported. The alert
-feed uses the same rule, from the graph the run records in `outcome.json`. With fewer than two
-reporting ingresses there is no ladder: one column is nothing to compare.
+peers, and a layer is compared only with the nearest layers behind it that reported. Going
+inward one kind at a time, the comparison stops at the first kind where any layer reported. So
+a gateway in front of two routers, only one of which reported, is compared with that router,
+and that router with the engine. The alert feed uses the same rule, from the graph the run
+records in `outcome.json`; a recorded graph that misses a layer that reported is read as no
+graph. With fewer than two reporting ingresses there is no ladder: one column is nothing to
+compare.
 
 ## How a request reaches the fleet
 

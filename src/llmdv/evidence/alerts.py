@@ -23,9 +23,10 @@ not a comparison was made, so a pager can tell it from a new break on the first 
 
 `points_at` is read off the layer graph the run recorded in outcome.json, with the pairing rule
 the run summary's attribution ladder uses (`profile/topology.py`): from the failing layer, step
-to a failing layer it fronts, until every layer it fronts passed or there is none. It is a
-hypothesis; `basis` says what it rests on. A run recorded before outcome.json carried the graph
-is read by kind depth, as it was then, so an archived run's feed does not change.
+to a failing layer among the nearest layers behind it that reported, until all of those passed
+or there is none. It is a hypothesis; `basis` says what it rests on. A run recorded before
+outcome.json carried the graph is read by kind depth, as it was then, so an archived run's feed
+does not change. So is a run whose recorded graph misses an ingress that reported.
 
 `publication` and `job_exit_code` are only set on the local copy, which `llmdv job` also prints as
 the last line of its output. Like `outcome.json`, the published copy cannot know how its own
@@ -77,6 +78,8 @@ def build(run_dir: Path) -> dict[str, Any] | None:
     for record in records:
         ingress, case, variant = key(record)
         columns.setdefault((case, variant), {})[ingress] = record
+    if topology and not topology.covers(name for column in columns.values() for name in column):
+        topology = None
 
     results = []
     for record in records:
@@ -135,9 +138,10 @@ def attribute(
     """The layer a failing result points at, and the observation that points there.
 
     `column` holds the same case's decided results by ingress. The walk starts at the failing
-    layer and steps to the first failing layer among its nearest reported descendants; it
-    stops where all of them passed, or where there are none. Peers are never compared. Without
-    a `topology` (a run recorded before outcome.json carried one) it reads kind depth instead.
+    layer and steps to the first failing layer among the nearest layers behind it that reported
+    (`Topology.nearest`); it stops where all of them passed, or where there are none. Peers are
+    never compared. Without a `topology` (a run recorded before outcome.json carried one, or
+    one whose graph misses a layer that reported) it reads kind depth instead.
     """
     if topology is None:
         return _attribute_by_depth(record, column)
