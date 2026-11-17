@@ -18,6 +18,7 @@ alternative, and it would make the helpers harder to use than the bare `assert` 
 
 from __future__ import annotations
 
+import time
 from dataclasses import asdict, dataclass, field
 from typing import Any
 
@@ -41,9 +42,13 @@ class Check:
     # absent from the record for any other check.
     rule: dict[str, Any] | None = None
     samples: list[dict[str, Any]] | None = None
+    # When it was recorded (monotonic). Not serialised: it orders a check against the case's
+    # requests, so a check that failed before a connection did is known to be about the fleet.
+    at: float = field(default_factory=time.monotonic, repr=False, compare=False)
 
     def to_dict(self) -> dict[str, Any]:
-        return {k: v for k, v in asdict(self).items() if k in BASE or v is not None}
+        recorded = {k: v for k, v in asdict(self).items() if k != "at"}
+        return {k: v for k, v in recorded.items() if k in BASE or v is not None}
 
     def render(self) -> str:
         mark = "ok" if self.ok else "FAILED"

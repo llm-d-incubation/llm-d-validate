@@ -25,8 +25,9 @@ from . import redact, sse
 log = get_logger("http")
 
 # Failures before any response arrived: refused, a connect timeout, or a connection reset or
-# closed with nothing sent back. Against a local tunnel these are what a dead port-forward
-# looks like; the plugin decides with one health probe whether that is what happened.
+# closed with nothing sent back. Against a local tunnel these are what a dead port-forward can
+# look like, and equally what a crashing server looks like, so they decide nothing alone: the
+# plugin then reads whether the local port itself still accepts connections.
 CONNECTION_ERRORS = (
     httpx.ConnectError,
     httpx.ConnectTimeout,
@@ -61,8 +62,11 @@ class Exchange:
     headers_s: float | None = None
     connection: dict[str, Any] | None = None
     # Not serialised: transport_error says the same for a reader. Set when the request failed
-    # with one of CONNECTION_ERRORS before any response status arrived.
+    # with one of CONNECTION_ERRORS before any response status arrived, and when it did
+    # (monotonic), so a check that failed earlier in the case can be told from one that
+    # observed the missing response.
     connection_failed: bool = field(default=False, repr=False)
+    failed_at: float = field(default=0.0, repr=False, compare=False)
 
     @property
     def ok(self) -> bool:
@@ -209,6 +213,7 @@ class RecordingClient:
             exchange.elapsed_s = time.monotonic() - started
             exchange.transport_error = f"{type(exc).__name__}: {exc}"
             exchange.connection_failed = isinstance(exc, CONNECTION_ERRORS)
+            exchange.failed_at = time.monotonic()
             log.debug("%s %s -> transport error: %s", method.upper(), url, exchange.transport_error)
             self.exchanges.append(exchange)
             return exchange
@@ -323,6 +328,7 @@ class RecordingClient:
                 exchange.connection_failed = (
                     isinstance(exc, CONNECTION_ERRORS) and exchange.status is None
                 )
+                exchange.failed_at = time.monotonic()
 
         exchange.elapsed_s = time.monotonic() - started
         exchange.client_closed = transcript.client_closed

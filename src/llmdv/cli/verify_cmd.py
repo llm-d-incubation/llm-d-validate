@@ -381,8 +381,8 @@ def _verify(args: argparse.Namespace, run: _Run) -> int:
     )
     run.records, run.table = _summarise(run_dir, records, run.collected, run.profile)
     code = _map_pytest_exit(code, _SIGNALLED.is_set())
-    # Every failure was a local connection lost mid-run: the vantage point, not the fleet. A
-    # single real failure anywhere keeps exit 1.
+    # Every failure was a local connection lost mid-run, its local port refusing connections:
+    # the vantage point, not the fleet. A single real failure anywhere keeps exit 1.
     if code == TEST_FAILURES and environment_only(records):
         return PREFLIGHT
     return code

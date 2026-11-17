@@ -27,6 +27,8 @@ from __future__ import annotations
 
 import os
 import shlex
+import socket
+import time
 from dataclasses import dataclass, field
 from enum import Enum
 from typing import TYPE_CHECKING
@@ -265,7 +267,7 @@ def _check_proxy(ingress: Ingress) -> Problem | None:
 
     host = urlsplit(ingress.base_url).hostname or ""
     no_proxy = os.environ.get("NO_PROXY", "") + "," + os.environ.get("no_proxy", "")
-    entries = {item.strip() for item in no_proxy.split(",") if item.strip()}
+    entries = {item.strip().strip("[]") for item in no_proxy.split(",") if item.strip()}
     if host in entries or (is_local(ingress) and entries & LOOPBACK):
         return None
 
@@ -281,12 +283,63 @@ def _check_proxy(ingress: Ingress) -> Problem | None:
 
 # The hosts that mean "this machine". An ingress reached through one is reached through
 # something the operator started, usually a port-forward, so losing it is their environment.
-LOOPBACK = frozenset({"localhost", "127.0.0.1"})
+LOOPBACK = frozenset({"localhost", "127.0.0.1", "::1"})
+
+# How many times, and how far apart, the local port must refuse before it is called gone. Long
+# enough that a server restarting on this machine is listening again inside the window.
+GONE_READS = 3
+GONE_INTERVAL_S = 0.5
 
 
 def is_local(ingress: Ingress) -> bool:
-    """Whether the ingress is reached through this machine's loopback, as a tunnel is."""
-    return (urlsplit(ingress.base_url).hostname or "") in LOOPBACK
+    """Whether the ingress is reached through this machine's loopback, as a tunnel is.
+
+    The one loopback predicate: preflight's proxy check and the mid-run lost-connection rule
+    both use it. `hostname` has already dropped the brackets of an `http://[::1]:8000` URL.
+    """
+    return (urlsplit(ingress.base_url).hostname or "").lower() in LOOPBACK
+
+
+def refuses_connections(ingress: Ingress) -> bool:
+    """Whether the ingress's own port refuses a TCP connection on every address of its host.
+
+    A connect and a close: no request is sent, so nothing is retried. Only a refusal counts.
+    A port that accepts, on any address `localhost` resolves to, has a listener, and a timeout
+    or any other error is not evidence either way, so both answer False.
+    """
+    parts = urlsplit(ingress.base_url)
+    port = parts.port or (443 if parts.scheme == "https" else 80)
+    try:
+        addresses = socket.getaddrinfo(parts.hostname, port, type=socket.SOCK_STREAM)
+    except OSError:
+        return False
+    for family, kind, proto, _, address in addresses:
+        try:
+            with socket.socket(family, kind, proto) as sock:
+                sock.settimeout(ingress.timeouts.connect)
+                sock.connect(address)
+        except ConnectionRefusedError:
+            continue
+        except OSError:
+            return False
+        return False
+    return bool(addresses)
+
+
+def local_end_gone(ingress: Ingress) -> bool:
+    """Whether nothing listens on the ingress's local port, read `GONE_READS` times in a row.
+
+    This is the only evidence that a connection lost mid-run is the operator's: the port a
+    port-forward or tunnel was holding on this machine is closed. A port that accepts even
+    once is a listener whose far side failed, and that is not something llmdv can pin on the
+    environment.
+    """
+    for read in range(GONE_READS):
+        if read:
+            time.sleep(GONE_INTERVAL_S)
+        if not refuses_connections(ingress):
+            return False
+    return True
 
 
 def reachable(ingress: Ingress) -> tuple[bool, float]:
@@ -294,8 +347,7 @@ def reachable(ingress: Ingress) -> tuple[bool, float]:
 
     A non-2xx still counts as reachable: LiteLLM's `/health/readiness` legitimately 401s under
     custom_auth, and "something is listening and speaking HTTP" is what preflight needs to
-    know. Only a transport error means nothing is there. The plugin asks again, once, when a
-    local ingress fails a case at the connection level.
+    know. Only a transport error means nothing is there.
     """
     with RecordingClient(
         ingress.base_url,

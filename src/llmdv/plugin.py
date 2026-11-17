@@ -25,7 +25,7 @@ import functools
 import json
 import re
 import uuid
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 from pathlib import Path
 from typing import Any
 
@@ -841,7 +841,8 @@ def _skip_if_connection_lost(request: pytest.FixtureRequest) -> None:
     Checked after `gate`, so a case it would skip anyway keeps its class. A case that would
     have skipped itself in its own body never runs, so it is skipped here. The class is
     `requires_instrumentation`: the instrument missing is this vantage point's own path to the
-    ingress, a port-forward that died, and the fleet behind it was never asked.
+    ingress, a port-forward that died, and the fleet behind it was never asked. The local port
+    is read once more first, and a port that accepts again ends the skipping.
     """
     lost = getattr(request.config, "_llmdv_connection_lost", {})
     if not lost:
@@ -850,7 +851,7 @@ def _skip_if_connection_lost(request: pytest.FixtureRequest) -> None:
         target = request.getfixturevalue("ingress")
     else:
         target = _ingress_from_params(request.node, getattr(request.config, "_llmdv_profile", None))
-    if target is None or target.id not in lost:
+    if target is None or target.id not in lost or not _still_lost(request.config, target):
         return
     _ACTIVE.setdefault(request.node.nodeid, {})["connection_lost"] = target.id
     _mark_skip(request.node, SkipClass.REQUIRES_INSTRUMENTATION)
@@ -860,15 +861,39 @@ def _skip_if_connection_lost(request: pytest.FixtureRequest) -> None:
     )
 
 
+def _still_lost(config: Any, target: Ingress) -> bool:
+    """Whether a lost ingress's local port still refuses, read once before skipping a case.
+
+    A port that accepts again, a forward someone restarted, is no longer lost: the ingress is
+    forgotten and this case and the ones after it run.
+    """
+    if preflight.refuses_connections(target):
+        return True
+    del config._llmdv_connection_lost[target.id]
+    log.info("the local port of ingress %s accepts connections again; resuming", target.id)
+    return False
+
+
 def _connection_lost(
-    config: pytest.Config, state: dict[str, Any], http: Any, ingress: Ingress | None
+    config: pytest.Config,
+    state: dict[str, Any],
+    http: Any,
+    ingress: Ingress | None,
+    checks: Sequence[Any] = (),
 ) -> tuple[Ingress, str] | None:
     """The local ingress this failed case lost its connection to, with the error, or None.
 
-    Two things must both hold: a request to a loopback ingress failed at the connection level,
-    and the ingress's health path, asked once now, does not answer either. The health read is
-    not a retry of the case's request, and the case keeps its own exchanges as evidence. An
-    ingress that is slow, or that answers its health path, keeps the failure as a fleet result.
+    Three things must all hold. A request to a loopback ingress failed at the connection
+    level. No check of the case had failed before that request did: a case that already found
+    a defect is a fleet result whatever happens to a later request. And the ingress's local
+    port itself now refuses connections, read more than once (`preflight.local_end_gone`):
+    the port-forward or tunnel on this machine is gone. That read is a TCP connect, not a
+    retry of the case's request, and the case keeps its own exchanges as evidence.
+
+    A local port that still accepts keeps the failure as a fleet result, however the request
+    died: a reset, a connection closed with nothing sent and a health path that does not
+    answer are what a crashing server looks like, and what a pod that died behind a live
+    port-forward looks like. llmdv cannot tell those two apart, so it does not guess.
     """
     lost: dict[str, dict[str, Any]] = config._llmdv_connection_lost  # type: ignore[attr-defined]
     client_ingresses = state.get("client_ingresses", {})
@@ -882,10 +907,13 @@ def _connection_lost(
         )
         if failed is None:
             continue
+        failed_at = getattr(failed, "failed_at", 0.0)
+        if any(not check.ok and check.at < failed_at for check in checks):
+            log.debug("%s: a check failed before the connection did; the failure stands", owner.id)
+            continue
         probed.add(owner.id)
-        answered, _ = preflight.reachable(owner)
-        if answered:
-            log.debug("%s still answers its health path; the failure stands", owner.id)
+        if not preflight.local_end_gone(owner):
+            log.debug("%s still accepts connections on its port; the failure stands", owner.id)
             continue
         return owner, failed.transport_error or "no response"
     return None
@@ -1067,7 +1095,9 @@ def pytest_runtest_makereport(item: pytest.Item, call: pytest.CallInfo):
     checks = [check.to_dict() for check in active.checks] if active else []
 
     verdict, reason = _outcome(report), _reason(report)
-    lost = _connection_lost(config, state, http, ingress) if report.failed else None
+    lost = None
+    if report.failed:
+        lost = _connection_lost(config, state, http, ingress, active.checks if active else ())
     if lost is not None:
         # The case did not test the fleet: the request never reached it. An error with the
         # environment named, so the run's exit code can tell this from a fleet failure.
@@ -1078,8 +1108,9 @@ def pytest_runtest_makereport(item: pytest.Item, call: pytest.CallInfo):
         state["connection_lost"] = target.id
         reason = (
             f"the local connection to ingress {target.id!r} ({target.base_url}) was lost: "
-            f"{error}; its health path no longer answers. Your environment, not the fleet: "
-            "a port-forward or tunnel that died. Later cases on it are skipped"
+            f"{error}; its local port now refuses connections. Your environment, not the "
+            "fleet: a port-forward or tunnel that died. Later cases on it are skipped until "
+            "the port accepts again"
         )
         log.error("%s", reason)
 

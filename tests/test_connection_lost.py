@@ -4,27 +4,38 @@ Preflight already turns a dead port-forward into exit 3 before the first case. T
 same tunnel dying after preflight passed: the case that found it gone is an error naming the
 lost connection, later cases on that ingress are skipped, and the run exits 3 unless a real
 failure also happened. Nothing is retried and no tunnel is restarted.
+
+The evidence has to be the operator's side: the local port itself refusing connections. A local
+port that still accepts, whatever happens to the request afterwards, is a server or a pod
+crashing behind a live tunnel, and that stays a fleet result.
 """
 
 from __future__ import annotations
 
 import json
 import os
+import socket
 import subprocess
 import sys
+import time
 from pathlib import Path
 from types import SimpleNamespace
 
+import pytest
+
 from llmdv import plugin, preflight
+from llmdv.evidence import journal
 from llmdv.http.client import Exchange
 from llmdv.profile import loader
-from tests.fakes import SRC, FakeFleet, profile_yaml, run_llmdv
+from tests.fakes import SRC, FakeFleet, LocalForward, profile_yaml, run_llmdv
 
 SELECTION = ("-m", "openai_chat")
 
 
-def _profile(tmp_path: Path, fleet: FakeFleet, timeouts: str | None = None) -> Path:
-    text = profile_yaml(fleet.base_url, fleet.model)
+def _profile(
+    tmp_path: Path, fleet: FakeFleet, timeouts: str | None = None, base_url: str | None = None
+) -> Path:
+    text = profile_yaml(base_url or fleet.base_url, fleet.model)
     if timeouts:
         text = text.replace("    health_path: /health\n", f"    health_path: /health\n{timeouts}\n")
     path = tmp_path / "fake.yaml"
@@ -147,20 +158,166 @@ def test_a_slow_local_ingress_is_not_a_lost_connection(tmp_path):
     assert _outcome(tmp_path)["connection_lost"] == []
 
 
+def test_a_local_server_that_crashes_and_recovers_is_a_fleet_failure(tmp_path):
+    # The local port never stops accepting: the tunnel is alive, and what is behind it drops
+    # one request, stays down for the next connections and comes back. The fleet crashed.
+    with (
+        FakeFleet() as fleet,
+        LocalForward(fleet.base_url, crash_on_post=3, down_for=3) as forward,
+    ):
+        result = _verify(tmp_path, _profile(tmp_path, fleet, base_url=forward.base_url))
+        assert forward.accepting
+    assert result.returncode == 1, result.stderr
+
+    records = _records(tmp_path)
+    assert not [r for r in records if r.get("connection_lost")]
+    assert not [r for r in records if r.get("skip_class") == "requires_instrumentation"]
+    failed = [i for i, r in enumerate(records) if r["outcome"] in ("fail", "error")]
+    assert failed and forward.dropped == 3
+    # The ingress answered again, so the cases after the crash ran against it.
+    assert [r for r in records[failed[-1] + 1 :] if r["outcome"] == "pass"]
+
+    outcome = _outcome(tmp_path)
+    assert outcome["verification"]["class"] == "fleet"
+    assert outcome["connection_lost"] == []
+    assert "your environment, not the fleet" not in result.stdout + result.stderr
+
+
+def _ipv6_loopback() -> bool:
+    try:
+        with socket.socket(socket.AF_INET6, socket.SOCK_STREAM) as sock:
+            sock.bind(("::1", 0))
+    except OSError:
+        return False
+    return True
+
+
+@pytest.mark.parametrize("host", ["127.0.0.1", "::1"])
+def test_a_local_listener_that_goes_away_exits_3(tmp_path, host):
+    if host == "::1" and not _ipv6_loopback():
+        pytest.skip("this machine has no IPv6 loopback")
+    with FakeFleet() as fleet, LocalForward(fleet.base_url, host=host, close_on_post=3) as forward:
+        result = _verify(tmp_path, _profile(tmp_path, fleet, base_url=forward.base_url))
+        assert not forward.accepting
+    assert result.returncode == 3, result.stderr
+
+    records = _records(tmp_path)
+    assert not [r for r in records if r["outcome"] == "fail"]
+    [hit] = [r for r in records if r["outcome"] == "error"]
+    assert hit["connection_lost"] == "fake"
+    assert "refuses connections" in hit["reason"]
+    assert {r["outcome"] for r in records[records.index(hit) + 1 :]} <= {"skip"}
+    assert _outcome(tmp_path)["verification"]["class"] == "environment"
+
+
 def _state(ingress, exchange: Exchange) -> tuple[SimpleNamespace, dict]:
     client = SimpleNamespace(exchanges=[exchange], last=exchange)
     config = SimpleNamespace(_llmdv_connection_lost={})
     return config, {"clients": [client], "client_ingresses": {id(client): ingress}}
 
 
-def test_a_connection_error_on_an_ingress_that_still_answers_its_health_path_stands(tmp_path):
-    exchange = Exchange(
-        "POST", "/v1/chat/completions", transport_error="ReadError: reset", connection_failed=True
-    )
+def _reset() -> Exchange:
+    return Exchange(
+        "POST", "/v1/chat/completions", transport_error="ReadError: reset",
+        connection_failed=True, failed_at=time.monotonic(),
+    )  # fmt: skip
+
+
+def _closed_ingress(tmp_path: Path):
+    """An ingress on a loopback port nothing listens on any more."""
+    with FakeFleet() as fleet:
+        return loader.load(_profile(tmp_path, fleet)).ingress("fake")
+
+
+def test_a_connection_error_on_a_local_port_that_still_accepts_stands(tmp_path):
     with FakeFleet() as fleet:
         ingress = loader.load(_profile(tmp_path, fleet)).ingress("fake")
-        config, state = _state(ingress, exchange)
+        config, state = _state(ingress, _reset())
         assert plugin._connection_lost(config, state, None, ingress) is None
+
+
+def test_a_failed_health_read_is_not_evidence_while_the_local_port_accepts(tmp_path):
+    # Accepts every connection and closes it with nothing: no health answer, a live listener.
+    with (
+        FakeFleet() as fleet,
+        LocalForward(fleet.base_url, crash_on_post=0, down_for=99) as forward,
+    ):
+        ingress = loader.load(_profile(tmp_path, fleet, base_url=forward.base_url)).ingress("fake")
+        assert preflight.reachable(ingress)[0] is False
+        config, state = _state(ingress, _reset())
+        assert plugin._connection_lost(config, state, None, ingress) is None
+
+
+def test_a_local_port_that_refuses_is_a_lost_connection(tmp_path):
+    ingress = _closed_ingress(tmp_path)
+    config, state = _state(ingress, _reset())
+    owner, error = plugin._connection_lost(config, state, None, ingress)
+    assert owner is ingress
+    assert error == "ReadError: reset"
+
+
+def test_a_port_that_accepts_again_within_the_window_is_not_lost(tmp_path, monkeypatch):
+    # Refused once, then listening: a server restarting, not a tunnel that is gone.
+    ingress = _closed_ingress(tmp_path)
+    answers = iter([True, False])
+    monkeypatch.setattr(preflight, "refuses_connections", lambda ingress: next(answers))
+    monkeypatch.setattr(preflight.time, "sleep", lambda seconds: None)
+    assert preflight.local_end_gone(ingress) is False
+    config, state = _state(ingress, _reset())
+    monkeypatch.setattr(preflight, "local_end_gone", lambda ingress: False)
+    assert plugin._connection_lost(config, state, None, ingress) is None
+
+
+def test_the_local_end_is_read_more_than_once_before_it_is_called_gone(tmp_path, monkeypatch):
+    ingress = _closed_ingress(tmp_path)
+    reads = []
+    monkeypatch.setattr(preflight, "refuses_connections", lambda i: reads.append(i) or True)
+    monkeypatch.setattr(preflight.time, "sleep", lambda seconds: None)
+    assert preflight.local_end_gone(ingress) is True
+    assert len(reads) == preflight.GONE_READS > 1
+
+
+def test_a_check_that_failed_before_the_connection_did_keeps_the_case_a_fleet_result(tmp_path):
+    # The case found a real defect, and only afterwards a request of its own met a dead port.
+    ingress = _closed_ingress(tmp_path)
+    active = journal.activate("case")
+    try:
+        journal.record("finish_reason", "abort", "stop", ok=False)
+        time.sleep(0.01)
+        config, state = _state(ingress, _reset())
+        assert plugin._connection_lost(config, state, None, ingress, active.checks) is None
+    finally:
+        journal.deactivate()
+
+
+def test_a_check_that_failed_on_the_lost_connection_itself_does_not_make_it_the_fleet(tmp_path):
+    # Recorded after the request failed: it observed the missing response, not the fleet.
+    ingress = _closed_ingress(tmp_path)
+    active = journal.activate("case")
+    try:
+        config, state = _state(ingress, _reset())
+        time.sleep(0.01)
+        journal.record("status", None, "200", ok=False)
+        assert plugin._connection_lost(config, state, None, ingress, active.checks) is not None
+        assert "at" not in active.checks[0].to_dict()
+    finally:
+        journal.deactivate()
+
+
+def test_a_lost_ingress_that_listens_again_runs_its_later_cases(tmp_path):
+    with FakeFleet() as fleet:
+        ingress = loader.load(_profile(tmp_path, fleet)).ingress("fake")
+        port = int(fleet.base_url.rsplit(":", 1)[1])
+    config = SimpleNamespace(_llmdv_connection_lost={"fake": {"case": "a.case"}})
+    assert plugin._still_lost(config, ingress) is True
+    assert "fake" in config._llmdv_connection_lost
+
+    with socket.socket() as listener:
+        listener.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        listener.bind(("127.0.0.1", port))
+        listener.listen(1)
+        assert plugin._still_lost(config, ingress) is False
+    assert config._llmdv_connection_lost == {}
 
 
 def test_a_non_local_ingress_is_never_probed(tmp_path, monkeypatch):
@@ -170,7 +327,7 @@ def test_a_non_local_ingress_is_never_probed(tmp_path, monkeypatch):
     )  # fmt: skip
     probed = []
     monkeypatch.setattr(preflight, "is_local", lambda ingress: False)
-    monkeypatch.setattr(preflight, "reachable", lambda ingress: probed.append(ingress) or (0, 0))
+    monkeypatch.setattr(preflight, "local_end_gone", lambda ingress: probed.append(ingress) or 1)
     with FakeFleet() as fleet:
         ingress = loader.load(_profile(tmp_path, fleet)).ingress("fake")
     config, state = _state(ingress, exchange)
@@ -182,5 +339,7 @@ def test_the_local_predicate_is_the_loopback_one_preflight_uses(tmp_path):
     with FakeFleet() as fleet:
         ingress = loader.load(_profile(tmp_path, fleet)).ingress("fake")
     assert preflight.is_local(ingress)
+    for url in ("http://localhost:8000", "http://[::1]:8000", "https://[::1]"):
+        assert preflight.is_local(SimpleNamespace(base_url=url)), url
     remote = SimpleNamespace(base_url="https://gateway.example.com")
     assert not preflight.is_local(remote)

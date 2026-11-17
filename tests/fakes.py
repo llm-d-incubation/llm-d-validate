@@ -15,6 +15,7 @@ import base64
 import json
 import os
 import re
+import socket
 import ssl
 import subprocess
 import sys
@@ -1468,7 +1469,8 @@ class FakeFleet:
         # Seconds every POST waits before answering, so a test can interrupt a run mid-flight.
         self.delay_s = delay_s
         # Not a fleet defect: the local tunnel to it dying mid-run. The Nth POST is dropped
-        # unanswered and the listener closes, so every later connection is refused.
+        # unanswered and the listener closes, so every later connection is refused. For a
+        # listener that stays up while the far side fails, see LocalForward.
         self.go_dark_after = go_dark_after
         self.posts = 0
         self.seen: list[tuple[str, str, dict]] = []
@@ -2785,6 +2787,140 @@ class FakeFleet:
     def __exit__(self, *_: object) -> None:
         self._server.shutdown()
         self._server.server_close()
+
+
+class LocalForward:
+    """A listener on this machine in front of a fake fleet, as a port-forward or a tunnel is.
+
+    Two things can go wrong behind a local port, and they are not the same party's problem:
+
+    `crash_on_post=N, down_for=K`  the far side crashes on the Nth POST and is back K
+        connections later. The listener never stops accepting: each of those K connections is
+        accepted and closed with nothing sent, which is a server, or a pod behind a live
+        forward, crashing. Counted in connections, not seconds, so a test does not race it.
+    `close_on_post=N`  at the Nth POST the listener itself goes away for good, as a forward
+        whose process died: that connection is dropped and every later one is refused.
+    """
+
+    def __init__(
+        self,
+        upstream: str,
+        *,
+        host: str = "127.0.0.1",
+        crash_on_post: int | None = None,
+        down_for: int = 1,
+        close_on_post: int | None = None,
+    ):
+        target = urlsplit(upstream)
+        self._upstream = (target.hostname, target.port)
+        self.host = host
+        self.crash_on_post = crash_on_post
+        self.down_for = down_for
+        self.close_on_post = close_on_post
+        self.posts = 0
+        self.dropped = 0
+        self._crashed = False
+        self._lock = threading.Lock()
+        self._open: set[socket.socket] = set()
+        self._closing = threading.Event()
+        self._closed = threading.Event()
+        family = socket.AF_INET6 if ":" in host else socket.AF_INET
+        self._listener = socket.socket(family, socket.SOCK_STREAM)
+        self._listener.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        self._listener.bind((host, 0))
+        self._listener.listen(64)
+        self._listener.settimeout(0.05)
+        self.port = self._listener.getsockname()[1]
+        self._thread = threading.Thread(target=self._serve, daemon=True)
+
+    @property
+    def base_url(self) -> str:
+        host = f"[{self.host}]" if ":" in self.host else self.host
+        return f"http://{host}:{self.port}"
+
+    @property
+    def accepting(self) -> bool:
+        """Whether the local port accepts a connection right now."""
+        try:
+            socket.create_connection((self.host, self.port), timeout=2).close()
+        except OSError:
+            return False
+        return True
+
+    def __enter__(self) -> LocalForward:
+        self._thread.start()
+        return self
+
+    def __exit__(self, *_: object) -> None:
+        self._closing.set()
+        self._thread.join(timeout=5)
+
+    def _serve(self) -> None:
+        while not self._closing.is_set():
+            try:
+                client, _ = self._listener.accept()
+            except TimeoutError:
+                continue
+            except OSError:
+                break
+            client.settimeout(None)
+            threading.Thread(target=self._handle, args=(client,), daemon=True).start()
+        self._listener.close()
+        with self._lock:
+            held, self._open = self._open, set()
+        for sock in held:
+            self._drop(sock)
+        self._closed.set()
+
+    @staticmethod
+    def _drop(sock: socket.socket) -> None:
+        try:
+            sock.shutdown(socket.SHUT_RDWR)
+        except OSError:
+            pass
+        sock.close()
+
+    def _handle(self, client: socket.socket) -> None:
+        try:
+            first = client.recv(65536)
+        except OSError:
+            first = b""
+        with self._lock:
+            if first.startswith(b"POST"):
+                self.posts += 1
+            self._crashed = self._crashed or self.posts == self.crash_on_post
+            down = self._crashed and self.dropped < self.down_for
+            self.dropped += down
+            close = self.close_on_post is not None and self.posts >= self.close_on_post
+        if close:
+            # The listener is gone before this connection is dropped, so the client's next
+            # connect is refused rather than racing the close.
+            self._closing.set()
+            self._closed.wait(timeout=5)
+        if close or down or not first:
+            self._drop(client)
+            return
+        try:
+            upstream = socket.create_connection(self._upstream)
+        except OSError:
+            self._drop(client)
+            return
+        with self._lock:
+            self._open |= {client, upstream}
+        upstream.sendall(first)
+        threading.Thread(target=self._pipe, args=(client, upstream), daemon=True).start()
+        self._pipe(upstream, client)
+
+    def _pipe(self, source: socket.socket, sink: socket.socket) -> None:
+        try:
+            while data := source.recv(65536):
+                sink.sendall(data)
+        except OSError:
+            pass
+        for sock in (source, sink):
+            with self._lock:
+                self._open.discard(sock)
+            self._drop(sock)
 
 
 def profile_yaml(

@@ -3,8 +3,12 @@
 A connection refused against localhost is almost never a fleet defect -- it is a port-forward
 that was never started or has died. Reporting that as a test failure teaches people to
 distrust the suite, so it gets its own code and CI can tell the two apart without parsing logs.
-That holds when the forward dies mid-run too: a run whose only failures are a lost local
-connection exits 3, while one real fleet failure anywhere keeps it at 1.
+That holds when the forward dies mid-run too, on that same evidence and no other: the local
+port (localhost, 127.0.0.1 or ::1) refuses connections, read more than once. A run whose only
+failures are such a lost local connection exits 3, while one real fleet failure anywhere keeps
+it at 1. A local port that still accepts is never the environment: a reset or a dropped
+response behind it is a crashing server, or a pod that died behind a live port-forward, which
+llmdv cannot tell apart, so both stay exit 1.
 
 `EXITS` is the one table of what each code means. The `--help` epilog, the manual's exit table
 and the dashboard all read it; a test keeps the manual in step.
@@ -13,7 +17,9 @@ and the dashboard all read it; a test keeps the manual in step.
 OK = 0
 TEST_FAILURES = 1  # the fleet
 USAGE = 2  # bad arguments, or an invalid profile
-PREFLIGHT = 3  # the vantage point: preflight, or a results store without credentials
+# The vantage point: preflight, a local port that stopped accepting mid-run, or a results
+# store without credentials.
+PREFLIGHT = 3
 INTERNAL = 4  # a defect in llmdv itself
 # Verification passed, but results or the notification were not delivered. Never returned for a
 # failed verification: the verification code always takes precedence.

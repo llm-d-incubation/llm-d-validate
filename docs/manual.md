@@ -137,16 +137,38 @@ Separating environment problems from fleet problems is the point of having more 
 A delivery failure never hides a verification failure: failed tests and a failed upload exit
 `1`, and `outcome.json` records both. `5` is returned only when verification succeeded.
 
-A local connection lost mid-run is the environment too. When a request to an ingress on
-`localhost` or `127.0.0.1` is refused, times out connecting, or is reset before any response,
-llmdv reads that ingress's health path once. If it does not answer, the port-forward or tunnel
-behind it has died: that case is recorded as an `error` naming the lost connection, every later
-case on that ingress is skipped as `requires_instrumentation`, and the run exits `3`. llmdv does
-not restart the tunnel or retry the request. A real failure anywhere in the run still exits `1`,
-because the fleet result is the one that must not be hidden. `outcome.json` lists each lost
-ingress under `connection_lost`, with the case that found it gone, how many cases finished before
-it and how many were skipped after; `summary.md` and the closing summary say the same. An ingress
-reached any other way, and a local one that is only slow, keep their failures as fleet results.
+A local connection lost mid-run is the environment too, on one piece of evidence only: the local
+port itself refuses connections. When a request to an ingress on `localhost`, `127.0.0.1` or
+`[::1]` fails before any response (refused, a connect timeout, a reset, or closed with nothing
+sent) and no check of that case had already failed, llmdv opens a TCP connection to the
+ingress's port, up to three times over one second. If every one is refused, nothing is
+listening there any more: the port-forward or tunnel on your machine is gone. That case is
+recorded as an `error` naming the lost connection, later cases on that ingress are skipped as
+`requires_instrumentation`, and the run exits `3`. The connect sends no request, so nothing is
+retried, and llmdv does not restart the tunnel. Before each skip the port is read once more; if
+it accepts again, that case and the ones after it run.
+
+Everything else stays a fleet result and exits `1`, with no case skipped:
+
+- **The local port still accepts.** A reset, a response cut off, or a health path that stops
+  answering behind a port that accepts connections is a server that crashed. It is also what a
+  pod that died behind a `kubectl port-forward` still running looks like: the forward accepts
+  the connection and then resets it. llmdv cannot tell a dead pod from a crashing server from
+  where it stands, so it does not guess: the failures are reported against the fleet, and the
+  forward is the first thing to check when every case after some point fails the same way.
+- **A check failed first.** A case that had already recorded a failed check keeps its failure,
+  whatever happens to a later request in it.
+- **A real failure anywhere in the run**, because the fleet result is the one that must not be
+  hidden.
+- **An ingress reached any other way**, and a local one that is only slow.
+
+One case is beyond the evidence in the other direction: a server you run directly on this
+machine whose process exits leaves a refusing port, exactly as a dead forward does, and is
+reported as a lost connection.
+
+`outcome.json` lists each lost ingress under `connection_lost`, with the case that found it gone,
+how many cases finished before it and how many were skipped after; `summary.md` and the closing
+summary say the same.
 
 The class is what `outcome.json` records as `verification.class`. `5` is class `ok` because the
 verification passed; `publication` says what happened to the results. A code llmdv never returns
@@ -162,7 +184,7 @@ grey box reads as coverage. Every skip carries one of six classes:
 | --- | --- |
 | `undeclared` | the fleet does not expose this; nothing is wrong |
 | `not_implemented` | llmdv cannot drive it yet; a gap in the tool |
-| `requires_instrumentation` | needs an instrumented backend to observe, or a local connection to the ingress that was lost mid-run |
+| `requires_instrumentation` | needs an instrumented backend to observe, or the ingress's local port (`localhost`, `127.0.0.1`, `[::1]`) stopped accepting connections mid-run and still refuses them |
 | `requires_load` | needs a load experiment, i.e. a system test |
 | `excluded_by_policy` | the profile declares the fleet shared, and this case is disruptive |
 | `throttled` | a layer declared `rate_limited` refused the request for being over quota |
