@@ -39,7 +39,15 @@
 #             deltas read before and after (#27). cache_reuse cannot see it; see below.
 #             MEASURED 2026-11-16 on kind (real EPP, simulator engine): ten sequential
 #             shared-prefix requests all landed on one replica, by per-replica request counters
-#   4      TensorRT-LLM request spread -> same family, with TensorRT-LLM's metric names
+#             The guide's own check (guide.yaml verify.tests.pod_metrics, README "Verify
+#             prefix-cache aware routing") reads these per-pod series through the API-server
+#             proxy on port 8000, from pods labeled for the guide: vLLM
+#             vllm:request_success_total and vllm:prefix_cache_{hits,queries}_total; SGLang
+#             sglang:num_requests_total and sglang:cached_tokens_total{cache_source="device"}
+#             (the README notes sglang:cache_hit_rate is a rolling gauge that reads 0 on some
+#             builds even when hits occur)
+#   4      TensorRT-LLM request spread -> same family, with TensorRT-LLM's metric names. No CI lane
+#          runs TensorRT-LLM, so no profile here covers it
 #   5, 6   load-aware scoring and the saturation override -> load mode (#23) or a benchmark
 #   7      latency and throughput -> a benchmark, not llmdv
 #   8      each accelerator serves exactly one model
@@ -49,7 +57,11 @@
 #   10     reasoning and tool parsers per overlay -> model.reasoning and model.tools (model parts,
 #          parser names in each combination)
 #   11     engine metrics at :8000/metrics (TensorRT-LLM: /prometheus/metrics) -> NOT COVERED:
-#          needs an engine layer and an engine-metrics contract
+#          needs an engine layer and an engine-metrics contract. The series the README's "Key
+#          metrics for this path" names, for that contract: vLLM vllm:num_requests_running,
+#          vllm:num_requests_waiting, vllm:kv_cache_usage_perc, vllm:time_to_first_token_seconds,
+#          vllm:inter_token_latency_seconds and the prefix-cache counters above; SGLang
+#          sglang:num_running_reqs, sglang:token_usage, sglang:prompt_tokens_total
 #   12     the EPP's six HTTP APIs -> contract.declared_surfaces_exist and
 #          undeclared_surfaces_absent for four of them (topology parts); embeddings and
 #          /inference/v1/generate need new surfaces
@@ -63,9 +75,12 @@
 #   18     x-llm-d-request-dropped-reason absent on success -> topology parts; its values need load
 #   19, 24 FailOpen and graceful drain -> fault injection or a rollout in CI, not llmdv
 #   20     standalone endpoint `<GUIDE_NAME>-epp` on port 80 -> topology/standalone.yaml
-#   21     gateway mode through `llm-d-inference-gateway` on port 80 -> topology/gateway.yaml, as a
-#          router-kind ingress until the gateway role exists (#24). A wrong provider (503s on GKE
-#          with provider none) is a CI matter
+#   21     gateway mode through `llm-d-inference-gateway` on port 80 -> NOT COVERED: no CI lane
+#          runs gateway mode, and llmdv has no gateway role yet (#24). A wrong provider (503s on
+#          GKE with provider none) is a CI matter
+#   28     the standalone sidecar proxy can be agentgateway instead of Envoy (README, "Deploy the
+#          llm-d Router") -> NOT COVERED: every CI lane uses the Envoy sidecar, and the router
+#          facts in topology/standalone.yaml were measured with Envoy
 #   22, 23, 25   router and engine settings agree, replica counts, sidecar args
 #          -> fleet.config rules, which need cluster access a committed profile does not carry
 #   26     EPP Prometheus series when MONITORING=true -> fleet.metrics, same reason

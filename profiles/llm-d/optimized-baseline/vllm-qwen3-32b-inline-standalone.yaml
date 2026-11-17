@@ -1,18 +1,16 @@
 # The optimized-baseline guide in standalone mode (the client reaches the EPP's own listener):
-# vLLM serving Qwen/Qwen3-32B with no parsers: inline <think>, no tool calls. Group B in
-# ../README.md's coverage table. Guide status: validated (a nightly lane runs at least one overlay
-# below).
+# vLLM serving Qwen/Qwen3-32B with no parsers: inline <think>, no tool calls.
 #
 # STATUS: WRITTEN, NOT RUN against this engine. Composed from the guide's shipped config at
 # llm-d 565373b and the API references. Only the router layer has been measured (on kind,
-# with a simulator engine; see ../topology/standalone.yaml).
+# with a simulator engine; see ../parts/topology/standalone.yaml).
 #
-# Covers these shipped overlays (ACCELERATOR_TYPE/MODEL_SERVER/INFRA_PROVIDER), which look
-# the same to a client: a provider overlay changes only node, cache and NCCL settings.
-#   amd/vllm/base                     validated
-#   amd/vllm/amd-ci                   validated; the AMD CI provider overlay
-#   tpu/v5p/vllm/gke                  validated
-#   tpu/v5p/vllm/base                 an overlay exists; guide.yaml lists only `gke` for tpu/v5p
+# CI lanes that deploy this configuration (llm-d's nightly-e2e-optimized-baseline-<lane>
+# workflows; each runs in standalone mode):
+#   amd-acc-rocm-vllm-x               amd/vllm/amd-ci
+#   gke-acc-tpu-vllm-x                tpu/v5p/vllm (the lane sets no provider; the base and gke
+#                                     overlays render the same engine arguments)
+# Same to a client, but run by no lane: amd/vllm/base.
 #
 # The two accelerators run the same vLLM release (v0.31.0, ROCm and TPU builds) with the same
 # client-visible arguments; their runs are worth comparing with llmdv compare.

@@ -1,16 +1,14 @@
 # The optimized-baseline guide in standalone mode (the client reaches the EPP's own listener):
-# SGLang serving Qwen/Qwen3-32B with the qwen3 reasoning parser and the qwen tool parser. Group C
-# in ../README.md's coverage table. Guide status: validated (a nightly lane runs at least one
-# overlay below).
+# SGLang serving Qwen/Qwen3-32B with the qwen3 reasoning parser and the qwen tool parser.
 #
 # STATUS: WRITTEN, NOT RUN against this engine. Composed from the guide's shipped config at
 # llm-d 565373b and the API references. Only the router layer has been measured (on kind,
-# with a simulator engine; see ../topology/standalone.yaml).
+# with a simulator engine; see ../parts/topology/standalone.yaml).
 #
-# Covers these shipped overlays (ACCELERATOR_TYPE/MODEL_SERVER/INFRA_PROVIDER), which look
-# the same to a client: a provider overlay changes only node, cache and NCCL settings.
-#   gpu/sglang/base                   validated
-#   gpu/sglang/gke                    validated
+# CI lane that deploys this configuration (llm-d's nightly-e2e-optimized-baseline-<lane>
+# workflow; it runs in standalone mode):
+#   gke-acc-gpu-sglang-x              gpu/sglang/gke
+# Same to a client, but run by no lane: gpu/sglang/base.
 #
 # These overlays run SGLang's Rust HTTP frontend (SGLANG_RUST_SERVER=1,
 # guides/optimized-baseline/README.md, "Tuning"), unlike the other SGLang overlays; its response
@@ -40,6 +38,9 @@ model:
   # client sees; the names belong to the engine, so they are stated here.
   reasoning:
     parser: qwen3
+    # Inferred: SGLang's OpenAI server names the field reasoning_content. Not yet observed on
+    # this guide's SGLang build; the first run settles it.
+    field: reasoning_content
   tools:
     parser: qwen
 

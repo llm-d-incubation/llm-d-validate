@@ -1,15 +1,13 @@
 # The optimized-baseline guide in standalone mode (the client reaches the EPP's own listener):
-# vLLM serving Qwen/Qwen3-0.6B with no parsers (an Intel XPU vLLM build). Group I in
-# ../README.md's coverage table. Guide status: validated (a nightly lane runs at least one overlay
-# below).
+# vLLM serving Qwen/Qwen3-0.6B with no parsers (an Intel XPU vLLM build).
 #
 # STATUS: WRITTEN, NOT RUN against this engine. Composed from the guide's shipped config at
 # llm-d 565373b and the API references. Only the router layer has been measured (on kind,
-# with a simulator engine; see ../topology/standalone.yaml).
+# with a simulator engine; see ../parts/topology/standalone.yaml).
 #
-# Covers these shipped overlays (ACCELERATOR_TYPE/MODEL_SERVER/INFRA_PROVIDER), which look
-# the same to a client: a provider overlay changes only node, cache and NCCL settings.
-#   xpu/vllm/base                     validated
+# CI lane that deploys this configuration (llm-d's nightly-e2e-optimized-baseline-<lane>
+# workflow; it runs in standalone mode):
+#   intel-acc-xpu-vllm-x              xpu/vllm/base (the lane sets no provider)
 #
 # How a lane runs it, after deploying the guide in standalone mode (guide.yaml deploy.standalone)
 # with one of the overlays above:

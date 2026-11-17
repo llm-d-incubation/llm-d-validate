@@ -3,11 +3,11 @@
 # front of simulated replicas answering as Qwen/Qwen3-32B. For a kind or CI cluster with no
 # accelerators. Not a shipped overlay; the guide has no simulator overlay.
 #
-# IT VALIDATES THE ROUTER, NOT AN ENGINE. See ../models/qwen3-32b-sim.yaml for what a run of it
+# IT VALIDATES THE ROUTER, NOT AN ENGINE. See ../parts/models/qwen3-32b-sim.yaml for what a run of it
 # shows and what it does not. No engine part is listed: the simulator is both engine and model.
 #
 # MEASURED 2026-11-16 on kind (real EPP, simulator engine): the router-layer facts quoted in
-# ../topology/standalone.yaml come from this setup (llm-d-router-endpoint-picker main, chart
+# ../parts/topology/standalone.yaml come from this setup (llm-d-router-endpoint-picker main, chart
 # llm-d-router-standalone, Envoy v1.40.2, llm-d-inference-sim v1.2.0, two replicas).
 #
 # How a lane runs it: deploy the guide's router in standalone mode, and in place of the
@@ -30,7 +30,7 @@ extends:
 name: optimized-baseline-sim-qwen3-32b-standalone
 
 ingresses:
-  # Overrides ../topology/standalone.yaml on purpose: the simulator serves vLLM's four render
+  # Overrides ../parts/topology/standalone.yaml on purpose: the simulator serves vLLM's four render
   # routes and the EPP passes them through, MEASURED 2026-11-16 on kind (real EPP, simulator
   # engine). Declared here, not in the model part, because surfaces are keyed by ingress id and
   # only this file knows the topology.

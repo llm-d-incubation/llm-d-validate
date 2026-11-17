@@ -23,8 +23,8 @@ model:
   # --context-length=16384 (SGLang, tpu/*/sglang/base/patch-sglang.yaml).
   max_model_len: 16384
   reasoning:
-    # INTENT: the parser's separate field, named reasoning_content by both engines.
-    field: reasoning_content
+    # A reasoning parser moves the <think> block out of `content` into its own field. The
+    # field's name is the engine's, so each combination states it beside the parser names.
     # INTENT: Qwen3 thinks unless asked not to.
     default_on: true
   tools:

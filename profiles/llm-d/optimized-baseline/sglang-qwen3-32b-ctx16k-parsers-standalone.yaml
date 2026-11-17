@@ -1,18 +1,16 @@
 # The optimized-baseline guide in standalone mode (the client reaches the EPP's own listener):
 # SGLang serving Qwen/Qwen3-32B at a 16384-token window with the qwen3 and qwen parsers (sglang
-# v0.1.0-tpu). Group C' in ../README.md's coverage table. Guide status: validated (a nightly lane
-# runs at least one overlay below).
+# v0.1.0-tpu).
 #
 # STATUS: WRITTEN, NOT RUN against this engine. Composed from the guide's shipped config at
 # llm-d 565373b and the API references. Only the router layer has been measured (on kind,
-# with a simulator engine; see ../topology/standalone.yaml).
+# with a simulator engine; see ../parts/topology/standalone.yaml).
 #
-# Covers these shipped overlays (ACCELERATOR_TYPE/MODEL_SERVER/INFRA_PROVIDER), which look
-# the same to a client: a provider overlay changes only node, cache and NCCL settings.
-#   tpu/v5p/sglang/gke                validated
-#   tpu/v5p/sglang/base               an overlay exists; guide.yaml lists only `gke` for tpu/v5p
-#   tpu/v6/sglang/{base,gke}          community
-#   tpu/v7/sglang/{base,gke}          community
+# CI lane that deploys this configuration (llm-d's nightly-e2e-optimized-baseline-<lane>
+# workflow; it runs in standalone mode):
+#   gke-acc-tpu-sglang-x              tpu/v5p/sglang (the lane sets no provider; the base and gke
+#                                     overlays render the same engine arguments)
+# Same to a client, but run by no lane: tpu/v6/sglang and tpu/v7/sglang (community).
 #
 # How a lane runs it, after deploying the guide in standalone mode (guide.yaml deploy.standalone)
 # with one of the overlays above:
@@ -38,6 +36,9 @@ model:
   # client sees; the names belong to the engine, so they are stated here.
   reasoning:
     parser: qwen3
+    # Inferred: SGLang's OpenAI server names the field reasoning_content. Not yet observed on
+    # this guide's SGLang build; the first run settles it.
+    field: reasoning_content
   tools:
     parser: qwen
 

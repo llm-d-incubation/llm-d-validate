@@ -1,16 +1,14 @@
 # The optimized-baseline guide in standalone mode (the client reaches the EPP's own listener):
-# Atom serving Qwen/Qwen3-32B with no parsers, at a window no source states. Group E in
-# ../README.md's coverage table. Guide status: validated (a nightly lane runs at least one overlay
-# below).
+# Atom serving Qwen/Qwen3-32B with no parsers, at a window no source states.
 #
 # STATUS: WRITTEN, NOT RUN against this engine. Composed from the guide's shipped config at
 # llm-d 565373b and the API references. Only the router layer has been measured (on kind,
-# with a simulator engine; see ../topology/standalone.yaml).
+# with a simulator engine; see ../parts/topology/standalone.yaml).
 #
-# Covers these shipped overlays (ACCELERATOR_TYPE/MODEL_SERVER/INFRA_PROVIDER), which look
-# the same to a client: a provider overlay changes only node, cache and NCCL settings.
-#   amd/atom/base                     validated
-#   amd/atom/amd-ci                   validated; the AMD CI provider overlay
+# CI lane that deploys this configuration (llm-d's nightly-e2e-optimized-baseline-<lane>
+# workflow; it runs in standalone mode):
+#   amd-acc-rocm-atom-x               amd/atom/amd-ci
+# Same to a client, but run by no lane: amd/atom/base.
 #
 # How a lane runs it, after deploying the guide in standalone mode (guide.yaml deploy.standalone)
 # with one of the overlays above:

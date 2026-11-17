@@ -27,9 +27,8 @@ model:
   # first run's GET /v1/models (vLLM's max_model_len) confirms it.
   max_model_len: 40960
   reasoning:
-    # INTENT: a reasoning parser moves the <think> block out of `content` into its own field,
-    # which vLLM's and SGLang's OpenAI servers both name reasoning_content.
-    field: reasoning_content
+    # A reasoning parser moves the <think> block out of `content` into its own field. The
+    # field's name is the engine's, so each combination states it beside the parser names.
     # INTENT: Qwen3 thinks unless asked not to (its template's enable_thinking defaults to
     # true).
     default_on: true
