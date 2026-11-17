@@ -78,10 +78,10 @@ Each profile chooses its own variable names, per ingress. Print the ones yours r
 
 ```sh
 source .venv/bin/activate
-python -c "import sys,yaml
-for i in yaml.safe_load(open(sys.argv[1]))['ingresses']:
-    a=i.get('auth') or {}
-    print(i['id'], i.get('kind','vllm'), 'url:', i.get('base_url_env') or 'inline', 'key:', a.get('key_env') or 'none')" <profile>
+python -c "import sys
+from llmdv.profile import loader
+for i in loader.load(sys.argv[1]).ingresses:
+    print(i.id, i.kind.value, 'url:', i.base_url_env or 'inline', 'key:', i.auth.key_env or 'none')" <profile>
 ```
 
 Then export each named variable: a gateway ingress's URL and key from wherever the user keeps them (step 1), a router ingress's URL from step 2.
@@ -97,7 +97,8 @@ An unset variable fails preflight (exit 3) and names the variable, never a value
 
 ```sh
 llmdv profile validate <profile>
-llmdv profile show <profile> --matrix      # which surfaces run at which ingress; policy skips show up in the run
+llmdv profile show <profile> --matrix      # which surfaces run at which ingress
+llmdv plan --profile <profile> -q          # cases that would run and skip, by skip class (policy skips included)
 ```
 
 Use `fleet_policy: dedicated`: it runs every case, including the disruptive families (malformed input, token abuse, disconnects, long context), and in practice these have not disturbed the deployments they ran against. Switch to `shared` (which skips them as `excluded_by_policy`) only when the deployment's owner asks for it.
@@ -133,7 +134,7 @@ llmdv verify --profile <profile> --evidence all -k "<tests>"  # the cases you ca
 llmdv verify --profile <profile> --analyze                    # the full suite, 15-60 min; runs/<timestamp>/
 ```
 
-Restrict a multi-ingress profile with `--ingress <id>`. Keep the machine awake for the full run, or run it unattended with `llmdv job` or as a cluster job ([docs/end-to-end.md](../../../docs/end-to-end.md#from-a-cluster-job); [`.agents/ENVIRONMENT.md`](../../ENVIRONMENT.md), "Long runs"). Exit `1` is test failures, `3` an environment problem (nothing was tested), `5` results not delivered, `6` interrupted; see [docs/manual.md](../../../docs/manual.md#exit-codes).
+Restrict a multi-ingress profile with `--ingress <id>`. Keep the machine awake for the full run, or run it unattended with `llmdv job` or as a cluster job ([docs/end-to-end.md](../../../docs/end-to-end.md#from-a-cluster-job); [`.agents/ENVIRONMENT.md`](../../ENVIRONMENT.md), "Long runs"). Exit `1` is test failures, `3` your environment rather than the fleet, `5` results not delivered, `6` interrupted; see [docs/manual.md](../../../docs/manual.md#exit-codes).
 
 ## 8. Compare and report
 

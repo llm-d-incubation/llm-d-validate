@@ -21,7 +21,7 @@ Each lives at `.agents/skills/<name>/SKILL.md`. Load the one that matches before
 | [probing-a-fleet-before-asserting](.agents/skills/probing-a-fleet-before-asserting/SKILL.md) | writing or changing an assertion about a live response, or a live case fails |
 | [extending-llmdv](.agents/skills/extending-llmdv/SKILL.md) | adding a surface, ingress kind, case, client, assertion or capability |
 | [testing-a-model-deployment](.agents/skills/testing-a-model-deployment/SKILL.md) | testing a model you were handed endpoints for (a LiteLLM gateway, a router or EPP route, or both): picking and pointing a profile, first checks, the run, the comparison |
-| [running-and-comparing-live-runs](.agents/skills/running-and-comparing-live-runs/SKILL.md) | starting a live run (PC, unattended or cluster job), pulling one back, comparing runs |
+| [running-and-comparing-live-runs](.agents/skills/running-and-comparing-live-runs/SKILL.md) | starting a live run (PC, unattended or cluster job), publishing one, pulling one back, comparing runs |
 | [reporting-a-run](.agents/skills/reporting-a-run/SKILL.md) | sharing a run directory; building the annotated HTML dashboard and its notes |
 | [triaging-a-run](.agents/skills/triaging-a-run/SKILL.md) | finding out what broke in a run and why: grouping failures into causes, existing issues, transient or real, the layer responsible, reproducing from bundles and logs |
 | [filing-a-fleet-finding](.agents/skills/filing-a-fleet-finding/SKILL.md) | turning a failure group into a GitHub issue or issue draft |
@@ -66,9 +66,11 @@ fleet gap, `not_implemented` a tool gap, `requires_instrumentation` and `require
 missing instrument, `excluded_by_policy` is a choice not to run on a shared fleet, and
 `throttled` is our own quota. A matrix that merges them reads as coverage when it is not.
 
-**Exit codes separate blame.** `0` ok, `1` test failures (the fleet), `2` usage or invalid
-profile, `3` the operator's environment (preflight unsatisfied, a local connection lost mid-run, or a results store that cannot be used), `4` a llmdv defect, `5`
-verification passed but results or the notification were not delivered, `6` interrupted. Never
+**Exit codes separate blame** (`EXITS` in `cli/exit_codes.py`). `0` ok, `1` test failures (the
+fleet), `2` usage or invalid profile, `3` the operator's environment (preflight unsatisfied, a
+local port that refuses connections mid-run with no fleet failure, or a results store that cannot
+be used), `4` a llmdv defect, `5` verification passed but results or the notification were not
+delivered, `6` interrupted. Never
 widen `1` to cover an environment problem, and never let `5` mask a verification failure: the
 verification code takes precedence.
 

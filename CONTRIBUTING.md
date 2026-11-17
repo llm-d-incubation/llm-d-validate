@@ -69,7 +69,8 @@ pre-commit install                                          # optional: formats 
 ```
 
 The offline suite runs every case against `tests/fakes.py`, a real HTTP server on a local socket
-with flags for the defects the suite exists to catch. CI runs it on Python 3.10, 3.11 and 3.12.
+with flags for the defects the suite exists to catch. Running it in parallel, and what CI runs,
+are in the [manual](docs/manual.md#running-llmdvs-own-tests).
 
 [docs/architecture.md](docs/architecture.md) describes the layout, and the invariants a change must keep.
 

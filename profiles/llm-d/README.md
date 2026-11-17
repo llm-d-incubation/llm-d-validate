@@ -71,7 +71,7 @@ Behaviour lines change only after the team triages a failure, and the comment th
 
 ## optimized-baseline coverage
 
-These profiles follow llm-d's CI: there is one for every configuration a nightly lane deploys, and none for a configuration no lane runs. The guide's ten lanes (`nightly-e2e-optimized-baseline-<lane>.yaml` in llm-d, each in standalone mode) deploy seven configurations that differ to a client:
+These profiles follow llm-d's CI: there is one for every configuration the guide marks `validated` and a nightly lane deploys, and none for any other. The guide's ten lanes (`nightly-e2e-optimized-baseline-<lane>.yaml` in llm-d, each in standalone mode) deploy seven configurations that differ to a client:
 
 | CI lane | Overlay it deploys (`ACCELERATOR_TYPE/MODEL_SERVER/INFRA_PROVIDER`) | Profile (`optimized-baseline/`) |
 | --- | --- | --- |

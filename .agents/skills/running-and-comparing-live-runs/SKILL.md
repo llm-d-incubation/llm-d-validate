@@ -21,7 +21,7 @@ The profile names its variables in `base_url_env` and `auth.key_env` (every ingr
 
 A `*.local.yaml` copy may write `base_url` inline instead of `base_url_env` (never both); it is gitignored. Testing a model you were handed endpoints for is the testing-a-model-deployment skill.
 
-Publishing and pulling runs need the bucket variables exported (`AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_ENDPOINT_URL_S3`, `AWS_DEFAULT_REGION`, `AWS_BUCKET`); without them, work from local run directories. Check a variable with `[ -n "$VAR" ] && echo set`, never `echo $VAR`.
+Publishing and pulling runs need the bucket variables exported ([`.agents/ENVIRONMENT.md`](../../ENVIRONMENT.md) lists them); without them, work from local run directories. Check a variable with `[ -n "$VAR" ] && echo set`, never `echo $VAR`.
 
 ## Start a run
 
@@ -86,12 +86,7 @@ llmdv compare --from "$PREFIX" --profile <profile name> --window 3          # th
 # (llmdv job spells these --compare-baseline and --compare-window)
 ```
 
-| Exit | Meaning |
-|---|---|
-| `0` | no regression, or `--no-fail` was given |
-| `1` | a case went from pass to fail or error |
-| `2` | nothing to compare: no runs, one run, or an empty run |
-| `3` | the store could not be read (missing credentials or `AWS_ENDPOINT_URL_S3`, wrong bucket): your environment, not the runs. Check that the credentials file was sourced with `set -a` |
+Exit `1` is a regression, `2` nothing to compare, and `3` a store that could not be read, which is your environment, not the runs: check that the credentials file was sourced with `set -a`. [docs/compare.md](../../../docs/compare.md#exit-codes) has the full table.
 
 Runs published to a local directory (`--remote-output file:///<dir>`) compare the same way with `--from file:///<dir>`. A plain local run (`runs/<timestamp>/`) has neither that layout nor a `MANIFEST.json`, so compare two of those case by case from their `results.jsonl`, keyed on `nodeid`.
 

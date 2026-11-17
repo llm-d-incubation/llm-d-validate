@@ -10,9 +10,7 @@ local sockets.
 | `test_*.py` | one file per area of the library or suite under test |
 | [`fixtures/`](fixtures/) | recorded inputs |
 
-```sh
-.venv/bin/python -m pytest tests/ -q           # one test at a time
-.venv/bin/python -m pytest tests/ -q -n auto   # in parallel; needs ./install.sh --dev
-```
+The commands to run them are in the
+[manual](../docs/manual.md#running-llmdvs-own-tests).
 
 A new case needs its defect added to a fake, and a test proving the case fails against it.

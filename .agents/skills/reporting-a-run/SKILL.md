@@ -16,7 +16,7 @@ The static page draws no conclusions. That is your job, and it must stay visibly
 
 ## Steps
 
-1. **Get the run directory onto this machine.** A local run needs nothing. To pull a published one, follow running-and-comparing-live-runs ("Pull a run back"); the run's `outcome.json` gives its `publication.location`. Without bucket access, ask someone who has it for the run directory. If `llmdv compare --from "$PREFIX" --profile <profile name> --list` cannot list the folder, `aws s3 ls "$PREFIX/<profile name>/" --endpoint-url "$AWS_ENDPOINT_URL_S3"` does.
+1. **Get the run directory onto this machine.** A local run needs nothing. To pull a published one, follow running-and-comparing-live-runs ("Pull a run back"); the run's `outcome.json` gives its `publication.location`. Without bucket access, ask someone who has it for the run directory.
 2. **Build the static page** from the repository root, with every `auth.key_env` variable the run's `profile.used.yaml` names exported, so the credential scan checks their exact values. Load them as [`.agents/ENVIRONMENT.md`](../../ENVIRONMENT.md) describes (ask where the person keeps the key; never echo it), under the profile's names:
    ```sh
    export <auth.key_env>="$<their key variable>"

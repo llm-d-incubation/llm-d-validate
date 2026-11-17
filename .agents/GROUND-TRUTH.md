@@ -217,7 +217,8 @@ share one hop which becomes what you measure. *Declare `setup.proxy: bypass` and
 fail when an HTTP proxy would capture a localhost request.*
 
 **A dead port-forward is not a deployment failure.** It is the most common cause of a red run
-from a laptop. *Preflight catches it and exits 3, separately from test failures at 1.*
+from a laptop. *Preflight catches it and exits 3, separately from test failures at 1.* A forward
+that dies mid-run also exits 3, when the local port refuses connections and nothing else failed.
 
 **A kubeconfig can hold the wrong context.** A profile naming a kubeconfig that lacks the
 declared context degrades selector resolution silently to an unresolved label. If

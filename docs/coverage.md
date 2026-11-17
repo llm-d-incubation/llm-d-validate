@@ -41,7 +41,7 @@ the cases against it (see [docs/end-to-end.md](end-to-end.md)).
 | Client scenarios (`scenarios`) | 6 | Client-shaped multi-request patterns: blank turns, cancel bursts, aliases | `scenario_checks`, `client_model_names`, `chat_quiet_efforts` | built |
 | Real clients (`real_clients`) | 9 | Pinned Claude Code sessions through the declared chain | `clients[].binaries`, `client_sessions`, `client_reuse` | built |
 | Fleet invariants (`fleet`) | 10 | Config reads, Prometheus bounds, forbidden log lines | `fleet.config`, `fleet.metrics`, `ingresses[].logs` | built |
-| **Total** | **364** | | | |
+| **Total** | **368** | | | |
 
 Keys without a prefix live under `capabilities`, either at the top level or per ingress; see
 [profiles/REFERENCE.md](../profiles/REFERENCE.md#capabilities). Surfaces and transport, logs and

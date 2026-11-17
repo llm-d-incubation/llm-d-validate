@@ -18,7 +18,7 @@ explains how the pieces fit.
 | [`fleet/`](fleet/) | configuration, metrics and log invariants; the read-only metrics client |
 | [`instruments/`](instruments/) | operator-run helpers, such as a header-echo backend |
 | [`output/`](output/) | where a run's artifacts go: local, `file://` and `s3://` |
-| [`results/`](results/) | the structured result record |
+| [`results/`](results/) | the structured result record and its one reader |
 | [`log/`](log/) | the logger tree |
 | [`suites/`](suites/) | the functional tests themselves |
 | `plugin.py` | the pytest plugin that ties it together |

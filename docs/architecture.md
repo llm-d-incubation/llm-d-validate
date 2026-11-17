@@ -95,6 +95,7 @@ flowchart TB
     F --> G["write evidence, collect pod logs"]
     G --> I{"did any case fail?"}
     I -->|"yes"| E1["exit 1: the fleet"]
+    I -->|"only a local connection lost mid-run"| E3
     I -->|"no"| P{"publication requested<br/>and failed?"}
     P -->|"yes"| E5["exit 5: not delivered"]
     P -->|"no"| E0["exit 0"]
@@ -201,7 +202,8 @@ Log collection through the read-only adapter. Local and remote sinks (`file://`,
 `output/s3.py`, or `output/ibm_cos.py` under `LLMDV_S3_AUTH=ibm-iam`) also expose object puts for
 opt-in oversized-artifact offloading; publication still writes `MANIFEST.json` last. Both S3
 paths use redaction-registered credentials, because an S3 error can
-echo the access key id into `outcome.json`. `results/` writes versioned `results.jsonl` records.
+echo the access key id into `outcome.json`. `results/` writes versioned `results.jsonl` records, and
+`results/read.py` is the one reader of them: it refuses any schema but `llmdv.results/1`.
 `log/` provides two streams: diagnostics (per-case progress) to stderr under `--log-level`, and
 primary output (banner and summary) to stdout, never suppressed, so `llmdv verify > report.txt`
 keeps the report. Colour follows whether each stream is a terminal; `NO_COLOR` and `--no-color`
@@ -246,11 +248,5 @@ the failure, including that a recorded check is marked not-ok. The steps are in 
 
 ## Testing your change
 
-```sh
-.venv/bin/python -m pytest tests/ -q     # no cluster needed
-.venv/bin/ruff check src/ tests/
-```
-
-`tests/fakes.py` is a real HTTP server on a local socket, not a mock, with flags for the
-misbehaviours the suite exists to catch. If you add a case, add its defect to the fake and prove
-the case catches it.
+The commands for the offline suite and lint are in
+[CONTRIBUTING.md](../CONTRIBUTING.md#development-and-testing).

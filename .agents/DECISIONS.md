@@ -68,9 +68,7 @@ after the failure has been triaged; until then the profile states the correct be
 
 A declaration llmdv cannot check from the client side skips with the missing instrument named,
 rather than passing. There are six skip classes (`SkipClass` in `profile/schema.py`), and they
-are never collapsed: `undeclared` is a fleet gap, `not_implemented` a tool gap,
-`requires_instrumentation` and `requires_load` a missing instrument, `excluded_by_policy` a
-choice not to run on a shared fleet, `throttled` the tool's own quota.
+are never collapsed; [AGENTS.md](../AGENTS.md#conventions-that-are-enforced) says what each means.
 
 *Why:* a matrix that merges them reads as coverage when it is not. A green cell for a header the
 client cannot observe is a false claim; a skip that says "needs an instrumented backend" is a
@@ -92,13 +90,16 @@ is one more thing to leak or die silently.
 
 ## Exit codes separate blame
 
-`0` ok, `1` fleet failures, `2` usage or invalid profile, `3` preflight (the vantage point), `4`
-an llmdv defect, `5` passed but not delivered, `6` interrupted. Preflight runs before collection
-and checks every selected ingress, the credentials and the output destination.
+Each code names who is to blame: the fleet, the usage, the operator's environment, llmdv itself,
+delivery, or an interruption. `EXITS` in `cli/exit_codes.py` is the one table of codes and
+meanings; [AGENTS.md](../AGENTS.md#conventions-that-are-enforced) summarizes it. Preflight runs
+before collection and checks every selected ingress, the credentials and the output destination.
 
 *Why:* a connection refused against `localhost` is almost always a dead port-forward, not a
 fleet bug. Reporting it as a test failure teaches people to distrust the suite. With separate
 codes, CI can tell "the fleet is broken" from "the runner is broken" without parsing logs.
+The same evidence, and no other, counts mid-run: a run whose only failures are a local port
+refusing connections exits `3`, and a local port that still accepts is never the environment.
 `5` never masks a verification failure: the verification code always wins.
 
 ## argparse, not Typer
@@ -118,7 +119,7 @@ swap would not reach the library.
 No `print` (ruff `T20`). Diagnostics go to stderr under `--log-level`; primary output goes to
 stdout through a logger the level never suppresses. A redaction filter sits on every handler.
 
-*Why:* `llmdv profile show | yq` must keep working whatever the log level. And httpx logs request
+*Why:* `llmdv plan --json | jq` must keep working whatever the log level. And httpx logs request
 headers at DEBUG, so without a filter on the handlers a debug run writes keys into `llmdv.log`,
 which is then published with the run. Redaction in the evidence writer alone does not hold.
 

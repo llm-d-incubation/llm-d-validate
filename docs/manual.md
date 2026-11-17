@@ -75,13 +75,11 @@ Repeating a selector is a union; different selectors intersect. `-k` and `-m` ca
 selection but never widen it. The ingress id is the parametrisation id, so `-k router` keeps one
 column.
 
-`-m` accepts one marker per suite package under `src/llmdv/suites/`: `anthropic_messages`,
-`cache`, `contract`, `discovery`, `evolution`, `field_options`, `fleet`, `long_context`,
-`openai_chat`, `openai_completions`, `openai_responses`, `real_clients`, `render`, `scenarios`,
-`streaming`, `tools`, `transport` and `unhappy`. A case whose `case_id` starts with another
+`-m` accepts one marker per suite package under `src/llmdv/suites/`;
+[docs/coverage.md](coverage.md#coverage) lists them. A case whose `case_id` starts with another
 suite's name carries that marker too, so `-m openai_chat` also selects
 `openai_chat.disconnect_recovery`, which lives in `streaming/`; `-m streaming` still selects it.
-Cases also carry `disruptive`, `surface`, `surface_generic`, `case_id` and `needs`. A name that
+Cases also carry `disruptive`, `surface`, `surface_generic`, `case_id`, `needs` and `samples`. A name that
 is not a marker exits `2` and lists the ones that exist, rather than deselecting everything and
 reporting `PASSED`.
 
@@ -192,7 +190,7 @@ counted as coverage.
 
 A profile is hand-written YAML describing one fleet from one vantage point. It carries no
 secrets or hostnames: `auth.key_env` and `base_url_env` name environment variables. A profile may
-`extends:` another and hold only its changes; the run validates and records the composed result.
+`extends:` one or more others and hold only its changes; the run validates and records the composed result.
 Start with [profiles/README.md](../profiles/README.md); every field is in
 [profiles/REFERENCE.md](../profiles/REFERENCE.md).
 

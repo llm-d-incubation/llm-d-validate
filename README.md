@@ -88,15 +88,8 @@ what is still missing. `llmdv profile show <profile> --matrix` shows what will r
 
 ## Development
 
-```sh
-./install.sh --dev                            # adds ruff, pre-commit and pytest-xdist
-.venv/bin/pre-commit install                  # formats staged Python on commit
-.venv/bin/python -m pytest tests -q -n auto   # the offline suite, against local fakes
-```
-
-The offline suite needs no cluster or gateway. CI runs it with lint on every pull request, on
-Python 3.10 and 3.11. Live verification always runs one case at a time: `llmdv verify` refuses
-`-n`.
+The development install, lint and the offline suite, which needs no cluster or gateway, are in
+[CONTRIBUTING.md](CONTRIBUTING.md#development-and-testing).
 
 A failure traced to an upstream defect can be listed in the profile's `known_failures` with its
 issue: it still runs and still fails, but runs and `llmdv compare` show it as known rather than

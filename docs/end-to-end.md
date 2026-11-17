@@ -27,7 +27,7 @@ an S3 or S3-compatible bucket.
 | --- | --- |
 | `llmdv`, installed as above (`--s3` adds the bucket client) | every path, and reading any run |
 | the gateway URL and key | every live run |
-| read-only cluster access (`get` on pods and `pods/log`) | port-forwarded ingresses and `--pod-logs` |
+| read-only cluster access (`get` and `list` on pods, `get` on `pods/log`) | port-forwarded ingresses and `--pod-logs` |
 | cluster access with the `llmdv-trigger` Role, and the CronJob deployed ([deploy/README.md](../deploy/README.md)) | cluster jobs |
 | the [AWS CLI](https://aws.amazon.com/cli/) and bucket credentials | pulling a published run (publishing needs only the credentials) |
 
@@ -77,7 +77,7 @@ A run is published to `<prefix>/<profile name>/<run id>/`, and is complete once 
 
 ## Unattended
 
-`llmdv job` runs `llmdv verify` as a child process, publishes, optionally notifies a webhook, and
+`llmdv job` runs `llmdv verify` as a child process, publishes, optionally notifies Slack, and
 prints `outcome.json`, however verify ended. That makes it suitable for a Kubernetes CronJob or a
 CI step. The [`Containerfile`](../Containerfile) builds a runner image.
 
@@ -112,8 +112,8 @@ kubectl -n <namespace> logs -f "job/$job"
 <details>
 <summary><b>More:</b> what a job does, options, and where results land</summary>
 
-`llmdv job` runs `llmdv verify` as a child process, publishes, optionally notifies Slack, and prints
-`outcome.json` to the job log. Deploying it (image, overlay, settings and Secret) and every `trigger.sh` option are in
+The job does what [Unattended](#unattended) describes, and prints `outcome.json` to the job log.
+Deploying it (image, overlay, settings and Secret) and every `trigger.sh` option are in
 [deploy/README.md](../deploy/README.md).
 
 - **Scheduled runs** are labelled `trigger=nightly` and are the baselines for `--compare`
