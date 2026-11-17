@@ -28,6 +28,8 @@ WORDS = "amber birch cobalt dune ember fjord grove heron iris juniper kelp lagoo
 _REPLAYED: dict[str, tuple[int, dict | None, str | None]] = {}
 # Successive temperature-0 completions under `greedy_unstable` never repeat.
 _UNSTABLE = (f"draw{n}" for n in itertools.count())
+# Temperature-0 JSON completions under `greedy_two_answers` alternate between two answers.
+_TWO_ANSWERS = itertools.cycle((" Paris", " Lutetia"))
 # The proof prompt reasons this many pieces before it answers, in the `reasoning` field.
 PROOF_THOUGHT = 200
 
@@ -92,6 +94,10 @@ def _answer(body: dict, path: str, defect: str | None) -> list[str]:
         if defect == "greedy_unstable" and body.get("temperature") == 0:
             # An engine whose temperature-0 decode varies from one request to the next.
             return [" Paris", " is", " the", " capital", f" {next(_UNSTABLE)}", "."]
+        if defect == "greedy_two_answers" and body.get("temperature") == 0:
+            # Two answers equally often; a stream carries the one the JSON requests saw second.
+            city = " Lutetia" if body.get("stream") else next(_TWO_ANSWERS)
+            return [city, " is", " the", " capital", "."]
         return [" Paris", " is", " the", " capital", "."]
     if "Count from 1 to 10" in asked:
         return ["1", *(f", {n}" for n in range(2, 11))]

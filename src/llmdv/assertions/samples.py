@@ -16,23 +16,31 @@ The rule kinds are closed:
 
 - `count`: the number of samples equal to the target (the most common value, or a named one)
   lies within [min, max]. All equal is `min: n`, k of n is `min: k`, all distinct is `max: 1`.
-  Bounds count samples, so they are integers; `min` defaults to 0 and `max` to n.
+  Bounds count samples, so they are integers; `min` defaults to 0 and `max` to n. A whole
+  float and its integer are one value.
 - `ratio`: median(a) / median(b) lies within [min, max]. A zero median below the line fails.
 - `order`: the groups' medians follow the declared order: the first is strictly below the last,
   and no lower group's median exceeds a higher one's by more than the factor `slack`.
 
 A verdict is pass or fail. A failed sample request fails its own check before the rule is
-reached, so the rule always sees n samples per group.
+reached, so the rule always sees n samples per group. A `ratio` or `order` sample that is not a
+finite number fails the check, with every sample on record.
+
+Every bound is a finite number, and a sample that is not finite is recorded by name, so a rule
+and its samples are always strict JSON. A profile's entry keeps the case's default for each
+key it leaves unset, and an entry whose rule no sample set can fail is refused (`resolve`).
 """
 
 from __future__ import annotations
 
 import dataclasses
+import enum
 import hashlib
 import json
+import math
 from collections import Counter
 from collections.abc import Callable, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from statistics import median
 from typing import Any
 
@@ -41,7 +49,16 @@ from ..http.redact import redact_value, scrub
 from ..profile.errors import ProfileError
 
 KINDS = ("count", "ratio", "order")
-MODE = "mode"
+
+
+class Target(enum.Enum):
+    """What a count rule counts when it names no value. Not a string, so a sample whose text
+    is `mode` stays a value a rule can name."""
+
+    MODE = "mode"
+
+
+MODE = Target.MODE
 PREVIEW_CHARS = 60
 # The bounds each kind takes; the profile may set these and n, never the kind or the target.
 BOUNDS = {"count": ("min", "max"), "ratio": ("min", "max"), "order": ("slack",)}
@@ -61,6 +78,8 @@ class Rule:
     slack: float | None = None
     # ratio: (a, b); order: the declared order, lowest first. Empty for one group.
     groups: tuple[str, ...] = ()
+    # The profile changed the case's default, so the check's claim describes this rule.
+    from_profile: bool = field(default=False, compare=False)
 
     def __post_init__(self) -> None:
         if self.kind not in KINDS:
@@ -72,10 +91,8 @@ class Rule:
             if value is not None and name not in BOUNDS[self.kind]:
                 takes = " and ".join(BOUNDS[self.kind])
                 raise ValueError(f"{name}: the {self.kind} rule takes {takes}")
-            if value is not None and (
-                isinstance(value, bool) or not isinstance(value, int | float)
-            ):
-                raise ValueError(f"{name}: expected a number, got {value!r}")
+            if value is not None and not _finite(value):
+                raise ValueError(f"{name}: expected a finite number, got {value!r}")
         low, high = self.bounds()
         if self.kind == "count":
             if any(isinstance(b, float) and not b.is_integer() for b in (low, high)):
@@ -106,7 +123,7 @@ class Rule:
         out: dict[str, Any] = {"kind": self.kind, "n": self.n}
         if self.kind == "count":
             low, high = self.bounds()
-            target = MODE if self.target == MODE else _reduce(self.target)
+            target = MODE.value if self.target is MODE else _reduce(self.target)
             out |= {"target": target, "min": int(low), "max": int(high)}
         elif self.kind == "ratio":
             out |= {"min": self.bounds()[0], "max": self.max}
@@ -137,7 +154,8 @@ class Sample:
 def sample(
     value: Any, exchange: int | None = None, group: str | None = None, preview: Any = None
 ) -> Sample:
-    """A sample of `value`: a number, a boolean or null as itself, anything else as a digest.
+    """A sample of `value`: a finite number, a boolean or null as itself, a number that is not
+    finite by its name (`nan`, `inf`, `-inf`), anything else as a digest.
 
     `exchange` is the request's `seq` in exchanges.jsonl. The preview shows the start of
     `preview`, or of the value when none is given, redacted and at most PREVIEW_CHARS long.
@@ -172,8 +190,13 @@ def judge(
         raise ValueError(
             f"{name}: expected {rule.n} samples per group {list(groups)}, got {counts}"
         )
-    observed = _JUDGES[rule.kind](rule, samples)
+    odd = sum(not _finite(s.value) for s in samples) if rule.kind != "count" else 0
+    # Medians of anything but numbers mean nothing: the check fails on what it was sent.
+    observed = {"not_numbers": odd, "holds": False} if odd else _JUDGES[rule.kind](rule, samples)
     claim = expected or _describe(rule)
+    if rule.from_profile:
+        # The case worded its claim for its default rule; this one is the profile's.
+        claim = f"{_describe(rule)} (set by the profile)"
     if not decides:
         claim = f"measured, not judged: {claim}"
     ok = observed["holds"] or not decides
@@ -185,11 +208,11 @@ def judge(
 
 
 def _count(rule: Rule, samples: Sequence[Sample]) -> dict[str, Any]:
-    values = Counter(json.dumps(s.value, sort_keys=True) for s in samples)
-    if rule.target == MODE:
+    values = Counter(_key(s.value) for s in samples)
+    if rule.target is MODE:
         count = max(values.values())
     else:
-        count = values[json.dumps(_reduce(rule.target), sort_keys=True)]
+        count = values[_key(_reduce(rule.target))]
     low, high = rule.bounds()
     return {"count": count, "n": rule.n, "distinct": len(values), "holds": low <= count <= high}
 
@@ -221,7 +244,7 @@ _JUDGES = {"count": _count, "ratio": _ratio, "order": _order}
 def _describe(rule: Rule) -> str:
     low, high = rule.bounds()
     if rule.kind == "count":
-        target = "the most common" if rule.target == MODE else repr(rule.target)
+        target = "the most common" if rule.target is MODE else repr(rule.target)
         span = f"{low}" if low == high else f"{low} to {high}"
         return f"{span} of {rule.n} samples equal {target}"
     if rule.kind == "ratio":
@@ -232,28 +255,72 @@ def _describe(rule: Rule) -> str:
     return f"medians in the order {order}, within a factor {rule.to_dict()['slack']}"
 
 
+def _finite(value: Any) -> bool:
+    """A number a bound or a median can be: an integer or a finite float, never a boolean."""
+    return not isinstance(value, bool) and isinstance(value, int | float) and math.isfinite(value)
+
+
+def _key(value: Any) -> str:
+    """What makes two reduced samples equal: 1 and 1.0 are one value, 1 and true are not."""
+    if isinstance(value, float) and value.is_integer():
+        value = int(value)
+    return json.dumps(value, sort_keys=True)
+
+
 def _reduce(value: Any) -> Any:
-    """A JSON scalar for a sample: numbers, booleans and null as themselves, else a digest."""
-    if value is None or isinstance(value, bool | int | float):
+    """A JSON scalar for a sample: finite numbers, booleans and null as themselves, a number
+    that is not finite as its name (strict JSON has no NaN or Infinity), else a digest."""
+    if value is None or isinstance(value, bool | int):
         return value
+    if isinstance(value, float):
+        return value if math.isfinite(value) else str(value)
     text = value if isinstance(value, str) else json.dumps(value, sort_keys=True)
     return "sha256:" + hashlib.sha256(text.encode("utf-8")).hexdigest()[:12]
+
+
+def unfalsifiable(rule: Rule) -> str | None:
+    """Why no set of n samples can fail `rule`, or None when some set can.
+
+    A count of the most common value is always between 1 and n, and a count of a named value
+    between 0 and n, so a count rule whose bounds admit that whole range checks nothing. A
+    ratio fails on a zero median below the line and an order on equal medians, whatever their
+    bounds.
+    """
+    if rule.kind != "count":
+        return None
+    low, high = rule.bounds()
+    least = 1 if rule.target is MODE else 0
+    if low > least or high < rule.n:
+        return None
+    if least == rule.n:
+        return "the most common of 1 sample is always that sample; set n to at least 2"
+    return f"any {rule.n} samples satisfy it; set min above {least} or max below {rule.n}"
 
 
 def resolve(default: Rule, override: Any, where: str) -> Rule:
     """The case's default rule with the profile's entry (n and bounds) applied.
 
-    A count entry that changes n states min or max too: they count samples, so a default
-    written for one n says nothing about another.
+    A key the entry leaves unset keeps the case's default. A count entry that changes n states
+    min or max too: they count samples, so a default written for one n says nothing about
+    another. An entry that contradicts a kept default, or whose rule no sample set can fail,
+    is refused.
     """
     if override is None:
         return default
     given = {k: v for k, v in dataclasses.asdict(override).items() if v is not None}
     if default.kind == "count" and "n" in given and not {"min", "max"} & set(given):
         raise ProfileError(f"{where}: a count rule that sets n also sets min or max")
-    if default.kind == "count" and {"min", "max"} & set(given):
-        given = {"min": None, "max": None, **given}
+    kept = [
+        f"{name} {getattr(default, name)}"
+        for name in ("n", *BOUNDS[default.kind])
+        if name not in given and getattr(default, name) is not None
+    ]
     try:
-        return dataclasses.replace(default, **given)
+        rule = dataclasses.replace(default, **given)
     except ValueError as exc:
-        raise ProfileError(f"{where}: {exc}") from None
+        defaults = f"; a key left unset keeps the case's default ({', '.join(kept)})"
+        raise ProfileError(f"{where}: {exc}{defaults if kept else ''}") from None
+    why = unfalsifiable(rule)
+    if why:
+        raise ProfileError(f"{where}: {_describe(rule)} can never fail: {why}")
+    return dataclasses.replace(rule, from_profile=rule.to_dict() != default.to_dict())

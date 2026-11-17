@@ -11,9 +11,12 @@ an unknown major is refused, with the file and the version named.
 
 from __future__ import annotations
 
+import base64
 import copy
+import gzip
 import importlib.util
 import json
+import re
 import sys
 from pathlib import Path
 
@@ -31,6 +34,7 @@ from llmdv.output import manifest
 from llmdv.profile.known import first_failed_check
 from llmdv.results import read as results_file
 from llmdv.results.read import UnreadableSchema
+from llmdv.results.record import ResultRecord, ResultsWriter
 
 REPO = Path(__file__).resolve().parents[1]
 
@@ -331,3 +335,45 @@ def test_the_ci_job_summary_names_an_unknown_major_instead_of_counting_it(
     out = summarize(monkeypatch, capsys, run_dir(tmp_path, "v3", unknown(extended_records())))
     assert "Results not summarized: results.jsonl, line 3: schema 'llmdv.results/3'" in out
     assert "### By suite" not in out
+
+
+def _strict(text: str):
+    """Parse as a browser's JSON.parse does: NaN and Infinity are not JSON."""
+
+    def refuse(name):
+        raise ValueError(f"not strict JSON: {name}")
+
+    return json.loads(text, parse_constant=refuse)
+
+
+def test_a_non_finite_number_is_written_to_results_as_strict_json(tmp_path):
+    check = {
+        "name": "effort_order",
+        "observed": {"medians": {"low": float("nan")}, "ratio": float("-inf")},
+        "ok": False,
+        "rule": {"kind": "order", "n": 1, "slack": float("nan")},
+        "samples": [{"exchange": 0, "value": float("inf"), "preview": "inf"}, {"value": 1.5}],
+    }
+    writer = ResultsWriter(tmp_path / "results.jsonl")
+    writer.append(ResultRecord(run_id="r", nodeid="n", outcome="fail", profile="p", checks=[check]))
+    writer.close()
+    (row,) = [_strict(line) for line in (tmp_path / "results.jsonl").read_text().splitlines()]
+    (written,) = row["checks"]
+    assert written["rule"]["slack"] == "NaN"
+    assert written["observed"] == {"medians": {"low": "NaN"}, "ratio": "-Infinity"}
+    assert [s["value"] for s in written["samples"]] == ["Infinity", 1.5]
+
+
+def test_a_non_finite_number_in_an_older_run_reaches_the_dashboard_as_strict_json(tmp_path):
+    """A run written before the writer refused them still renders a page a browser can parse."""
+    rows = extended_records()
+    repeat = next(c for row in rows for c in row["checks"] if c["name"] == "repeat_text")
+    repeat["rule"] = {"kind": "order", "n": 3, "slack": float("nan")}
+    repeat["samples"][0]["value"] = float("inf")
+    run = run_dir(tmp_path, "nan", rows)
+    assert "NaN" in (run / "results.jsonl").read_text()
+    page = dashboard.write(run).read_text()
+    packed = re.search(r"[A-Za-z0-9+/=]{500,}", page).group(0)
+    data = _strict(gzip.decompress(base64.b64decode(packed)).decode())
+    (shown,) = [c for t in data["tests"] for c in t.get("checks", []) if c.get("rule")]
+    assert shown["rule"]["slack"] == "NaN" and shown["samples"][0]["value"] == "Infinity"

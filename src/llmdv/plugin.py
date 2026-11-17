@@ -565,8 +565,8 @@ def _check_capability_names(items: list[pytest.Item]) -> None:
 
 
 def _check_sample_rules(profile: Profile, items: list[pytest.Item]) -> None:
-    """Refuse a `capabilities.samples` entry that names no statistical case, or that its case's
-    rule cannot take, before any request.
+    """Refuse a `capabilities.samples` entry that names no statistical case, that its case's
+    rule cannot take, or that leaves a rule no sample set can fail, before any request.
 
     The keys are checked against every collected case, before `-k` and `-m` narrow the run, so a
     valid entry for a case left out of this run is still valid. A key naming no case would
@@ -584,6 +584,12 @@ def _check_sample_rules(profile: Profile, items: list[pytest.Item]) -> None:
         if marker is not None:
             rules[case.args[0]] = sampling.Rule(*marker.args, **marker.kwargs)
     problems: set[str] = set()
+    for case_id, rule in rules.items():
+        why = sampling.unfalsifiable(rule)
+        if why:
+            problems.add(
+                f"{case_id}: its samples marker declares a rule that can never fail: {why}"
+            )
     for ingress in profile.ingresses:
         for case_id, override in ingress.capabilities.samples.items():
             where = f"ingresses[{ingress.id}].capabilities.samples.{case_id}"

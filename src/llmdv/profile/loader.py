@@ -1051,9 +1051,11 @@ def _samples(value: Any, where: str) -> dict[str, SampleRule]:
         for name in ("min", "max", "slack"):
             bound = entry.get(name)
             if bound is not None and (
-                isinstance(bound, bool) or not isinstance(bound, int | float)
+                isinstance(bound, bool)
+                or not isinstance(bound, int | float)
+                or not math.isfinite(bound)
             ):
-                raise ProfileError(f"{at}.{name}: expected a number, got {bound!r}")
+                raise ProfileError(f"{at}.{name}: expected a finite number, got {bound!r}")
         rules[case_id] = SampleRule(**entry)
     return rules
 

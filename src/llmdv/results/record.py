@@ -18,6 +18,7 @@ exists, because attribution without it produces confident wrong answers -- see
 from __future__ import annotations
 
 import json
+import math
 import uuid
 from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
@@ -28,6 +29,21 @@ from .. import __version__
 from ..http import redact
 
 SCHEMA = "llmdv.results/1"
+
+
+def strict(value: Any) -> Any:
+    """`value` with every number that is not finite as its name: `NaN`, `Infinity`, `-Infinity`.
+
+    JSON has no such numbers, Python writes them all the same, and a browser's `JSON.parse`
+    then refuses the whole file. A fleet can send one, so a check can observe one.
+    """
+    if isinstance(value, float) and not math.isfinite(value):
+        return "NaN" if math.isnan(value) else "Infinity" if value > 0 else "-Infinity"
+    if isinstance(value, dict):
+        return {key: strict(item) for key, item in value.items()}
+    if isinstance(value, list | tuple):
+        return [strict(item) for item in value]
+    return value
 
 
 def new_run_id() -> str:
@@ -79,7 +95,8 @@ class ResultRecord:
 
     def to_json(self) -> str:
         # A reason or check can quote what the fleet sent back, credentials included.
-        return json.dumps(redact.redact_value(asdict(self)), sort_keys=False)
+        body = strict(redact.redact_value(asdict(self)))
+        return json.dumps(body, sort_keys=False, allow_nan=False)
 
 
 class ResultsWriter:

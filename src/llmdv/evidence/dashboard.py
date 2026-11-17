@@ -42,6 +42,7 @@ from ..cli.exit_codes import class_of
 from ..http import redact
 from ..log.setup import get_logger
 from ..results import read as results_file
+from ..results.record import strict
 
 log = get_logger("evidence.dashboard")
 
@@ -618,8 +619,13 @@ def secret_findings(text: str, profile: dict) -> list[str]:
     return found
 
 
+def _json(data: dict) -> str:
+    """The page data as strict JSON, which is what the page's `JSON.parse` reads."""
+    return json.dumps(strict(data), ensure_ascii=False, default=str, allow_nan=False)
+
+
 def render(data: dict) -> str:
-    raw = json.dumps(data, ensure_ascii=False, default=str)
+    raw = _json(data)
     packed = base64.b64encode(gzip.compress(raw.encode("utf-8"), 9)).decode("ascii")
     title = f"llmdv run {data['run_id']}"
     template = TEMPLATE.read_text(encoding="utf-8")
@@ -645,7 +651,7 @@ def write(
     """
     data = build(Path(run_dir), body_cap, max_exchanges)
     apply_notes(data, notes)
-    raw = json.dumps(data, ensure_ascii=False, default=str)
+    raw = _json(data)
     findings = secret_findings(raw, data["profile"]) + named_credentials(data)
     if findings:
         raise CredentialFound("; ".join(findings[:10]))

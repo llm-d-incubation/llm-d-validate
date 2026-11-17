@@ -337,25 +337,36 @@ These declare what a fleet does so the first run after a fleet or client change 
 
 ## samples
 
-A statistical case sends n requests, all declared before the first, never stopping early and never re-sending, and records one check holding its rule, the judged summary and every sample with its request's `seq` in `exchanges.jsonl`. The case fixes the rule's kind; `capabilities.samples`, keyed by case id, may set n and the bounds. An undeclared case keeps the defaults below.
+A statistical case sends n requests, all declared before the first, never stopping early and never re-sending, and records one check holding its rule, the judged summary and every sample with its request's `seq` in `exchanges.jsonl`. The case fixes the rule's kind; `capabilities.samples`, keyed by case id, may set n and the bounds. A key an entry leaves unset keeps the case's default, so `{max: 2}` on a case whose default is `min: 2` is the rule `min: 2, max: 2`. An undeclared case keeps the defaults below.
 
 | Key | Type | Default | Meaning |
 | --- | --- | --- | --- |
 | `n` | integer | the case's | Samples per group. A `count` entry that sets `n` also sets `min` or `max`. |
-| `min` | number | the case's | Lower bound: of matching samples for `count` (an integer, default 0), of the median ratio for `ratio`. |
-| `max` | number | the case's | Upper bound, as `min`; a `count` maximum defaults to `n`. |
+| `min` | number | the case's | Lower bound: of matching samples for `count` (an integer; 0 where the case sets none), of the median ratio for `ratio`. |
+| `max` | number | the case's | Upper bound, as `min`; a `count` maximum is `n` where the case sets none. |
 | `slack` | number | the case's | `order` only: how far, as a factor of at least 1, a lower group's median may exceed a higher one's. |
 
 The rule kinds:
 
 - **`count`** holds when `min` <= the samples equal to the most common one <= `max`. All equal is `min: n`, k of n is `min: k`, all distinct is `max: 1`.
-- **`ratio`** holds when `min` <= median(a) / median(b) <= `max`.
+- **`ratio`** holds when `min` <= median(a) / median(b) <= `max`. A zero median below the line fails.
 - **`order`** holds when the first group's median is below the last's, and no lower group's median exceeds a higher one's by more than `slack`.
+
+A `ratio` or `order` sample that is not a finite number fails the check.
+
+An entry is refused, naming the ingress and the case, when the profile loads or before the first request, if:
+
+- a value is not a finite number: `.nan`, `.inf`, a boolean or text. `n` is a positive integer;
+- it sets a key the case's rule kind does not take;
+- the rule it leaves is contradictory: for `count`, anything but 0 <= `min` <= `max` <= `n`, with the case's defaults for the keys left unset; for `ratio`, `min` above `max`; for `order`, `slack` below 1;
+- no set of samples can fail the rule it leaves. That is a `count` rule with `min` <= 1 and `max` = `n`: the most common of n samples always matches between 1 and n of them, so every `count` rule with `n: 1` is refused, as is `min: 1` alone on a repeat case. A `ratio` rule can always fail on a zero median and an `order` rule on equal medians, so neither is refused on this ground, at any n.
+
+A check judged by a profile's rule records that rule in words as its `expected`, ending `(set by the profile)`; under the default it records the case's own wording.
 
 The statistical cases, their check and their defaults:
 
 - **`openai_chat.seed_repeat`, `openai_chat.greedy_repeat`**: `repeat_text`, `count` with n 2, min 2. A measurement unless `deterministic_repeats` is declared.
-- **`openai_completions.streaming_matches_json`**: `greedy_repeat`, `count` with n 2, min 2. A measurement unless `deterministic_repeats` is declared; without it, repeats that disagree skip the stream comparison as `undeclared`.
+- **`openai_completions.streaming_matches_json`**: `greedy_repeat`, `count` with n 2, min 2. A measurement unless `deterministic_repeats` is declared; without it, repeats that disagree skip the stream comparison as `undeclared`. With it, the stream is held to the most common answer, or to any of several equally common ones.
 - **`openai_chat.fresh_generation`**: `fresh_generation`, `count` with n 2, max 1, over the texts; the ids are checked as `fresh_ids`.
 - **`openai_chat.reasoning_effort_order`**: `effort_order`, `order` with n 3 per declared effort, slack 1.25.
 

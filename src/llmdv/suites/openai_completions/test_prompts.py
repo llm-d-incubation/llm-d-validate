@@ -109,8 +109,9 @@ def test_completions_streaming_matches_json(client, surface, model, ingress, sam
     requests of the `samples` rule go first, and their agreement is recorded as `greedy_repeat`.
     Where the profile declares `deterministic_repeats`, the rule is the verdict, a
     disagreement beyond it fails as `greedy_repeat`, and the stream is held to the most common
-    answer. Otherwise the agreement is a measurement, and any disagreement skips the case: the
-    stream has no one answer to be held to.
+    answer, or to any of them where several are equally common. Otherwise the agreement is a
+    measurement, and any disagreement skips the case: the stream has no one answer to be held
+    to.
     """
     require_contract(ingress, surface)
     if "greedy" not in ingress.capabilities.chat_repeats:
@@ -138,14 +139,14 @@ def test_completions_streaming_matches_json(client, surface, model, ingress, sam
     body = surface.stream_body(model.public_id, 24, include_usage=True, prompt=prompt)
     streamed = assemble_stream(surface, stream_frames(client, surface, body, ingress))
     check_completion(streamed, surface, model)
-    pair = {
-        "json": max(repeats, key=repeats.count),
-        "sse": [
-            "".join(c.get("text") or "" for f in streamed.raw["chunks"] for c in f["choices"]),
-            streamed.usage.prompt_tokens,
-            streamed.usage.completion_tokens,
-        ],
-    }
+    sse = [
+        "".join(c.get("text") or "" for f in streamed.raw["chunks"] for c in f["choices"]),
+        streamed.usage.prompt_tokens,
+        streamed.usage.completion_tokens,
+    ]
+    most = max(map(repeats.count, repeats))
+    common = [answer for answer in repeats if repeats.count(answer) == most]
+    pair = {"json": sse if sse in common else common[0], "sse": sse}
     if pair["json"] != pair["sse"]:
         fail("stream_matches_json", pair, "the same text and token counts")
     journal.record("stream_matches_json", pair, "the same text and token counts", ok=True)

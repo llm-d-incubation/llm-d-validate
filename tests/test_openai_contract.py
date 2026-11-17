@@ -632,21 +632,77 @@ def test_a_profile_sets_the_sample_count_and_every_sample_is_sent(tmp_path):
 
 
 def test_a_profile_threshold_decides_a_declared_repeat(tmp_path):
-    """Five greedy samples that never repeat: at least 1 of 5 holds; at least 2 does not."""
-    for low, verdict in ((1, "pass"), (2, "fail")):
+    """Five greedy samples that never repeat: at least 2 of 5 fails, at most 1 of 5 holds."""
+    for entry, verdict in (({"n": 5, "min": 2}, "fail"), ({"n": 5, "min": 0, "max": 1}, "pass")):
         caps = {
             **REPEAT_CAPS,
             "deterministic_repeats": True,
-            "samples": {"openai_chat.greedy_repeat": {"n": 5, "min": low}},
+            "samples": {"openai_chat.greedy_repeat": entry},
         }
         _, (record,) = contract_records(
-            tmp_path / str(low),
+            tmp_path / verdict,
             "test_chat_greedy_repeat",
             caps,
             openai_contract_defect="greedy_unstable",
         )
         assert record["outcome"] == verdict, record
         assert len(_check(record, "repeat_text")["samples"]) == 5
+
+
+def test_a_bound_the_profile_leaves_unset_keeps_the_default_against_an_ignored_seed(tmp_path):
+    """`max` alone keeps the case's `min: 2`, so a fleet that ignores the seed still fails."""
+    caps = {
+        **REPEAT_CAPS,
+        "deterministic_repeats": True,
+        "samples": {"openai_chat.seed_repeat": {"max": 2}},
+    }
+    code, (record,) = contract_records(
+        tmp_path, "test_chat_seed_repeat", caps, openai_contract_defect="seed_ignored"
+    )
+    check = _check(record, "repeat_text")
+    assert check["rule"] == {"kind": "count", "n": 2, "target": "mode", "min": 2, "max": 2}
+    assert check["observed"] == {"count": 1, "n": 2, "distinct": 2, "holds": False}
+    assert check["expected"] == "the same text for the same seed at temperature 1"
+    assert record["outcome"] == "fail" and code == 1
+
+
+def test_more_fresh_samples_keep_the_default_maximum_against_a_replaying_cache(tmp_path):
+    """`{n: 3, min: 0}` keeps `max: 1`, and the recorded claim is the rule that was applied."""
+    caps = {**REPEAT_CAPS, "samples": {"openai_chat.fresh_generation": {"n": 3, "min": 0}}}
+    code, (record,) = contract_records(
+        tmp_path, "test_chat_fresh_generation", caps, openai_contract_defect="replay"
+    )
+    check = _check(record, "fresh_generation")
+    assert check["rule"] == {"kind": "count", "n": 3, "target": "mode", "min": 0, "max": 1}
+    assert check["observed"] == {"count": 3, "n": 3, "distinct": 1, "holds": False}
+    assert check["expected"] == "0 to 1 of 3 samples equal the most common (set by the profile)"
+    assert record["outcome"] == "fail" and code == 1
+
+
+def test_a_stream_is_held_to_any_of_the_tied_most_common_answers(tmp_path):
+    """Four JSON answers split two and two satisfy `min: 2`; the stream carries the second."""
+    caps = {
+        **PROMPT_CAPS,
+        "deterministic_repeats": True,
+        "samples": {"openai_completions.streaming_matches_json": {"n": 4, "min": 2}},
+    }
+    code, (record,) = contract_records(
+        tmp_path,
+        STREAM_PARITY,
+        caps,
+        surfaces=("completions",),
+        openai_contract_defect="greedy_two_answers",
+    )
+    assert _check(record, "greedy_repeat")["observed"] == {
+        "count": 2,
+        "n": 4,
+        "distinct": 2,
+        "holds": True,
+    }
+    parity = _check(record, "stream_matches_json")
+    assert parity["ok"] is True and parity["observed"]["json"] == parity["observed"]["sse"]
+    assert parity["observed"]["sse"][0].startswith(" Lutetia")
+    assert record["outcome"] == "pass" and code == 0
 
 
 def _refused(tmp_path, samples, selector=REPEATS):
@@ -668,6 +724,41 @@ def test_a_profile_entry_the_rule_cannot_take_is_refused_before_any_request(tmp_
     assert (
         "ingresses[fake].capabilities.samples.openai_chat.greedy_repeat: "
         "slack: the count rule takes min and max"
+    ) in output
+
+
+@pytest.mark.parametrize(
+    "case,entry",
+    [
+        ("openai_chat.fresh_generation", {"n": 1, "max": 1}),
+        ("openai_chat.seed_repeat", {"n": 1, "min": 1}),
+        ("openai_chat.greedy_repeat", {"min": 1}),
+    ],
+)
+def test_a_rule_no_samples_can_fail_is_refused_before_any_request(tmp_path, case, entry):
+    code, output, records, sent = _refused(tmp_path, {case: entry})
+    assert code == 4 and records == [] and not sent, output
+    assert f"ingresses[fake].capabilities.samples.{case}: " in output
+    assert "can never fail" in output
+
+
+def test_a_bound_contradicting_a_kept_default_is_refused_before_any_request(tmp_path):
+    code, output, records, sent = _refused(tmp_path, {"openai_chat.seed_repeat": {"max": 1}})
+    assert code == 4 and records == [] and not sent, output
+    assert (
+        "ingresses[fake].capabilities.samples.openai_chat.seed_repeat: "
+        "expected 0 <= min <= max <= n (2), got 2, 1"
+    ) in output
+
+
+@pytest.mark.parametrize("slack", [float("nan"), float("inf"), True])
+def test_a_non_finite_slack_is_refused_when_the_profile_loads(tmp_path, slack):
+    entry = {"openai_chat.reasoning_effort_order": {"slack": slack}}
+    code, output, records, sent = _refused(tmp_path, entry, EFFORT_ORDER)
+    assert code != 0 and records == [] and not sent, output
+    assert "fake.yaml" in output
+    assert (
+        "capabilities.samples.openai_chat.reasoning_effort_order.slack: expected a finite number"
     ) in output
 
 
