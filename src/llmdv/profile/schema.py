@@ -547,6 +547,7 @@ MESSAGES_FEATURES = (
     "thinking_between_tools",
     "thinking_display_omitted",
     "thinking_display_updates",
+    "tool_reference",
     "tool_result_blocks",
     "tool_result_image",
     "top_k",

@@ -30,6 +30,8 @@ DEFECTS = frozenset(
         "rejects_text_beside_calls",  # assistant text beside replayed calls is refused
         "drops_trailing_text",  # user text after a result never reaches the model
         "drops_result_blocks",  # search_result and document blocks in a result are dropped
+        "drops_tool_reference",  # a tool_reference in a result renders as nothing
+        "suffixes_names",  # a call names the tool plus a dot and a parameter: Bash.command
         "accepts_orphans",  # serves a result whose call id names no issued call
         "allowed_5xx",  # allowed_tools fails with a server error
         "args_as_strings",  # integers in arguments arrive as strings
@@ -412,6 +414,8 @@ class History:
     after: list[str] = field(default_factory=list)
     # Whether an assistant turn carried text beside its calls.
     text_beside_calls: bool = False
+    # Tools a tool-search result referred to by name, as rendered for the model.
+    references: list[str] = field(default_factory=list)
 
     def user(self, text: str) -> None:
         self.prompt.append(text)
@@ -471,6 +475,8 @@ def _history(api: str, body: dict, defect: str | None = None) -> History:
                     continue
                 if block.get("type") == "tool_result":
                     inner = block.get("content")
+                    if defect != "drops_tool_reference":
+                        seen.references += _references(inner)
                     seen.results.append(
                         Result(
                             block.get("tool_use_id"),
@@ -484,10 +490,45 @@ def _history(api: str, body: dict, defect: str | None = None) -> History:
     return seen
 
 
+def _references(content: Any) -> list[str]:
+    """The tool names tool_reference blocks in a result's content point at."""
+    if not isinstance(content, list):
+        return []
+    return [
+        part.get("tool_name", "")
+        for part in content
+        if isinstance(part, dict) and part.get("type") == "tool_reference"
+    ]
+
+
+def _without_references(value: Any) -> Any:
+    if isinstance(value, dict):
+        return {key: _without_references(item) for key, item in value.items()}
+    if isinstance(value, list):
+        return [
+            _without_references(item)
+            for item in value
+            if not (isinstance(item, dict) and item.get("type") == "tool_reference")
+        ]
+    return value
+
+
 def _input_tokens(body: dict, results: list[Result], defect: str | None) -> int:
     """A synthetic prompt size that grows with what the template renders."""
     view = _drop_key(body, "is_error") if defect == "drops_is_error" else body
+    if defect == "drops_tool_reference":
+        view = _without_references(view)
     text = json.dumps(view)
+    # A rendered reference writes the named tool's definition into the result.
+    if defect != "drops_tool_reference":
+        offered = {
+            tool.get("name"): tool for tool in body.get("tools") or [] if isinstance(tool, dict)
+        }
+        for message in body.get("messages") or []:
+            for block in message.get("content") if isinstance(message.get("content"), list) else []:
+                if isinstance(block, dict) and block.get("type") == "tool_result":
+                    for name in _references(block.get("content")):
+                        text += " " + json.dumps(offered.get(name, {}))
     image_tokens = 0
     for result in results:
         if result.image:
@@ -579,7 +620,7 @@ def _turn(api: str, body: dict, defect: str | None) -> Turn | tuple[int, str]:
                 )
         if mode not in ("auto", "required"):
             return answer
-        return _chained(api, functions, seen, prompt, defect) or answer
+        return _chained(api, body, functions, seen, prompt, defect) or answer
     if form is not None and defect == "format_blocks_calls":
         text = json.dumps(_instance(form, prompt, "", None, form))
         return Turn(text=text, input_tokens=_input_tokens(body, [], defect))
@@ -633,6 +674,8 @@ def _turn(api: str, body: dict, defect: str | None) -> Turn | tuple[int, str]:
             name = name[:40]
         if defect == "renames_dotted":
             name = re.sub(r"[^A-Za-z0-9_-]", "_", name)
+        if defect == "suffixes_names":
+            name = f"{name}.{next(iter(function.schema.get('properties') or {}), '')}"
         turn.calls.append((_call_id(api, defect), name, arguments))
     if defect == "duplicate_ids":
         turn.calls = [(turn.calls[0][0], name, args) for _, name, args in turn.calls]
@@ -682,17 +725,27 @@ def _answer(body, seen: History, defect) -> Turn | tuple[int, str]:
 
 
 def _chained(
-    api: str, functions: list[Function], seen: History, prompt: str, defect: str | None
+    api: str,
+    body: dict,
+    functions: list[Function],
+    seen: History,
+    prompt: str,
+    defect: str | None,
 ) -> Turn | None:
-    """A call the prompt asks for after the results, with values the results supplied."""
+    """A call the prompt asks for after the results, with values the results supplied, or the
+    tool a tool-search result referred to."""
     called = set(seen.calls.values())
-    pending = [f for f in functions if f.name in prompt and f.name not in called]
+    wanted = [f for f in functions if f.name in prompt or f.name in seen.references]
+    pending = [f for f in wanted if f.name not in called]
     if not pending or defect == "no_call_after_result":
         return None
     context = prompt
     if defect != "ignores_result":
         context = " ".join([prompt, *(result.text for result in seen.results)])
     turn = Turn(input_tokens=len(context.split()))
+    if seen.references:
+        # Sized like the answer turn it stands in for, so the two can be compared.
+        turn.input_tokens = _input_tokens(body, seen.results, defect)
     turn.calls.append(
         (_call_id(api, defect), pending[0].name, _arguments(pending[0], context, defect))
     )

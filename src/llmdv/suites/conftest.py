@@ -71,7 +71,10 @@ def budget_for(model: Model, floor: int = 64) -> int:
     tight budget yields finish_reason="length" with empty content -- a healthy response that a
     naive assertion reads as a failure. The floor is raised when reasoning is on by default.
     """
-    return floor * 4 if model.reasoning.default_on else floor
+    budget = floor * 4 if model.reasoning.default_on else floor
+    # A model that reasons long by default needs more than the fixed floor: the profile's measured
+    # answer budget, when larger, is the least a case asks with.
+    return max(budget, model.answer_max_tokens or 0)
 
 
 def check_answer_budget(client, surface: Surface, model: Model, ingress: Ingress) -> None:
