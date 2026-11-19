@@ -419,6 +419,84 @@ def test_name_outside_spec(client, surface, model, ingress):
         check_call_turn(completion, surface, model, [tool], REQUIRED, names=[name])
 
 
+def _agent_tool(name: str, summary: str, **properties: str) -> ToolDef:
+    """A tool whose parameters are all strings; the first is required. Bash's own parameter is
+    called `description`, so the tool's description is `summary` here."""
+    return ToolDef(
+        name,
+        summary,
+        {
+            "type": "object",
+            "properties": {
+                key: {"type": "string", "description": text} for key, text in properties.items()
+            },
+            "required": list(properties)[:1],
+        },
+    )
+
+
+# A coding agent's core tools as Claude Code names them, with their leading parameters.
+AGENT_TOOLS = (
+    _agent_tool(
+        "Bash",
+        "Run a shell command and return its output.",
+        command="The command to run",
+        description="What the command does, in a few words",
+    ),
+    _agent_tool("Read", "Read a file from the local filesystem.", file_path="Absolute path"),
+    _agent_tool("Glob", "Find files whose path matches a glob pattern.", pattern="Glob pattern"),
+    _agent_tool(
+        "Grep", "Search file contents with a regular expression.", pattern="Regex", path="Where"
+    ),
+    _agent_tool(
+        "Edit",
+        "Replace text in a file.",
+        file_path="Absolute path",
+        old_string="Text to replace",
+        new_string="Replacement text",
+    ),
+)
+AGENT_TASKS = (
+    "List the Python files under src with your tools, then read src/app/main.py.",
+    "Find where the function parse_config is defined with your tools and open that file.",
+    "Run the test suite with pytest using your tools and show the last lines of its output.",
+)
+# Independent sampled turns, no retry: a model that misnames a tool now and then shows in some
+# turns only, so a clean case means none in this many, not that it cannot happen.
+OFFERED_NAME_SAMPLES = 6
+
+
+@pytest.mark.parametrize("stream", [False, True], ids=["json", "sse"])
+@pytest.mark.case_id("tools.offered_names")
+def test_offered_names(client, surface, model, ingress, stream):
+    """In coding-agent turns with an agent's tools, every call names an offered tool exactly.
+
+    A model that names a parameter after the tool (`Bash.command`, `Read.file_path`, `Glob.`)
+    makes the client answer "No such tool available", and an agent often gives up after a few.
+    """
+    require_auto(model, ingress)
+    choice, named = ToolChoice("auto"), []
+    for sample in range(OFFERED_NAME_SAMPLES):
+        body = wire(surface).request(
+            model.public_id,
+            AGENT_TASKS[sample % len(AGENT_TASKS)],
+            list(AGENT_TOOLS),
+            choice,
+            tool_budget(model),
+            parallel=True,
+            stream=stream,
+            sampled=True,
+        )
+        journal.record("sample", sample)
+        completion = (stream_tools if stream else post_tools)(client, surface, ingress, body)
+        # assert_calls fails tool_call_name on a name that was not offered, naming it.
+        calls = check_call_turn(completion, surface, model, AGENT_TOOLS, choice)
+        named += [call.name for call, _ in calls]
+    journal.record(
+        "offered_names", sorted(set(named)), "every call names an offered tool exactly", ok=True
+    )
+
+
 @pytest.mark.case_id("tools.long_description")
 def test_long_description(client, surface, model, ingress):
     """A description of about 6,000 characters reaches the model whole."""

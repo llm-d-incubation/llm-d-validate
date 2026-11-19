@@ -218,6 +218,34 @@ def _tool_turns(result: Callable[[str], list[dict[str, Any]]], prompt: str = QUE
     return build
 
 
+# The tool a tool-search result refers to, offered beside the search tool as clients offer it.
+REFERENCED_TOOL = "llmdv_lookup"
+
+
+def _tool_reference_turns(prompt: str = OK_PROMPT):
+    """A tool-search result that refers to another offered tool by name, as Claude Code's
+    tool search returns it: a `tool_reference` block in the tool_result."""
+
+    def build(surface: Surface, model: Model, marker: str) -> Request:
+        request = _tool_turns(
+            lambda m: [{"type": "tool_reference", "tool_name": REFERENCED_TOOL}], prompt=prompt
+        )(surface, model, marker)
+        request.body["tools"].append(
+            {
+                "name": REFERENCED_TOOL,
+                "description": "Look up a record by its key.",
+                "input_schema": {
+                    "type": "object",
+                    "properties": {"key": {"type": "string"}},
+                    "required": ["key"],
+                },
+            }
+        )
+        return request
+
+    return build
+
+
 def _cached_message(surface: Surface, model: Model, marker: str) -> Request:
     body = _plain()(surface, model, marker).body
     body["messages"][-1]["content"] = [
@@ -373,6 +401,9 @@ FEATURES: dict[str, Feature] = {
     "tool_result_blocks": Feature(
         "answer", _tool_turns(lambda m: [{"type": "text", "text": _note(m)}]), counted=True
     ),
+    # Served is all this proves: whether the reference reaches the prompt is
+    # tools.result_tool_reference, which compares the rendered size with and without it.
+    "tool_reference": Feature("valid", _tool_reference_turns(), prompt=OK_PROMPT),
     "tool_result_image": Feature(
         "valid",
         _tool_turns(

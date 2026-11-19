@@ -412,6 +412,10 @@ class MessagesToolWire(ToolWire):
             }
         raise ValueError(f"no tool_result block kind {kind!r}")
 
+    def tool_reference(self, name: str) -> dict[str, Any]:
+        """A tool_result block that names an offered tool, as a tool search returns its match."""
+        return {"type": "tool_reference", "tool_name": name}
+
     @staticmethod
     def _result(output: ToolOutput) -> dict[str, Any]:
         content = output.content
