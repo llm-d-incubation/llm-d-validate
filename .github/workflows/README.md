@@ -3,6 +3,7 @@
 | Workflow | What it does |
 | --- | --- |
 | [offline-tests.yaml](offline-tests.yaml) | lint and the offline suite on every pull request and push to `main` |
+| [image.yaml](image.yaml) | builds the runner image (amd64, arm64) and publishes it to `ghcr.io/llm-d-incubation/llm-d-validate`: `:main` and `:sha-<sha>` on every push to `main`, `:vX.Y.Z` and `:latest` on a release tag, signed with cosign; pull requests build without pushing |
 | [ci-signed-commits.yaml](ci-signed-commits.yaml) | checks every commit in a pull request carries a DCO sign-off |
 | [prow-github.yaml](prow-github.yaml) | Prow commands in comments: `/lgtm`, `/approve`, `/assign`, `/kind`, `/priority`, `/close` and others |
 | [prow-pr-automerge.yaml](prow-pr-automerge.yaml) | merges a pull request once it has `lgtm` and `approved` |
