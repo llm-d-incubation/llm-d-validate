@@ -19,6 +19,10 @@
   <a href="CONTRIBUTING.md">Contributing</a>
 </p>
 
+<p align="center">
+  <img src="docs/images/llmdv-overview.gif" width="100%" alt="Animated overview: a profile defines the test plan; llmdv sends real requests to the gateway (end to end), the llm-d router (router and engine) and the engine alone; each layer gets a verdict; the run's evidence (results, exchanges, repro scripts, a dashboard) is bundled, published to object storage and sent as a notification. Runs launch from a workstation, CI or a cluster job.">
+</p>
+
 - **`llmdv`** sends real requests through each layer of a deployed stack you can reach (gateway,
   router, engine) and checks every answer against what a correct stack must return: Chat,
   Completions, Messages and Responses, streaming, tools, caching, headers and failure paths.
