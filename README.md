@@ -24,7 +24,7 @@
 </p>
 
 <p align="center"><sub>LiteLLM and vLLM are trademarks of their respective owners. Their logos identify example
-components only and imply no endorsement.</sub></p>
+components only.</sub></p>
 
 - **`llmdv`** sends real requests through each layer of a deployed stack you can reach (gateway,
   router, engine) and checks every answer against what a correct stack must return: Chat,
