@@ -9,7 +9,6 @@ from __future__ import annotations
 
 import pytest
 
-from ...evidence import journal
 from ...surfaces.tool_wire import SERVER_TOOLS, ToolChoice, ToolDef
 from ..conftest import check_completion, check_sse_response
 from .common import (
@@ -78,11 +77,17 @@ def test_namespace(client, surface, model, ingress):
 @pytest.mark.case_id("tools.additional_tools")
 def test_additional_tools_item(client, surface, model, ingress):
     """Tools offered only through an `additional_tools` input item, as Codex sends them, reach
-    the model: a required choice calls one. Declared `accepted`, a refusal fails; undeclared, a
-    4xx refusal passes, but a served turn without the call fails, because the item was dropped.
+    the model: a required choice calls one.
+
+    Runs where the profile declares the feature `accepted`: a refusal fails, and so does a served
+    turn without the call, because the item's tools were dropped. The other dispositions are
+    `openai_responses.request_feature[additional_tools]`'s to judge.
     """
-    disposition = ingress.capabilities.responses_features.get("additional_tools")
-    journal.record("feature_disposition", disposition or "undeclared", "additional_tools")
+    if ingress.capabilities.responses_features.get("additional_tools") != "accepted":
+        pytest.skip(
+            f"[undeclared] ingress {ingress.id!r} does not declare Responses feature "
+            "'additional_tools' accepted"
+        )
     body = wire(surface).request(
         model.public_id, "Hello there.", [WEATHER], REQUIRED, tool_budget(model)
     )
@@ -93,16 +98,7 @@ def test_additional_tools_item(client, surface, model, ingress):
         {**item, "tools": body.pop("tools")},
         *([{"role": "user", "content": prior}] if isinstance(prior, str) else prior),
     ]
-    if disposition == "accepted":
-        completion = post_tools(client, surface, ingress, body)
-    else:
-        exchange = client.post(surface.path, json_body=body)
-        if not served_or_refused(exchange, surface, ingress):
-            return
-        completion = surface.parse_completion(exchange.response_body)
-        if disposition == "ignored":
-            check_completion(completion, surface, model)
-            return
+    completion = post_tools(client, surface, ingress, body)
     check_call_turn(completion, surface, model, [WEATHER], REQUIRED, names=["get_weather"])
 
 
