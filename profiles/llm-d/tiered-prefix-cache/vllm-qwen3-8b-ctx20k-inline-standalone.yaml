@@ -10,7 +10,7 @@
 #   intel-acc-xpu-vllm-lmcache        xpu/vllm/lmcache-connector/cpu/base
 # (overlay as ACCELERATOR_TYPE/MODEL_SERVER/CONNECTOR/VARIANT/INFRA_PROVIDER)
 # Identity flags per lane:
-#   intel-acc-xpu-vllm-lmcache        --identity accelerator=xpu --identity provider=base
+#   intel-acc-xpu-vllm-lmcache        --identity accelerator=xpu --identity provider=base --identity flavor=lmcache-connector/cpu
 #
 # llm-d-xpu v1.0.0 on one XPU. guide.yaml's support table lists Qwen/Qwen3-32B for xpu and
 # says in its notes that this overlay serves Qwen/Qwen3-8B; the run's guide.yaml MODEL must

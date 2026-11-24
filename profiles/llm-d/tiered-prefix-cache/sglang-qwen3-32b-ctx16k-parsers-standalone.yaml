@@ -10,7 +10,7 @@
 #   gke-cpu-tpu-sglang-native         tpu/v5p/sglang/native/cpu (no provider: applies `base`)
 # (overlay as ACCELERATOR_TYPE/MODEL_SERVER/CONNECTOR/VARIANT/INFRA_PROVIDER)
 # Identity flags per lane:
-#   gke-cpu-tpu-sglang-native         --identity accelerator=tpu/v5p --identity provider=base
+#   gke-cpu-tpu-sglang-native         --identity accelerator=tpu/v5p --identity provider=base --identity flavor=native/cpu
 #
 # --context-length=16384, --enable-hierarchical-cache, --hicache-size=32 (FROM values:
 # modelserver/tpu/v5p/sglang/native/cpu/base/patch-decode.yaml).

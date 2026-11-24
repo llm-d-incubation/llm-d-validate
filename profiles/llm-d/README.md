@@ -72,7 +72,7 @@ Behaviour lines change only after the team triages a failure, and the comment th
 
 ## Coverage
 
-Every guide that llm-d runs in a nightly lane (`.github/workflows/nightly-e2e-<guide>-*.yaml` at `9ca8ff0`) has a folder here, named as its `guide.yaml` names it. Each folder's README maps every lane to its profile and gives the exact `--identity` flags; lanes that look the same to a client share a profile, and `--identity flavor=` separates lanes that would otherwise share an identity.
+Every guide that llm-d runs in a nightly lane (`.github/workflows/nightly-e2e-<guide>-*.yaml` at `9ca8ff0`) has a folder here, named as its `guide.yaml` names it. Each folder's README maps every lane to its profile and gives the exact `--identity` flags; lanes that look the same to a client share a profile. The flags follow llm-d's own lane inputs: `accelerator` is the guide's `ACCELERATOR_TYPE`, `provider` the `INFRA_PROVIDER` folder the lane renders (with any connector the guide folds into it, such as `nixl/amd-ci`; `base` when the lane sets none), and every other variable the guide's lanes vary (connector, variant, topology, scaler) goes into one `--identity flavor=`, llm-d's values joined with `/` in overlay-path order, passed on every lane of that guide.
 
 | Guide | Lanes | Profiles | Notes |
 | --- | --- | --- | --- |
@@ -82,13 +82,13 @@ Every guide that llm-d runs in a nightly lane (`.github/workflows/nightly-e2e-<g
 | [precise-prefix-cache-routing](precise-prefix-cache-routing/README.md) | 6 | 4 | |
 | [predicted-latency-routing](predicted-latency-routing/README.md) | 5 | 2 | |
 | [tiered-prefix-cache](tiered-prefix-cache/README.md) | 15 | 5 | `flavor` names the connector and tier |
-| [multimodal-serving](multimodal-serving/README.md) | 3 | 1 | `flavor` names aggregation or e-pd |
+| [multimodal-serving](multimodal-serving/README.md) | 3 | 1 | `flavor` names the topology |
 | [pod-snapshot](pod-snapshot/README.md) | 2 | 2 | |
 | [fast-model-actuation](fast-model-actuation/README.md) | 2 | 1 | |
 | [flow-control](flow-control/README.md) | 2 | 2 | |
 | [agentic-api](agentic-api/README.md) | 1 | 1 | the router only |
 | [async-multitenant](async-multitenant/README.md) | 2 | 1 | the router only; `flavor` names evictable or holdback |
-| [keda-epp](keda-epp/README.md) | 3 | 2 | |
+| [keda-epp](keda-epp/README.md) | 3 | 3 | `flavor` names the scaling signal; the router runs flow control on the queue lanes only |
 
 Every profile tests at the router (`<release>-epp`, standalone mode), the only layer every lane exposes the same way. None has been run against a real engine: each says `WRITTEN, NOT RUN`, and its first run is its measurement.
 
@@ -153,7 +153,7 @@ These profiles follow llm-d's CI: there is one for every configuration the guide
 
 Three lanes set no provider. They apply the accelerator and engine folder's own kustomization, which includes only `base`, so they deploy what the `base` overlay does.
 
-Lanes share a profile when the overlays they deploy give a client the same model, context window, parsers and engine: a provider overlay changes only node, cache and NCCL settings. Pass the lane's accelerator and provider with `--identity` to keep their runs apart. Lanes that share a profile and still differ in something those do not name, such as tiered-prefix-cache's lmcache and native offload, add `--identity flavor=<value>` (`flavor=lmcache-cpu`). `sim-qwen3-32b-standalone` is not a lane: it runs the guide's router in front of llm-d-inference-sim, for kind or CI without accelerators.
+Lanes share a profile when the overlays they deploy give a client the same model, context window, parsers and engine: a provider overlay changes only node, cache and NCCL settings. Pass the lane's accelerator and provider with `--identity` to keep their runs apart. A guide whose lanes also vary a connector, tier, topology or scaler passes it on every lane as `--identity flavor=<value>`, such as tiered-prefix-cache's `flavor=lmcache-connector/cpu` (see [Coverage](#coverage)); this guide's lanes vary none, so they pass no flavor. `sim-qwen3-32b-standalone` is not a lane: it runs the guide's router in front of llm-d-inference-sim, for kind or CI without accelerators.
 
 **Not covered, because no lane runs them:** the community overlays (TPU v6e and v7, TPU v7 dynamic slicing, Rebellions NPU, CPU, Iluvatar, MetaX, Biren, Enflame, Moore Threads, TensorRT-LLM, and SGLang on Intel XPU), gateway mode, and agentgateway as the standalone sidecar proxy. Each follows the same pattern, a model part and a few-line combination, and is added when a lane runs it.
 

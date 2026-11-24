@@ -29,12 +29,14 @@
 # kv-cache-utilization-scorer 2, prefix-cache-scorer 3, no-hit-lru-scorer 2. Every lane starts the
 # model server at one replica with maxReplicaCount 2.
 #
-# What that means for llmdv's run: with one request at a time, neither flow control (work
-# conserving) nor the scheduling profile changes what a client sees, so lanes that serve the same
-# model configuration share a combination. The replica count is not fixed: the lane's
-# scale-event validator drives the HPA from 1 to 2 and back. A run that overlaps a scale event
-# may see a second replica join the pool, or stay Pending; nothing declared here depends on the
-# replica count (cache_reuse is not declared, and no case reads per-pod counters).
+# What that means for llmdv's run: with one request at a time, flow control is work conserving and
+# the scheduling profile changes nothing a client sees, but flow control adds one response header,
+# x-llm-d-flow-queue-duration-ms, to every request it admits. The gke and amd combinations declare
+# it `promised`; the ibm lane, with no flow control, has its own combination without it, though it
+# serves the gke lane's model configuration. The replica count is not fixed: the lane's scale-event
+# validator drives the HPA from 1 to 2 and back. A run that overlaps a scale event may see a second
+# replica join the pool, or stay Pending; nothing declared here depends on the replica count
+# (cache_reuse is not declared, and no case reads per-pod counters).
 #
 # The guide's claims (K/README.md, K/guide.yaml verify, .github/scripts/e2e/
 # e2e-validate-scale-event.sh) and where each one lands. Router claims it shares with
@@ -49,8 +51,10 @@
 #       -> NOT COVERED: reads of cluster objects, fleet.config
 #   4   a concurrent burst raises desiredReplicas above min, and the drain brings it back
 #       (verify.tests.scale_event) -> NOT COVERED: requires_load (#23) and HPA reads
-#   5   the flowControl feature gate is on where the queue signal is used -> NOT COVERED: needs
-#       EPP logs (fleet.logs)
+#   5   the flowControl feature gate is on where the queue signal is used -> the gke and amd
+#       combinations' x-llm-d-flow-queue-duration-ms `promised` (contract.header_disposition),
+#       which only a router with flow control sends; the log line itself needs EPP logs
+#       (fleet.logs)
 #   6   overshoot while pods start (K/README.md) -> NOT COVERED: a scaling claim, requires_load
 #   7   one model, Qwen/Qwen3-32B, as optimized-baseline serves it -> model parts,
 #       discovery.models_lists_declared_model, discovery.unknown_model_no_fallback

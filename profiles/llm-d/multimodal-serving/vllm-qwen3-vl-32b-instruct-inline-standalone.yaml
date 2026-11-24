@@ -31,7 +31,7 @@
 #   llmdv profile validate profiles/llm-d/multimodal-serving/vllm-qwen3-vl-32b-instruct-inline-standalone.yaml
 #   llmdv verify --profile profiles/llm-d/multimodal-serving/vllm-qwen3-vl-32b-instruct-inline-standalone.yaml \
 #     --identity accelerator=<ACCELERATOR_TYPE> --identity provider=<INFRA_PROVIDER> \
-#     --identity flavor=<aggregation|e-pd>
+#     --identity flavor=<aggregation|e-disaggregation/e-pd>
 # The exact flags per lane are in README.md beside this file.
 
 extends:

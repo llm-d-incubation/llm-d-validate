@@ -24,13 +24,14 @@
 # rest in the EPP for up to defaultRequestTTL (60s) before rejecting them.
 #
 # What that means for llmdv's own run, which sends one request at a time: flow control is
-# work-conserving, so a single request never queues, and every case sees the router as
-# optimized-baseline's would. Two cases send concurrent requests: scenarios.cancel_burst (eight
-# streams at once) and the cache suite's parallel sub-agents (four; not run here, since
-# cache_reuse is not declared). Under the CI setting, four of cancel_burst's streams wait in the
-# EPP until a cancelled stream frees its slot; well inside the 60s TTL and the band's 200-request
-# limit, so a correct stack still serves them. A rejection there (429, 503 or 500 with
-# x-llm-d-request-dropped-reason) is a finding, not a skip.
+# work-conserving, so a single request never queues, and a client sees the router as
+# optimized-baseline's but for one response header, x-llm-d-flow-queue-duration-ms, which flow
+# control adds to every request it admits (declared below). Two cases send concurrent requests:
+# scenarios.cancel_burst (eight streams at once) and the cache suite's parallel sub-agents (four;
+# not run here, since cache_reuse is not declared). Under the CI setting, four of cancel_burst's
+# streams wait in the EPP until a cancelled stream frees its slot; well inside the 60s TTL and the
+# band's 200-request limit, so a correct stack still serves them. A rejection there (429, 503 or 500
+# with x-llm-d-request-dropped-reason) is a finding, not a skip.
 #
 # Model servers: this guide keeps no modelserver/ overlay. Each lane renders optimized-baseline's
 # and relabels it (`sed s/optimized-baseline/flow-control/g`), so the model, window and parsers
@@ -40,7 +41,9 @@
 # shares with optimized-baseline (surfaces, streaming pass-through, the EPP's error envelopes,
 # header aliases) land as ../../optimized-baseline/parts/common.yaml maps them.
 #   1   the flowControl feature gate is on ("Initializing Flow Control layer" in the EPP log,
-#       guide.yaml verify.tests.feature_gate) -> NOT COVERED: needs log access (fleet.logs) a
+#       guide.yaml verify.tests.feature_gate) -> x-llm-d-flow-queue-duration-ms declared
+#       `promised` below (contract.header_disposition): every admitted request carries it, and
+#       none does without flow control. The log line itself needs log access (fleet.logs) a
 #       committed profile does not carry
 #   2   maxConcurrency is the one value in the values file (verify.tests.max_concurrency)
 #       -> NOT COVERED: a config read, fleet.config, same reason
@@ -77,6 +80,16 @@ capabilities:
   # OB/modelserver/amd/vllm/base) passes vLLM's --enable-prompt-tokens-details. With no
   # cached_tokens, `affinity: routed` would fail on a correct stack for want of the field.
   cache_reuse: null
+
+headers:
+  # FROM docs: llm-d-router@main:pkg/epp/handlers/response.go:436-445 and
+  # pkg/epp/metadata/consts.go:74-76, the router build guides/env.sh pins (ROUTER_EPP_VERSION
+  # main). With the flowControl feature gate on, the EPP adds this header, the time the request
+  # waited in flow control, to the response of every request flow control admits, before the
+  # first byte; without flow control it is absent. Its presence on a success is the one thing a
+  # client sees of the gate. Keyed by the topology part's ingress id.
+  x-llm-d-flow-queue-duration-ms:
+    epp: promised
 
 # The cases this guide's lanes run by default (`llmdv verify --all` runs everything). They test
 # what a lane's own deployment can get wrong: the router path, the overlay's parsers and window,

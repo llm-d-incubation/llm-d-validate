@@ -15,16 +15,17 @@
 #   intel-acc-xpu-vllm-native         xpu/vllm/native/cpu/base
 # (overlays as ACCELERATOR_TYPE/MODEL_SERVER/CONNECTOR/VARIANT/INFRA_PROVIDER)
 # Identity flags per lane:
-#   amd-cpu-rocm-vllm-lmcache         --identity accelerator=amd --identity provider=amd-ci --identity flavor=lmcache-cpu
-#   amd-cpu-rocm-vllm-native          --identity accelerator=amd --identity provider=amd-ci --identity flavor=native-cpu
-#   amd-fs-rocm-vllm-lmcache          --identity accelerator=amd --identity provider=amd-ci --identity flavor=lmcache-fs
-#   amd-fs-rocm-vllm-native           --identity accelerator=amd --identity provider=amd-ci --identity flavor=native-fs
-#   gke-cpu-tpu-vllm-native           --identity accelerator=tpu/v5p --identity provider=base
-#   intel-acc-xpu-vllm-native         --identity accelerator=xpu --identity provider=base
+#   amd-cpu-rocm-vllm-lmcache         --identity accelerator=amd --identity provider=amd-ci --identity flavor=lmcache-connector/cpu
+#   amd-cpu-rocm-vllm-native          --identity accelerator=amd --identity provider=amd-ci --identity flavor=native/cpu
+#   amd-fs-rocm-vllm-lmcache          --identity accelerator=amd --identity provider=amd-ci --identity flavor=lmcache-connector/fs
+#   amd-fs-rocm-vllm-native           --identity accelerator=amd --identity provider=amd-ci --identity flavor=native/fs
+#   gke-cpu-tpu-vllm-native           --identity accelerator=tpu/v5p --identity provider=base --identity flavor=native/cpu
+#   intel-acc-xpu-vllm-native         --identity accelerator=xpu --identity provider=base --identity flavor=native/cpu
 #
 # vllm-openai-rocm v0.31.0 (AMD), vllm-tpu v0.31.0 with TPUOffloadConnector (TPU v5p) and
-# llm-d-xpu v1.0.0 (Intel XPU, one replica). Only the four AMD lanes share an accelerator
-# and a provider, so only they pass `flavor`.
+# llm-d-xpu v1.0.0 (Intel XPU, one replica). Every lane passes `flavor` (CONNECTOR/VARIANT);
+# only the four AMD lanes share an accelerator and a provider, so only they need it to stay
+# apart.
 #
 # How a lane runs it, after deploying the guide in standalone mode (guide.yaml deploy.standalone)
 # with one of the overlays above (GUIDE_NAME=tiered-prefix-cache):

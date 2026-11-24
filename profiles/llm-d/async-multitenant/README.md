@@ -6,7 +6,7 @@ Profiles for llm-d's [multitenant async-processing guide](https://github.com/llm
 
 ## Lanes
 
-Both lanes run `guides/batch-serving/asynchronous-processing/multitenant/scripts/nightly-deploy-gke.sh` through `reusable-nightly-e2e-gke`, render the guide's `modelserver/gpu/vllm/gke` (optimized-baseline's `gpu/vllm/gke` relabelled, one replica), and differ only in the router values file. A client sending one request at a time cannot tell the two apart, so they share one profile and pass `--identity flavor`.
+Both lanes run `guides/batch-serving/asynchronous-processing/multitenant/scripts/nightly-deploy-gke.sh` through `reusable-nightly-e2e-gke`, render the guide's `modelserver/gpu/vllm/gke` (optimized-baseline's `gpu/vllm/gke` relabelled, one replica), and differ only in the router values file. A client sending one request at a time cannot tell the two apart, so they share one profile and pass `--identity flavor`. Both run flow control, which a client sees as the `x-llm-d-flow-queue-duration-ms` response header on every admitted request; `parts/common.yaml` declares it `promised`.
 
 | CI lane (`nightly-e2e-<lane>`) | Router values | Profile | Identity flags |
 | --- | --- | --- | --- |

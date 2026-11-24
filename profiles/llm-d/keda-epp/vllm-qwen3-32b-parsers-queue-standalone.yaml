@@ -1,0 +1,62 @@
+# The keda-epp guide's llm-d router in standalone mode (the client reaches the EPP's own
+# listener, with flow control on): vLLM serving Qwen/Qwen3-32B with the qwen3 reasoning parser
+# and the hermes tool parser, autoscaled by KEDA on the flow-control queue between one and two
+# replicas.
+#
+# STATUS: WRITTEN, NOT RUN. llm-d 9ca8ff0. Composed from the guide's shipped config and the API
+# references. Only the router layer has been measured, and that with optimized-baseline's router
+# config, without flow control (on kind, with a simulator engine; see
+# ../parts/topology/standalone.yaml).
+#
+# CI lanes that deploy this configuration (llm-d's nightly-e2e-workload-autoscaling-keda-epp-<lane>
+# workflows; standalone mode, with a custom_deploy_script):
+#   gke-acc-gpu-vllm-x   reusable-nightly-e2e-gke,
+#                        guides/workload-autoscaling/scripts/nightly-deploy-gke-keda-epp.sh:
+#                        guides/optimized-baseline/modelserver/gpu/vllm/gke, flow control on,
+#                        queue ScaledObject; Service <release>-gke-epp
+# The ibm lane serves the same model configuration without flow control, so it has its own
+# combination, vllm-qwen3-32b-parsers-inflight-standalone.yaml: this one promises the flow-control
+# header, which its router does not send.
+#
+# How a lane runs it, after the deploy script:
+#   export LLMDV_EPP_URL=http://<release>-gke-epp.<namespace>.svc.cluster.local
+#   # or from outside the cluster:
+#   #   kubectl port-forward -n <namespace> svc/<release>-gke-epp 18080:80 &
+#   #   export LLMDV_EPP_URL=http://localhost:18080
+#   llmdv profile validate profiles/llm-d/keda-epp/vllm-qwen3-32b-parsers-queue-standalone.yaml
+#   llmdv verify --profile profiles/llm-d/keda-epp/vllm-qwen3-32b-parsers-queue-standalone.yaml \
+#     --identity accelerator=gpu --identity provider=gke --identity flavor=queue
+
+extends:
+  - ../parts/base.yaml
+  - ../parts/topology/standalone.yaml
+  - ../parts/engines/vllm.yaml
+  - ../parts/models/qwen3-32b-parsers.yaml
+  - ../parts/sentinels/unmeasured-with-tools.yaml
+  - parts/common.yaml
+
+name: keda-epp-vllm-qwen3-32b-parsers-queue-standalone
+
+model:
+  # FROM values: the overlays' own flag values (--reasoning-parser=qwen3,
+  # --tool-call-parser=hermes). The model part declares the shape a client sees; the names
+  # belong to the engine, so they are stated here.
+  reasoning:
+    parser: qwen3
+    # Inferred from another deployment (vLLM 0.32 behind an llm-d router), where the field is
+    # `reasoning`, and `reasoning_content` is absent. Not yet observed on this guide's vLLM
+    # builds; the first run settles it.
+    field: reasoning
+  tools:
+    parser: hermes
+
+headers:
+  # FROM docs: llm-d-router@main:pkg/epp/handlers/response.go:436-445 and
+  # pkg/epp/metadata/consts.go:74-76, the router build guides/env.sh pins (ROUTER_EPP_VERSION
+  # main). With the flowControl feature gate on, which this lane's router values set
+  # (guides/workload-autoscaling/keda-epp/optimized-baseline/router.values.yaml; see
+  # parts/common.yaml), the EPP adds this header, the time the request waited in flow control, to
+  # the response of every request flow control admits, before the first byte; without flow
+  # control it is absent. Keyed by the topology part's ingress id.
+  x-llm-d-flow-queue-duration-ms:
+    epp: promised

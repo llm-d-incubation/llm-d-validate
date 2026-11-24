@@ -15,15 +15,15 @@
 #   ibm-cpu-gpu-vllm-native           gpu/vllm/native/cpu/ocp
 # (overlays as ACCELERATOR_TYPE/MODEL_SERVER/CONNECTOR/VARIANT/INFRA_PROVIDER)
 # Identity flags per lane:
-#   cks-cpu-gpu-vllm-lmcache          --identity accelerator=gpu --identity provider=base --identity flavor=lmcache-cpu
-#   cks-cpu-gpu-vllm-native           --identity accelerator=gpu --identity provider=base --identity flavor=native-cpu
-#   gke-cpu-gpu-vllm-lmcache          --identity accelerator=gpu --identity provider=gke --identity flavor=lmcache-cpu
-#   gke-cpu-gpu-vllm-native           --identity accelerator=gpu --identity provider=gke --identity flavor=native-cpu
-#   ibm-cpu-gpu-vllm-lmcache          --identity accelerator=gpu --identity provider=ocp --identity flavor=lmcache-cpu
-#   ibm-cpu-gpu-vllm-native           --identity accelerator=gpu --identity provider=ocp --identity flavor=native-cpu
+#   cks-cpu-gpu-vllm-lmcache          --identity accelerator=gpu --identity provider=base --identity flavor=lmcache-connector/cpu
+#   cks-cpu-gpu-vllm-native           --identity accelerator=gpu --identity provider=base --identity flavor=native/cpu
+#   gke-cpu-gpu-vllm-lmcache          --identity accelerator=gpu --identity provider=gke --identity flavor=lmcache-connector/cpu
+#   gke-cpu-gpu-vllm-native           --identity accelerator=gpu --identity provider=gke --identity flavor=native/cpu
+#   ibm-cpu-gpu-vllm-lmcache          --identity accelerator=gpu --identity provider=ocp --identity flavor=lmcache-connector/cpu
+#   ibm-cpu-gpu-vllm-native           --identity accelerator=gpu --identity provider=ocp --identity flavor=native/cpu
 #
 # vllm-openai v0.31.0. The connector changes nothing a client sees, so the two connectors
-# on one provider differ only in `flavor`, which keeps their runs apart.
+# on one provider differ only in `flavor` (CONNECTOR/VARIANT), which keeps their runs apart.
 #
 # How a lane runs it, after deploying the guide in standalone mode (guide.yaml deploy.standalone)
 # with one of the overlays above (GUIDE_NAME=tiered-prefix-cache):
