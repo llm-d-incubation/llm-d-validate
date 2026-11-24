@@ -174,9 +174,32 @@ def test_unmatched_entries_are_the_ones_that_labelled_nothing():
     entries = [ENTRY, KnownFailure(check="http_status", issue="#2", cases=("tools.*",))]
     records = [
         {"known_failure": {"status": "known", "issue": "#1", "check": "finish_reason"}},
-        {"case_id": "tools.forced_call", "ingress": "g", "outcome": "pass"},
+        {
+            "case_id": "tools.forced_call",
+            "ingress": "g",
+            "outcome": "pass",
+            "checks": [{"name": "http_status", "ok": True}],
+        },
     ]
     assert unmatched(entries, records) == [{"check": "http_status", "issue": "#2"}]
+
+
+@pytest.mark.parametrize(
+    "record",
+    [
+        {"outcome": "error", "connection_lost": "epp", "checks": [{"name": "x", "ok": False}]},
+        {"outcome": "error", "connection_lost": "epp"},
+        {"outcome": "error", "checks": []},
+        {"outcome": "skip", "connection_lost": "epp"},
+    ],
+    ids=["lost-with-checks", "lost", "setup-error", "skipped-for-lost"],
+)
+def test_a_case_that_reached_no_verdict_against_the_fleet_is_not_one_that_ran(record):
+    """A setup error records no check and a lost local connection says nothing about the
+    fleet: neither may offer an entry for pruning as if its fix had landed."""
+    entries = [KnownFailure(check="choice_text", issue="#5", cases=("openai_chat.basic",))]
+    records = [{"case_id": "openai_chat.basic", "ingress": "g", **record}]
+    assert unmatched(entries, records) == []
 
 
 @pytest.mark.parametrize("outcome", [None, "skip"])

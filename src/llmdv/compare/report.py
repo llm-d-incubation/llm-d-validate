@@ -273,8 +273,10 @@ def render(delta: Delta, profile: str, before_id: str, after_id: str) -> str:
     if delta.outside_selection:
         lines += [
             "",
-            f"_Outside the selection ({len(delta.outside_selection)}): only one of these runs "
-            "selected them, so there is nothing to compare. Not regressions, not new cases._",
+            f"_Outside the selection ({len(delta.outside_selection)}): a run of the window held "
+            "them and a selection left them out of this run, or this run held them and every "
+            "run of the window left them out, so there is nothing to compare. Not "
+            "regressions, not new cases._",
         ]
         lines += _bullets(delta.outside_selection)
 

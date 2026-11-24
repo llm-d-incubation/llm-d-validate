@@ -353,6 +353,8 @@ def _apply_known(
             setattr(d, bucket, [n for n in getattr(d, bucket) if n not in moved])
         d.flaky = [n for n in d.flaky if n.split(" (")[0] not in moved]
         d.appeared_known = sorted(set(d.appeared) & moved)
+        # A known failure in a case only this run selected is said once, as known.
+        d.outside_selection = [n for n in d.outside_selection if n not in moved]
     return d
 
 

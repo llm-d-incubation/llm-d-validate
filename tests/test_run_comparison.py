@@ -1520,3 +1520,42 @@ def test_the_comparison_reads_each_runs_selection_from_its_outcome(tmp_path):
         uri, "p", list(runs)[1:], [rec("a", "pass"), rec("b", "fail")], selected()
     )
     assert delta.outside_selection == ["b@litellm"] and delta.selection_changes == ["removed a"]
+
+
+def test_cases_an_older_full_run_held_are_outside_a_selection_both_runs_share():
+    """A full run held `b1` and `b2`; the baseline and this run both selected `a*`. The cases
+    are outside the selection with no selection change, and the report says what is true:
+    neither run selected them, so it cannot say only one did."""
+    d = compare_window(
+        [[rec("a1", "pass"), rec("b1", "pass"), rec("b2", "pass")], [rec("a1", "pass")]],
+        [rec("a1", "pass")],
+        [selected(), selected("a*")],
+        selected("a*"),
+    )
+    assert d.selection_changes == [] and d.vanished == []
+    assert d.outside_selection == ["b1@litellm", "b2@litellm"]
+    text = render(d, "p", "r1", "r2")
+    assert "selection changed" not in text
+    assert "only one of these runs selected them" not in text
+    assert (
+        "Outside the selection (2): a run of the window held them and a selection left them "
+        "out of this run" in " ".join(text.split())
+    )
+    record = as_record(d, "r1", "r2")
+    assert record["selection"] == {"changes": [], "outside": ["b1@litellm", "b2@litellm"]}
+
+
+def test_a_known_failure_only_this_run_selected_is_listed_once_as_known():
+    known = {"status": "known", "issue": "#9", "check": "x"}
+    d = compare_window(
+        [[rec("a1", "pass")]],
+        [rec("a1", "pass"), {**rec("b2", "fail"), "known_failure": known}],
+        [selected("a*")],
+        selected(),
+    )
+    assert [e["label"] for e in d.known_failing] == ["b2@litellm"]
+    assert d.outside_selection == [] and d.appeared == []
+    assert d.current_failing == ["b2@litellm"] and not d.regressed
+    text = render(d, "p", "r1", "r2")
+    assert text.count("b2@litellm") == 1 and "Outside the selection" not in text
+    assert as_record(d, "r1", "r2")["selection"]["outside"] == []

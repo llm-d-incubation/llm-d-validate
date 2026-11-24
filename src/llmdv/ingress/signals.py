@@ -114,13 +114,51 @@ THROTTLE_PREFIXES = ("x-ratelimit-",)
 THROTTLE_HEADERS = ("retry-after",)
 PROXY_HEADERS = ("via", "x-forwarded-proto")
 
-# Headers whose value changes from one request to the next, so it can never name a build: a
-# request or trace id, a quota, a time, a length, and llmdv's own correlation headers.
-_PER_REQUEST_HEADERS = frozenset(
-    {"request-id", "date", "content-length", "traceparent", "tracestate", *THROTTLE_HEADERS}
+# Headers that carry a client's or a proxy's address, so they may name a host: forwarded
+# chains, a proxy's view of the client, and Envoy's external address.
+_HOST_HEADERS = frozenset(
+    {
+        *PROXY_HEADERS,
+        "forwarded",
+        "x-real-ip",
+        "true-client-ip",
+        "cf-connecting-ip",
+        "x-envoy-external-address",
+    }
 )
-_PER_REQUEST_PREFIXES = (*THROTTLE_PREFIXES, "anthropic-ratelimit-", "x-llmdv-")
-_PER_REQUEST_SUFFIXES = ("-request-id",)
+_HOST_PREFIXES = ("x-forwarded-",)
+_HOST_SUFFIXES = ("-client-ip",)
+
+# Headers whose value changes from one request to the next, so it can never name a build: a
+# request or trace id, a quota, a time, a length, and llmdv's own correlation headers. Some
+# sit under a recorded prefix of the table (`x-envoy-*`), which a declared build header may
+# otherwise claim, so they are named here one by one.
+_PER_REQUEST_HEADERS = frozenset(
+    {
+        "request-id",
+        "date",
+        "content-length",
+        "traceparent",
+        "tracestate",
+        "b3",
+        "ratelimit",
+        "x-envoy-upstream-service-time",
+        *THROTTLE_HEADERS,
+    }
+)
+_PER_REQUEST_PREFIXES = (
+    *THROTTLE_PREFIXES,
+    "ratelimit-",
+    "anthropic-ratelimit-",
+    "x-b3-",
+    "x-llmdv-",
+)
+_PER_REQUEST_SUFFIXES = ("-request-id", "-requestid")
+
+
+def _trace_id(name: str) -> bool:
+    """A trace id under any spelling: `x-trace-id`, `x-amzn-trace-id`, `x-b3-traceid`."""
+    return "trace" in name and name.endswith("id")
 
 
 def undeclarable(name: str) -> str | None:
@@ -130,16 +168,20 @@ def undeclarable(name: str) -> str | None:
     compared between runs, two of them in one run reading as a rollout. So it must be neither a
     credential (`secret`), nor something that may name a host (`host`), nor a value that changes
     with every request (`per_request`). The evidence table's own rows are the loader's to check.
+    A recorded prefix row (`x-envoy-*`, `x-gateway-*`) is not refused as a whole: a proxy may
+    send its build under one, such as `x-envoy-build`, so only the per-request and address
+    headers known under those prefixes are named here.
     """
     name = name.strip().lower()
     if name in SECRET_HEADERS:
         return "secret"
-    if name in PROXY_HEADERS or name == "forwarded" or name.startswith("x-forwarded-"):
+    if name in _HOST_HEADERS or name.startswith(_HOST_PREFIXES) or name.endswith(_HOST_SUFFIXES):
         return "host"
     if (
         name in _PER_REQUEST_HEADERS
         or name.startswith(_PER_REQUEST_PREFIXES)
         or name.endswith(_PER_REQUEST_SUFFIXES)
+        or _trace_id(name)
     ):
         return "per_request"
     return None
