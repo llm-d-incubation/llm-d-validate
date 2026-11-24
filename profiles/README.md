@@ -38,17 +38,48 @@ and why.
 
 ## Run a guide
 
-Deploy the guide with an overlay a combination covers, give llmdv the router's URL, and run the
-combination with your lane's identity:
+A guide profile tests the guide's router, the EPP, in standalone mode. llmdv needs one thing from
+your deployment: **a URL to the EPP that it can reach**. Any of these works:
+
+| Where llmdv runs | `LLMDV_EPP_URL` |
+| --- | --- |
+| your machine, with a port-forward | `kubectl port-forward -n <namespace> svc/<GUIDE_NAME>-epp 18080:80`, then `http://localhost:18080` |
+| your machine, through a route, ingress or load balancer you expose | that address |
+| inside the cluster (a job or a pod) | `http://<GUIDE_NAME>-epp.<namespace>.svc.cluster.local` |
+
+The EPP authenticates nothing, so no key is needed. Then run the combination that matches your
+deployment, with its identity flags:
 
 ```sh
-export LLMDV_EPP_URL=http://<GUIDE_NAME>-epp.<namespace>.svc.cluster.local   # or a port-forward
+export LLMDV_EPP_URL=http://localhost:18080
 llmdv verify --profile profiles/llm-d/optimized-baseline/vllm-qwen3-32b-parsers-standalone.yaml \
   --identity accelerator=gpu --identity provider=gke
 ```
 
 [llm-d/README.md](llm-d/README.md) covers picking a combination, the `--identity` flags, and
 which lane runs every case with `--all`.
+
+### Add your gateway
+
+If a gateway sits in front of the router (Istio, kgateway, LiteLLM or your own), add it as a
+second ingress. Write a short local file that extends the guide's combination:
+
+```yaml
+# profiles/my-guide.local.yaml (gitignored)
+extends: llm-d/optimized-baseline/vllm-qwen3-32b-parsers-standalone.yaml
+name: my-optimized-baseline
+ingresses:
+  - id: gateway
+    kind: gateway
+    base_url_env: MY_GATEWAY_URL
+    auth: {type: bearer, key_env: MY_GATEWAY_KEY}   # or {type: none}
+    surfaces: [chat_completions, completions]       # the APIs your gateway routes
+```
+
+The gateway inherits the model and the guide's cases, and llmdv judges each layer separately, so a
+failure shows whether the gateway or the router caused it. If the gateway names the model
+differently, add `model: {public_id: <its id>}` to that ingress. See [Your own stack](#your-own-stack)
+for everything else a profile can declare.
 
 ## Your own stack
 

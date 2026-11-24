@@ -22,8 +22,11 @@ llmdv verify --profile profiles/llm-d/optimized-baseline/vllm-qwen3-32b-parsers-
   --identity accelerator=gpu --identity provider=gke
 ```
 
-Any address that reaches the EPP works: a route, the Service's in-cluster address, or a
-port-forward you run yourself.
+Any address that reaches the EPP works: a route or load balancer you expose, a port-forward
+(`kubectl port-forward -n <namespace> svc/<GUIDE_NAME>-epp 18080:80`, then
+`http://localhost:18080`), or the Service's in-cluster address when llmdv runs in the cluster.
+The EPP needs no key. A gateway in front of it is one more ingress in a local file that extends
+the combination: [add your gateway](../README.md#add-your-gateway).
 
 A combination is `<engine>-<model-config>-<topology>.yaml`; files in a `parts/` folder never run
 on their own. The guide folder's README maps each lane's overlay to its combination and gives the

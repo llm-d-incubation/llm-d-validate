@@ -40,18 +40,22 @@ Anthropic-compatible one, by sending it real requests and checking every answer.
 
 ## Test an llm-d guide
 
-The [supported llm-d guides](https://github.com/llm-d-incubation/llm-d-validate/blob/main/profiles/README.md#supported-llm-d-guides) have ready profiles.
-Deploy the guide, point `llmdv` at its router, and pick the combination and `--identity` flags
-your lane deploys from the guide's folder:
+Every [supported llm-d guide](https://github.com/llm-d-incubation/llm-d-validate/blob/main/profiles/README.md#supported-llm-d-guides) has ready profiles. They test the
+guide's router (the EPP) directly, so all you need is **one URL to the EPP that your machine can
+reach**: a route or load balancer you expose, or a port-forward. No key is needed.
 
 ```sh
 ./install.sh && source .venv/bin/activate
-export LLMDV_EPP_URL=http://<GUIDE_NAME>-epp.<namespace>.svc.cluster.local
+kubectl port-forward -n <namespace> svc/<GUIDE_NAME>-epp 18080:80 &   # or use a route you expose
+export LLMDV_EPP_URL=http://localhost:18080
 llmdv verify --profile profiles/llm-d/optimized-baseline/vllm-qwen3-32b-parsers-standalone.yaml \
   --identity accelerator=gpu --identity provider=gke
 ```
 
-Requires Python 3.10 or newer. A port-forward to the router works as well as the Service address.
+Pick the combination and `--identity` flags for your deployment from the guide's folder. A gateway
+in front of the router (Istio, kgateway, LiteLLM) is one more ingress in a short local file, and
+llmdv then tests both layers:
+[add your gateway](https://github.com/llm-d-incubation/llm-d-validate/blob/main/profiles/README.md#add-your-gateway). Requires Python 3.10 or newer.
 
 ## Test your own stack
 

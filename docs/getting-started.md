@@ -41,21 +41,25 @@ issue or a chat. If your credentials file sets variables without `export`, load 
 ## Run an llm-d guide profile
 
 Each supported llm-d guide has ready profiles under [`profiles/llm-d/`](../profiles/llm-d/), one
-per combination of engine, model configuration and topology. Deploy the guide with an overlay the
-combination covers (its header lists them), then give llmdv the router's URL. The router
-authenticates nothing, so no key is needed:
+per combination of engine, model configuration and topology. They test the guide's router (the
+EPP) directly: deploy the guide with an overlay the combination covers (its header lists them),
+then give llmdv **one URL to the EPP that it can reach**. A port-forward, a route or load balancer
+you expose, or, inside the cluster, the Service name all work. The EPP authenticates nothing, so
+no key is needed:
 
 ```sh
 P=profiles/llm-d/optimized-baseline/vllm-qwen3-32b-parsers-standalone.yaml
-export LLMDV_EPP_URL=http://<GUIDE_NAME>-epp.<namespace>.svc.cluster.local   # or a route, or a port-forward
+kubectl port-forward -n <namespace> svc/<GUIDE_NAME>-epp 18080:80 &    # or use a route you expose
+export LLMDV_EPP_URL=http://localhost:18080   # in-cluster: http://<GUIDE_NAME>-epp.<namespace>.svc.cluster.local
 llmdv profile validate $P                 # offline schema and consistency checks
 llmdv plan --profile $P                   # every case verify would run or skip; sends nothing
 llmdv verify --profile $P -m contract     # about a minute: the profile against reality
 llmdv verify --profile $P --identity accelerator=gpu --identity provider=gke
 ```
 
-From outside the cluster, `kubectl port-forward -n <namespace> svc/<GUIDE_NAME>-epp 18080:80`
-and `LLMDV_EPP_URL=http://localhost:18080` work too.
+A gateway in front of the router is one more ingress in a short local file that extends the
+combination; llmdv then tests both layers and says which one a failure came from. See
+[add your gateway](../profiles/README.md#add-your-gateway).
 
 Pass the lane's accelerator and provider with `--identity`: one combination covers several
 overlays, and identity keeps their runs apart. Each guide folder's README gives the exact flags
