@@ -4,7 +4,7 @@ Profiles for llm-d's [multimodal-serving](https://github.com/llm-d/llm-d/tree/ma
 
 ## Lanes
 
-Every configuration the guide marks `validated` and a nightly lane deploys looks the same to a client: vLLM v0.31.0 serving `Qwen/Qwen3-VL-32B-Instruct` at its own window, with no reasoning or tool parser. One combination covers the three lanes. `accelerator` is the lane's `ACCELERATOR_TYPE`, `provider` the `INFRA_PROVIDER` folder it renders, and `flavor` the guide's topology as the overlay path spells it: the topology folder, then `TOPOLOGY` where it adds a folder of its own (`aggregation`, `e-disaggregation/e-pd`). Every lane passes it; it is what tells the aggregated GPU lane and the E/PD GPU lane apart (they share accelerator and provider).
+Every configuration a nightly lane deploys looks the same to a client: vLLM v0.31.0 serving `Qwen/Qwen3-VL-32B-Instruct` at its own window, with no reasoning or tool parser. One combination covers the three lanes. `accelerator` is the lane's `ACCELERATOR_TYPE`, `provider` the `INFRA_PROVIDER` folder it renders, and `flavor` the guide's topology as the overlay path spells it: the topology folder, then `TOPOLOGY` where it adds a folder of its own (`aggregation`, `e-disaggregation/e-pd`). Every lane passes it; it is what tells the aggregated GPU lane and the E/PD GPU lane apart (they share accelerator and provider).
 
 | CI lane (`nightly-e2e-multimodal-serving-<lane>`) | Overlay it renders | Profile | Identity flags |
 | --- | --- | --- | --- |
