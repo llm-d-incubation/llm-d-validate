@@ -15,10 +15,7 @@
 #                         guide, one replica
 #
 # How a lane runs it, after the deploy script:
-#   export LLMDV_EPP_URL=http://<GUIDE_NAME>-epp.<namespace>.svc.cluster.local
-#   # or from outside the cluster:
-#   #   kubectl port-forward -n <namespace> svc/<GUIDE_NAME>-epp 18080:80 &
-#   #   export LLMDV_EPP_URL=http://localhost:18080
+#   export LLMDV_EPP_URL=<the EPP's URL>
 #   llmdv profile validate profiles/llm-d/flow-control/vllm-qwen3-32b-parsers-standalone.yaml
 #   llmdv verify --profile profiles/llm-d/flow-control/vllm-qwen3-32b-parsers-standalone.yaml \
 #     --identity accelerator=gpu --identity provider=gke

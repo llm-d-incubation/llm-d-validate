@@ -16,15 +16,12 @@ Deploy the guide with an overlay a combination covers (its header lists them), g
 router's URL, and run:
 
 ```sh
-export LLMDV_EPP_URL=http://<GUIDE_NAME>-epp.<namespace>.svc.cluster.local   # standalone mode
+export LLMDV_EPP_URL=<your EPP's URL>
 llmdv profile validate profiles/llm-d/optimized-baseline/vllm-qwen3-32b-parsers-standalone.yaml
 llmdv verify --profile profiles/llm-d/optimized-baseline/vllm-qwen3-32b-parsers-standalone.yaml \
   --identity accelerator=gpu --identity provider=gke
 ```
 
-Any address that reaches the EPP works: a route or load balancer you expose, a port-forward
-(`kubectl port-forward -n <namespace> svc/<GUIDE_NAME>-epp 18080:80`, then
-`http://localhost:18080`), or the Service's in-cluster address when llmdv runs in the cluster.
 The EPP needs no key. A gateway in front of it is one more ingress in a local file that extends
 the combination: [add your gateway](../README.md#add-your-gateway).
 

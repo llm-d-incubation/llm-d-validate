@@ -18,7 +18,7 @@ Six nightly lanes (`nightly-e2e-precise-prefix-cache-routing-<lane>.yaml`, each 
 A lane that sets no provider applies the accelerator and engine folder's own kustomization, which includes only `base`, so it passes `provider=base`. No two lanes share both a profile and an accelerator and provider, so none passes `flavor`.
 
 ```sh
-export LLMDV_EPP_URL=http://<GUIDE_NAME>-epp.<namespace>.svc.cluster.local   # GUIDE_NAME=precise-prefix-cache-routing
+export LLMDV_EPP_URL=<the EPP's URL>
 llmdv verify --profile profiles/llm-d/precise-prefix-cache-routing/<profile>.yaml <identity flags>
 ```
 

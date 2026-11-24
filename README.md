@@ -41,13 +41,11 @@ Anthropic-compatible one, by sending it real requests and checking every answer.
 ## Test an llm-d guide
 
 Every [supported llm-d guide](https://github.com/llm-d-incubation/llm-d-validate/blob/main/profiles/README.md#supported-llm-d-guides) has ready profiles. They test the
-guide's router (the EPP) directly, so all you need is **one URL to the EPP that your machine can
-reach**: a route or load balancer you expose, or a port-forward. No key is needed.
+guide's router (the EPP) directly: give llmdv the EPP's URL and run. No key is needed.
 
 ```sh
 ./install.sh && source .venv/bin/activate
-kubectl port-forward -n <namespace> svc/<GUIDE_NAME>-epp 18080:80 &   # or use a route you expose
-export LLMDV_EPP_URL=http://localhost:18080
+export LLMDV_EPP_URL=<your EPP's URL>
 llmdv verify --profile profiles/llm-d/optimized-baseline/vllm-qwen3-32b-parsers-standalone.yaml \
   --identity accelerator=gpu --identity provider=gke
 ```

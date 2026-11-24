@@ -11,7 +11,7 @@ The guide has no support table; `guide.yaml` offers `MODEL_SERVER` `vllm` or `sg
 | `gke-acc-gpu-vllm-x` | `modelserver/gpu/vllm/gke` (vLLM v0.31.0, `--max-model-len 8192`, `--enable-sleep-mode`) | `vllm-qwen3-32b-ctx8k-inline-standalone` | `--identity accelerator=gpu --identity provider=gke` |
 | `gke-acc-gpu-sglang-x` | `modelserver/gpu/sglang/gke` (SGLang v0.5.22, `--context-length 8192`, `--enable-memory-saver --enable-weights-cpu-backup`) | `sglang-qwen3-32b-ctx8k-inline-standalone` | `--identity accelerator=gpu --identity provider=gke` |
 
-The client calls the `<GUIDE_NAME>-epp` Service on port 80 (the lanes' `gateway_host`), in standalone mode. Run llmdv after the deploy script returns, so the run reaches both replicas. From outside the cluster, port-forward the Service, not a pod: a port-forward to a gVisor pod is refused (guide README, "gVisor Localhost Isolation").
+The client calls the `<GUIDE_NAME>-epp` Service on port 80 (the lanes' `gateway_host`), in standalone mode. Run llmdv after the deploy script returns, so the run reaches both replicas.
 
 ## Not covered, and why
 

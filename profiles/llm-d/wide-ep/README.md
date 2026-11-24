@@ -27,7 +27,7 @@ The router differs by accelerator (always-disaggregate on gpu and amd, one aggre
 Run one after deploying the guide in standalone mode:
 
 ```sh
-export LLMDV_EPP_URL=http://<GUIDE_NAME>-epp.<namespace>.svc.cluster.local
+export LLMDV_EPP_URL=<the EPP's URL>
 llmdv verify --profile profiles/llm-d/wide-ep/vllm-deepseek-r1-0528-tools-standalone.yaml \
   --identity accelerator=gpu --identity provider=gke
 ```

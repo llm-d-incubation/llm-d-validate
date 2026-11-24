@@ -38,20 +38,12 @@ and why.
 
 ## Run a guide
 
-A guide profile tests the guide's router, the EPP, in standalone mode. llmdv needs one thing from
-your deployment: **a URL to the EPP that it can reach**. Any of these works:
-
-| Where llmdv runs | `LLMDV_EPP_URL` |
-| --- | --- |
-| your machine, with a port-forward | `kubectl port-forward -n <namespace> svc/<GUIDE_NAME>-epp 18080:80`, then `http://localhost:18080` |
-| your machine, through a route, ingress or load balancer you expose | that address |
-| inside the cluster (a job or a pod) | `http://<GUIDE_NAME>-epp.<namespace>.svc.cluster.local` |
-
-The EPP authenticates nothing, so no key is needed. Then run the combination that matches your
-deployment, with its identity flags:
+A guide profile tests the guide's router, the EPP, in standalone mode. Give llmdv the EPP's URL,
+then run the combination that matches your deployment with its identity flags. The EPP
+authenticates nothing, so no key is needed:
 
 ```sh
-export LLMDV_EPP_URL=http://localhost:18080
+export LLMDV_EPP_URL=<your EPP's URL>
 llmdv verify --profile profiles/llm-d/optimized-baseline/vllm-qwen3-32b-parsers-standalone.yaml \
   --identity accelerator=gpu --identity provider=gke
 ```

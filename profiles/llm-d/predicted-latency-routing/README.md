@@ -17,7 +17,7 @@ Five nightly lanes (`nightly-e2e-predicted-latency-routing-<lane>.yaml`, each `g
 A lane that sets no provider applies the folder's own kustomization, which includes only `base`, so it passes `provider=base`. No two lanes share both a profile and an accelerator and provider, so none passes `flavor`. The NVIDIA and AMD lanes run the same model, window and parsers, so their runs are worth comparing with `llmdv compare`.
 
 ```sh
-export LLMDV_EPP_URL=http://<GUIDE_NAME>-epp.<namespace>.svc.cluster.local   # GUIDE_NAME=predicted-latency-routing
+export LLMDV_EPP_URL=<the EPP's URL>
 llmdv verify --profile profiles/llm-d/predicted-latency-routing/<profile>.yaml <identity flags>
 ```
 

@@ -24,7 +24,7 @@ The workflows pass `infra_provider` and `connector` separately to llm-d-infra's 
 Run one, after the lane has deployed the guide:
 
 ```sh
-export LLMDV_EPP_URL=http://<GUIDE_NAME>-epp.<namespace>.svc.cluster.local
+export LLMDV_EPP_URL=<the EPP's URL>
 llmdv verify --profile profiles/llm-d/pd-disaggregation/<profile> <identity flags from the table>
 ```
 

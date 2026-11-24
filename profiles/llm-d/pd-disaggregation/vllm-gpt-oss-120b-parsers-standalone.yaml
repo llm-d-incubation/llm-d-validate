@@ -22,10 +22,7 @@
 #
 # How a lane runs it, after deploying the guide in standalone mode (guide.yaml deploy.standalone)
 # with one of the overlays above:
-#   export LLMDV_EPP_URL=http://<GUIDE_NAME>-epp.<namespace>.svc.cluster.local
-#   # or from outside the cluster:
-#   #   kubectl port-forward -n <namespace> svc/<GUIDE_NAME>-epp 18080:80 &
-#   #   export LLMDV_EPP_URL=http://localhost:18080
+#   export LLMDV_EPP_URL=<the EPP's URL>
 #   llmdv profile validate profiles/llm-d/pd-disaggregation/vllm-gpt-oss-120b-parsers-standalone.yaml
 #   llmdv verify --profile profiles/llm-d/pd-disaggregation/vllm-gpt-oss-120b-parsers-standalone.yaml \
 #     --identity accelerator=<ACCELERATOR_TYPE> --identity provider=<INFRA_PROVIDER>

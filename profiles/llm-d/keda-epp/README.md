@@ -15,7 +15,7 @@ The profiles test the router (EPP) each lane exposes, in standalone mode, throug
 Each lane's deploy script names its own router release; `<release>` stands for the prefix it sets, and the Service is in the lane's `gateway_host`. The provider value is the overlay's `INFRA_PROVIDER` folder, and the flavor is the guide's `SIGNAL` value, the `ScaledObject` overlay the lane applies. The `gke` and `ibm` lanes serve the same model configuration but do not share a profile: a router with flow control adds `x-llm-d-flow-queue-duration-ms` to every request it admits, even one at a time, and one without sends no such header. The `queue` combinations declare it `promised`, so `contract.header_disposition` checks that flow control is on.
 
 ```sh
-export LLMDV_EPP_URL=http://<release>-gke-epp.<namespace>.svc.cluster.local
+export LLMDV_EPP_URL=<the EPP's URL>
 llmdv verify --profile profiles/llm-d/keda-epp/vllm-qwen3-32b-parsers-queue-standalone.yaml \
   --identity accelerator=gpu --identity provider=gke --identity flavor=queue
 ```

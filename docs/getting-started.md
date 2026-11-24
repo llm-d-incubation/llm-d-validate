@@ -43,14 +43,11 @@ issue or a chat. If your credentials file sets variables without `export`, load 
 Each supported llm-d guide has ready profiles under [`profiles/llm-d/`](../profiles/llm-d/), one
 per combination of engine, model configuration and topology. They test the guide's router (the
 EPP) directly: deploy the guide with an overlay the combination covers (its header lists them),
-then give llmdv **one URL to the EPP that it can reach**. A port-forward, a route or load balancer
-you expose, or, inside the cluster, the Service name all work. The EPP authenticates nothing, so
-no key is needed:
+then give llmdv the EPP's URL. The EPP authenticates nothing, so no key is needed:
 
 ```sh
 P=profiles/llm-d/optimized-baseline/vllm-qwen3-32b-parsers-standalone.yaml
-kubectl port-forward -n <namespace> svc/<GUIDE_NAME>-epp 18080:80 &    # or use a route you expose
-export LLMDV_EPP_URL=http://localhost:18080   # in-cluster: http://<GUIDE_NAME>-epp.<namespace>.svc.cluster.local
+export LLMDV_EPP_URL=<your EPP's URL>
 llmdv profile validate $P                 # offline schema and consistency checks
 llmdv plan --profile $P                   # every case verify would run or skip; sends nothing
 llmdv verify --profile $P -m contract     # about a minute: the profile against reality
