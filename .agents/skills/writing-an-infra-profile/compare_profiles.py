@@ -22,8 +22,17 @@ from llmdv.profile import loader
 
 LEFT_OUT = {"id", "base_url", "base_url_env", "auth", "setup", "logs"}
 # Profile-wide fields that are not compared here: the ingresses and headers are read per ingress
-# below, and the rest are expected to differ between a private profile and its public copy.
-PROFILE_LEFT_OUT = {"name", "ingresses", "headers", "environment", "source_path"}
+# below, the model and capabilities are compared there as the ingress's effective values, and
+# the rest are expected to differ between a private profile and its public copy.
+PROFILE_LEFT_OUT = {
+    "name",
+    "ingresses",
+    "headers",
+    "model",
+    "capabilities",
+    "environment",
+    "source_path",
+}
 # Values only a run of one exact stack supplies; a published profile carries placeholders.
 SENTINELS = {"prompt_pins", "render_pins", "contract_baseline"}
 

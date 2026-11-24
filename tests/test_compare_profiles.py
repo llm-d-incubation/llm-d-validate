@@ -103,3 +103,17 @@ def test_comparison_rejects_an_unknown_ingress(tmp_path):
 
     with pytest.raises(SystemExit, match="no ingress 'missing'"):
         comparator.settings(private, "missing")
+
+
+def test_comparison_names_a_changed_profile_wide_setting(tmp_path, capsys, monkeypatch):
+    """A scrub that drops the selection changes what runs, though no ingress field moved."""
+    private, local = write_profiles(tmp_path, local_window=32768)
+    private.write_text(private.read_text() + "selection: ['contract.*']\n", encoding="utf-8")
+    comparator = load_comparator()
+    monkeypatch.setattr(sys, "argv", ["compare_profiles.py", str(private), str(local), "engine"])
+
+    comparator.main()
+
+    output = capsys.readouterr().out
+    assert "1 differ" in output
+    assert "profile.selection" in output
