@@ -38,6 +38,25 @@
 # /v1/messages/count_tokens is not stated by any source here; the first run shows what each
 # answers. xpu has no sidecar and no P/D.
 #
+# What the sidecar changes that a client can see (FROM docs: llm-d-router main@a490c31e, the
+# `:main` image both overlays render through
+# R/modelserver/components/images/routing-sidecar/nightly/kustomization.yaml; also holds at
+# v1.0.0; both run --kv-connector=nixlv2), and the case that sees it. The router's
+# always-disagg-pd-decider sends every gpu and amd request through it; xpu runs these cases as
+# plain conformance.
+#   - it caps the prefill leg to one token, non-streaming, and deletes `n`, `min_tokens`,
+#     `stream_options` and enabled Messages thinking there; the decode leg keeps the client's
+#     values (pkg/common/request/tokens.go:62-87) -> openai_completions.multiple_choices
+#   - it re-marshals every decode SSE data line that carries "usage", adding
+#     `prompt_tokens_details.cached_tokens` where the engine omitted it (connector_nixlv2.go:
+#     494-499, pkg/common/usage/cached_tokens.go:423-460,539-553)
+#     -> openai_chat.streaming_include_usage, openai_chat.continuous_usage
+#   - it relays a prefill error unchanged (connector_nixlv2.go:122-140) and writes its own 400 for
+#     bad JSON, a non-boolean stream, unreadable Responses input and Responses
+#     previous_response_id/conversation/background (proxy_helpers.go:282-312,
+#     tokens.go:205-249) -> unhappy.wrong_field_type, unhappy.malformed_json,
+#     unhappy.streaming_validation
+#
 # Block sizes, for when the cache suite or routing.prefix_affinity can use them (FROM values):
 #   amd             engine --block-size 16, prefix caching OFF (--no-enable-prefix-caching)
 #   xpu             engine --block-size 64
@@ -80,8 +99,11 @@ capabilities:
   # Not declared, on purpose. The cache suite reads cached_tokens from each response, and no
   # overlay of this guide asks an engine to report it: none passes vLLM's
   # --enable-prompt-tokens-details (FROM values: G/modelserver/, every overlay rendered). The
-  # amd overlay also turns prefix caching off. With no cached_tokens, `affinity: routed` would
-  # fail on a correct stack for want of the field, not for want of affinity.
+  # amd overlay also turns prefix caching off. On gpu and amd the routing sidecar adds
+  # cached_tokens itself, possibly 0, to every decode response the engine left without it (see
+  # the sidecar note above), so the field can be there, but the sidecar wrote it, not the engine
+  # on the rank the router chose: `affinity: routed` cannot be judged from it. xpu has
+  # no sidecar and no cached_tokens.
   cache_reuse: null
 
 # The cases this guide's lanes run by default (`llmdv verify --all` runs everything). They test
@@ -128,3 +150,11 @@ selection:
   - unhappy.invalid_token_limit
   - unhappy.streaming_validation
   - scenarios.cancel_burst
+  # The sidecar deletes `n` on the prefill leg only; the decode leg must still return n choices.
+  - openai_completions.multiple_choices
+  # The sidecar re-marshals the usage frame; it must still parse and count the same tokens.
+  - openai_chat.streaming_include_usage
+  # Every frame carries usage, so the sidecar rewrites every frame.
+  - openai_chat.continuous_usage
+  # The sidecar's own 400s, and prefill 400s it relays, must keep the API's error shape.
+  - unhappy.wrong_field_type
