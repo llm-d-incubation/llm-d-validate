@@ -63,7 +63,7 @@ llmdv verify --profile profiles/llm-d/optimized-baseline/vllm-qwen3-32b-parsers-
 Pick the combination and `--identity` flags that match your deployment from the guide's folder.
 
 Running a gateway in front of the router (Istio, agentgateway, LiteLLM)? Add it as one more
-ingress in a short local file, and `llmdv` tests both layers:
+ingress, and `llmdv` tests both layers. See
 [add your gateway](https://github.com/llm-d-incubation/llm-d-validate/blob/main/profiles/README.md#add-your-gateway).
 
 ## Test your own stack
