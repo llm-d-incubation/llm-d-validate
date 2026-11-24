@@ -334,8 +334,8 @@ def test_the_same_case_failing_another_check_is_a_plain_failure(tmp_path):
 
 
 def test_a_known_failure_on_the_awaited_build_is_reported_as_a_fix_that_did_not_land(tmp_path):
-    # The fake answers with Python's `server` header, `BaseHTTP/0.6 ...`, which the base
-    # adapter records as a build signal. 0.1 is behind it, so the fix was expected.
+    # The fake answers with the `server` header `BaseHTTP/0.6 ...` (pinned in FakeFleet), which
+    # the base adapter records as a build signal. 0.1 is behind it, so the fix was expected.
     block = KNOWN_BLOCK + '    until: {server: "BaseHTTP/0.1"}\n'
     with FakeFleet(abort_finish_reason=True) as fleet:
         result, records, outcome, _ = run(tmp_path, fleet, block)

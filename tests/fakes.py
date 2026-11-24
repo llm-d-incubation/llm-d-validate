@@ -1479,6 +1479,9 @@ class FakeFleet:
 
         class Handler(BaseHTTPRequestHandler):
             protocol_version = "HTTP/1.1"
+            # Pinned rather than inherited: the `server` header is a build signal llmdv records,
+            # and Python 3.15 dropped the version from http.server's own (`BaseHTTP`).
+            server_version = "BaseHTTP/0.6"
 
             def log_message(self, *args):  # noqa: A002 - silence the default access log
                 pass
