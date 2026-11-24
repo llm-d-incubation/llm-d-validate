@@ -1,103 +1,55 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1440 640" width="1440" height="640" role="img" aria-labelledby="t d">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1440 548" width="1440" height="548" role="img" aria-labelledby="t d">
 <title id="t">What llmdv tests</title>
-<desc id="d">Nineteen test suites in four groups: API surfaces, model behaviour, failure and resilience, and contract and change, run against the gateway, the router and the engine.</desc>
-<rect width="1440" height="640" rx="18" fill="#181430"/>
-<text x="60" y="78" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="34" font-weight="700" fill="#f3f0ff">What <tspan font-family="SFMono-Regular, Menlo, Consolas, monospace">llmdv</tspan> tests</text>
-<text x="60" y="114" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="19" fill="#a9a1d5">19 suites, run against every layer you can reach</text>
-<rect x="60" y="150" width="312" height="370" rx="14" fill="#221c40" stroke="#3b3266"/>
-<rect x="60" y="150" width="312" height="6" rx="3" fill="#8fd3ff"/>
-<text x="82" y="194" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="21" font-weight="700" fill="#8fd3ff">API surfaces</text>
-<rect x="78" y="216" width="276" height="44" rx="10" fill="#2d2552" stroke="#4a3f80"/>
-<circle cx="102" cy="238" r="9" fill="#8fd3ff" fill-opacity="0.9"/>
-<path d="M97.5 238.5 l3 3 l6 -6.5" fill="none" stroke="#181430" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>
-<text x="122" y="245" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="17" fill="#ece8ff">OpenAI Chat Completions</text>
-<rect x="78" y="274" width="276" height="44" rx="10" fill="#2d2552" stroke="#4a3f80"/>
-<circle cx="102" cy="296" r="9" fill="#8fd3ff" fill-opacity="0.9"/>
-<path d="M97.5 296.5 l3 3 l6 -6.5" fill="none" stroke="#181430" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>
-<text x="122" y="303" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="17" fill="#ece8ff">OpenAI Completions</text>
-<rect x="78" y="332" width="276" height="44" rx="10" fill="#2d2552" stroke="#4a3f80"/>
-<circle cx="102" cy="354" r="9" fill="#8fd3ff" fill-opacity="0.9"/>
-<path d="M97.5 354.5 l3 3 l6 -6.5" fill="none" stroke="#181430" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>
-<text x="122" y="361" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="17" fill="#ece8ff">OpenAI Responses</text>
-<rect x="78" y="390" width="276" height="44" rx="10" fill="#2d2552" stroke="#4a3f80"/>
-<circle cx="102" cy="412" r="9" fill="#8fd3ff" fill-opacity="0.9"/>
-<path d="M97.5 412.5 l3 3 l6 -6.5" fill="none" stroke="#181430" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>
-<text x="122" y="419" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="17" fill="#ece8ff">Anthropic Messages</text>
-<rect x="78" y="448" width="276" height="44" rx="10" fill="#2d2552" stroke="#4a3f80"/>
-<circle cx="102" cy="470" r="9" fill="#8fd3ff" fill-opacity="0.9"/>
-<path d="M97.5 470.5 l3 3 l6 -6.5" fill="none" stroke="#181430" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>
-<text x="122" y="477" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="17" fill="#ece8ff">Model discovery</text>
-<rect x="396" y="150" width="312" height="370" rx="14" fill="#221c40" stroke="#3b3266"/>
-<rect x="396" y="150" width="312" height="6" rx="3" fill="#d98ad0"/>
-<text x="418" y="194" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="21" font-weight="700" fill="#d98ad0">Model behaviour</text>
-<rect x="414" y="216" width="276" height="44" rx="10" fill="#2d2552" stroke="#4a3f80"/>
-<circle cx="438" cy="238" r="9" fill="#d98ad0" fill-opacity="0.9"/>
-<path d="M433.5 238.5 l3 3 l6 -6.5" fill="none" stroke="#181430" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>
-<text x="458" y="245" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="17" fill="#ece8ff">Tool calling</text>
-<rect x="414" y="274" width="276" height="44" rx="10" fill="#2d2552" stroke="#4a3f80"/>
-<circle cx="438" cy="296" r="9" fill="#d98ad0" fill-opacity="0.9"/>
-<path d="M433.5 296.5 l3 3 l6 -6.5" fill="none" stroke="#181430" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>
-<text x="458" y="303" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="17" fill="#ece8ff">Streaming (SSE)</text>
-<rect x="414" y="332" width="276" height="44" rx="10" fill="#2d2552" stroke="#4a3f80"/>
-<circle cx="438" cy="354" r="9" fill="#d98ad0" fill-opacity="0.9"/>
-<path d="M433.5 354.5 l3 3 l6 -6.5" fill="none" stroke="#181430" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>
-<text x="458" y="361" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="17" fill="#ece8ff">Structured output &amp; options</text>
-<rect x="414" y="390" width="276" height="44" rx="10" fill="#2d2552" stroke="#4a3f80"/>
-<circle cx="438" cy="412" r="9" fill="#d98ad0" fill-opacity="0.9"/>
-<path d="M433.5 412.5 l3 3 l6 -6.5" fill="none" stroke="#181430" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>
-<text x="458" y="419" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="17" fill="#ece8ff">Image input</text>
-<rect x="414" y="448" width="276" height="44" rx="10" fill="#2d2552" stroke="#4a3f80"/>
-<circle cx="438" cy="470" r="9" fill="#d98ad0" fill-opacity="0.9"/>
-<path d="M433.5 470.5 l3 3 l6 -6.5" fill="none" stroke="#181430" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>
-<text x="458" y="477" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="17" fill="#ece8ff">Long context</text>
-<rect x="732" y="150" width="312" height="370" rx="14" fill="#221c40" stroke="#3b3266"/>
-<rect x="732" y="150" width="312" height="6" rx="3" fill="#f2b766"/>
-<text x="754" y="194" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="21" font-weight="700" fill="#f2b766">Failure &amp; resilience</text>
-<rect x="750" y="216" width="276" height="44" rx="10" fill="#2d2552" stroke="#4a3f80"/>
-<circle cx="774" cy="238" r="9" fill="#f2b766" fill-opacity="0.9"/>
-<path d="M769.5 238.5 l3 3 l6 -6.5" fill="none" stroke="#181430" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>
-<text x="794" y="245" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="17" fill="#ece8ff">Error paths &amp; envelopes</text>
-<rect x="750" y="274" width="276" height="44" rx="10" fill="#2d2552" stroke="#4a3f80"/>
-<circle cx="774" cy="296" r="9" fill="#f2b766" fill-opacity="0.9"/>
-<path d="M769.5 296.5 l3 3 l6 -6.5" fill="none" stroke="#181430" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>
-<text x="794" y="303" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="17" fill="#ece8ff">Transport &amp; TLS</text>
-<rect x="750" y="332" width="276" height="44" rx="10" fill="#2d2552" stroke="#4a3f80"/>
-<circle cx="774" cy="354" r="9" fill="#f2b766" fill-opacity="0.9"/>
-<path d="M769.5 354.5 l3 3 l6 -6.5" fill="none" stroke="#181430" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>
-<text x="794" y="361" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="17" fill="#ece8ff">Client scenarios</text>
-<rect x="750" y="390" width="276" height="44" rx="10" fill="#2d2552" stroke="#4a3f80"/>
-<circle cx="774" cy="412" r="9" fill="#f2b766" fill-opacity="0.9"/>
-<path d="M769.5 412.5 l3 3 l6 -6.5" fill="none" stroke="#181430" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>
-<text x="794" y="419" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="17" fill="#ece8ff">Real clients (Claude Code)</text>
-<rect x="1068" y="150" width="312" height="370" rx="14" fill="#221c40" stroke="#3b3266"/>
-<rect x="1068" y="150" width="312" height="6" rx="3" fill="#6fd39a"/>
-<text x="1090" y="194" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="21" font-weight="700" fill="#6fd39a">Contract &amp; change</text>
-<rect x="1086" y="216" width="276" height="44" rx="10" fill="#2d2552" stroke="#4a3f80"/>
-<circle cx="1110" cy="238" r="9" fill="#6fd39a" fill-opacity="0.9"/>
-<path d="M1105.5 238.5 l3 3 l6 -6.5" fill="none" stroke="#181430" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>
-<text x="1130" y="245" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="17" fill="#ece8ff">Declared surfaces &amp; headers</text>
-<rect x="1086" y="274" width="276" height="44" rx="10" fill="#2d2552" stroke="#4a3f80"/>
-<circle cx="1110" cy="296" r="9" fill="#6fd39a" fill-opacity="0.9"/>
-<path d="M1105.5 296.5 l3 3 l6 -6.5" fill="none" stroke="#181430" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>
-<text x="1130" y="303" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="17" fill="#ece8ff">Render &amp; token parity</text>
-<rect x="1086" y="332" width="276" height="44" rx="10" fill="#2d2552" stroke="#4a3f80"/>
-<circle cx="1110" cy="354" r="9" fill="#6fd39a" fill-opacity="0.9"/>
-<path d="M1105.5 354.5 l3 3 l6 -6.5" fill="none" stroke="#181430" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>
-<text x="1130" y="361" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="17" fill="#ece8ff">Prefix-cache reuse</text>
-<rect x="1086" y="390" width="276" height="44" rx="10" fill="#2d2552" stroke="#4a3f80"/>
-<circle cx="1110" cy="412" r="9" fill="#6fd39a" fill-opacity="0.9"/>
-<path d="M1105.5 412.5 l3 3 l6 -6.5" fill="none" stroke="#181430" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>
-<text x="1130" y="419" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="17" fill="#ece8ff">Change sentinels</text>
-<rect x="1086" y="448" width="276" height="44" rx="10" fill="#2d2552" stroke="#4a3f80"/>
-<circle cx="1110" cy="470" r="9" fill="#6fd39a" fill-opacity="0.9"/>
-<path d="M1105.5 470.5 l3 3 l6 -6.5" fill="none" stroke="#181430" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>
-<text x="1130" y="477" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="17" fill="#ece8ff">Fleet config, metrics &amp; logs</text>
-<text x="60" y="592" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="18" fill="#a9a1d5">Every case runs per layer</text>
-<rect x="300" y="568" width="115.6" height="34" rx="17" fill="#2d2552" stroke="#8a7fd0"/>
-<text x="357.8" y="591" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="17" font-weight="600" fill="#ece8ff">Gateway</text>
-<rect x="429.6" y="568" width="104.8" height="34" rx="17" fill="#2d2552" stroke="#8a7fd0"/>
-<text x="482.0" y="591" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="17" font-weight="600" fill="#ece8ff">Router</text>
-<rect x="548.4" y="568" width="104.8" height="34" rx="17" fill="#2d2552" stroke="#8a7fd0"/>
-<text x="600.8" y="591" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="17" font-weight="600" fill="#ece8ff">Engine</text>
-<text x="675.1999999999999" y="592" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="18" fill="#a9a1d5">· each judged on its own, with the evidence to reproduce it</text>
+<desc id="d">Nineteen test suites in four groups, each with its pytest marker: API surfaces, model behaviour, failure and resilience, contract and change. Every case runs per layer: gateway, router, engine.</desc>
+<rect width="1440" height="548" rx="16" fill="#181430"/>
+<text x="64" y="76" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="28" font-weight="600" fill="#ece8ff">What <tspan font-family="SFMono-Regular, Menlo, Consolas, 'Liberation Mono', monospace" font-weight="500">llmdv</tspan> tests</text>
+<text x="1376" y="76" text-anchor="end" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="16" fill="#8f86bd">19 suites · run any one with <tspan font-family="SFMono-Regular, Menlo, Consolas, 'Liberation Mono', monospace" fill="#c9a8f0">-m &lt;marker&gt;</tspan></text>
+<line x1="64" y1="104" x2="1376" y2="104" stroke="#2f2856" stroke-width="1"/>
+<text x="64.0" y="150" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="13" font-weight="600" letter-spacing="1.6" fill="#c9a8f0">API SURFACES</text>
+<text x="64.0" y="196" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="19" fill="#ece8ff">Chat Completions</text>
+<text x="64.0" y="216" font-family="SFMono-Regular, Menlo, Consolas, 'Liberation Mono', monospace" font-size="13" fill="#8f86bd">openai_chat</text>
+<text x="64.0" y="248" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="19" fill="#ece8ff">Completions</text>
+<text x="64.0" y="268" font-family="SFMono-Regular, Menlo, Consolas, 'Liberation Mono', monospace" font-size="13" fill="#8f86bd">openai_completions</text>
+<text x="64.0" y="300" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="19" fill="#ece8ff">Responses</text>
+<text x="64.0" y="320" font-family="SFMono-Regular, Menlo, Consolas, 'Liberation Mono', monospace" font-size="13" fill="#8f86bd">openai_responses</text>
+<text x="64.0" y="352" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="19" fill="#ece8ff">Messages</text>
+<text x="64.0" y="372" font-family="SFMono-Regular, Menlo, Consolas, 'Liberation Mono', monospace" font-size="13" fill="#8f86bd">anthropic_messages</text>
+<text x="64.0" y="404" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="19" fill="#ece8ff">Model discovery</text>
+<text x="64.0" y="424" font-family="SFMono-Regular, Menlo, Consolas, 'Liberation Mono', monospace" font-size="13" fill="#8f86bd">discovery</text>
+<line x1="376.0" y1="136" x2="376.0" y2="422" stroke="#2f2856" stroke-width="1"/>
+<text x="392.0" y="150" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="13" font-weight="600" letter-spacing="1.6" fill="#c9a8f0">MODEL BEHAVIOUR</text>
+<text x="392.0" y="196" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="19" fill="#ece8ff">Tool calling</text>
+<text x="392.0" y="216" font-family="SFMono-Regular, Menlo, Consolas, 'Liberation Mono', monospace" font-size="13" fill="#8f86bd">tools</text>
+<text x="392.0" y="248" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="19" fill="#ece8ff">Streaming</text>
+<text x="392.0" y="268" font-family="SFMono-Regular, Menlo, Consolas, 'Liberation Mono', monospace" font-size="13" fill="#8f86bd">streaming</text>
+<text x="392.0" y="300" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="19" fill="#ece8ff">Structured output</text>
+<text x="392.0" y="320" font-family="SFMono-Regular, Menlo, Consolas, 'Liberation Mono', monospace" font-size="13" fill="#8f86bd">field_options</text>
+<text x="392.0" y="352" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="19" fill="#ece8ff">Image input</text>
+<text x="392.0" y="372" font-family="SFMono-Regular, Menlo, Consolas, 'Liberation Mono', monospace" font-size="13" fill="#8f86bd">images</text>
+<text x="392.0" y="404" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="19" fill="#ece8ff">Long context</text>
+<text x="392.0" y="424" font-family="SFMono-Regular, Menlo, Consolas, 'Liberation Mono', monospace" font-size="13" fill="#8f86bd">long_context</text>
+<line x1="704.0" y1="136" x2="704.0" y2="422" stroke="#2f2856" stroke-width="1"/>
+<text x="720.0" y="150" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="13" font-weight="600" letter-spacing="1.6" fill="#c9a8f0">FAILURE AND RESILIENCE</text>
+<text x="720.0" y="196" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="19" fill="#ece8ff">Error paths</text>
+<text x="720.0" y="216" font-family="SFMono-Regular, Menlo, Consolas, 'Liberation Mono', monospace" font-size="13" fill="#8f86bd">unhappy</text>
+<text x="720.0" y="248" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="19" fill="#ece8ff">Transport and TLS</text>
+<text x="720.0" y="268" font-family="SFMono-Regular, Menlo, Consolas, 'Liberation Mono', monospace" font-size="13" fill="#8f86bd">transport</text>
+<text x="720.0" y="300" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="19" fill="#ece8ff">Client scenarios</text>
+<text x="720.0" y="320" font-family="SFMono-Regular, Menlo, Consolas, 'Liberation Mono', monospace" font-size="13" fill="#8f86bd">scenarios</text>
+<text x="720.0" y="352" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="19" fill="#ece8ff">Real clients</text>
+<text x="720.0" y="372" font-family="SFMono-Regular, Menlo, Consolas, 'Liberation Mono', monospace" font-size="13" fill="#8f86bd">real_clients</text>
+<line x1="1032.0" y1="136" x2="1032.0" y2="422" stroke="#2f2856" stroke-width="1"/>
+<text x="1048.0" y="150" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="13" font-weight="600" letter-spacing="1.6" fill="#c9a8f0">CONTRACT AND CHANGE</text>
+<text x="1048.0" y="196" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="19" fill="#ece8ff">Declared surfaces</text>
+<text x="1048.0" y="216" font-family="SFMono-Regular, Menlo, Consolas, 'Liberation Mono', monospace" font-size="13" fill="#8f86bd">contract</text>
+<text x="1048.0" y="248" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="19" fill="#ece8ff">Render parity</text>
+<text x="1048.0" y="268" font-family="SFMono-Regular, Menlo, Consolas, 'Liberation Mono', monospace" font-size="13" fill="#8f86bd">render</text>
+<text x="1048.0" y="300" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="19" fill="#ece8ff">Prefix cache</text>
+<text x="1048.0" y="320" font-family="SFMono-Regular, Menlo, Consolas, 'Liberation Mono', monospace" font-size="13" fill="#8f86bd">cache</text>
+<text x="1048.0" y="352" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="19" fill="#ece8ff">Change sentinels</text>
+<text x="1048.0" y="372" font-family="SFMono-Regular, Menlo, Consolas, 'Liberation Mono', monospace" font-size="13" fill="#8f86bd">evolution</text>
+<text x="1048.0" y="404" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="19" fill="#ece8ff">Fleet invariants</text>
+<text x="1048.0" y="424" font-family="SFMono-Regular, Menlo, Consolas, 'Liberation Mono', monospace" font-size="13" fill="#8f86bd">fleet</text>
+<line x1="64" y1="466" x2="1376" y2="466" stroke="#2f2856" stroke-width="1"/>
+<text x="64" y="504" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="17" fill="#8f86bd">Every case runs per layer, <tspan fill="#ece8ff">gateway</tspan> · <tspan fill="#ece8ff">router</tspan> · <tspan fill="#ece8ff">engine</tspan>, and each layer is judged on its own.</text>
 </svg>
