@@ -87,11 +87,18 @@ When one stack needs several profiles, write each fact once in a **part** and li
 
 ### Profiles for an llm-d guide
 
-Write a profile for each configuration that is both deployed by one of the guide's CI lanes and marked `validated` in the guide's own table (its `guide.yaml` and README), and none for any other: not a `community` overlay, and not a configuration no lane runs. Say "guide", the word llm-d's own files use (`guides/`, `guide.yaml`, `GUIDE_NAME`), and name the folder exactly as llm-d names the guide; do not write "well-lit path" or any other term for it.
+Decide which configurations get a profile from the guide itself, and read all of its sources, checking each against the others:
 
-1. List the guide's nightly workflows in llm-d. For each lane read its accelerator, engine, provider and gateway class.
-2. Render the overlay that lane applies, locally (`kubectl kustomize <path>`, never against a cluster). A lane that sets no provider applies the accelerator and engine folder's own kustomization. Read the model, context window, parsers and engine build, for each role (prefill and decode can differ).
-3. Group lanes that look the same to a client. Each group is one combination; its header names its lanes, and the directory's README maps every lane to its profile with the exact `--identity` flags that keep lanes sharing a combination apart, and lists what no lane runs.
+- the nightly lanes, `.github/workflows/nightly-e2e-<guide>-*.yaml`, and the deploy scripts they call;
+- the rendered manifests of the overlay each lane applies (`kubectl kustomize <path>`, locally, never against a cluster), for the model, context window, parsers, engine build and flags;
+- the guide's `guide.yaml`, including any `support:` table;
+- the guide's README, including any support or supported-accelerators section.
+
+Write a profile for each configuration a nightly lane deploys, as the rendered manifests show it, and none for any other. `guide.yaml` and the README are statements to check against the lanes and manifests, not the source of truth. Wherever they disagree (a lane deploying something the table or README does not list, a table cell no lane runs, a README naming a different model or flag than the manifest), profile what the lane deploys and record the disagreement under "Upstream notes" in the guide folder's README, citing paths. Say "guide", the word llm-d's own files use (`guides/`, `guide.yaml`, `GUIDE_NAME`), and name the folder exactly as llm-d names the guide; do not write "well-lit path" or any other term for it.
+
+1. List the guide's nightly workflows in llm-d and the deploy scripts they call. For each lane read its accelerator, engine, provider and gateway class.
+2. Render the overlay that lane applies, locally (`kubectl kustomize <path>`, never against a cluster). A lane that sets no provider applies the accelerator and engine folder's own kustomization. Read the model, context window, parsers, engine build and flags, for each role (prefill and decode can differ). Check what you read against `guide.yaml` and the README.
+3. Group lanes that look the same to a client. Each group is one combination; its header names its lanes, and the directory's README maps every lane to its profile with the exact `--identity` flags that keep lanes sharing a combination apart, lists what no lane runs, and records under "Upstream notes" every disagreement between the guide's sources.
 4. Give the guide's `parts/common.yaml` a `selection:` of the cases the guide's claims touch, keeping `contract.*` (see [REFERENCE.md](../../../profiles/REFERENCE.md#selection)), and check every glob with `llmdv plan --profile <combination>`. Rule 3 still holds for the configuration: one lane per configuration runs `--all`, recorded in `profiles/llm-d/README.md` under "Which lane runs everything", as does a lane whose engine build differs from the rest of its configuration.
 5. A layer the kinds cannot order (a routing sidecar between the router and the engines, two routers in series, a coordinator in front of the router) is placed with `fronts`; see [Declared layer edges](../../../profiles/REFERENCE.md#declared-layer-edges). An ingress may front only ingresses at its own position or deeper.
 
@@ -171,5 +178,6 @@ comment beside the line and, if the declaration changes, cite the decision.
 | "They need green for sign-off" | A sign-off lists failures and their triage. |
 | "It's a private repo, the namespace is fine" | It goes in `*.local.yaml`. |
 | "To publish it, I'll swap our values for sensible defaults" | Scrub comments, keep values, and prove it with `compare_profiles.py`. |
-| "The guide's table lists it, so it needs a profile" | Only what the table marks `validated` and a CI lane deploys gets one. |
+| "The table or README lists it, so it needs a profile" | Only what a nightly lane deploys gets one; record the difference under "Upstream notes". |
+| "The guide has no support table, so nothing qualifies" | The lanes decide: profile what each one deploys. |
 | "One file per accelerator" | Name by what a client sees; lanes that look the same share a profile. |

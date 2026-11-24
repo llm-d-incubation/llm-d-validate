@@ -47,7 +47,10 @@ curl -s -D - -o /dev/null -H "Authorization: Bearer $GATEWAY_KEY" -H 'content-ty
   | grep -i -E '^x-litellm-(version|model-name|model-api-base)'
 curl -s -H "Authorization: Bearer $GATEWAY_KEY" "$GATEWAY_URL/v1/model/info" \
   | jq -r '.data[] | select(.model_name=="<gateway id>") | .litellm_params.model'   # the provider and engine-side name
-curl -s "$ROUTER_URL/v1/models" | jq -r '.data[].id'; curl -s "$ROUTER_URL/version"   # router: the engine's id and vLLM build
+curl -s "$ROUTER_URL/v1/models" | jq -r '.data[].id'   # router: the engine's model id
+# The router has no version endpoint of its own: it forwards the path (it restricts none;
+# profiles/llm-d/parts/topology/standalone.yaml) and one engine replica answers, only on vLLM.
+curl -s "$ROUTER_URL/version"
 ```
 
 Record: the gateway version, the engine build (`system_fingerprint`), and which backend the gateway forwards to (`x-litellm-model-api-base` or `/v1/model/info`; an internal URL, so describe it, never commit it). An HTML 503 from a gateway is its route being down, not the model: stop and report it.

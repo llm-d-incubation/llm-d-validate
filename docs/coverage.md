@@ -69,8 +69,9 @@ Left out on purpose: unsafe HTTP methods on API paths, by policy. The real-clien
 `multi_file_fix` session runs model-written code, so run it in a disposable container.
 
 Stop strings matching inside reasoning are not a fleet defect: keeping them dormant there
-is not an established contract (#272). The reasoning-collision case was removed rather than
-retained as a skip. Answer-stop cases remain, and on a model that reasons by default they turn
+is not an established contract
+([vllm#52393](https://github.com/vllm-project/vllm/issues/52393)). The reasoning-collision
+case was removed rather than retained as a skip. Answer-stop cases remain, and on a model that reasons by default they turn
 reasoning off with the declared quiet effort (else `none`), so the stop string can only meet the
 answer; they do not establish reasoning-channel isolation.
 
@@ -112,7 +113,7 @@ OpenAI alike, so the tools cases hold a call's arguments to the schema only for 
 for every tool when the profile declares `tools.strict_level: parameter`. Elsewhere a mismatch
 is recorded (`tool_call_arguments_unconstrained`) as evidence. `tools.strict`,
 `tools.schema_features` and `tools.args_types` send strict tools, so they still verify the
-schema is honoured (#270).
+schema is honoured.
 
 **Call markup is a leak wherever it appears.** Every generation on a tool surface runs
 `tool_markup_in_answer` as part of the shared contract when the profile declares

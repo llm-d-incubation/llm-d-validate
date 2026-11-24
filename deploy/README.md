@@ -295,6 +295,9 @@ podman run --rm --network none --read-only --user 10001:0 \
     --entrypoint /usr/local/bin/claude <image> --version
 ```
 
+`--user 10001:0` is deliberate: like OpenShift, it runs as a UID the image does not know, with
+group 0, rather than the image's own `USER 1001`.
+
 ## Refreshing the image's pins
 
 The base image is pinned by digest, every Python package by hash, and Claude Code by version and
