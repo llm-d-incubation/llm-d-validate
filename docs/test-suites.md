@@ -4,7 +4,7 @@ The suites llmdv runs, what each one checks, the profile key that turns it on, a
 missing. Each suite is a package under `src/llmdv/suites/`, and its name is also its pytest marker.
 
 <p align="center">
-  <img src="images/llmdv-coverage.svg" width="100%" alt="What llmdv tests: 19 suites in four groups, each shown with the pytest marker that runs it (API surfaces, model behaviour, failure and resilience, contract and change), each run per layer: gateway, router, engine.">
+  <img src="images/llmdv-coverage.svg" width="100%" alt="What llmdv tests: 19 suites and growing, in four groups, each shown with the -m marker that runs it (API surfaces, model behaviour, failure and resilience, contract and change), each run per layer: gateway, router, engine.">
 </p>
 
 ## Run a suite
