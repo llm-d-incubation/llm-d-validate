@@ -272,6 +272,20 @@ def test_no_header_a_backend_row_matches_can_be_declared(tmp_path, header):
         ("x-forwarded-for", "may name a host"),
         ("forwarded", "may name a host"),
         ("via", "may name a host"),
+        ("x-envoy-upstream-service-time", "changes from one request to the next"),
+        ("x-b3-traceid", "changes from one request to the next"),
+        ("x-b3-spanid", "changes from one request to the next"),
+        ("b3", "changes from one request to the next"),
+        ("x-trace-id", "changes from one request to the next"),
+        ("x-amzn-trace-id", "changes from one request to the next"),
+        ("ratelimit-remaining", "changes from one request to the next"),
+        ("ratelimit", "changes from one request to the next"),
+        ("x-amzn-requestid", "changes from one request to the next"),
+        ("x-envoy-external-address", "may name a host"),
+        ("x-real-ip", "may name a host"),
+        ("true-client-ip", "may name a host"),
+        ("cf-connecting-ip", "may name a host"),
+        ("x-client-ip", "may name a host"),
     ],
 )
 def test_a_header_that_is_never_a_build_cannot_be_declared(tmp_path, header, problem):
@@ -281,7 +295,9 @@ def test_a_header_that_is_never_a_build_cannot_be_declared(tmp_path, header, pro
         loader.load(_declaring(tmp_path, header))
 
 
-@pytest.mark.parametrize("header", ["server", "x-kong-version", "x-gateway-build"])
+@pytest.mark.parametrize(
+    "header", ["server", "x-kong-version", "x-gateway-build", "x-envoy-build", "x-traced-by"]
+)
 def test_a_build_header_can_still_be_declared(tmp_path, header):
     assert loader.load(_declaring(tmp_path, header)).ingress("edge").version_headers == (header,)
 

@@ -138,7 +138,10 @@ def unmatched(entries: Iterable[KnownFailure], records: Iterable[Mapping[str, An
     """The entries that labelled no record although a case they cover ran: candidates for
     pruning, because the fix may have landed. Matched by issue and check, which together name
     an entry. An entry none of whose cases ran (the profile's `selection` or a `-k` left them
-    out, or they skipped) says nothing about this run, so it is not listed."""
+    out, or they skipped) says nothing about this run, so it is not listed. A case ran only if
+    it reached a verdict against the fleet: it recorded checks, and its ingress's local
+    connection was not lost. A setup error records no check and a lost port-forward says
+    nothing about the fleet, so neither makes an entry look fixed."""
     records = list(records)
     used = {
         (str(k.get("issue")), str(k.get("check")))
@@ -148,7 +151,9 @@ def unmatched(entries: Iterable[KnownFailure], records: Iterable[Mapping[str, An
     ran = [
         (r.get("case_id"), r.get("variant") or None, r.get("ingress"))
         for r in records
-        if r.get("outcome") != "skip"
+        if r.get("outcome") in ("pass", "fail", "error")
+        and r.get("checks")
+        and not r.get("connection_lost")
     ]
     return [
         {"check": e.check, "issue": e.issue}
