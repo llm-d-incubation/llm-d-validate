@@ -16,7 +16,7 @@ from llmdv.cli.main import build_parser
 from llmdv.evidence import dashboard
 from tests.fakes import SRC
 
-MANUAL = SRC.parent / "docs" / "cli.md"
+CLI_DOC = SRC.parent / "docs" / "cli.md"
 
 
 def constants() -> dict[str, int]:
@@ -53,7 +53,7 @@ def test_the_help_epilog_lists_every_code_and_meaning():
 
 
 def test_the_cli_reference_exit_table_matches_exit_codes():
-    section = MANUAL.read_text().split("## Exit codes", 1)[1].split("\n## ", 1)[0]
+    section = CLI_DOC.read_text().split("## Exit codes", 1)[1].split("\n## ", 1)[0]
     rows = re.findall(r"^\| `(\d+)` \| `(\w+)` \| (.+?) \|$", section, re.MULTILINE)
     assert {int(code): (cls, meaning) for code, cls, meaning in rows} == exit_codes.EXITS
 

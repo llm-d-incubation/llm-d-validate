@@ -180,7 +180,7 @@ expose this" with "llmdv cannot test it yet" reads as coverage.
 | `throttled` | a layer declared `rate_limited` refused the request for being over quota |
 
 They are decided in this order, so the first honest answer wins. Only the last branch produces a
-verdict.
+verdict; a case whose setup fails is recorded as an error.
 
 ```mermaid
 flowchart TB
@@ -195,7 +195,7 @@ flowchart TB
     Q3 -->|"needs a load experiment"| RL["skip: requires_load"]
     Q3 -->|"yes"| RUN["run the case"]
     RUN -->|"429 from a rate_limited layer"| T["skip: throttled"]
-    RUN --> V["pass or fail"]
+    RUN --> V["pass, fail or error"]
 ```
 
 ## Output

@@ -111,8 +111,11 @@ Installed. Next:
   llmdv --help
   llmdv profile validate profiles/examples/example-two-ingress.yaml
 
-  # against a fleet: copy an example, fill in the placeholders, then
-  llmdv profile show <your-profile>.local.yaml --setup     # prints the port-forwards
+  # an llm-d guide: give llmdv the EPP's URL and run the guide's combination
+  export LLMDV_EPP_URL=<your EPP's URL>
+  llmdv verify --profile profiles/llm-d/<guide>/<combination>.yaml --identity accelerator=<a> --identity provider=<p>
+
+  # your own stack: copy an example, fill in the placeholders, then
   llmdv verify --profile <your-profile>.local.yaml
 
   # offline, no cluster needed

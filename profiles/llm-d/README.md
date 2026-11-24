@@ -25,7 +25,8 @@ llmdv verify --profile profiles/llm-d/optimized-baseline/vllm-qwen3-32b-parsers-
 The EPP needs no key. A gateway in front of it is one more ingress in a local file that extends
 the combination: [add your gateway](../README.md#add-your-gateway).
 
-A combination is `<engine>-<model-config>-<topology>.yaml`; files in a `parts/` folder never run
+A combination is `<engine>-<model-config>[-<variant>]-<topology>.yaml`, with a variant only where
+lanes of one configuration differ to a client (keda-epp's `queue` and `inflight`); files in a `parts/` folder never run
 on their own. The guide folder's README maps each lane's overlay to its combination and gives the
 exact `--identity` flags, which keep apart lanes that share a profile. They follow llm-d's lane
 inputs:
@@ -38,8 +39,8 @@ inputs:
 
 ## Coverage
 
-Every guide llm-d runs in a nightly lane (`.github/workflows/nightly-e2e-<guide>-*.yaml` at
-`9ca8ff0`) has a folder here, named as its `guide.yaml` names it. Lanes that look the same to a
+Every guide llm-d runs in a nightly lane (`.github/workflows/nightly-e2e-*.yaml` at `9ca8ff0`;
+keda-epp's are `nightly-e2e-workload-autoscaling-keda-epp-*`) has a folder here, named as its `guide.yaml` names it. Lanes that look the same to a
 client share a profile.
 
 | Guide | Lanes | Profiles | Notes |
@@ -96,7 +97,7 @@ engine and model conformance, which depends only on the engine build, the model 
 client-visible flags, so one lane per configuration runs it with `llmdv verify --all` and the
 others rely on that run. Where optimized-baseline deploys a configuration, its lane is the one.
 
-Each profile below is `<guide>/<engine>-<model part>-standalone`. GPU means NVIDIA GPU, XPU
+Each profile below is `<guide>/<engine>-<model part>[-<variant>]-standalone`. GPU means NVIDIA GPU, XPU
 Intel XPU.
 
 | Profile that runs `--all` | Accelerator | Also deploys it (selection only) |

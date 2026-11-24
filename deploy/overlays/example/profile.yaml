@@ -1,6 +1,6 @@
 # An in-cluster profile: the same schema as an external profile, but reaching the fleet by
 # Service DNS, so `setup` needs no port-forwards. Placeholders throughout; see
-# ../../../profiles/README.md for every field.
+# ../../../profiles/REFERENCE.md for every field.
 schema: llmdv.profile/1
 name: fleet-a
 vantage: in-cluster

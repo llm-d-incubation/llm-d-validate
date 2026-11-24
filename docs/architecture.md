@@ -43,13 +43,14 @@ The layers form a graph (`profile/topology.py`, `Profile.topology`), built one o
   in front of a per-pod routing sidecar that fronts a prefill and a decode engine.
 
 `loader.load` builds a declared graph, so an unknown id, an id listed twice in one `fronts`, a
-self-edge, a cycle or an ingress on no edge is an invalid profile (exit 2), never a mid-run
+self-edge, an edge to an ingress at a shallower position, a cycle or an ingress on no edge is an
+invalid profile (exit 2), never a mid-run
 error.
 
-A layer is compared only with the nearest layers behind it that reported. Going inward one kind
-at a time, the comparison stops at the first kind where any layer reported: a gateway in front
-of two routers, one of which reported, is compared with that router, and that router with the
-engine. The alert feed reads the graph the run records in `outcome.json` by the same rule; a
+A layer is compared only with the nearest layers behind it that reported: from each layer, step
+to the ones it fronts, compare with any that reported, and only if none did, step on through
+them. A gateway in front of two routers, one of which reported, is compared with that router,
+and that router with the engine; ingresses with no edge between them are peers, never compared. The alert feed reads the graph the run records in `outcome.json` by the same rule; a
 recorded graph that misses a layer that reported is read as no graph. Fewer than two reporting
 ingresses make no ladder.
 
@@ -82,9 +83,9 @@ Every `kubectl` or `oc` call goes through `kube.py`, whose allowlist admits `get
 records it as `kube_cli`. With no CLI, URL-only testing proceeds unless `--pod-logs all` asks for
 logs.
 
-From outside the cluster the data plane arrives over a port-forward, which llmdv declares and
-checks but never starts, so a dead tunnel fails preflight as your environment, not the fleet.
-In-cluster, the same profile points at Service DNS and `setup` is empty.
+Each layer is reached at the URL its profile names. A profile whose layers need local setup
+declares it in `setup`, which llmdv checks but never starts, so a dead tunnel fails preflight as
+your environment, not the fleet.
 
 Preflight checks the operator's side before any case runs: reachability, credentials and model
 access (one authenticated `GET /v1/models` per ingress), and that each declared API answers a
@@ -141,7 +142,7 @@ llm-d-validate/
   pyproject.toml    console script `llmdv`; pytest11 entry point
   Containerfile     the unattended runner image, pinned by requirements.lock
   deploy/           trigger.sh, the smoke test and the kustomize base (see deploy/README.md)
-  docs/             getting started, the CLI, architecture, comparing runs, coverage
+  docs/             getting started, the CLI, architecture, comparing runs, test suites
   profiles/         llm-d guide profiles, examples and parts (see profiles/README.md)
   src/llmdv/        the package: library, CLI and suites (see the module map below)
   tests/            llmdv's own unit tests; no cluster required

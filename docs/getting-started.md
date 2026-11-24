@@ -108,12 +108,12 @@ llmdv verify --profile $P -m contract
 llmdv verify --profile $P --analyze       # the full run, with a dashboard
 ```
 
-With cluster access, [`example-two-ingress.yaml`](../profiles/examples/example-two-ingress.yaml)
-drives the engine and the router through port-forwards:
+A profile can also declare the local setup its layers need, as
+[`example-two-ingress.yaml`](../profiles/examples/example-two-ingress.yaml) does; `--setup` prints it:
 
 ```sh
 llmdv profile show $P --matrix   # what the profile claims, and what will run
-llmdv profile show $P --setup    # the port-forwards, pods resolved live; run them in another shell
+llmdv profile show $P --setup    # the setup it declares, pods resolved live
 llmdv verify --profile $P
 ```
 
