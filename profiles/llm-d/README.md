@@ -50,7 +50,8 @@ Rules that keep this simple:
 
 | Source | Owns |
 | --- | --- |
-| the guide's `guide.yaml` | which overlays exist, which are validated, how a client reaches the stack |
+| the guide's nightly lanes and the deploy scripts they call | which configurations get a profile |
+| the guide's `guide.yaml` and README | what the guide says exists and is supported, checked against the lanes and manifests (a disagreement goes in the guide folder's "Upstream notes"); how a client reaches the stack |
 | router values and model-server overlays | the deployed configuration: model id, window, parsers, router plugins, block sizes |
 | the APIs (OpenAI, Anthropic, the EPP reference) | behaviour: statuses, envelopes, fields, header handling |
 | a run | existence (surfaces served, the window an engine resolves) and the truth of every line above |
@@ -94,7 +95,8 @@ Every profile tests at the router (`<release>-epp`, standalone mode), the only l
 
 **Not covered, and why:**
 
-- **fast-model-actuation-keda** (2 lanes): the pool scales from zero, so the first request can wait up to 300 s and the pool returns to zero after about a minute idle; a profile cannot say "the first request may be slow" without loosening every latency check.
+- **fast-model-actuation-keda** (2 lanes): the guide scales the pool on the router's flow-control queue size only, from zero (`minReplicaCount: 0`, `cooldownPeriod: 30`; llm-d 9ca8ff0 `guides/fast-model-actuation/fast-model-actuation-keda/keda/base/kustomization.yaml`), and llmdv sends one request at a time, which never queues. So the pool can return to zero mid-run and cold-start again, holding a request up to the router's `noEndpointRequestTTL` of 300 s (`guides/fast-model-actuation/fast-model-actuation-keda/router/fast-model-actuation-keda.values.yaml`). llmdv has no warm-up, and tolerating that would mean raising `stream_idle` and `stream_budget` ([parts/topology/standalone.yaml](parts/topology/standalone.yaml)) for every streaming check. Tracked in #130.
+- **ci-async-kind-e2e**: a workflow run on pull requests, and by hand, never nightly (llm-d 9ca8ff0 `.github/workflows/ci-async-kind-e2e.yaml`) that creates a temporary kind cluster (optimized-baseline's router over a CPU vLLM serving `facebook/opt-125m` at `--max_model_len=2048`, plus Redis and llm-d-async v1.0.0; `guides/batch-serving/asynchronous-processing/test/kind-e2e.sh`) and deletes it on exit, so there is no stack for llmdv to run against. Its router is covered by [optimized-baseline/sim-qwen3-32b-standalone](optimized-baseline/sim-qwen3-32b-standalone.yaml).
 - **Layers in front of or beside the router**: agentic-api's stateful Responses server, the async coordinator and its queues, and the prefill/decode routing sidecar. Each needs its own ingress, placed in the layer graph with `fronts` (the sidecar behind the router, the others in front of or beside it), and measured behaviour.
 - **Claims that only hold under load or need cluster reads**: queueing, priority and fairness, eviction and shedding, scaling events, prefill/decode decisions, offload and cache counters, snapshot restore, prefix affinity (#23, #27).
 - **Guides no nightly lane runs**: coord-disaggregation, p2p-kv-cache-sharing, multi-model-routing, omni-serving, turn-priority-fairness, modelexpress-p2p, hyperconverged-cephfs, the per-model guides under `guides/models/`, and the other workload-autoscaling variants. Each is added when a lane runs it.
@@ -136,7 +138,7 @@ A guide's `selection` (in its `parts/common.yaml`) is what its lanes run by defa
 
 ## optimized-baseline coverage
 
-These profiles follow llm-d's CI: there is one for every configuration the guide marks `validated` and a nightly lane deploys, and none for any other. The guide's ten lanes (`nightly-e2e-optimized-baseline-<lane>.yaml` in llm-d, each in standalone mode) deploy seven configurations that differ to a client:
+These profiles follow llm-d's CI: there is one for every configuration a nightly lane deploys, and none for any other. The guide's ten lanes (`nightly-e2e-optimized-baseline-<lane>.yaml` in llm-d, each in standalone mode) deploy seven configurations that differ to a client:
 
 | CI lane | Overlay it deploys (`ACCELERATOR_TYPE/MODEL_SERVER/INFRA_PROVIDER`) | Profile (`optimized-baseline/`) |
 | --- | --- | --- |

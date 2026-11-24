@@ -20,8 +20,11 @@ A fleet finding is a defect an llmdv run caught in the deployed serving stack. E
    - **Rerun the cases:** the two or three smallest, with `llmdv verify --profile <p> --evidence all -k "<test names>"` (a function name selects every variant; quote a full `name[variant]` from the `nodeid` to select one). Add `--all` when the case is outside the profile's `selection` (every llm-d guide profile declares one, and a run made with `--all` records `selection.all: true` in `outcome.json`); otherwise `-k` finds nothing to run. Record the date and result.
    - **Run the curl:** run the request from the new `repro.sh` as the curl the issue will show: the same path and body, trimmed headers, and a filter that shows the defect. Paste its real output as "observed".
      - Put the host in `BASE`, read without printing. A committed profile names it by variable (`base_url_env`), a local one may write `base_url` inline; this reads either:
-       `BASE=$(.venv/bin/python -c "from llmdv.profile import loader;print(next(i for i in loader.load('<p>').ingresses if i.id=='<ingress>').base_url)")`
-       Run it from the repository root; `<ingress>` is the segment of `failures/<ingress>/<case>/`.
+       ```sh
+       BASE=$(.venv/bin/python -c "from llmdv.profile import loader;i=next(i for i in loader.load('<p>').ingresses if i.id=='<ingress>');i.base_url or exit(f'{i.base_url_env} is unset: export it first');print(i.base_url)")
+       : "${BASE:?no base URL for <ingress>}"
+       ```
+       Run it from the repository root; `<ingress>` is the segment of `failures/<ingress>/<case>/`. An empty base URL stops it with the variable to export, in bash and zsh alike.
      - Load the key from wherever the person keeps it ([`.agents/ENVIRONMENT.md`](../../ENVIRONMENT.md)), never echoing it.
 
    If the defect no longer reproduces, say so and do not file.

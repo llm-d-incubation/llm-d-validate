@@ -316,9 +316,8 @@ def _exit_code(verify_code: int, compare_code: int, publish_code: int, notify_co
     # superseded by the fallback publish above, which always runs when results go anywhere.
     if verify_code not in (OK, NOT_DELIVERED):
         return verify_code
-    # A run can pass every case and still have regressed against the previous one. That is the
-    # question a nightly job exists to answer, so it decides the exit code when verification
-    # itself was clean.
+    # Unreachable while results.jsonl mirrors pytest: a newly failing record means verify
+    # exited 1. Kept so a regression can never exit 0 if the two ever diverge.
     if compare_code == TEST_FAILURES:
         return TEST_FAILURES
     if compare_code == USAGE:
