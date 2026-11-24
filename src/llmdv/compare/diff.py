@@ -86,6 +86,9 @@ class Delta:
     appeared_known: list[str] = field(default_factory=list)
     window: int = 1
     window_dropped: int = 0
+    # Which run of the history the verdicts were judged against, by its position there: the
+    # newest one under the current contract, so not always the newest run. None with no run.
+    baseline: int | None = None
     window_errors: dict[str, str] = field(default_factory=dict)
     digest_changed: bool = False
     profile_diff: list[str] = field(default_factory=list)
@@ -130,8 +133,8 @@ def compare_window(history: list[list[dict]], after: list[dict]) -> Delta:
     # claim about declarations that no longer apply -- so those runs are dropped from the
     # window rather than counted as agreement.
     current = digests(after)
-    usable, dropped = [], 0
-    for records in history:
+    usable, positions, dropped = [], [], 0
+    for position, records in enumerate(history):
         if not records:
             continue
         theirs = digests(records)
@@ -139,11 +142,13 @@ def compare_window(history: list[list[dict]], after: list[dict]) -> Delta:
             dropped += 1
             continue
         usable.append(records)
+        positions.append(position)
     if not usable and history:
         # Nothing in the window shares the contract. Still worth comparing against the most
         # recent run, but the reader has to be told the contract moved -- which the drift flag
         # below does. It was not "left out" if we went on to use it.
-        usable = [records for records in history if records][-1:]
+        positions = [position for position, records in enumerate(history) if records][-1:]
+        usable = [history[position] for position in positions]
         dropped = 0
     # Two different facts, and conflating them misleads: dropping older runs means the window
     # is shorter than asked for, while this flag means the baseline we are actually comparing
@@ -157,6 +162,7 @@ def compare_window(history: list[list[dict]], after: list[dict]) -> Delta:
         window=len(runs),
         window_dropped=dropped,
         digest_changed=drift,
+        baseline=positions[-1] if positions else None,
         current_failing=[label(k) for k in sorted(new) if new[k]["outcome"] in _BAD],
     )
     if not runs:

@@ -33,7 +33,7 @@ from ..compare.archive import (
     read_stack,
     require_records,
 )
-from ..compare.diff import Delta, attach_stack, compare_window, digests
+from ..compare.diff import Delta, attach_stack, compare_window
 from ..compare.report import COMPARISON_FILE, COMPARISON_JSON, as_record, not_made, render
 from ..evidence import outcome
 from ..evidence.stack import declared_in_both, stack_from_run, version_headers_in
@@ -220,11 +220,10 @@ def _compare_baselines(
     delta = compare_window(list(history.values()), after)
     delta.window_errors = errors
     delta.window_dropped += len(errors)
-    before_id = next(reversed(history))
-    newest = history[before_id]
-    delta.digest_changed = bool(
-        digests(newest) and digests(after) and digests(newest) != digests(after)
-    )
+    # The run the verdicts were judged against, which after a reverted profile is not the
+    # newest: its stack, profile and digest are the ones the report must name.
+    ids = list(history)
+    before_id = ids[delta.baseline] if delta.baseline is not None else ids[-1]
     return delta, before_id
 
 
