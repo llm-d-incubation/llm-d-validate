@@ -1129,7 +1129,11 @@ def mark_skip_current(skip_class: SkipClass) -> None:
 def pytest_runtest_makereport(item: pytest.Item, call: pytest.CallInfo):
     outcome = yield
     report = outcome.get_result()
-    if report.when != "call" and not (report.when == "setup" and report.outcome == "skipped"):
+    # One record per case: its call, or the setup that stopped it running. A setup that
+    # skipped or raised leaves no call, so without its own record the case would vanish from
+    # results.jsonl, the counts and the comparison. Teardown never writes one: the call
+    # already did, and a second record would duplicate the case's key.
+    if report.when == "teardown" or (report.when == "setup" and report.passed):
         return
 
     config = item.config

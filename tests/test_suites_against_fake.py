@@ -867,6 +867,67 @@ def test_the_closest_surface_marker_decides(tmp_path):
     ]
 
 
+def test_a_case_that_errors_in_setup_is_recorded_once_and_a_teardown_error_adds_none(tmp_path):
+    """A fixture that raises stops the case before its call, so the setup report is its only
+    report: without a record of it the case vanishes from results.jsonl, the counts and the
+    comparison while pytest still exits 1. A teardown error follows a call that already wrote
+    the case's record, and a second would duplicate its key."""
+    from llmdv.evidence.outcome import environment_only, summarise
+
+    files = {
+        "test_setup_error.py": """
+            import pytest
+
+            pytestmark = pytest.mark.surface("chat_completions")
+
+
+            @pytest.fixture
+            def broken():
+                raise RuntimeError("fixture exploded on purpose")
+
+
+            @pytest.fixture
+            def breaks_after():
+                yield
+                raise RuntimeError("teardown exploded on purpose")
+
+
+            @pytest.mark.case_id("probe.setup_error")
+            def test_setup_error(ingress, broken):
+                pass
+
+
+            @pytest.mark.case_id("probe.teardown_error")
+            def test_teardown_error(ingress, breaks_after):
+                pass
+
+
+            @pytest.mark.case_id("probe.passes")
+            def test_passes(ingress):
+                pass
+        """,
+    }
+    with FakeFleet() as fleet:
+        result, records = run_suite_source(tmp_path, fleet, files)
+
+    assert result.returncode == 1, result.stdout
+    assert sorted((r["case_id"], r["outcome"]) for r in records) == [
+        ("probe.passes", "pass"),
+        ("probe.setup_error", "error"),
+        ("probe.teardown_error", "pass"),
+    ]
+    errored = next(r for r in records if r["case_id"] == "probe.setup_error")
+    assert errored["ingress"] == "fake"
+    assert "RuntimeError" in errored["reason"]
+    assert "fixture exploded on purpose" in errored["reason"]
+    assert not errored["connection_lost"]
+    counts, _, failures = summarise(records)
+    assert counts == {"pass": 2, "error": 1}
+    assert [f["case_id"] for f in failures] == ["probe.setup_error"]
+    # A fleet result, not the environment: the run still exits 1, never 3.
+    assert not environment_only(records)
+
+
 def test_both_surface_markers_on_one_case_fail_collection(tmp_path):
     """A contradiction is a llmdv defect, reported at collection rather than resolved silently."""
     files = {
