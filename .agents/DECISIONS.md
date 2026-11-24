@@ -185,10 +185,9 @@ Within one run, the summary reads a ladder off the profile: which layer failed w
 inside it passed. The rows come from the declared layers, ordered by `kind` (gateway, router,
 engine) or by the declared `fronts` edges, and a run that cannot establish an order offers none. Every result records
 `served_by`. The summary and the alert feed pair layers by one rule: a layer is compared only
-with the nearest layers behind it that reported. Going inward one kind at a time, the first kind
-with any layer that reported is where the comparison stops; a layer of that kind that did not
-report is left out, and nothing is compared through it. Two layers of one kind are peers and
-are never compared. A recorded graph that misses a layer that reported is read as no graph.
+with the nearest layers behind it that reported. From each layer, step to the ones it fronts;
+compare it with any of those that reported, and only if none did, step on through them.
+Ingresses with no edge between them (two engines, say) are peers and are never compared. A recorded graph that misses a layer that reported is read as no graph.
 
 *Why:* the ladder assumes the layers are in series and otherwise identical, and they are not.
 Direct access reaches one replica; a router load-balances across many with different
@@ -212,7 +211,9 @@ Human reference: [../docs/compare.md](../docs/compare.md).
 | `skip → fail` | new evidence, not new breakage |
 
 Zero cases is never a pass, a changed `profile_digest` is reported before the findings with the
-declarations that moved. Automatic baselines match the run identity; a missing identity is never
+declarations that moved. A profile's `selection` is not digested: compare says *the selection
+changed*, lists cases only one run selected under *Outside the selection*, and names the
+baseline it judged against. Automatic baselines match the run identity; a missing identity is never
 selected, and the default trigger is `manual`.
 
 *Why:* a skip is an absence of evidence. Reporting it as a failure trains people to ignore the

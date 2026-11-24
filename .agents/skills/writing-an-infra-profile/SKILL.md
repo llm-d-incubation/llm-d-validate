@@ -116,12 +116,12 @@ profiles/llm-d/
     sentinels/unmeasured*.yaml         placeholder change sentinels until a run measures them
   <guide>/                             one folder per guide, named as llm-d names it
     parts/common.yaml                  what every profile of the guide shares: its claims, cache decisions, block sizes
-    <engine>-<model-config>-<topology>.yaml   a combination: what you run
+    <engine>-<model-config>[-<variant>]-<topology>.yaml   a combination: what you run
 ```
 
 A combination is `extends: [../parts/base.yaml, ../parts/topology/<t>.yaml, ../parts/engines/<e>.yaml, ../parts/models/<m>.yaml, ../parts/sentinels/<s>.yaml, parts/common.yaml]`, then its `name` and the parser names (the engine's own flag values, where the model part has parsers). The sentinel part is `unmeasured-with-tools.yaml` when the model has a tool-call parser, `unmeasured.yaml` otherwise. Once a run of that exact stack measures them, the combination sets its own `prompt_pins` and `contract_baseline`, which override the part.
 
-- **No key is set by two parts,** so the order of the list changes nothing. The one exception is the simulator: its model part overrides four `base.yaml` keys and its combination overrides the standalone surfaces, on purpose, and each says so in a comment. A run's `profile.used.yaml` names the file that set each key.
+- **No key is set by two parts,** so the order of the list changes nothing. The exceptions, each on purpose: the simulator's model part overrides five `base.yaml` keys, and the simulator, the precise-prefix-cache-routing GPU, AMD and XPU and the fast-model-actuation combinations override the standalone surfaces, and each says so in a comment. A run's `profile.used.yaml` names the file that set each key.
 - **`tests/test_example_profiles.py` checks every part** through the combinations that list it.
 - **Ingress-keyed facts live in the topology part.** llmdv keys surfaces, error statuses and header dispositions by ingress id, and the ids differ by topology (`epp`, `gateway`). So the SLO headers, which the guides leave without effect, are declared there, not in a guide's `parts/common.yaml`.
 - **Model parts are named by the configuration a client sees** (`qwen3-32b-ctx16k-parsers`), never by accelerator; their headers list the overlays that use them.

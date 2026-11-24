@@ -73,7 +73,7 @@ as `undeclared` without sending a request.
 | `chat_template_kwargs` effects, cache metric fallback | none | Not built: needs a template fixture and a metric contract |
 | Other Responses request options | none | Partly built: metadata echo, output logprobs, reasoning effort and structured output exist |
 | Valid `output_config.effort` reaching the model | none | Partly built: invalid-value rejection, an output-size effect probe (`messages_checks: [effort_effect]`) and `field_options.messages_effort_rendered` exist; the last needs prompt logprobs on Messages, which the LiteLLM gateway does not return |
-| Render pins measured on a real build | none | Not yet measured: precise-prefix-cache-routing declares render surfaces; its first run supplies the pins |
+| Render pins measured on a real build | none | Not yet measured: precise-prefix-cache-routing (GPU, AMD, XPU) and fast-model-actuation declare render surfaces; their first runs supply the pins |
 | Sanitized production-shaped prefix fixtures, cross-ingress render parity | none | Not built |
 | HTTP/2 framing | none | Not built: needs the `h2` package |
 | 429, 5xx and errors after a stream opens | none | Needs load or fault injection |

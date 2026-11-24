@@ -187,7 +187,8 @@ options explicitly. The caller waits on the Job itself and needs the `llmdv-trig
 CronJobs, create Jobs and ConfigMaps (the last for `--profile-file`, whose ConfigMap goes with
 the Job). Label a rollout run with an immutable deployment reference.
 
-On-demand runs are never `--compare` baselines ([docs/compare.md](../docs/compare.md)). A
+On-demand runs are never baselines for nightly runs, because their trigger differs
+([docs/compare.md](../docs/compare.md)). A
 triggered run can overlap a nightly one; run ids never collide. For on-demand runs only, suspend
 the CronJob (the example overlay has the patch).
 

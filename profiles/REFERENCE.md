@@ -551,8 +551,9 @@ What a run reports:
   stays `known`. Name a signal the failing response carries.
 - A pass is never labelled. An entry that labelled no failure although a case it covers ran is
   listed in the banner, `summary.md` and `outcome.json` (`verification.known.unmatched`): the fix
-  may have landed and the entry should go. An entry none of whose cases ran (the selection or a
-  `-k` left them out, or they skipped) is not listed, because the run says nothing about it. `llmdv compare` reports
+  may have landed and the entry should go. An entry none of whose cases reached a verdict (the selection
+  or a `-k` left them out, they skipped, they errored in setup or lost their local connection) is
+  not listed, because the run says nothing about it. `llmdv compare` reports
   a fix landing when a case the previous run labelled passes now, and never calls a regression
   known. See [docs/compare.md](../docs/compare.md).
 - `verdict.txt` in a failure bundle, `alerts.json` and the dashboard's failure groups carry the

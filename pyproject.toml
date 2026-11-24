@@ -53,7 +53,7 @@ s3 = ["boto3>=1.36"]
 # `s3` because ibm-cos-sdk is a boto3 fork of comparable size and `llmdv/output/ibm_cos.py` is
 # the only module that imports it -- an AWS-credentialled install should not carry it.
 ibm-cos = ["ibm-cos-sdk>=2.16.2"]
-# Keep Ruff in sync with the version pinned in ../.pre-commit-config.yaml. pytest-xdist runs
+# Keep Ruff in sync with the version pinned in .pre-commit-config.yaml. pytest-xdist runs
 # llmdv's own offline tests in parallel (`pytest tests -n auto`); it is only for developers, and
 # `llmdv verify` blocks it, so live verification stays serial wherever it is installed.
 dev = ["ruff==0.16.9", "pre-commit>=4.1", "pytest-xdist>=3.6"]
