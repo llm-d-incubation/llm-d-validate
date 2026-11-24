@@ -31,7 +31,9 @@
 #
 # The two router configurations differ only under saturation. llmdv sends one request at a time,
 # so a correct stack answers every case the same way under either; the two lanes share one
-# combination and are told apart with --identity flavor=evictable|holdback.
+# combination and are told apart with --identity flavor=evictable|holdback. Both run flow
+# control, which a client sees only as the x-llm-d-flow-queue-duration-ms response header
+# (declared below).
 #
 # The guide's claims (MT/README.md, MT/guide.yaml, .github/scripts/e2e/async-multitenant/) and
 # where each one lands. Router claims it shares with optimized-baseline (surfaces, streaming
@@ -68,6 +70,16 @@ capabilities:
   # OB/modelserver/gpu/vllm/base) does not pass vLLM's --enable-prompt-tokens-details. With no
   # cached_tokens, `affinity: routed` would fail on a correct stack for want of the field.
   cache_reuse: null
+
+headers:
+  # FROM docs: llm-d-router@main:pkg/epp/handlers/response.go:436-445 and
+  # pkg/epp/metadata/consts.go:74-76, the router build guides/env.sh pins (ROUTER_EPP_VERSION
+  # main). With the flowControl feature gate on, which both router values files set, the EPP adds
+  # this header, the time the request waited in flow control, to the response of every request
+  # flow control admits, before the first byte; without flow control it is absent. Keyed by the
+  # topology part's ingress id.
+  x-llm-d-flow-queue-duration-ms:
+    epp: promised
 
 # The cases this guide's lanes run by default (`llmdv verify --all` runs everything). They test
 # what a lane's own deployment can get wrong: the router path, the overlay's parsers and window,

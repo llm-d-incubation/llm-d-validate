@@ -10,7 +10,7 @@
 #   gke-cpu-gpu-sglang-native         gpu/sglang/native/cpu/gke
 # (overlay as ACCELERATOR_TYPE/MODEL_SERVER/CONNECTOR/VARIANT/INFRA_PROVIDER)
 # Identity flags per lane:
-#   gke-cpu-gpu-sglang-native         --identity accelerator=gpu --identity provider=gke
+#   gke-cpu-gpu-sglang-native         --identity accelerator=gpu --identity provider=gke --identity flavor=native/cpu
 #
 # sglang v0.5.22 with --enable-hierarchical-cache and --page-size=64; unlike
 # optimized-baseline's NVIDIA SGLang overlay it does not set SGLANG_RUST_SERVER (FROM values:

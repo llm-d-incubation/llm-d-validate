@@ -1,0 +1,53 @@
+# The keda-epp guide's llm-d router in standalone mode (the client reaches the EPP's own
+# listener, with no flow control): vLLM serving Qwen/Qwen3-32B with the qwen3 reasoning parser
+# and the hermes tool parser, autoscaled by KEDA on in-flight requests between one and two
+# replicas.
+#
+# STATUS: WRITTEN, NOT RUN. llm-d 9ca8ff0. Composed from the guide's shipped config and the API
+# references. Only the router layer has been measured, and that with optimized-baseline's router
+# config (on kind, with a simulator engine; see ../parts/topology/standalone.yaml).
+#
+# CI lanes that deploy this configuration (llm-d's nightly-e2e-workload-autoscaling-keda-epp-<lane>
+# workflows; standalone mode, with a custom_deploy_script):
+#   ibm-acc-gpu-vllm-x   reusable-nightly-e2e-openshift,
+#                        guides/workload-autoscaling/scripts/nightly-deploy-ocp-keda-epp.sh:
+#                        guides/optimized-baseline/modelserver/gpu/vllm/base, optimized-baseline's
+#                        router values, no flow control, inflight ScaledObject; Service
+#                        <release>-inflight-epp. The workflow also passes image_override
+#                        docker.io/vllm/vllm-openai:nightly to the reusable workflow, whose effect
+#                        is outside this repository
+# Without flow control the router adds no x-llm-d-flow-queue-duration-ms header, so this lane does
+# not share vllm-qwen3-32b-parsers-queue-standalone.yaml with the gke lane; no header is declared
+# for it here, since the router's other headers are the topology part's.
+#
+# How a lane runs it, after the deploy script:
+#   export LLMDV_EPP_URL=http://<release>-inflight-epp.<namespace>.svc.cluster.local
+#   # or from outside the cluster:
+#   #   kubectl port-forward -n <namespace> svc/<release>-inflight-epp 18080:80 &
+#   #   export LLMDV_EPP_URL=http://localhost:18080
+#   llmdv profile validate profiles/llm-d/keda-epp/vllm-qwen3-32b-parsers-inflight-standalone.yaml
+#   llmdv verify --profile profiles/llm-d/keda-epp/vllm-qwen3-32b-parsers-inflight-standalone.yaml \
+#     --identity accelerator=gpu --identity provider=base --identity flavor=inflight
+
+extends:
+  - ../parts/base.yaml
+  - ../parts/topology/standalone.yaml
+  - ../parts/engines/vllm.yaml
+  - ../parts/models/qwen3-32b-parsers.yaml
+  - ../parts/sentinels/unmeasured-with-tools.yaml
+  - parts/common.yaml
+
+name: keda-epp-vllm-qwen3-32b-parsers-inflight-standalone
+
+model:
+  # FROM values: the overlays' own flag values (--reasoning-parser=qwen3,
+  # --tool-call-parser=hermes). The model part declares the shape a client sees; the names
+  # belong to the engine, so they are stated here.
+  reasoning:
+    parser: qwen3
+    # Inferred from another deployment (vLLM 0.32 behind an llm-d router), where the field is
+    # `reasoning`, and `reasoning_content` is absent. Not yet observed on this guide's vLLM
+    # builds; the first run settles it.
+    field: reasoning
+  tools:
+    parser: hermes

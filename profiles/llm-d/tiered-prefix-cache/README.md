@@ -8,23 +8,23 @@ The overlay is `modelserver/<ACCELERATOR_TYPE>/<MODEL_SERVER>/<CONNECTOR>/<VARIA
 
 | CI lane | Overlay | Profile | Identity flags |
 | --- | --- | --- | --- |
-| `cks-cpu-gpu-vllm-lmcache` | `gpu/vllm/lmcache-connector/cpu/base` | `vllm-qwen3-32b-parsers-standalone` | `--identity accelerator=gpu --identity provider=base --identity flavor=lmcache-cpu` |
-| `cks-cpu-gpu-vllm-native` | `gpu/vllm/native/cpu/base` | `vllm-qwen3-32b-parsers-standalone` | `--identity accelerator=gpu --identity provider=base --identity flavor=native-cpu` |
-| `gke-cpu-gpu-vllm-lmcache` | `gpu/vllm/lmcache-connector/cpu/gke` | `vllm-qwen3-32b-parsers-standalone` | `--identity accelerator=gpu --identity provider=gke --identity flavor=lmcache-cpu` |
-| `gke-cpu-gpu-vllm-native` | `gpu/vllm/native/cpu/gke` | `vllm-qwen3-32b-parsers-standalone` | `--identity accelerator=gpu --identity provider=gke --identity flavor=native-cpu` |
-| `ibm-cpu-gpu-vllm-lmcache` | `gpu/vllm/lmcache-connector/cpu/ocp` | `vllm-qwen3-32b-parsers-standalone` | `--identity accelerator=gpu --identity provider=ocp --identity flavor=lmcache-cpu` |
-| `ibm-cpu-gpu-vllm-native` | `gpu/vllm/native/cpu/ocp` | `vllm-qwen3-32b-parsers-standalone` | `--identity accelerator=gpu --identity provider=ocp --identity flavor=native-cpu` |
-| `amd-cpu-rocm-vllm-lmcache` | `amd/vllm/lmcache-connector/cpu/amd-ci` | `vllm-qwen3-32b-inline-standalone` | `--identity accelerator=amd --identity provider=amd-ci --identity flavor=lmcache-cpu` |
-| `amd-cpu-rocm-vllm-native` | `amd/vllm/native/cpu/amd-ci` | `vllm-qwen3-32b-inline-standalone` | `--identity accelerator=amd --identity provider=amd-ci --identity flavor=native-cpu` |
-| `amd-fs-rocm-vllm-lmcache` | `amd/vllm/lmcache-connector/fs/amd-ci` | `vllm-qwen3-32b-inline-standalone` | `--identity accelerator=amd --identity provider=amd-ci --identity flavor=lmcache-fs` |
-| `amd-fs-rocm-vllm-native` | `amd/vllm/native/fs/amd-ci` | `vllm-qwen3-32b-inline-standalone` | `--identity accelerator=amd --identity provider=amd-ci --identity flavor=native-fs` |
-| `gke-cpu-tpu-vllm-native` | `tpu/v5p/vllm/native/cpu` (no provider; includes `base`) | `vllm-qwen3-32b-inline-standalone` | `--identity accelerator=tpu/v5p --identity provider=base` |
-| `intel-acc-xpu-vllm-native` | `xpu/vllm/native/cpu/base` | `vllm-qwen3-32b-inline-standalone` | `--identity accelerator=xpu --identity provider=base` |
-| `intel-acc-xpu-vllm-lmcache` | `xpu/vllm/lmcache-connector/cpu/base` | `vllm-qwen3-8b-ctx20k-inline-standalone` | `--identity accelerator=xpu --identity provider=base` |
-| `gke-cpu-gpu-sglang-native` | `gpu/sglang/native/cpu/gke` | `sglang-qwen3-32b-parsers-standalone` | `--identity accelerator=gpu --identity provider=gke` |
-| `gke-cpu-tpu-sglang-native` | `tpu/v5p/sglang/native/cpu` (no provider; includes `base`) | `sglang-qwen3-32b-ctx16k-parsers-standalone` | `--identity accelerator=tpu/v5p --identity provider=base` |
+| `cks-cpu-gpu-vllm-lmcache` | `gpu/vllm/lmcache-connector/cpu/base` | `vllm-qwen3-32b-parsers-standalone` | `--identity accelerator=gpu --identity provider=base --identity flavor=lmcache-connector/cpu` |
+| `cks-cpu-gpu-vllm-native` | `gpu/vllm/native/cpu/base` | `vllm-qwen3-32b-parsers-standalone` | `--identity accelerator=gpu --identity provider=base --identity flavor=native/cpu` |
+| `gke-cpu-gpu-vllm-lmcache` | `gpu/vllm/lmcache-connector/cpu/gke` | `vllm-qwen3-32b-parsers-standalone` | `--identity accelerator=gpu --identity provider=gke --identity flavor=lmcache-connector/cpu` |
+| `gke-cpu-gpu-vllm-native` | `gpu/vllm/native/cpu/gke` | `vllm-qwen3-32b-parsers-standalone` | `--identity accelerator=gpu --identity provider=gke --identity flavor=native/cpu` |
+| `ibm-cpu-gpu-vllm-lmcache` | `gpu/vllm/lmcache-connector/cpu/ocp` | `vllm-qwen3-32b-parsers-standalone` | `--identity accelerator=gpu --identity provider=ocp --identity flavor=lmcache-connector/cpu` |
+| `ibm-cpu-gpu-vllm-native` | `gpu/vllm/native/cpu/ocp` | `vllm-qwen3-32b-parsers-standalone` | `--identity accelerator=gpu --identity provider=ocp --identity flavor=native/cpu` |
+| `amd-cpu-rocm-vllm-lmcache` | `amd/vllm/lmcache-connector/cpu/amd-ci` | `vllm-qwen3-32b-inline-standalone` | `--identity accelerator=amd --identity provider=amd-ci --identity flavor=lmcache-connector/cpu` |
+| `amd-cpu-rocm-vllm-native` | `amd/vllm/native/cpu/amd-ci` | `vllm-qwen3-32b-inline-standalone` | `--identity accelerator=amd --identity provider=amd-ci --identity flavor=native/cpu` |
+| `amd-fs-rocm-vllm-lmcache` | `amd/vllm/lmcache-connector/fs/amd-ci` | `vllm-qwen3-32b-inline-standalone` | `--identity accelerator=amd --identity provider=amd-ci --identity flavor=lmcache-connector/fs` |
+| `amd-fs-rocm-vllm-native` | `amd/vllm/native/fs/amd-ci` | `vllm-qwen3-32b-inline-standalone` | `--identity accelerator=amd --identity provider=amd-ci --identity flavor=native/fs` |
+| `gke-cpu-tpu-vllm-native` | `tpu/v5p/vllm/native/cpu` (no provider; includes `base`) | `vllm-qwen3-32b-inline-standalone` | `--identity accelerator=tpu/v5p --identity provider=base --identity flavor=native/cpu` |
+| `intel-acc-xpu-vllm-native` | `xpu/vllm/native/cpu/base` | `vllm-qwen3-32b-inline-standalone` | `--identity accelerator=xpu --identity provider=base --identity flavor=native/cpu` |
+| `intel-acc-xpu-vllm-lmcache` | `xpu/vllm/lmcache-connector/cpu/base` | `vllm-qwen3-8b-ctx20k-inline-standalone` | `--identity accelerator=xpu --identity provider=base --identity flavor=lmcache-connector/cpu` |
+| `gke-cpu-gpu-sglang-native` | `gpu/sglang/native/cpu/gke` | `sglang-qwen3-32b-parsers-standalone` | `--identity accelerator=gpu --identity provider=gke --identity flavor=native/cpu` |
+| `gke-cpu-tpu-sglang-native` | `tpu/v5p/sglang/native/cpu` (no provider; includes `base`) | `sglang-qwen3-32b-ctx16k-parsers-standalone` | `--identity accelerator=tpu/v5p --identity provider=base --identity flavor=native/cpu` |
 
-`flavor` is `<connector>-<tier>` and is passed only where two lanes would otherwise have the same profile, accelerator and provider: the six NVIDIA vLLM lanes (two connectors per provider) and the four AMD lanes (one provider, two connectors by two tiers). The TPU and XPU vLLM lanes share `vllm-qwen3-32b-inline-standalone` with AMD but differ in accelerator; the two XPU lanes differ in profile.
+`accelerator` is the lane's `ACCELERATOR_TYPE` and `provider` the `INFRA_PROVIDER` folder it renders (`base` for the two TPU lanes, which set none). `flavor` is `<CONNECTOR>/<VARIANT>`, the workflow's `connector` and `offloading_target` in overlay-path order, and every lane passes it, as [../README.md](../README.md) sets out. Lanes that would otherwise share a profile, accelerator and provider need it to stay apart: the six NVIDIA vLLM lanes (two connectors per provider) and the four AMD lanes (one provider, two connectors by two tiers).
 
 ```sh
 export LLMDV_EPP_URL=http://<GUIDE_NAME>-epp.<namespace>.svc.cluster.local   # GUIDE_NAME=tiered-prefix-cache

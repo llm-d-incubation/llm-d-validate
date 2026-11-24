@@ -9,8 +9,8 @@
 # <INFRA_PROVIDER>/ (FROM values: G/guide.yaml env.static and deploy.modelserver). CONNECTOR is
 # the offloading implementation (native, lmcache-connector) and VARIANT the tier (cpu = CPU RAM,
 # fs = CPU RAM plus a shared filesystem on a ReadWriteMany PVC). Neither changes the model, the
-# window or the parsers a client sees, so lanes that differ only in them share a combination and
-# are told apart with --identity flavor=<CONNECTOR short name>-<VARIANT> (README.md).
+# window or the parsers a client sees, so lanes that differ only in them share a combination. Every
+# lane passes --identity flavor=<CONNECTOR>/<VARIANT> (README.md), which keeps them apart.
 #
 # The router, as every lane configures it (FROM values: G/router/single-host/
 # tiered-prefix-cache-cpu.values.yaml; no lane sets HOST_TYPE=multi-host):

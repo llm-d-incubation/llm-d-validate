@@ -1,10 +1,11 @@
 # The keda-epp guide's llm-d router in standalone mode (the client reaches the EPP's own
 # listener, with flow control on): vLLM serving Qwen/Qwen3-32B with no parsers: inline <think>,
-# no tool calls, autoscaled by KEDA between one and two replicas.
+# no tool calls, autoscaled by KEDA on the flow-control queue between one and two replicas.
 #
 # STATUS: WRITTEN, NOT RUN. llm-d 9ca8ff0. Composed from the guide's shipped config and the API
 # references. Only the router layer has been measured, and that with optimized-baseline's router
-# config (on kind, with a simulator engine; see ../parts/topology/standalone.yaml).
+# config, without flow control (on kind, with a simulator engine; see
+# ../parts/topology/standalone.yaml).
 #
 # CI lanes that deploy this configuration (llm-d's nightly-e2e-workload-autoscaling-keda-epp-<lane>
 # workflows; standalone mode, with a custom_deploy_script):
@@ -21,7 +22,7 @@
 #   #   export LLMDV_EPP_URL=http://localhost:18080
 #   llmdv profile validate profiles/llm-d/keda-epp/vllm-qwen3-32b-inline-standalone.yaml
 #   llmdv verify --profile profiles/llm-d/keda-epp/vllm-qwen3-32b-inline-standalone.yaml \
-#     --identity accelerator=amd --identity provider=base
+#     --identity accelerator=amd --identity provider=base --identity flavor=queue
 
 extends:
   - ../parts/base.yaml
@@ -32,3 +33,14 @@ extends:
   - parts/common.yaml
 
 name: keda-epp-vllm-qwen3-32b-inline-standalone
+
+headers:
+  # FROM docs: llm-d-router@main:pkg/epp/handlers/response.go:436-445 and
+  # pkg/epp/metadata/consts.go:74-76, the router build guides/env.sh pins (ROUTER_EPP_VERSION
+  # main). With the flowControl feature gate on, which this lane's router values set
+  # (guides/workload-autoscaling/keda-epp/optimized-baseline/router.values.yaml; see
+  # parts/common.yaml), the EPP adds this header, the time the request waited in flow control, to
+  # the response of every request flow control admits, before the first byte; without flow
+  # control it is absent. Keyed by the topology part's ingress id.
+  x-llm-d-flow-queue-duration-ms:
+    epp: promised

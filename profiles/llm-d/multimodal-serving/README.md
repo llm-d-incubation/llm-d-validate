@@ -4,15 +4,15 @@ Profiles for llm-d's [multimodal-serving](https://github.com/llm-d/llm-d/tree/ma
 
 ## Lanes
 
-Every configuration the guide marks `validated` and a nightly lane deploys looks the same to a client: vLLM v0.31.0 serving `Qwen/Qwen3-VL-32B-Instruct` at its own window, with no reasoning or tool parser. One combination covers the three lanes, and `--identity flavor=<topology>` tells the aggregated GPU lane and the E/PD GPU lane apart (they share accelerator and provider). The TPU lane passes `flavor=aggregation` too, so the topology is recorded the same way on every run.
+Every configuration the guide marks `validated` and a nightly lane deploys looks the same to a client: vLLM v0.31.0 serving `Qwen/Qwen3-VL-32B-Instruct` at its own window, with no reasoning or tool parser. One combination covers the three lanes. `accelerator` is the lane's `ACCELERATOR_TYPE`, `provider` the `INFRA_PROVIDER` folder it renders, and `flavor` the guide's topology as the overlay path spells it: the topology folder, then `TOPOLOGY` where it adds a folder of its own (`aggregation`, `e-disaggregation/e-pd`). Every lane passes it; it is what tells the aggregated GPU lane and the E/PD GPU lane apart (they share accelerator and provider).
 
 | CI lane (`nightly-e2e-multimodal-serving-<lane>`) | Overlay it renders | Profile | Identity flags |
 | --- | --- | --- | --- |
 | `aggregation-gke-acc-gpu-vllm-x` | `aggregation/modelserver/gpu/vllm/gke` | `vllm-qwen3-vl-32b-instruct-inline-standalone` | `--identity accelerator=gpu --identity provider=gke --identity flavor=aggregation` |
-| `aggregation-gke-acc-tpu-vllm-x` | `aggregation/modelserver/tpu/v7/vllm/qwen3-vl` | `vllm-qwen3-vl-32b-instruct-inline-standalone` | `--identity accelerator=tpu/v7 --identity provider=gke --identity flavor=aggregation` |
-| `e-disaggregation-gke-acc-gpu-vllm-x` | `e-disaggregation/modelserver/gpu/vllm/e-pd/gke` | `vllm-qwen3-vl-32b-instruct-inline-standalone` | `--identity accelerator=gpu --identity provider=gke --identity flavor=e-pd` |
+| `aggregation-gke-acc-tpu-vllm-x` | `aggregation/modelserver/tpu/v7/vllm/qwen3-vl` | `vllm-qwen3-vl-32b-instruct-inline-standalone` | `--identity accelerator=tpu/v7 --identity provider=qwen3-vl --identity flavor=aggregation` |
+| `e-disaggregation-gke-acc-gpu-vllm-x` | `e-disaggregation/modelserver/gpu/vllm/e-pd/gke` | `vllm-qwen3-vl-32b-instruct-inline-standalone` | `--identity accelerator=gpu --identity provider=gke --identity flavor=e-disaggregation/e-pd` |
 
-The TPU lane's `infra_provider` input is `qwen3-vl`, a model folder rather than a provider; the guide's README names `tpu/v7/vllm/gke` for that accelerator, which wraps `qwen3-vl` and renders the same manifests, and the lane runs on GKE. Its runs are recorded as `provider=gke`.
+The TPU lane's `infra_provider` input is `qwen3-vl`, and the folder it renders is `tpu/v7/vllm/qwen3-vl`, so its runs are recorded as `provider=qwen3-vl`: the folder the lane renders, not the one `guide.yaml` lists (see Upstream notes). The E/PD lane's `infra_provider` input is `e-pd/gke`, the workflow's join of `TOPOLOGY` and `INFRA_PROVIDER`; `guide.yaml` keeps them apart, so `e-pd` goes in the flavor and the provider is `gke`.
 
 The client calls the `<GUIDE_NAME>-epp` Service on port 80, in standalone mode.
 
@@ -35,6 +35,6 @@ The client calls the `<GUIDE_NAME>-epp` Service on port 80, in standalone mode.
 
 ## Upstream notes
 
-- `nightly-e2e-multimodal-serving-aggregation-gke-acc-tpu-vllm-x.yaml` passes `infra_provider: qwen3-vl`, which is not one of `guide.yaml`'s `INFRA_PROVIDER` values (`base`, `gke`, `coreweave`); the README's overlay table names `tpu/v7/vllm/gke` for TPU v7. The two render identically today.
+- `nightly-e2e-multimodal-serving-aggregation-gke-acc-tpu-vllm-x.yaml` passes `infra_provider: qwen3-vl`, which is not one of `guide.yaml`'s `INFRA_PROVIDER` values (`base`, `gke`, `coreweave`), and `guide.yaml`'s support table lists only `gke` as the provider for `tpu/v7`; the README's overlay table names `tpu/v7/vllm/gke` for TPU v7, which wraps `qwen3-vl`. The two render identically today.
 - The E/PD decode pods' routing sidecar runs `ghcr.io/llm-d/llm-d-router-disagg-sidecar:main` (`imagePullPolicy: Always`), a floating tag, so two runs of the same llm-d commit can run different sidecar builds. `e-disaggregation/modelserver/gpu/vllm/e-pd/base/kustomization.yaml` takes the `recipes/modelserver/components/images/routing-sidecar/nightly` component (tag `main`) rather than its `release` sibling (tag `v1.0.0`), while it takes the `release` vLLM image.
 - `unhappy.invalid_image` is expected to fail on the E/PD lane, and that is a finding for the team, not an excuse; the selection is unchanged. The router's `always-disagg-multimodal-decider` (`e-disaggregation/router/vllm/e-pd-disaggregation.values.yaml:21-25`) sends media requests through the decode pod's routing sidecar, which turns an encoder's non-2xx answer, such as vLLM's 400 for a corrupt image, into its own 502 (llm-d-router main@a490c31e, the `:main` image above: `connector_ec_common.go:298`, `connector_ec_nixl.go:136-144`). Text requests carry no encoder header and pass through unchanged (`dispatch.go:264-285`).
