@@ -457,7 +457,7 @@ def test_the_known_top_level_keys_are_the_profile_s_fields_and_extends():
     assert set(loader.TOP_LEVEL_KEYS) == {
         "schema", "name", "vantage", "environment", "guide", "engine", "gateway", "model",
         "ingresses", "capabilities",
-        "headers", "clients", "fleet_policy", "fleet", "known_failures", "extends",
+        "headers", "clients", "fleet_policy", "fleet", "known_failures", "selection", "extends",
     }  # fmt: skip
 
 

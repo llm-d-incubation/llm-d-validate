@@ -21,6 +21,7 @@ import os
 import re
 import shutil
 import signal
+import subprocess
 import sys
 import threading
 import time
@@ -179,6 +180,12 @@ def add_selection_arguments(parser: argparse.ArgumentParser) -> None:
     )
     parser.add_argument("-k", dest="keyword", default=None, help="pytest keyword expression")
     parser.add_argument("-m", dest="marker", default=None, help="pytest marker expression")
+    parser.add_argument(
+        "--all",
+        action="store_true",
+        help="ignore the profile's `selection` and run every case; the selectors above still "
+        "narrow",
+    )
 
 
 @dataclass
@@ -291,6 +298,11 @@ def _verify(args: argparse.Namespace, run: _Run) -> int:
         log.error("%s", exc)
         return USAGE
     run.outcome.topology = profile.topology().as_record()
+    run.outcome.selection = {
+        "cases": list(profile.selection),
+        "all": args.all,
+        "in_force": bool(profile.selection) and not args.all,
+    }
     run.outcome.write(run_dir)
 
     diagnostics = loader.validate(profile)
@@ -321,6 +333,11 @@ def _verify(args: argparse.Namespace, run: _Run) -> int:
     if bad:
         for message in bad:
             log.error("%s", message)
+        return USAGE
+    # So are the profile's selection globs: a typo is exit 2 before preflight sends a request.
+    unmatched = _unmatched_selection(profile, args)
+    if unmatched:
+        log.error("%s", unmatched)
         return USAGE
     run.profile = profile
 
@@ -848,6 +865,28 @@ def _unknown_selectors(profile, args) -> list[str]:
     return problems
 
 
+def _unmatched_selection(profile: Profile, args: argparse.Namespace) -> str | None:
+    """Why the profile's `selection` names a glob that matches no case, or None.
+
+    The plugin checks the globs against the collected cases, which in a run happens only after
+    preflight has contacted the fleet. So verify first asks `llmdv plan`, which collects the
+    same cases offline, in a child process so that this run's pytest session starts clean. Any
+    other problem plan reports is left for the run itself to report.
+    """
+    if not profile.selection or getattr(args, "all", False):
+        return None
+    command = [sys.executable, "-m", "llmdv.cli.main", "plan", "--profile", args.profile, "--json"]
+    for ingress_id in args.ingress or []:
+        command += ["--ingress", ingress_id]
+    result = subprocess.run(command, capture_output=True, text=True, check=False)  # noqa: S603 -- our own interpreter and CLI
+    if result.returncode != USAGE:
+        return None
+    for line in result.stderr.splitlines():
+        if "selection: " in line:
+            return line[line.index("selection: ") :]
+    return None
+
+
 # pytest's own exit codes. Collapsing these into "tests failed" would report a llmdv defect or a
 # bad selection as a fleet verdict, which is exactly the confusion the exit codes exist to end.
 def _map_pytest_exit(code: int, interrupted: bool = False) -> int:
@@ -867,7 +906,7 @@ def _map_pytest_exit(code: int, interrupted: bool = False) -> int:
         log.error("pytest hit an internal error -- this is a llmdv defect, not a fleet result")
         return INTERNAL
     if code == 4:
-        log.error("pytest usage error in the arguments llmdv built")
+        log.error("pytest refused the run; the error above says why")
         return USAGE
     if code == 5:
         log.warning("no tests were collected; check --ingress/--client/--surface and -k/-m")
@@ -935,6 +974,8 @@ def selection_argv(args: argparse.Namespace) -> list[str]:
         argv += ["--llmdv-client", client_id]
     for surface in args.surface:
         argv += ["--llmdv-surface", surface]
+    if getattr(args, "all", False):
+        argv += ["--llmdv-all"]
     if args.keyword:
         argv += ["-k", args.keyword]
     if args.marker:

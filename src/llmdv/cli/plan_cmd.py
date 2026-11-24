@@ -61,11 +61,13 @@ class _Planner:
 
     def __init__(self) -> None:
         self.rows: list[dict] = []
+        self.left_out = 0
 
     def pytest_collection_finish(self, session) -> None:
         from ..plugin import plan_row
 
         self.rows = [plan_row(item) for item in session.items]
+        self.left_out = getattr(session.config, "_llmdv_left_out", 0)
 
 
 def cmd_plan(args: argparse.Namespace) -> int:
@@ -98,7 +100,7 @@ def cmd_plan(args: argparse.Namespace) -> int:
     if code != OK:
         return code
 
-    document = _document(profile.name, args, planner.rows)
+    document = _document(profile.name, args, planner.rows, profile.selection, planner.left_out)
     if args.json:
         emit(json.dumps(document, indent=2))
     else:
@@ -107,7 +109,9 @@ def cmd_plan(args: argparse.Namespace) -> int:
     return OK
 
 
-def _document(name: str, args: argparse.Namespace, rows: list[dict]) -> dict:
+def _document(
+    name: str, args: argparse.Namespace, rows: list[dict], globs: tuple[str, ...], left_out: int
+) -> dict:
     by_suite: dict[str, dict[str, int]] = {}
     for row in rows:
         tally = by_suite.setdefault(row["suite"] or "other", {"run": 0, "skip": 0})
@@ -125,6 +129,10 @@ def _document(name: str, args: argparse.Namespace, rows: list[dict]) -> dict:
             "keyword": args.keyword,
             "marker": args.marker,
             "pytest_args": [item for item in (args.pytest_args or []) if item != "--"],
+            "all": args.all,
+            # The profile's own selection and how many collected cases it deselected, which
+            # are in neither `counts` nor `cases`.
+            "profile": {"cases": list(globs), "left_out": left_out},
         },
         "counts": {
             "total": len(rows),
@@ -143,8 +151,11 @@ def _text(document: dict, counts_only: bool) -> list[str]:
     lines = [
         f"{document['profile']['name']}: {counts['total']} cases, "
         f"{counts['run']} would run, {counts['skip']} would skip before running",
-        "",
     ]
+    left_out = document["selection"]["profile"]["left_out"]
+    if left_out:
+        lines.append(f"{left_out} left out by the profile's selection (--all runs them)")
+    lines.append("")
     width = max([len("suite"), *map(len, counts["by_suite"])])
     lines.append(f"  {'suite'.ljust(width)}   run  skip")
     for suite, tally in counts["by_suite"].items():

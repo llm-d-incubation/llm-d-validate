@@ -74,12 +74,20 @@ llmdv verify --profile P --ingress litellm     # one layer
 llmdv verify --profile P -m contract           # check the profile against reality
 llmdv verify --profile P -m "not disruptive"   # leave the fleet alone
 llmdv verify --profile P -k discovery          # a pytest keyword expression
+llmdv verify --profile P --all                 # every case, setting the profile's selection aside
 llmdv verify --profile P -- -x --tb=long       # anything after -- goes to pytest
 ```
 
 Repeating a selector is a union; different selectors intersect. `-k` and `-m` can narrow a
 selection but never widen it. The ingress id is the parametrisation id, so `-k router` keeps one
 column.
+
+A profile can declare a [`selection`](../profiles/REFERENCE.md#selection) of case-id globs, and
+then `verify`, `plan` and `job` run only the cases it names; every selector above still narrows
+within it. `--all` sets it aside and runs every case. The cases it leaves out are deselected, not
+skipped: they appear in no result and no skip class, and the run says how many. A glob that
+matches no case exits `2` and names it, before preflight sends a request. `outcome.json` records
+the selection under `selection`.
 
 `-m` accepts one marker per suite package under `src/llmdv/suites/`;
 [docs/coverage.md](coverage.md#coverage) lists them. A case whose `case_id` starts with another
@@ -106,8 +114,11 @@ The plan is `verify`'s own collection and the same skip decisions it makes befor
 `undeclared` surfaces and capabilities, `not_implemented`, and `excluded_by_policy`. A case
 planned to run can still skip from inside once it runs, for a reason only the run decides: a
 `throttled` 429, a `requires_instrumentation` disposition, or a declaration the case reads
-itself. A selector error exits `2` exactly as it does for `verify`. `profile show --matrix` is
-the coarser view: surfaces per ingress, not cases.
+itself. A selector error exits `2` exactly as it does for `verify`. Under a profile's
+`selection` the plan's first lines say how many cases it left out and that `--all` runs them;
+the `--json` document carries the globs and that count under `selection.profile`, and the cases
+left out are in neither `counts` nor `cases`. `profile show --matrix` is the coarser view:
+surfaces per ingress, not cases.
 
 ### Driving a real Claude Code client
 
