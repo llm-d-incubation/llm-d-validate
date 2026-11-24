@@ -1071,7 +1071,10 @@ class Profile:
         loaded profile this never raises; a profile built in code is checked by `validate`.
         """
         if self.declares_fronts:
-            return Topology.declare((item.id, item.fronts or ()) for item in self.ingresses)
+            return Topology.declare(
+                ((item.id, item.fronts or ()) for item in self.ingresses),
+                {item.id: _KIND_DEPTH[item.kind] for item in self.ingresses},
+            )
         return Topology.derive((item.id, _KIND_DEPTH[item.kind]) for item in self.ingresses)
 
     def chain(self) -> list[str]:

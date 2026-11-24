@@ -63,14 +63,21 @@ class Topology:
         return cls(order=tuple(name for name, _ in ranked), fronts=fronts)
 
     @classmethod
-    def declare(cls, layers: Iterable[tuple[str, Iterable[str]]]) -> Topology:
+    def declare(
+        cls,
+        layers: Iterable[tuple[str, Iterable[str]]],
+        depths: Mapping[str, int] | None = None,
+    ) -> Topology:
         """The graph a profile declares, from `(id, fronts)` in declaration order.
 
-        Raises ProfileError naming the first problem, checked in this order: a `fronts` entry
-        naming no ingress, an id listed twice in one `fronts`, an ingress that fronts itself, a
-        cycle (reported as its path), and, with more than one ingress, an ingress on no edge at
-        all. `order` is topological, built by always taking the earliest-declared ingress that
-        is ready, so every edge points later in it.
+        Raises ProfileError naming every bad `fronts` entry: one naming no ingress, an id listed
+        twice, an ingress that fronts itself, and an edge to an ingress at a shallower position
+        than its own (given `depths`: an engine cannot front a router). Only once every entry is
+        good is the graph itself checked, since those checks read the graph the entries
+        describe and a typo would otherwise also strand the ingress it meant: a cycle (reported
+        as its path) and, with more than one ingress, an ingress on no edge at all. `order` is
+        topological, built by always taking the earliest-declared ingress that is ready, so
+        every edge points later in it.
 
         An id declared twice is the loader's to refuse; here its first declaration stands.
         """
@@ -81,28 +88,44 @@ class Topology:
                 fronts[name] = tuple(targets)
                 where[name] = f"ingresses[{index}]({name})"
         names = list(fronts)
+        problems: list[str] = []
+        # The edges that name a known ingress other than the one declaring them, once each:
+        # what the cycle and connection checks read, so one bad entry is reported once.
+        edges: dict[str, tuple[str, ...]] = {}
         for name in names:
+            kept: list[str] = []
             for position, target in enumerate(fronts[name]):
+                at = f"{where[name]}.fronts[{position}]"
                 if target not in fronts:
-                    raise ProfileError(f"{where[name]}.fronts[{position}]: no ingress {target!r}")
-        for name in names:
-            for position, target in enumerate(fronts[name]):
-                if target in fronts[name][:position]:
-                    raise ProfileError(f"{where[name]}.fronts[{position}]: lists {target!r} twice")
-        for name in names:
-            if name in fronts[name]:
-                raise ProfileError(f"{where[name]}.fronts: lists itself")
-        cycle = _cycle(names, fronts)
+                    problems.append(f"{at}: no ingress {target!r}")
+                elif target in fronts[name][:position]:
+                    problems.append(f"{at}: lists {target!r} twice")
+                elif target == name:
+                    problems.append(f"{where[name]}.fronts: lists itself")
+                else:
+                    if depths is not None and depths[target] < depths[name]:
+                        problems.append(
+                            f"{at}: {target!r} is at a shallower position than {name!r}; "
+                            "an ingress fronts only ingresses at its own position or deeper"
+                        )
+                    kept.append(target)
+            edges[name] = tuple(kept)
+        if problems:
+            raise ProfileError(*problems)
+        cycle = _cycle(names, edges)
         if cycle:
-            raise ProfileError(f"ingresses: fronts form a cycle: {' -> '.join(cycle)}")
+            problems.append(f"ingresses: fronts form a cycle: {' -> '.join(cycle)}")
         if len(names) > 1:
             connected = {target for targets in fronts.values() for target in targets}
             connected |= {name for name, targets in fronts.items() if targets}
             for name in names:
                 if name not in connected:
-                    raise ProfileError(
+                    problems.append(
                         f"{where[name]}: on no edge; it fronts nothing and nothing fronts it"
                     )
+        if problems:
+            raise ProfileError(*problems)
+        fronts = edges
         # Kahn's algorithm, always taking the earliest-declared ingress that is ready: a heap of
         # declaration positions, so a long chain orders in one pass.
         position = {name: index for index, name in enumerate(names)}

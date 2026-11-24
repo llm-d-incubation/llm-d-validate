@@ -192,11 +192,23 @@ def test_a_bad_graph_in_a_profile_built_in_code_is_a_validation_error(tmp_path):
 
 
 def test_a_declared_cycle_is_named_by_its_path(tmp_path):
-    text = MINIMAL.replace("    kind: engine\n", "    kind: engine\n    fronts: [epp]\n")
-    path = write(tmp_path, text + ROUTER + "    fronts: [direct]\n")
+    """Two routers fronting each other: a cycle at one position, which only the cycle check
+    catches (an engine fronting a router is refused as against the positions first)."""
+    text = MINIMAL.replace("    kind: engine\n", "    kind: engine\n    fronts: []\n")
+    sidecar = "  - id: sidecar\n    kind: router\n    base_url: http://localhost:9996\n"
+    path = write(
+        tmp_path,
+        text + ROUTER + "    fronts: [sidecar]\n" + sidecar + "    fronts: [epp, direct]\n",
+    )
     result = run_llmdv("profile", "validate", str(path))
     assert result.returncode == 2, result.stderr
-    assert "fronts form a cycle: direct -> epp -> direct" in result.stdout + result.stderr
+    assert "fronts form a cycle: epp -> sidecar -> epp" in result.stdout + result.stderr
+
+
+def test_an_engine_fronting_a_router_is_refused_at_load(tmp_path):
+    text = MINIMAL.replace("    kind: engine\n", "    kind: engine\n    fronts: [epp]\n")
+    with pytest.raises(loader.ProfileError, match="'epp' is at a shallower position than 'direct'"):
+        loader.load(write(tmp_path, text + ROUTER + "    fronts: []\n"))
 
 
 def test_negative_context_length_is_an_invalid_profile(tmp_path):

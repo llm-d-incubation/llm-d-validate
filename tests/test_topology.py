@@ -527,17 +527,60 @@ def test_behind_is_everything_reachable_in_order():
             [("epp", ("decode",)), ("decode", ()), ("prefill", ())],
             "ingresses[2](prefill): on no edge; it fronts nothing and nothing fronts it",
         ),
-        # Checked in order: the unknown id is named before the cycle and the loner.
+        # Every bad entry is named; the cycle and the loner wait until the entries are good.
         (
             [("a", ("b",)), ("b", ("a", "x")), ("c", ())],
             "ingresses[1](b).fronts[1]: no ingress 'x'",
         ),
     ],
 )
-def test_a_declared_graph_that_is_not_one_names_its_first_problem(layers, problem):
+def test_a_declared_graph_that_is_not_one_names_its_problem(layers, problem):
     with pytest.raises(loader.ProfileError) as caught:
         Topology.declare(layers)
     assert caught.value.problems == (problem,)
+
+
+def test_every_bad_fronts_entry_is_named_in_one_error():
+    layers = [("gw", ("rtr", "gw")), ("rtr", ("e", "e", "ghost")), ("e", ())]
+    with pytest.raises(loader.ProfileError) as caught:
+        Topology.declare(layers)
+    assert caught.value.problems == (
+        "ingresses[0](gw).fronts: lists itself",
+        "ingresses[1](rtr).fronts[1]: lists 'e' twice",
+        "ingresses[1](rtr).fronts[2]: no ingress 'ghost'",
+    )
+
+
+def test_every_graph_problem_is_named_once_the_entries_are_good():
+    layers = [("a", ("b",)), ("b", ("a",)), ("c", ("d",)), ("d", ("c",)), ("e", ())]
+    with pytest.raises(loader.ProfileError) as caught:
+        Topology.declare(layers)
+    assert caught.value.problems == (
+        "ingresses: fronts form a cycle: a -> b -> a",
+        "ingresses[4](e): on no edge; it fronts nothing and nothing fronts it",
+    )
+
+
+@pytest.mark.parametrize(
+    "outer, inner",
+    [("engine", "router"), ("engine", "gateway"), ("router", "gateway")],
+)
+def test_an_edge_against_the_positions_is_refused(outer, inner):
+    depths = {"gateway": 0, "router": 1, "engine": 2}
+    layers = [(outer, (inner,)), (inner, ())]
+    with pytest.raises(loader.ProfileError) as caught:
+        Topology.declare(layers, {outer: depths[outer], inner: depths[inner]})
+    assert caught.value.problems == (
+        f"ingresses[0]({outer}).fronts[0]: {inner!r} is at a shallower position than "
+        f"{outer!r}; an ingress fronts only ingresses at its own position or deeper",
+    )
+
+
+def test_an_edge_between_ingresses_at_one_position_is_allowed():
+    """A router in front of a routing sidecar, both routers, is a chain, not a contradiction."""
+    layers = [("epp", ("sidecar",)), ("sidecar", ("decode",)), ("decode", ())]
+    topology = Topology.declare(layers, {"epp": 1, "sidecar": 1, "decode": 2})
+    assert topology.order == ("epp", "sidecar", "decode")
 
 
 def test_one_ingress_declared_as_fronting_nothing_is_a_graph():
