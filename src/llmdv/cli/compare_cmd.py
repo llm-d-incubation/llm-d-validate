@@ -28,6 +28,7 @@ from ..compare.archive import (
     publish_one,
     read_identity,
     read_local_results,
+    read_outcome,
     read_profile,
     read_results,
     read_stack,
@@ -166,7 +167,9 @@ def _compare_run(
             ]
             if mismatch:
                 raise NoSuchRun("baseline identity differs in: " + ", ".join(mismatch))
-    delta, before_id = _compare_baselines(source, profile, chosen, after)
+    delta, before_id = _compare_baselines(
+        source, profile, chosen, after, (outcome.read(run_dir) or {}).get("selection")
+    )
     local = run_dir / PROFILE_FILE
     before_profile = read_profile(source, profile, before_id)
     after_profile = local.read_text(encoding="utf-8") if local.is_file() else None
@@ -202,9 +205,17 @@ def _compare_run(
 
 
 def _compare_baselines(
-    source: str, profile: str, chosen: list[str], after: list[dict]
+    source: str,
+    profile: str,
+    chosen: list[str],
+    after: list[dict],
+    selection: dict | None = None,
 ) -> tuple[Delta, str]:
-    """Discard unusable archived runs whole; tonight's results remain strict."""
+    """Discard unusable archived runs whole; tonight's results remain strict.
+
+    `selection` is the later run's recorded selection. Each baseline's is read from its
+    outcome, so a case one run did not select is not reported as the suite changing.
+    """
     history, errors, unreadable = {}, {}, False
     for run_id in chosen:
         try:
@@ -217,7 +228,8 @@ def _compare_baselines(
         # statement about the runs.
         kind = ArchiveUnreadable if unreadable else NoSuchRun
         raise kind("no usable baseline runs: " + "; ".join(errors.values()))
-    delta = compare_window(list(history.values()), after)
+    selections = [_selection(source, profile, run_id) for run_id in history]
+    delta = compare_window(list(history.values()), after, selections, selection)
     delta.window_errors = errors
     delta.window_dropped += len(errors)
     # The run the verdicts were judged against, which after a reverted profile is not the
@@ -225,6 +237,18 @@ def _compare_baselines(
     ids = list(history)
     before_id = ids[delta.baseline] if delta.baseline is not None else ids[-1]
     return delta, before_id
+
+
+def _selection(source: str, profile: str, run_id: str) -> dict | None:
+    """A run's recorded `selection`, or None when it recorded none or its outcome is unreadable.
+
+    Advisory: without it a case the run left out reads as suite churn, never as a verdict.
+    """
+    try:
+        recorded = (read_outcome(source, profile, run_id) or {}).get("selection")
+    except ArchiveUnreadable:
+        return None
+    return recorded if isinstance(recorded, dict) else None
 
 
 def _save_comparison(
@@ -319,7 +343,13 @@ def run(args: argparse.Namespace) -> int:
                 ]
                 if mismatch:
                     raise NoSuchRun("baseline identity differs in: " + ", ".join(mismatch))
-        delta, before_id = _compare_baselines(args.source, args.profile, chosen, after)
+        delta, before_id = _compare_baselines(
+            args.source,
+            args.profile,
+            chosen,
+            after,
+            _selection(args.source, args.profile, after_id),
+        )
     except (NoSuchRun, EmptyRun, InvalidRun, UnsafeName) as exc:
         # Not having a comparison is a usage answer, never a passing one.
         log.error("%s", exc)

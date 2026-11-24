@@ -43,6 +43,10 @@ def as_record(
             "changes": list(delta.stack_changes),
             "mixed": list(delta.mixed_stack),
         },
+        "selection": {
+            "changes": list(delta.selection_changes),
+            "outside": list(delta.outside_selection),
+        },
         "regressed": delta.regressed,
         "transient": list(delta.transient),
         "known": {
@@ -115,6 +119,14 @@ def render(delta: Delta, profile: str, before_id: str, after_id: str) -> str:
             "its verdicts mix two fleets:_"
         )
         lines += [f"  `{line}`" for line in delta.mixed_stack]
+        lines.append("")
+
+    if delta.selection_changes:
+        lines.append(
+            "*The selection changed between these runs.* A case only one of them selected is "
+            "listed apart at the end, never as a regression:"
+        )
+        lines += [f"  `{change}`" for change in delta.selection_changes]
         lines.append("")
 
     if delta.digest_changed:
@@ -257,6 +269,14 @@ def render(delta: Delta, profile: str, before_id: str, after_id: str) -> str:
             )
         elif not delta.vanished:
             lines.append("_That is us, not the fleet._")
+
+    if delta.outside_selection:
+        lines += [
+            "",
+            f"_Outside the selection ({len(delta.outside_selection)}): only one of these runs "
+            "selected them, so there is nothing to compare. Not regressions, not new cases._",
+        ]
+        lines += _bullets(delta.outside_selection)
 
     return "\n".join(lines)
 

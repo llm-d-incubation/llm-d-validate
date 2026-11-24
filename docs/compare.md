@@ -44,9 +44,10 @@ engine are different questions. Only sections with something in them are printed
 | **Started running and passing** | skipped before, passes now; a count |
 | **Failing new cases** | absent from the window, failing now; not regressions |
 | **Suite changed** | cases appeared or disappeared: a change to llmdv, not the fleet |
+| **Outside the selection** | cases only one of the runs selected, after a note that **the selection changed**: nothing to compare, never a regression or a new case. `selection.outside` in `comparison.json` |
 | **Known failures, fix pending** | failing in the window too, and declared in the profile's `known_failures` with the issue that tracks them. Not a regression: the team knows. Named in `comparison.json` under `known.failing`, with the transition `known` |
 | **A regression is never known** | a note under *Newly failing*: the case passed in every run of the window and now fails a declared check. It stays a regression; the entry either excuses a failure or outlived its fix |
-| **Fix landed** | a case the previous run labelled as a known failure passes now: remove its entry |
+| **Fix landed** | a case the newest run of the window that held it labelled as a known failure passes now: remove its entry |
 | **Fix expected, still failing** | a known failure whose `until` build has answered and which still fails. Kept in its regression bucket, and named |
 | **No longer covered** | was a known failure in the previous run and is a plain failure now: the entry was removed, or the case fails a different check. Kept in its bucket, and named with the old issue and both checks |
 
@@ -56,17 +57,28 @@ because a case can move with the contract rather than with the fleet.
 
 A skip is not a verdict, so a throttled night does not dilute a window. Runs made under a
 different profile are dropped from the window and the count is stated. The digest hashes the
-parsed declarations, not the file: comments and the `known_failures` block do not move it. Runs
-recorded before that rule carry a digest of the file bytes, so the first run after it reports
-the profile as changed once, with nothing listed under what changed.
+parsed declarations, not the file: comments, the `known_failures` block and the `selection` do
+not move it. Runs recorded before that rule carry a digest of the file bytes, so the first run
+after it reports the profile as changed once, with nothing listed under what changed. The same
+happens once for a profile that declares a `selection`, at the first comparison after the
+selection left the digest.
 
 A run under a profile's [`selection`](../profiles/REFERENCE.md#selection) holds only the cases
-it selected. The ones it left out are deselected, not skipped, so they have no record at all:
-against a full run they are listed under **Suite changed** as vanished, never as *Stopped
-running* or as a regression. The selection is a declaration, so a selected run and a full one
-(or two runs under different selections) differ in digest and the report says **the profile
-changed**; a run with `--all` keeps the digest but holds every case. `outcome.json` records
-which it was under `selection`: the globs, whether `--all` was given, and `in_force`.
+it selected. The ones it left out are deselected, not skipped, so they have no record at all.
+A selection changes which cases run, never what a case asserts, so it is not part of the
+digest: a selected run, a full one and a run under another selection share one window, and
+`--all` runs keep their history. `outcome.json` records which it was under `selection`: the
+globs, whether `--all` was given, and `in_force`. When the baseline and the later run differ
+there (different globs, or the selection in force in one only), the report says **the
+selection changed** and names the globs added and removed and a run made with `--all`. A case
+that vanished because the later run's selection left it out, or appeared because every run of
+the window left it out, is listed under **Outside the selection**, apart from **Suite
+changed**: never a regression, a new case, *Stopped running* or a failing new case, and without
+a transition in `comparison.json`, which lists them under `selection.outside` beside the
+changes in `selection.changes`. Each case is read against the newest run of the window that
+holds it, so a case a selected run left out is still judged against, labelled from and seen to
+stop running by the full run before it; a known failure that passes now is a fix landed even
+when the previous run did not select it, given a `--window` that reaches the run that did.
 
 Every run records in `outcome.json` what its traffic said about each ingress, read the same way
 at every layer from one table (`src/llmdv/ingress/signals.py`) plus the `version_headers` the
