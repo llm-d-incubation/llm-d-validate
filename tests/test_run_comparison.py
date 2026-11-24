@@ -159,7 +159,15 @@ from llmdv.output import manifest  # noqa: E402
 from tests.fakes import run_llmdv  # noqa: E402
 
 
-def archive(tmp_path, profile="p", runs=None, triggers=None, accelerators=None, flavors=None):
+def archive(
+    tmp_path,
+    profile="p",
+    runs=None,
+    triggers=None,
+    accelerators=None,
+    flavors=None,
+    selections=None,
+):
     """A published-run layout: <root>/<profile>/<run-id>/results.jsonl."""
     for run_id, records in (runs or {}).items():
         d = tmp_path / profile / run_id
@@ -183,6 +191,8 @@ def archive(tmp_path, profile="p", runs=None, triggers=None, accelerators=None, 
             if run_id in (flavors or {}):
                 # None writes `"flavor": null`, as a real run without a flavor does.
                 body["identity"]["flavor"] = flavors[run_id]
+        if run_id in (selections or {}):
+            body["selection"] = selections[run_id]
         (d / "outcome.json").write_text(json.dumps(body))
         manifest.write(d)
     return f"file://{tmp_path}"
@@ -1362,3 +1372,151 @@ def test_a_reverted_profile_is_compared_with_and_named_by_the_run_it_was_judged_
     assert before_id == "2026-01-01T00-00-00Z"
     assert not delta.digest_changed
     assert delta.newly_failing
+
+
+# ----------------------------------------------------------------- runs under a selection
+
+from llmdv.profile import loader  # noqa: E402
+
+PROFILE = "name: p\ningresses:\n  - {id: gw, kind: gateway, url: http://gw}\n"
+
+
+def selected(*globs, all_=False):
+    """What `outcome.json` records under `selection` for a run."""
+    return {"cases": list(globs), "all": all_, "in_force": bool(globs) and not all_}
+
+
+def digest_of(tmp_path, text):
+    path = tmp_path / f"{abs(hash(text))}.yaml"
+    path.write_text(text, encoding="utf-8")
+    return loader.contract_digest(path)
+
+
+def test_editing_the_selection_leaves_the_contract_digest_alone(tmp_path):
+    """A selection changes which cases run, never what a case asserts."""
+    plain = digest_of(tmp_path, PROFILE)
+    narrow = digest_of(tmp_path, PROFILE + "selection: [contract.*]\n")
+    wide = digest_of(tmp_path, PROFILE + "selection: [contract.*, openai_chat.*]\n")
+    assert plain == narrow == wide
+    assert plain != digest_of(tmp_path, PROFILE.replace("http://gw", "http://other"))
+
+
+def test_narrowing_the_selection_keeps_the_window_so_a_flaky_case_stays_flaky(tmp_path):
+    """Reproduces (a): two full runs disagree about `a`, then the profile is narrowed. The
+    history must survive the edit, so `a` is flaky, not newly failing."""
+    full = digest_of(tmp_path, PROFILE)
+    narrow = digest_of(tmp_path, PROFILE + "selection: [a]\n")
+    d = compare_window(
+        [[rec("a", "pass", digest=full), rec("b", "pass", digest=full)]]
+        + [[rec("a", "fail", digest=full), rec("b", "pass", digest=full)]],
+        [rec("a", "pass", digest=narrow)],
+        [selected(), selected()],
+        selected("a"),
+    )
+    assert not d.digest_changed and d.window_dropped == 0
+    assert d.newly_failing == [] and d.flaky == ["a@litellm (.F.)"]
+    assert d.vanished == [] and d.outside_selection == ["b@litellm"]
+    assert d.selection_changes == ["added a"]
+
+
+def test_widening_the_selection_judges_a_case_against_the_full_runs_that_held_it(tmp_path):
+    """Reproduces (b): `b` passed in an earlier `--all` run, the previous run was selected
+    without it, then the profile's selection was widened to take `b` in, and it fails now.
+    That is a regression, not a new case."""
+    narrow = digest_of(tmp_path, PROFILE + "selection: [a]\n")
+    wide = digest_of(tmp_path, PROFILE + "selection: [a, b]\n")
+    d = compare_window(
+        [
+            [rec("a", "pass", digest=narrow), rec("b", "pass", digest=narrow)],
+            [rec("a", "pass", digest=narrow)],
+        ],
+        [rec("a", "pass", digest=wide), rec("b", "fail", digest=wide)],
+        [selected("a", all_=True), selected("a")],
+        selected("a", "b"),
+    )
+    assert d.newly_failing == ["b@litellm"] and d.appeared == []
+    assert d.transitions[("litellm", "b", "")] == "regressed"
+    assert d.selection_changes == ["added b"]
+
+
+def test_a_case_only_the_wider_run_selected_is_outside_the_selection_not_new():
+    d = compare_window(
+        [[rec("a", "pass")]], [rec("a", "pass"), rec("b", "fail")], [selected("a")], selected()
+    )
+    assert d.appeared == [] and d.outside_selection == ["b@litellm"]
+    assert ("litellm", "b", "") not in d.transitions and not d.regressed
+    text = render(d, "p", "r1", "r2")
+    assert "selection changed" in text and "Outside the selection (1)" in text
+    assert "Failing new cases" not in text and "Suite changed" not in text
+    record = as_record(d, "r1", "r2")
+    assert record["selection"] == {"changes": ["removed a"], "outside": ["b@litellm"]}
+
+
+def test_a_variant_glob_is_matched_against_the_variant():
+    d = compare_window(
+        [[rec("c", "pass", variant="x"), rec("c", "pass", variant="y")]],
+        [rec("c", "pass", variant="x")],
+        [selected()],
+        selected("c[x]"),
+    )
+    assert d.outside_selection == ["c[y]@litellm"] and d.vanished == []
+
+
+def test_a_case_the_selection_holds_and_the_run_lost_is_still_suite_churn():
+    """Only what the selection explains moves: a selected case with no record vanished."""
+    d = compare_window([[rec("a", "pass"), rec("b", "pass")]], [rec("a", "pass")], [None], None)
+    assert d.vanished == ["b@litellm"] and d.outside_selection == []
+    d = compare_window(
+        [[rec("a", "pass"), rec("b", "pass")]], [rec("a", "pass")], [selected()], selected("*")
+    )
+    assert d.vanished == ["b@litellm"] and d.outside_selection == []
+
+
+def test_an_all_run_against_a_selected_one_names_the_all():
+    d = compare_window(
+        [[rec("a", "pass")]],
+        [rec("a", "pass"), rec("b", "pass")],
+        [selected("a")],
+        selected("a", all_=True),
+    )
+    assert d.selection_changes == ["this run ran with --all"]
+    assert d.outside_selection == ["b@litellm"]
+
+
+def test_a_fix_is_seen_landing_when_the_previous_run_did_not_select_the_case():
+    """Reproduces (c): alternating full and selected runs. The newest run that holds `b` is
+    the full one, which labelled it known; it passes now, so the fix landed."""
+    known = {"status": "known", "issue": "#1", "check": "x"}
+    full = [rec("a", "pass"), {**rec("b", "fail"), "known_failure": known}]
+    d = compare_window(
+        [full, [rec("a", "pass")]],
+        [rec("a", "pass"), rec("b", "pass")],
+        [selected(), selected("a")],
+        selected(),
+    )
+    assert [e["label"] for e in d.fix_landed] == ["b@litellm"]
+    assert d.newly_passing == ["b@litellm"]
+
+
+def test_a_case_the_previous_run_did_not_select_is_seen_to_stop_running():
+    d = compare_window(
+        [[rec("a", "pass"), rec("b", "pass")], [rec("a", "pass")]],
+        [rec("a", "pass"), rec("b", "skip", skip_class="throttled")],
+    )
+    assert d.stopped_running == ["b@litellm (throttled)"]
+
+
+def test_the_comparison_reads_each_runs_selection_from_its_outcome(tmp_path):
+    runs = {
+        "2026-01-01T00-00-00Z": [rec("a", "pass"), rec("b", "pass")],
+        "2026-01-02T00-00-00Z": [rec("a", "pass")],
+    }
+    uri = archive(
+        tmp_path,
+        runs=runs,
+        selections={"2026-01-01T00-00-00Z": selected(), "2026-01-02T00-00-00Z": selected("a")},
+    )
+    delta, _ = compare_cmd._compare_baselines(
+        uri, "p", list(runs)[1:], [rec("a", "pass"), rec("b", "fail")], selected()
+    )
+    assert delta.outside_selection == ["b@litellm"] and delta.selection_changes == ["removed a"]

@@ -679,13 +679,19 @@ def _one_or_more(value: Any, where: str) -> tuple[str, ...]:
     return parse.strings(value, where)
 
 
+# Top-level keys that never change what a run asserts, so they never move the digest.
+_UNDIGESTED = frozenset({"known_failures", "selection"})
+
+
 def contract_digest(path: str | Path) -> str | None:
     """A short digest of the declarations in a profile, or None when it cannot be read.
 
-    Hashes the parsed document rather than its bytes, with `known_failures` left out: comments
-    carry probes, and the known-failure list carries triage, and neither changes what a run
-    asserts. A digest that moved with them would drop every earlier run from a comparison
-    window (`compare/diff.py`) each time a finding was filed or a comment updated. Where a
+    Hashes the parsed document rather than its bytes, with `known_failures` and `selection`
+    left out: comments carry probes, the known-failure list carries triage, and a selection
+    changes which cases run, never what a case asserts. A digest that moved with them would
+    drop every earlier run from a comparison window (`compare/diff.py`) each time a finding
+    was filed, a comment updated or a lane narrowed; a comparison reads which cases each run
+    selected from its `outcome.json` instead. Where a
     client binary sits on this machine is left out for the same reason: its `version` is the
     declaration, and its path differs between two checkouts of one profile.
     """
@@ -700,7 +706,7 @@ def contract_digest(path: str | Path) -> str | None:
         except ProfileError:
             return None
     if isinstance(raw, dict):
-        raw = {name: value for name, value in raw.items() if name != "known_failures"}
+        raw = {name: value for name, value in raw.items() if name not in _UNDIGESTED}
         if isinstance(raw.get("clients"), list):
             raw["clients"] = [_without_executables(client) for client in raw["clients"]]
     canonical = json.dumps(_stringify_keys(raw), sort_keys=True, default=str, separators=(",", ":"))

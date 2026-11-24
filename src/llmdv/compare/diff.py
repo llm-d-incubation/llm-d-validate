@@ -24,6 +24,7 @@ from dataclasses import dataclass, field
 
 from ..ingress.signals import build_signal_names
 from ..profile.known import FIX_EXPECTED, KNOWN, LABELLED, first_failed_check
+from ..profile.schema import matches_case
 
 # A verdict was reached. Anything else is an absence of evidence, not evidence of health.
 _DECIDED = frozenset({"pass", "fail", "error"})
@@ -62,6 +63,13 @@ class Delta:
     started_failing: list[str] = field(default_factory=list)
     appeared: list[str] = field(default_factory=list)
     vanished: list[str] = field(default_factory=list)
+    # A selection that differs between the baseline and this run (`outcome.json`'s
+    # `selection`), one line per glob added or removed and per run that set it aside with
+    # `--all`. A case that appeared or vanished only because one run's selection left it out
+    # is listed in `outside_selection` instead of under `appeared`/`vanished`: the suite did
+    # not change and the fleet did not either, so it is never a regression or a new failure.
+    selection_changes: list[str] = field(default_factory=list)
+    outside_selection: list[str] = field(default_factory=list)
     flaky: list[str] = field(default_factory=list)
     # Newly failing cases that got no HTTP answer at all: a timeout, a dropped connection, a
     # broken stream. Still counted as regressions -- an outage must not be filed under "flaky"
@@ -115,7 +123,12 @@ def compare(before: list[dict], after: list[dict]) -> Delta:
     return compare_window([before], after)
 
 
-def compare_window(history: list[list[dict]], after: list[dict]) -> Delta:
+def compare_window(
+    history: list[list[dict]],
+    after: list[dict],
+    selections: list[dict | None] | None = None,
+    selection: dict | None = None,
+) -> Delta:
     """Diff a run against the runs before it, oldest first.
 
     A single baseline cannot tell a regression from a flake. We have measured flaky cases --
@@ -127,6 +140,11 @@ def compare_window(history: list[list[dict]], after: list[dict]) -> Delta:
     A case whose history is mixed is called flaky and reported separately: it is not evidence
     the fleet got worse, and it is not nothing either -- it is a case nobody can currently draw
     a conclusion from, which is its own problem.
+
+    `selections` are the history's recorded `selection`s, in the same order, and `selection`
+    this run's (`outcome.json`). A run under a selection holds only the cases it selected, so
+    a case one run left out has no record there; with them, such a case is told apart from a
+    suite change. None, or a run that recorded no selection, says nothing either way.
     """
     # A verdict means something only against the contract it was produced under. A window that
     # spans a profile change mixes two contracts, and "every run agreed it passed" is then a
@@ -168,8 +186,13 @@ def compare_window(history: list[list[dict]], after: list[dict]) -> Delta:
     if not runs:
         return _apply_known(d, new, {})
 
-    previous = runs[-1]
-    seen_before = set().union(*(set(run) for run in runs))
+    # Per case, the newest run in the window that holds it. A run under a selection holds only
+    # what it selected, so the newest run of all may say nothing about a case an older full
+    # run decided, and that older record is the one a label or a lost verdict is read from.
+    latest: dict[tuple[str, str, str], dict] = {}
+    for run in runs:
+        latest.update(run)
+    seen_before = set(latest)
 
     for k in sorted(new.keys() - seen_before):
         d.appeared.append(label(k))
@@ -185,7 +208,7 @@ def compare_window(history: list[list[dict]], after: list[dict]) -> Delta:
         verdicts = [run[k]["outcome"] for run in runs if k in run and run[k]["outcome"] in _DECIDED]
 
         if now not in _DECIDED:
-            if k in previous and previous[k]["outcome"] in _DECIDED:
+            if k in latest and latest[k]["outcome"] in _DECIDED:
                 why = new[k].get("skip_class") or "unclassified"
                 d.stopped_running.append(f"{name} ({why})")
             continue
@@ -212,7 +235,63 @@ def compare_window(history: list[list[dict]], after: list[dict]) -> Delta:
             if now in _BAD and transport_failure(new[k]):
                 d.transient.append(name)
 
-    return _apply_known(d, new, previous)
+    if selections is not None:
+        theirs = [selections[position] for position in positions]
+        _apply_selection(d, new, seen_before, theirs, selection)
+    return _apply_known(d, new, latest)
+
+
+def _in_force(selection: dict | None) -> tuple[str, ...] | None:
+    """The globs a run's selection kept it to, or None when it held every case."""
+    if not isinstance(selection, dict) or not selection.get("in_force"):
+        return None
+    return tuple(str(glob) for glob in selection.get("cases") or ())
+
+
+def _left_out(selection: dict | None, k: tuple[str, str, str]) -> bool:
+    """Whether a run's recorded selection left the case out. False when it recorded none."""
+    globs = _in_force(selection)
+    return globs is not None and not matches_case(globs, k[1], k[2] or None)
+
+
+def _apply_selection(
+    d: Delta,
+    new: dict[tuple[str, str, str], dict],
+    seen_before: set[tuple[str, str, str]],
+    window: list[dict | None],
+    selection: dict | None,
+) -> None:
+    """Say how the selection moved, and take out of the suite churn what it alone explains.
+
+    A case that vanished is outside the selection when this run's selection left it out. One
+    that appeared is when every run of the window left it out: if any held every case or
+    selected it and still has no record of it, the suite did change. Neither gets a verdict:
+    there is nothing in the window to compare it to, and calling it new would read a narrower
+    run as a newer suite.
+    """
+    baseline = window[-1] if window else None
+    if isinstance(baseline, dict) and isinstance(selection, dict):
+        was, now = baseline.get("cases") or [], selection.get("cases") or []
+        if list(was) != list(now) or bool(baseline.get("in_force")) != bool(
+            selection.get("in_force")
+        ):
+            d.selection_changes += [f"added {glob}" for glob in now if glob not in was]
+            d.selection_changes += [f"removed {glob}" for glob in was if glob not in now]
+            for run, flagged in (("the baseline", baseline), ("this run", selection)):
+                if flagged.get("all") and flagged.get("cases"):
+                    d.selection_changes.append(f"{run} ran with --all")
+    moved = set()
+    for k in sorted(new.keys() - seen_before):
+        if window and all(_left_out(theirs, k) for theirs in window):
+            moved.add(label(k))
+            d.transitions.pop(k, None)
+    for k in sorted(seen_before - new.keys()):
+        if _left_out(selection, k):
+            moved.add(label(k))
+    if moved:
+        d.outside_selection = sorted(moved)
+        d.appeared = [name for name in d.appeared if name not in moved]
+        d.vanished = [name for name in d.vanished if name not in moved]
 
 
 def _apply_known(
@@ -227,7 +306,9 @@ def _apply_known(
     whatever the profile says, so it stays where it is and is named under `regressed_known`.
     A `fix_expected` record keeps its bucket and is named under `fix_missing`. The previous
     run's label is the authority for the other two: a labelled case that passes now is the
-    fix landing, and one that now fails a different check is no longer covered.
+    fix landing, and one that now fails a different check is no longer covered. `previous`
+    holds, per case, the newest record of it in the window, which under a selection need not
+    be the newest run.
     """
     moved: set[str] = set()
     for k in sorted(new):

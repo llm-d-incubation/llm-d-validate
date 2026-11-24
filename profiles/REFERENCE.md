@@ -578,7 +578,7 @@ selection:
 - It applies to every suite, the contract suite included, so a selection that should still check the profile's own declarations names `contract.*`. An item without a case id cannot be named short of `*`, so a selection leaves it out; every case under `suites/` has one.
 - A glob that matches no collected case is an invalid selection (exit 2), and the error names it, so a typo cannot quietly select nothing. `llmdv verify` checks this before preflight, so a typo sends no request. Globs are checked before `-k` and `-m` narrow, but after `--ingress`, which decides which ingresses are collected at all.
 - An empty list is an error. In a child profile, `selection: null` clears an inherited selection.
-- `outcome.json` records it under `selection`: the globs (`cases`), whether `--all` was given (`all`), and whether the selection applied (`in_force`: declared and not set aside by `--all`). The selection is a declaration, so changing it changes the profile digest, and `llmdv compare` reports the profile changed. See [docs/compare.md](../docs/compare.md).
+- `outcome.json` records it under `selection`: the globs (`cases`), whether `--all` was given (`all`), and whether the selection applied (`in_force`: declared and not set aside by `--all`). A selection changes which cases run, never what a case asserts, so it is not part of the profile digest: editing it keeps a run's comparison history. `llmdv compare` reads each run's recorded selection instead, says when it changed, and lists a case only one run selected under *Outside the selection*, never as a regression or a new case. See [docs/compare.md](../docs/compare.md).
 
 ## fleet
 
