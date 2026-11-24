@@ -227,7 +227,10 @@ def stack_signals(
     rows = [(signals.row_label(row), row.reveals.value) for row in signals.SIGNALS]
     out = []
     for ing in sorted(ingresses):
-        looked = rows + [(name, signals.Reveals.VERSION.value) for name in declared.get(ing, ())]
+        # A declared header the table already lists (`server`) is that row, marked declared.
+        labels = {label for label, _ in rows}
+        extra = [name for name in declared.get(ing, ()) if name not in labels]
+        looked = rows + [(name, signals.Reveals.VERSION.value) for name in extra]
         out.append(
             {
                 "ingress": ing,

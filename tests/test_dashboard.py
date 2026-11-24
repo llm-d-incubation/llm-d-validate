@@ -484,3 +484,22 @@ def test_the_stack_table_lists_a_header_the_profile_declares(tmp_path):
     assert rows["x-kong-version"]["declared"] is True
     assert rows["x-kong-version"]["seen"] == {"x-kong-version": {"3.9.1": 1}}
     assert rows["x-kong-build"]["seen"] == {}
+
+
+def test_a_declared_header_the_table_lists_is_one_row_marked_declared(tmp_path):
+    run = make_run(tmp_path)
+    profile = yaml.safe_load((run / "profile.used.yaml").read_text())
+    for ingress in profile["ingresses"]:
+        if ingress["id"] == "gw":
+            ingress["version_headers"] = ["server"]
+    (run / "profile.used.yaml").write_text(yaml.safe_dump(profile))
+    exchange = json.loads((run / "exchanges.jsonl").read_text())
+    exchange["response_headers"] = {"server": "kong/3.4.0"}
+    (run / "exchanges.jsonl").write_text(json.dumps(exchange) + "\n")
+    [entry] = [
+        r for r in payload(dashboard.write_best_effort(run))["stack"] if r["ingress"] == "gw"
+    ]
+    servers = [row for row in entry["rows"] if row["row"] == "server"]
+    assert len(servers) == 1
+    assert servers[0]["declared"] is True
+    assert servers[0]["seen"] == {"server": {"kong/3.4.0": 1}}
