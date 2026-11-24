@@ -9,9 +9,11 @@ whatever rows it matches. A header that passes through a layer still describes t
 a router's destination header seen at the gateway still names the pod that served it.
 
 An operator whose product sends a header this table does not know declares it per ingress
-(`ingresses[].version_headers`); a declared header counts as naming the build. A name the table
-marks `backend` cannot be declared there, because a backend header may name a host or a Service
-and must never reach `outcome.json`.
+(`ingresses[].version_headers`); a declared header counts as naming the build at that ingress.
+So may a header the table publishes without calling it a build, such as `server`, where it is
+the only build signal an unknown gateway sends. A name any `backend` row matches, exactly or by
+prefix, cannot be declared, because a backend header may name a host or a Service and must never
+reach `outcome.json`.
 
 Each row says what it was observed on. A row is added once the header has been seen on a real
 response, not from documentation.
@@ -84,6 +86,11 @@ SIGNALS: tuple[Signal, ...] = (
     Signal(Reveals.RECORDED, header="x-litellm-response-cost"),
     # Envoy's decorator names the route's Service and namespace.
     Signal(Reveals.BACKEND, header="x-envoy-decorator-operation"),
+    # Every variant of the destination headers names an endpoint too (the GIE protocol's
+    # x-gateway-destination-endpoint-served, for one), so the families are backend. Listed
+    # before the loose prefixes below, which would otherwise take them as published.
+    Signal(Reveals.BACKEND, prefix="x-gateway-destination-endpoint"),
+    Signal(Reveals.BACKEND, prefix="x-llm-d-destination-endpoint"),
     Signal(Reveals.VERSION, prefix="x-llm-d-"),
     Signal(Reveals.RECORDED, prefix="x-envoy-"),
     Signal(Reveals.RECORDED, prefix="x-gateway-"),
@@ -118,6 +125,11 @@ def row_label(row: Signal) -> str:
     return f"{row.prefix}*" if row.prefix else row.name
 
 
+def row_for(name: str) -> Signal | None:
+    """The row a header name matches: an exact row first, else the first matching prefix row."""
+    return _row_for(name)
+
+
 def _row_for(name: str) -> Signal | None:
     exact = next((s for s in SIGNALS if s.header == name), None)
     if exact is not None:
@@ -138,7 +150,8 @@ def classify(
     headers in declared order. So `served_by` and every reader built on this give one answer for
     one response. Header names are compared lower-cased. A declared header counts as naming the
     build and wins over a prefix row it also matches; an exact row, and any backend row, always
-    wins (the loader refuses a declaration an exact row knows).
+    wins: the loader refuses declaring one, except a row published without being a build (such
+    as `server`), which keeps its row here and counts as a build at that ingress.
     """
     lowered = {str(k).lower(): str(v) for k, v in (headers or {}).items()}
     wanted = list(dict.fromkeys(str(name).lower() for name in declared))

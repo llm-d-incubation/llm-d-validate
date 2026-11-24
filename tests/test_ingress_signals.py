@@ -229,6 +229,46 @@ def test_a_profile_cannot_declare_a_backend_header_as_a_version_header(tmp_path)
         loader.load(path)
 
 
+def _declaring(tmp_path, header):
+    path = tmp_path / "p.yaml"
+    path.write_text(
+        "schema: llmdv.profile/1\nname: p\nmodel: {public_id: m}\ningresses:\n"
+        "  - id: edge\n    kind: gateway\n    base_url: http://localhost:1\n"
+        f"    version_headers: ['{header}']\n"
+    )
+    return path
+
+
+@pytest.mark.parametrize(
+    "header",
+    [s.header for s in table.SIGNALS if s.reveals is table.Reveals.BACKEND and s.header]
+    + [
+        f"{s.prefix}-variant"
+        for s in table.SIGNALS
+        if s.reveals is table.Reveals.BACKEND and s.prefix
+    ],
+)
+def test_no_header_a_backend_row_matches_can_be_declared(tmp_path, header):
+    """Exact or by prefix: a declared header is published in outcome.json, and any backend row
+    may name a host, so none can be declared, including rows added later."""
+    with pytest.raises(ProfileError, match="may name a host"):
+        loader.load(_declaring(tmp_path, header))
+
+
+def test_a_destination_variant_is_never_published_undeclared():
+    """The GIE protocol's served variant names the endpoint as its parent does."""
+    headers = {"x-gateway-destination-endpoint-served": "10.0.0.5:8000"}
+    assert [f.reveals for f in table.classify(headers)] == [table.Reveals.BACKEND]
+    assert version_signals(headers, None) == {}
+
+
+def test_a_published_header_that_is_not_a_build_can_be_declared_one(tmp_path):
+    """`server` is often the only build signal an unknown gateway sends (Kong: kong/3.4.0)."""
+    assert loader.load(_declaring(tmp_path, "server")).ingress("edge").version_headers == (
+        "server",
+    )
+
+
 def test_declared_version_headers_load_lower_cased(tmp_path):
     path = tmp_path / "p.yaml"
     path.write_text(
@@ -322,8 +362,10 @@ def test_the_whole_record_is_the_same_for_any_header_order():
 @pytest.mark.parametrize(
     "declared, problem",
     [
-        ("[server]", "already in the evidence table"),
+        ("[x-litellm-version]", "already in the evidence table"),
         ("[x-litellm-call-id]", "already in the evidence table"),
+        ("[x-gateway-destination-endpoint-served]", "may name a host"),
+        ("[X-LLM-D-Destination-Endpoint-Pod]", "may name a host"),
         ("[x-kong-version, X-Kong-Version]", "declared twice"),
         ('["x-envoy-upstream-host "]', "may name a host"),
         ('[" X-Litellm-Model-Id"]', "may name a host"),

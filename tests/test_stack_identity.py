@@ -304,3 +304,14 @@ def test_an_ingress_one_run_did_not_observe_is_not_a_stack_change():
         f"litellm: system_fingerprint {OLD} → absent",
         "litellm: x-litellm-version 1.97.0 → absent",
     ]
+
+
+def test_a_declared_server_header_is_compared_at_its_own_ingress_only():
+    """Undeclared, `server` is not a build: one run may carry a proxy's error page beside the
+    product's own answers. Declared at an ingress, it names that ingress's build."""
+    before = {"gw": {"server": {"kong/3.4.0": 5}}, "other": {"server": {"envoy": 1}}}
+    after = {"gw": {"server": {"kong/3.5.0": 5}}, "other": {"server": {"uvicorn": 1}}}
+    assert stack_changes(before, after) == []
+    assert stack_changes(before, after, {"gw": ("server",)}) == [
+        "gw: server kong/3.4.0 → kong/3.5.0"
+    ]

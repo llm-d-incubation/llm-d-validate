@@ -36,7 +36,7 @@ from typing import Any
 import yaml
 
 from ..http.redact import SECRET_HEADERS
-from ..ingress.signals import BACKEND_HEADERS, KNOWN_HEADERS
+from ..ingress.signals import Reveals, row_for
 from ..surfaces import base as surfaces
 from . import compose, evolution, parse
 from . import transport as transport_contract
@@ -839,9 +839,11 @@ _HEADER_NAME = re.compile(r"[!#$%&'*+.^_`|~0-9a-z-]+")
 def _version_headers(value: Any, at: str) -> tuple[str, ...]:
     """Headers an operator declares as naming the build, which the evidence table does not know.
 
-    Never one that may name a backend (a declared header is published in outcome.json), never
-    one the table already knows (that would change its meaning for one profile), and never one
-    twice.
+    Never one any backend row matches, exactly or by prefix (a declared header is published in
+    outcome.json); never one the table already names exactly as a build, recorded value or
+    backend (that would change its meaning for one profile); and never one twice. A header the
+    table publishes without calling it a build, such as `server`, may be declared: it then names
+    the build at that ingress only.
     """
     raw_names = _optional_strings(value, f"{at}.version_headers")
     names = tuple(name.strip().lower() for name in raw_names)
@@ -850,15 +852,20 @@ def _version_headers(value: Any, at: str) -> tuple[str, ...]:
         where = f"{at}.version_headers[{index}]"
         if not _HEADER_NAME.fullmatch(name):
             problems.append(f"{where}: {raw_names[index]!r} is not a header name")
-        elif name in BACKEND_HEADERS:
+        elif (row := row_for(name)) is not None and row.reveals is Reveals.BACKEND:
             problems.append(
                 f"{where}: {name!r} may name a host or a Service, so it is recorded for "
                 "attribution and never published; it cannot be a version header"
             )
-        elif name in KNOWN_HEADERS:
+        elif (
+            row is not None
+            and row.header is not None
+            and not (row.reveals is Reveals.VERSION and not row.build)
+        ):
             problems.append(
                 f"{where}: {name!r} is already in the evidence table (src/llmdv/ingress/"
-                "signals.py), which says what it reveals; declare only headers it does not know"
+                "signals.py), which says what it reveals; declare only a header it does not "
+                "know, or one it publishes without calling a build, such as server"
             )
         elif name in names[:index]:
             problems.append(f"{where}: {name!r} is declared twice")
