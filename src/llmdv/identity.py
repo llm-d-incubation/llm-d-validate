@@ -57,7 +57,9 @@ def parse(values: list[str] | None) -> dict[str, str]:
     for item in values or []:
         key, sep, value = item.partition("=")
         key = _ALIASES.get(key, key)
-        if not sep or key not in (*LANE_DIMENSIONS, *ASSERTION_DIMENSIONS) or not value.strip():
+        if sep and key in (*LANE_DIMENSIONS, *ASSERTION_DIMENSIONS) and not value.strip():
+            raise IdentityError(f"--identity {key}: needs a value; got {item!r}")
+        if not sep or key not in (*LANE_DIMENSIONS, *ASSERTION_DIMENSIONS):
             raise IdentityError(
                 "--identity must be one of key=value for "
                 f"{', '.join((*LANE_DIMENSIONS, *ASSERTION_DIMENSIONS))}; "

@@ -116,8 +116,8 @@ def _add_compare_flags(command) -> None:
     command.add_argument(
         "--compare",
         action="store_true",
-        help="after publishing, compare this run to the latest nightly run(s) of the same "
-        "profile and include the analysis in the notification",
+        help="after publishing, compare this run to the latest earlier run(s) of the same "
+        "profile and configuration identity, and include the analysis in the notification",
     )
     command.add_argument(
         "--compare-window",
@@ -130,7 +130,7 @@ def _add_compare_flags(command) -> None:
     command.add_argument(
         "--compare-baseline",
         default=None,
-        help="run id to compare against instead of the nightly baseline, e.g. the run from "
+        help="run id to compare against instead of the automatic baseline, e.g. the run from "
         "before a rollout",
     )
 

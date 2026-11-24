@@ -125,9 +125,15 @@ def test_a_value_with_stray_whitespace_is_refused(value):
 
 
 @pytest.mark.parametrize("value", ["flavor=", "flavor= ", "flavor=\n"])
-def test_an_empty_or_blank_value_is_refused(value):
-    with pytest.raises(IdentityError, match="must be one of key=value"):
+def test_an_empty_or_blank_value_is_refused_naming_the_key(value):
+    """The key is right; only the value is missing, so the message says that."""
+    with pytest.raises(IdentityError, match="--identity flavor: needs a value"):
         parse([value])
+
+
+def test_an_unknown_key_is_refused_with_the_known_ones():
+    with pytest.raises(IdentityError, match="must be one of key=value for .*flavor"):
+        parse(["flavour=x"])
 
 
 def test_a_later_value_replaces_an_earlier_one():
