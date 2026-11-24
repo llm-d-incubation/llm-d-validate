@@ -8,14 +8,14 @@
 FROM registry.access.redhat.com/ubi9/python-311@sha256:a0bdb55576fc5b8d6704279307817828ef027e1065533ceba133fe9516003a6c
 
 ARG LLMDV_GIT_SHA=unknown
-ARG CLAUDE_CODE_VERSION=2.1.289
-ARG CLAUDE_CODE_SHA256_AMD64=a186b99e4a9c88366cd49df2f7dad56c61fc306ef0140b19ee64b7c42a8d1348
-ARG CLAUDE_CODE_SHA256_ARM64=d100d5e41dcbee220c80d3a3099292e4b5a508b57cafd181856efedf29f84f28
+ARG CLAUDE_CODE_VERSION=2.1.330
+ARG CLAUDE_CODE_SHA256_AMD64=f390eaa0814e6a1bff74cbb47acb74cb9c89d30ced809fe0af5af00c7bfe8ebb
+ARG CLAUDE_CODE_SHA256_ARM64=6016f90cac783e367fb1aa97c768a2efb94a0128a5b46b70fb3d8fcbbd9dd444
 
 USER 0
 # The native binary includes its runtime. Keep it outside /work and /tmp, which the Job mounts
 # over, and outside any user's home so OpenShift's arbitrary UID can execute it.
-# Checksums: https://downloads.claude.ai/claude-code-releases/2.1.289/manifest.json
+# Checksums: https://downloads.claude.ai/claude-code-releases/2.1.330/manifest.json
 RUN case "$(uname -m)" in \
       x86_64) platform=linux-x64; checksum="${CLAUDE_CODE_SHA256_AMD64}" ;; \
       aarch64) platform=linux-arm64; checksum="${CLAUDE_CODE_SHA256_ARM64}" ;; \

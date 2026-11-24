@@ -279,11 +279,11 @@ capabilities:
 
 clients:
   # FROM docs: profiles/REFERENCE.md, "Claude Code clients": the runner image ships Claude Code
-  # 2.1.289 at /usr/local/bin/claude. Where it is absent, the real-client cases skip as
+  # 2.1.330 at /usr/local/bin/claude. Where it is absent, the real-client cases skip as
   # requires_instrumentation.
   - id: claude-code
     surfaces: [messages]
     needs: [streaming]
     binaries:
-      - version: "2.1.289"
+      - version: "2.1.330"
         executable: /usr/local/bin/claude

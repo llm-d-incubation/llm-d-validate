@@ -268,7 +268,7 @@ is redacted at capture, in the logging layer and in every run-file writer.
 
 The image includes the native Claude Code binary at `/usr/local/bin/claude` (amd64 and arm64),
 the version in the [Containerfile](../Containerfile)'s `CLAUDE_CODE_VERSION`, currently
-**2.1.289**, checksum-verified, with background updates disabled. It works with a read-only root
+**2.1.330**, checksum-verified, with background updates disabled. It works with a read-only root
 filesystem and a non-root UID. No Claude credentials are baked in.
 
 Declare it in the profile mounted at `/etc/llmdv`, on an ingress that also declares `messages`:
@@ -278,7 +278,7 @@ clients:
   - id: claude-code
     surfaces: [messages]
     binaries:
-      - version: "2.1.289"
+      - version: "2.1.330"
         executable: /usr/local/bin/claude
 ```
 

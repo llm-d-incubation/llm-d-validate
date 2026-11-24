@@ -497,7 +497,7 @@ A real consumer and what it depends on. `--client <id>` selects the relevant cas
 
 ### Claude Code clients
 
-llmdv never installs a client. The runner image ships Claude Code 2.1.289 at `/usr/local/bin/claude`; elsewhere, install one and pin it. The harness drives Messages only and checks `--version` before sending anything. A missing binary skips as `requires_instrumentation`.
+llmdv never installs a client. The runner image ships Claude Code 2.1.330 at `/usr/local/bin/claude`; elsewhere, install one and pin it. The harness drives Messages only and checks `--version` before sending anything. A missing binary skips as `requires_instrumentation`.
 
 `client_sessions` runs real sessions with tools, project settings and hooks enabled, each capped at five minutes or `timeouts.request`, whichever is smaller. They need a tool-call parser. `hook` needs Claude Code 2.1.154 or newer, and `compaction` needs `model.max_model_len` declared; both skip rather than fail when unmet. A failing session keeps `session-trace.jsonl` and `session-project.txt` in its evidence.
 
