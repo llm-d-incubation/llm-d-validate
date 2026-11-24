@@ -1,17 +1,10 @@
-<h1 align="center">llm-d-validate</h1>
-
-<p align="center">
-  <b>Roll out <a href="https://github.com/llm-d/llm-d">llm-d</a> with confidence.</b>
-</p>
-
-Demonstrate that your gateway, router, and engine behave as their APIs define. Validation for
-deployed llm-d model serving stacks.
-
-<p align="center">
+<p align="right">
   <a href="https://github.com/llm-d-incubation/llm-d-validate/actions/workflows/offline-tests.yaml?query=branch%3Amain"><img alt="offline tests" src="https://github.com/llm-d-incubation/llm-d-validate/actions/workflows/offline-tests.yaml/badge.svg?branch=main"></a>
   <img alt="Python 3.10+" src="https://img.shields.io/badge/python-3.10%2B-3776AB">
   <a href="https://github.com/llm-d-incubation/llm-d-validate/blob/main/LICENSE"><img alt="License: Apache 2.0" src="https://img.shields.io/badge/license-Apache%202.0-blue"></a>
 </p>
+
+<h1 align="center">llm-d-validate</h1>
 
 <p align="center">
   <a href="https://github.com/llm-d-incubation/llm-d-validate/blob/main/docs/getting-started.md">Getting started</a> ·
@@ -20,6 +13,13 @@ deployed llm-d model serving stacks.
   <a href="https://github.com/llm-d-incubation/llm-d-validate/blob/main/docs/test-suites.md">Test suites</a> ·
   <a href="https://github.com/llm-d-incubation/llm-d-validate/blob/main/CONTRIBUTING.md">Contributing</a>
 </p>
+
+<p align="center">
+  <b>Roll out <a href="https://github.com/llm-d/llm-d">llm-d</a> with confidence.</b>
+</p>
+
+Demonstrate that your gateway, router, and engine behave as their APIs define. Validation for
+deployed llm-d model serving stacks.
 
 <p align="center">
   <img src="https://raw.githubusercontent.com/llm-d-incubation/llm-d-validate/main/docs/images/llmdv-overview.gif" width="100%" alt="Animated overview: a profile defines the test plan; llmdv sends real requests to the gateway (end to end), the llm-d router (router and engine) and the engine alone; each layer gets a verdict; the run's evidence (results, exchanges, repro scripts, a dashboard) is bundled, published to object storage and sent as a notification. Runs launch from a workstation, CI or a cluster job.">
