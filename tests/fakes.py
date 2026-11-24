@@ -2955,7 +2955,7 @@ capabilities:
   structured_output: {str(structured_output).lower()}
 ingresses:
   - id: fake
-    kind: vllm
+    kind: engine
     base_url: {base_url}
     auth: {{type: none}}
     health_path: /health

@@ -22,13 +22,13 @@ PARENT = {
     "ingresses": [
         {
             "id": "gateway",
-            "kind": "litellm",
+            "kind": "gateway",
             "base_url": "https://gateway.example",
             "surfaces": ["chat_completions", "messages"],
         },
         {
             "id": "engine",
-            "kind": "vllm",
+            "kind": "engine",
             "base_url": "http://localhost:8000",
             "surfaces": ["chat_completions"],
         },
@@ -57,7 +57,7 @@ def test_a_child_is_merged_over_its_parent(tmp_path):
             "capabilities": {"vllm_options": [], "count_tokens": None},
             "ingresses": [
                 {"id": "engine", "setup": {"proxy": "allow"}},
-                {"id": "extra", "base_url": "http://localhost:9000"},
+                {"id": "extra", "kind": "engine", "base_url": "http://localhost:9000"},
             ],
         },
     )
@@ -75,7 +75,7 @@ def test_a_child_is_merged_over_its_parent(tmp_path):
     # Ingresses match by id; a new id is added at the end.
     assert profile.ingress_ids == ("gateway", "engine", "extra")
     engine = profile.ingress("engine")
-    assert engine.kind.value == "vllm"
+    assert engine.kind.value == "engine"
     assert engine.surfaces == ("chat_completions",)
     assert engine.setup.proxy.value == "allow"
     assert engine.model.max_model_len == 4096
@@ -349,8 +349,13 @@ def test_an_ingress_id_named_twice_in_one_file_is_refused_before_composing(tmp_p
     """Composing merges entries by id, so a repeat would otherwise fold into one ingress."""
     write(tmp_path / "shared.yaml", PARENT)
     twice = [
-        {"id": "extra", "base_url": "http://localhost:7", "surfaces": ["chat_completions"]},
-        {"id": "extra", "base_url": "http://localhost:8"},
+        {
+            "id": "extra",
+            "kind": "engine",
+            "base_url": "http://localhost:7",
+            "surfaces": ["chat_completions"],
+        },
+        {"id": "extra", "kind": "engine", "base_url": "http://localhost:8"},
     ]
     document = {**extends, "name": "twice", "model": {"public_id": "m"}, "ingresses": twice}
     path = write(tmp_path / "local.yaml", document)
@@ -378,9 +383,18 @@ def test_an_ingress_id_named_twice_in_a_parent_names_the_parent(tmp_path):
         ({"base_url": "http://localhost:7"}, "ingresses[0].id: required"),
         ({"id": "", "base_url": "http://localhost:7"}, "ingresses[0].id: expected a name"),
         ({"id": 1, "base_url": "http://localhost:7"}, "ingresses[0].id: expected a name"),
-        ({"id": "x\ny: 1", "base_url": "http://localhost:7"}, "ingresses[0].id: expected a name"),
-        ({"id": "a b", "base_url": "http://localhost:7"}, "ingresses[0].id: expected a name"),
-        ({"id": "a)b", "base_url": "http://localhost:7"}, "ingresses[0].id: expected a name"),
+        (
+            {"id": "x\ny: 1", "kind": "engine", "base_url": "http://localhost:7"},
+            "ingresses[0].id: expected a name",
+        ),
+        (
+            {"id": "a b", "kind": "engine", "base_url": "http://localhost:7"},
+            "ingresses[0].id: expected a name",
+        ),
+        (
+            {"id": "a)b", "kind": "engine", "base_url": "http://localhost:7"},
+            "ingresses[0].id: expected a name",
+        ),
     ],
 )
 def test_an_ingress_needs_an_id_that_is_a_plain_name(tmp_path, extends, entry, message):

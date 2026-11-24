@@ -29,7 +29,7 @@ name: la
 model: {{public_id: m}}
 ingresses:
   - id: one
-    kind: vllm
+    kind: engine
     base_url: http://localhost:1
     surfaces: [chat_completions]
 {logs}

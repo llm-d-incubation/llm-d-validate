@@ -22,7 +22,7 @@ name: pf
 model: {{public_id: {model}}}
 ingresses:
   - id: one
-    kind: vllm
+    kind: engine
     base_url: {base_url}
     health_path: /health
     surfaces: [chat_completions]

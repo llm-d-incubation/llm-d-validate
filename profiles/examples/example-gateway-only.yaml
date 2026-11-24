@@ -50,7 +50,7 @@ model:
 
 ingresses:
   - id: gateway
-    kind: litellm
+    kind: gateway
     base_url: https://<gateway-host>
     # A gateway is usually the only authenticating layer in a stack, so a 401 here is a credential
     # problem rather than a fleet one. The value is never stored: this names the variable, and a

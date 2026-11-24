@@ -100,7 +100,7 @@ which is gitignored.
 - [`good first issue`](https://github.com/llm-d-incubation/llm-d-validate/issues?q=is%3Aopen+is%3Aissue+label%3A%22good+first+issue%22+no%3Aassignee):
   self-contained tasks that run with the offline suite alone.
 - [`help wanted`](https://github.com/llm-d-incubation/llm-d-validate/issues?q=is%3Aopen+is%3Aissue+label%3A%22help+wanted%22+no%3Aassignee):
-  work that needs familiarity with a surface, an ingress kind or the profile schema.
+  work that needs familiarity with a surface, the layers of a serving stack or the profile schema.
 
 Comment `/assign` on an issue to take it, and `/unassign` to release it.
 

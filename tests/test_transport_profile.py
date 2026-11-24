@@ -14,7 +14,7 @@ name: transport
 model: {public_id: example/model}
 ingresses:
   - id: edge
-    kind: llmd_router
+    kind: router
     base_url: https://edge.example
 """
 

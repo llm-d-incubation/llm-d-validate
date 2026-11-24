@@ -54,13 +54,13 @@ ingresses:
   # targetPort 8081; guides/optimized-baseline/guide.yaml verify.endpoint.standalone reads the
   # Service `${GUIDE_NAME}-epp`. Every guide names that Service after itself.
   #
-  # Rule 2 evidence for `llmd_router`: confirmed for the router layer by
+  # Rule 2 evidence that this `router` is the llm-d router: confirmed for the router layer by
   # MEASURED 2026-11-16 on kind (real EPP, simulator engine): EPP-generated errors carry the EPP's
   # own "error extracting request body: ..." text, and responses carry
   # x-went-into-resp-headers: true. No response header names the serving pod
   # (served_by.backend_pod stays empty).
   - id: epp
-    kind: llmd_router
+    kind: router
     # INTENT: the URL comes from the environment so no hostname is committed.
     base_url_env: LLMDV_EPP_URL
     # FROM values: guides/recipes/router/base.values.yaml configures no authentication.

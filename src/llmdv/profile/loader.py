@@ -87,7 +87,6 @@ from .schema import (
     FleetPolicy,
     Ingress,
     IngressKind,
-    IngressRole,
     KnownFailure,
     LogSource,
     Model,
@@ -232,8 +231,6 @@ def _diagnostics(profile: Profile) -> list[Diagnostic]:
     seen: set[str] = set()
     for index, ingress in enumerate(profile.ingresses):
         at = f"ingresses[{index}]({ingress.id})"
-        if ingress.role is not None and ingress.implementation is None:
-            out.append(Diagnostic("error", f"{at}.implementation", "required when role is set"))
         if ingress.id in seen:
             out.append(Diagnostic("error", at, f"duplicate ingress id {ingress.id!r}"))
         seen.add(ingress.id)
@@ -336,20 +333,6 @@ def _diagnostics(profile: Profile) -> list[Diagnostic]:
                 out.append(Diagnostic("error", req_at, "needs either target or selector"))
             if requirement.kind == "port_forward" and not requirement.local_port:
                 out.append(Diagnostic("error", req_at, "port_forward needs local_port"))
-
-    for role, legacy in (("engine", profile.engine), ("gateway", profile.gateway)):
-        layers = [item for item in profile.ingresses if item.role and item.role.value == role]
-        if len(layers) > 1:
-            out.append(Diagnostic("error", "ingresses", f"only one {role} role is allowed"))
-        if layers and legacy is not None:
-            out.append(
-                Diagnostic(
-                    "error",
-                    role,
-                    f"declare {role} implementation on its role ingress, not both {role} "
-                    "and ingress",
-                )
-            )
 
     # Cross-section consistency. A client needing a surface no ingress exposes is dead
     # config: it can never run, and nothing at runtime notices.
@@ -836,6 +819,43 @@ def _base_url(raw: dict[str, Any], at: str) -> str:
     return value.strip().rstrip("/")
 
 
+# The product names `kind` used to take. A profile that still names one is told the position
+# that replaces it, rather than only the list of valid kinds.
+_PRODUCT_KINDS = {"litellm": "gateway", "llmd_router": "router", "vllm": "engine"}
+
+# Run identity names the products at the top level (`engine`, `gateway`), where a profile
+# without that layer as an ingress can still state it.
+_RETIRED_INGRESS_KEYS = {
+    "role": "kind for the layer's position, and the top-level engine or gateway for its product",
+    "implementation": "the top-level engine or gateway",
+}
+
+
+def _refuse_retired_keys(raw: dict[str, Any], at: str) -> None:
+    problems = [
+        f"{at}.{key}: no longer an ingress field; use {replacement}"
+        for key, replacement in _RETIRED_INGRESS_KEYS.items()
+        if key in raw
+    ]
+    if problems:
+        raise ProfileError(*problems)
+
+
+def _kind(value: Any, where: str) -> IngressKind:
+    """Where the ingress sits. Required: a silent default would misplace a layer unnoticed."""
+    valid = ", ".join(member.value for member in IngressKind)
+    if value is None:
+        raise ProfileError(f"{where}: required; one of {valid}")
+    # Case and padding are forgiven for a position as for a product name: `Engine` is `engine`.
+    name = value.strip().lower() if isinstance(value, str) else None
+    if name in _PRODUCT_KINDS:
+        raise ProfileError(
+            f"{where}: {value!r} names a product, not a position; "
+            f"use {_PRODUCT_KINDS[name]!r} (one of {valid})"
+        )
+    return _enum(IngressKind, name if name is not None else value, None, where)
+
+
 def _ingress(
     raw: dict[str, Any],
     where: str,
@@ -844,42 +864,40 @@ def _ingress(
 ) -> Ingress:
     ingress_id = str(raw.get("id") or "")
     at = f"{where}({ingress_id})"
-    ingress = Ingress(
-        id=ingress_id,
-        **_each(
-            model=lambda: _ingress_model(raw.get("model", {}), model_defaults, f"{at}.model"),
-            capabilities=lambda: _ingress_capabilities(
-                raw.get("capabilities", {}), capability_defaults, f"{at}.capabilities"
-            ),
-            kind=lambda: _enum(IngressKind, raw.get("kind"), IngressKind.VLLM, f"{at}.kind"),
-            base_url=lambda: _base_url(raw, at),
-            role=lambda: _enum(IngressRole, raw.get("role"), None, f"{at}.role"),
-            implementation=lambda: _opt_str(raw.get("implementation")),
-            base_url_env=lambda: _opt_str(raw.get("base_url_env")),
-            auth=lambda: _auth(_block(raw.get("auth"), f"{at}.auth"), f"{at}.auth"),
-            health_path=lambda: str(raw.get("health_path") or "/health"),
-            surfaces=lambda: _optional_strings(raw.get("surfaces"), f"{at}.surfaces"),
-            timeouts=lambda: _timeouts(_block(raw.get("timeouts"), f"{at}.timeouts"), at),
-            error_status=lambda: _error_status(
-                _block(raw.get("error_status"), f"{at}.error_status"), f"{at}.error_status"
-            ),
-            unstructured_errors=lambda: _optional_strings(
-                raw.get("unstructured_errors"), f"{at}.unstructured_errors"
-            ),
-            rate_limited=lambda: parse.flag(raw.get("rate_limited"), False, f"{at}.rate_limited"),
-            logs=lambda: _every(
-                partial(_log_source, item, f"{at}.logs[{index}]")
-                for index, item in _entries(raw.get("logs"), f"{at}.logs")
-            ),
-            tls=lambda: Tls(
-                verify=parse.flag(
-                    _block(raw.get("tls"), f"{at}.tls").get("verify"), True, f"{at}.tls.verify"
-                )
-            ),
-            transport=lambda: transport_contract.parse(raw.get("transport"), f"{at}.transport"),
-            setup=lambda: _setup(_block(raw.get("setup"), f"{at}.setup"), f"{at}.setup"),
+    fields = _each(
+        retired=lambda: _refuse_retired_keys(raw, at),
+        model=lambda: _ingress_model(raw.get("model", {}), model_defaults, f"{at}.model"),
+        capabilities=lambda: _ingress_capabilities(
+            raw.get("capabilities", {}), capability_defaults, f"{at}.capabilities"
         ),
+        kind=lambda: _kind(raw.get("kind"), f"{at}.kind"),
+        base_url=lambda: _base_url(raw, at),
+        base_url_env=lambda: _opt_str(raw.get("base_url_env")),
+        auth=lambda: _auth(_block(raw.get("auth"), f"{at}.auth"), f"{at}.auth"),
+        health_path=lambda: str(raw.get("health_path") or "/health"),
+        surfaces=lambda: _optional_strings(raw.get("surfaces"), f"{at}.surfaces"),
+        timeouts=lambda: _timeouts(_block(raw.get("timeouts"), f"{at}.timeouts"), at),
+        error_status=lambda: _error_status(
+            _block(raw.get("error_status"), f"{at}.error_status"), f"{at}.error_status"
+        ),
+        unstructured_errors=lambda: _optional_strings(
+            raw.get("unstructured_errors"), f"{at}.unstructured_errors"
+        ),
+        rate_limited=lambda: parse.flag(raw.get("rate_limited"), False, f"{at}.rate_limited"),
+        logs=lambda: _every(
+            partial(_log_source, item, f"{at}.logs[{index}]")
+            for index, item in _entries(raw.get("logs"), f"{at}.logs")
+        ),
+        tls=lambda: Tls(
+            verify=parse.flag(
+                _block(raw.get("tls"), f"{at}.tls").get("verify"), True, f"{at}.tls.verify"
+            )
+        ),
+        transport=lambda: transport_contract.parse(raw.get("transport"), f"{at}.transport"),
+        setup=lambda: _setup(_block(raw.get("setup"), f"{at}.setup"), f"{at}.setup"),
     )
+    fields.pop("retired")
+    ingress = Ingress(id=ingress_id, **fields)
     _check_http_redirect(ingress, at)
     return ingress
 

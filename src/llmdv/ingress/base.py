@@ -118,14 +118,17 @@ class IngressAdapter:
         )
 
 
-# One row per ingress kind; a field a row leaves out takes the base default above.
+# One row per position, holding the headers of the product measured there so far: vLLM as the
+# engine, the llm-d router as the router, LiteLLM as the gateway. Another product in a position
+# gets that row too; headers it does not send are simply absent. A field a row leaves out takes
+# the base default above.
 ADAPTERS: dict[IngressKind, IngressAdapter] = {
     # Direct vLLM: the engine's own OpenAI-compatible server. Nothing sits in front, so a
     # failure here is the backend, the model template, or the fixture. vLLM reveals no backend
     # identity in its response headers -- verified against v0.30.0, which returns only
     # `server: uvicorn` and `x-went-into-resp-headers` -- so `backend_pod` stays None and the
     # port-forward target recorded in the bundle is what identifies the replica.
-    IngressKind.VLLM: IngressAdapter(),
+    IngressKind.ENGINE: IngressAdapter(),
     # The llm-d router gateway (EPP + Envoy, or the in-gateway `llm-d-router-gateway` mode).
     # Failure here with direct vLLM passing points at gateway parsing, mutation, routing or
     # timeout behaviour -- but only if both layers reached an identically configured replica,
@@ -134,7 +137,7 @@ ADAPTERS: dict[IngressKind, IngressAdapter] = {
     # which is recorded rather than guessed: a wrong backend attribution costs more than a
     # missing one. The version headers are the router's own signature and its routing headers;
     # Envoy's decorator names a Service, so it is not one of them.
-    IngressKind.LLMD_ROUTER: IngressAdapter(
+    IngressKind.ROUTER: IngressAdapter(
         backend_headers=(
             "x-gateway-destination-endpoint",
             "x-llm-d-destination-endpoint",
@@ -149,7 +152,7 @@ ADAPTERS: dict[IngressKind, IngressAdapter] = {
     # LiteLLM names the deployment it selected and, with the v3 limiter active, mirrors
     # rate-limit state into `x-ratelimit-*` (recorded for every layer), so a `promised`
     # rate-limit-header declaration can be verified from the response alone.
-    IngressKind.LITELLM: IngressAdapter(
+    IngressKind.GATEWAY: IngressAdapter(
         backend_headers=("x-litellm-model-id", "x-litellm-deployment"),
         version_headers=("server", "x-litellm-version", "x-litellm-model-name"),
         extra_headers=("x-litellm-call-id", "x-litellm-response-cost"),

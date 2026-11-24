@@ -95,9 +95,9 @@ class _OldLiteLLM(_OldBase):
 
 
 OLD = {
-    IngressKind.VLLM: _OldVllm(),
-    IngressKind.LLMD_ROUTER: _OldRouter(),
-    IngressKind.LITELLM: _OldLiteLLM(),
+    IngressKind.ENGINE: _OldVllm(),
+    IngressKind.ROUTER: _OldRouter(),
+    IngressKind.GATEWAY: _OldLiteLLM(),
 }
 
 # Header groups, each one a thing some adapter treats specially. Every combination of up to

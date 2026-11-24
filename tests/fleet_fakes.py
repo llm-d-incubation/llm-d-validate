@@ -413,7 +413,7 @@ def fleet_profile(path: Path, *blocks: str, ingress_extra: str = "") -> Path:
             model: {public_id: fake/Model-1B}
             ingresses:
               - id: fake
-                kind: vllm
+                kind: engine
                 base_url: http://127.0.0.1:9
                 surfaces: [chat_completions]
             """
@@ -784,7 +784,7 @@ def header_label_profile(path: Path, ingress_url: str, metrics_url: str) -> Path
             model: {{public_id: fake/Model-1B}}
             ingresses:
               - id: fake
-                kind: llmd_router
+                kind: router
                 base_url: {ingress_url}
                 surfaces: [chat_completions]
             environment:

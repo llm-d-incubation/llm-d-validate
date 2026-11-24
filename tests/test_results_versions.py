@@ -44,11 +44,11 @@ name: p
 model: {public_id: m}
 ingresses:
   - id: gateway
-    kind: litellm
+    kind: gateway
     base_url: https://gateway.example
     surfaces: [chat_completions]
   - id: router
-    kind: llmd_router
+    kind: router
     base_url: https://router.example
     surfaces: [chat_completions]
 """
@@ -63,7 +63,7 @@ SAMPLES = [
 
 
 def record(case, outcome, ingress="gateway", checks=(), **extra):
-    kind = {"gateway": "litellm", "router": "llmd_router"}[ingress]
+    kind = {"gateway": "gateway", "router": "router"}[ingress]
     return {
         "schema": "llmdv.results/1", "run_id": "r", "profile": "p", "profile_digest": "d1",
         "nodeid": f"src/llmdv/suites/x/test_x.py::test_{case}[{ingress}]", "case_id": f"x.{case}",
@@ -255,7 +255,7 @@ def test_the_comparison_is_the_same_and_a_window_may_mix_both(tmp_path):
 
 def test_the_stack_reading_is_the_same(runs):
     v1, full = (outcome.read_results(run) for run in runs)
-    expected = {"gateway": "litellm", "router": "llmd_router"}
+    expected = {"gateway": "gateway", "router": "router"}
     assert ingress_kinds(full) == ingress_kinds(v1) == expected
 
 

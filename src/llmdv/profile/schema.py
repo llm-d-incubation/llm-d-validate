@@ -31,24 +31,26 @@ from .transport import TRANSPORT_ERROR_CLASSES, TransportContract
 
 
 class IngressKind(str, Enum):
-    VLLM = "vllm"
-    LLMD_ROUTER = "llmd_router"
-    LITELLM = "litellm"
+    """Where a layer sits in the stack, never which product it is.
 
+    A gateway is the client's front door (LiteLLM, Kong, an API server), a router picks a
+    backend (the llm-d router, a routing sidecar), and an engine generates (vLLM, SGLang).
+    The product is the operator's business; `id` is where a profile names it.
+    """
 
-class IngressRole(str, Enum):
-    ENGINE = "engine"
     GATEWAY = "gateway"
+    ROUTER = "router"
+    ENGINE = "engine"
 
 
-# How deep each kind sits in a stack, outermost first. Determined rather than declared: vLLM
-# generates rather than forwarding, so it is terminal, and LiteLLM is the front door. The layer
-# graph (`topology.py`) is derived from these depths: each ingress fronts every ingress at the
-# next deeper depth present.
+# How deep each kind sits in a stack, outermost first. An engine generates rather than
+# forwarding, so it is terminal, and a gateway is the front door. The layer graph
+# (`topology.py`) is derived from these depths: each ingress fronts every ingress at the next
+# deeper depth present.
 #
 # Two ingresses of the same kind tie: they keep declaration order in `Profile.chain`, and they
 # are peers in the graph, never compared with each other.
-_KIND_DEPTH = {IngressKind.LITELLM: 0, IngressKind.LLMD_ROUTER: 1, IngressKind.VLLM: 2}
+_KIND_DEPTH = {IngressKind.GATEWAY: 0, IngressKind.ROUTER: 1, IngressKind.ENGINE: 2}
 
 
 def depth(kind: IngressKind | str) -> int:
@@ -372,10 +374,6 @@ class Ingress:
     # Fully resolved by the loader, including inherited profile defaults.
     model: Model
     capabilities: Capabilities
-    # The role and implementation identify this layer for run identity. They are optional so
-    # older profiles can continue using the profile-level compatibility fields.
-    role: IngressRole | None = None
-    implementation: str | None = None
     auth: Auth = field(default_factory=Auth)
     # The environment variable that holds `base_url`, for a profile that is committed: a real
     # gateway hostname is cluster-identifiable and stays out of the repository, like the key.

@@ -20,8 +20,8 @@
 # for its own validation errors.
 #
 # Not declared here, and why:
-#   the engine ingress          as for vLLM (engines/vllm.yaml). llmdv has no SGLang kind; a
-#                               per-replica SGLang layer would be `kind: vllm` until one exists,
-#                               which is wrong for SGLang's error envelopes and metric names
+#   the engine ingress          as for vLLM (engines/vllm.yaml): a per-replica SGLang layer is
+#                               `kind: engine`, declaring SGLang's own error envelopes and health
+#                               path, once lanes provide per-replica URLs
 
 engine: sglang

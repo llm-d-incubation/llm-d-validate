@@ -26,7 +26,7 @@ PROFILE = textwrap.dedent(
     model: {public_id: m}
     ingresses:
       - id: gw
-        kind: litellm
+        kind: gateway
         base_url: https://gateway.example
         auth: {type: bearer, key_env: DASH_KEY}
         surfaces: [chat_completions]
@@ -199,7 +199,7 @@ def test_a_credential_llmdv_reads_from_the_environment_refuses_the_page(tmp_path
         dashboard.write(run)
 
 
-@pytest.mark.parametrize("ingresses", ["{gw: {kind: vllm}}", "5", "[1, two, {id: ok}]"])
+@pytest.mark.parametrize("ingresses", ["{gw: {kind: engine}}", "5", "[1, two, {id: ok}]"])
 def test_an_invalid_ingresses_value_still_builds_a_page(tmp_path, ingresses):
     """An exit-2 run records the invalid profile verbatim; the page must still build from it."""
     run = make_run(tmp_path)
@@ -295,8 +295,8 @@ MULTI = textwrap.dedent(
     name: layers
     model: {public_id: m}
     ingresses:
-      - {id: engine, kind: vllm, base_url: "http://localhost:8000", surfaces: [chat_completions]}
-      - {id: router, kind: llmd_router, base_url: "http://localhost:8001", surfaces: [messages]}
+      - {id: engine, kind: engine, base_url: "http://localhost:8000", surfaces: [chat_completions]}
+      - {id: router, kind: router, base_url: "http://localhost:8001", surfaces: [messages]}
     """
 )
 

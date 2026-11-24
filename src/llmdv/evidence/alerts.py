@@ -25,8 +25,10 @@ not a comparison was made, so a pager can tell it from a new break on the first 
 the run summary's attribution ladder uses (`profile/topology.py`): from the failing layer, step
 to a failing layer among the nearest layers behind it that reported, until all of those passed
 or there is none. It is a hypothesis; `basis` says what it rests on. A run recorded before
-outcome.json carried the graph is read by kind depth, as it was then, so an archived run's feed
-does not change. So is a run whose recorded graph misses an ingress that reported.
+outcome.json carried the graph is read by kind depth, as it was then. So is a run whose recorded
+graph misses an ingress that reported. Runs recorded before kinds became positions (#91, during
+incubation) name products (`vllm`, `litellm`); those are not read as positions, so their layers
+are left unplaced.
 
 `publication` and `job_exit_code` are only set on the local copy, which `llmdv job` also prints as
 the last line of its output. Like `outcome.json`, the published copy cannot know how its own
@@ -161,8 +163,7 @@ def attribute(
 def _attribute_by_depth(record: dict, column: dict[str, dict]) -> tuple[dict, str]:
     """`attribute` for a run with no recorded graph: the rule such runs were read with.
 
-    Only layers strictly inside this one count, nearest first. Kept unchanged so an archived
-    run's feed is the same bytes whenever it is rebuilt.
+    Only layers strictly inside this one count, nearest first, as such runs were read.
     """
     here = record.get("ingress") or "-"
     mine = _depth(record)

@@ -31,7 +31,7 @@ CANDIDATES = sorted(
     + [ROOT / "deploy" / "overlays" / "example" / "profile.yaml"]
 )
 OUTCOMES = ("pass", "fail", "error")
-KINDS = (IngressKind.LITELLM, IngressKind.LLMD_ROUTER, IngressKind.VLLM)
+KINDS = (IngressKind.GATEWAY, IngressKind.ROUTER, IngressKind.ENGINE)
 
 
 def standalone(path: Path) -> Profile | None:
@@ -234,7 +234,7 @@ def test_a_layer_whose_peers_behind_it_all_pass_names_them_all():
 
 
 def test_an_archived_run_without_a_graph_keeps_the_depth_reading(tmp_path):
-    """Archived feeds are rebuilt byte for byte, so the depth walk's peer step is kept there.
+    """A run with no recorded graph is read by kind depth, the depth walk's peer step included.
 
     Known wrong, kept on purpose: with no graph recorded, the depth walk steps from the
     failing prefill to its passing peer. A run that records its graph never reads this way.

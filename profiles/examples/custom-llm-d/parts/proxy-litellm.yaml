@@ -38,7 +38,7 @@
 
 ingresses:
   - id: litellm
-    kind: litellm
+    kind: gateway
     base_url_env: LLMDV_LITELLM_URL
     auth: {type: bearer, key_env: LLMDV_LITELLM_KEY}
 

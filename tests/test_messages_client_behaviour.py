@@ -146,7 +146,7 @@ def two_layers(tmp_path, engine, gateway):
     profile = declare(tmp_path, engine, prompt_accounting=True)
     raw = yaml.safe_load(profile.read_text())
     raw["ingresses"].append(
-        {**raw["ingresses"][0], "id": "gateway", "kind": "litellm", "base_url": gateway.base_url}
+        {**raw["ingresses"][0], "id": "gateway", "kind": "gateway", "base_url": gateway.base_url}
     )
     profile.write_text(yaml.safe_dump(raw))
     code, records = run_suites(
@@ -171,6 +171,32 @@ def test_a_layer_is_compared_with_the_engine_behind_it(tmp_path, defect, passes)
     assert failed_check(by_ingress["gateway"], "prompt_size_matches_engine") is not passes
 
 
+@pytest.mark.parametrize("defect,passes", [(None, True), ("drops_mid_system", False)])
+def test_a_gateway_and_a_router_are_each_compared_with_the_engine_behind_them(
+    tmp_path, defect, passes
+):
+    """Three layers by position, gateway in front of router in front of engine: each outer
+    layer is compared with the engine, and only the defective one fails."""
+    with fake(prompt_accounting=True) as engine, fake(prompt_accounting=True) as gateway:
+        with fake(prompt_accounting=True, context_defect=defect) as router:
+            profile = declare(tmp_path, engine, prompt_accounting=True)
+            raw = yaml.safe_load(profile.read_text())
+            base = raw["ingresses"][0]
+            raw["ingresses"] += [
+                {**base, "id": "router", "kind": "router", "base_url": router.base_url},
+                {**base, "id": "gateway", "kind": "gateway", "base_url": gateway.base_url},
+            ]
+            profile.write_text(yaml.safe_dump(raw))
+            code, records = run_suites(
+                profile, tmp_path / "run", "-k", "test_prompt_size_matches_the_engine"
+            )
+    by_ingress = {r["ingress"]: r for r in records}
+    assert code == (0 if passes else 1)
+    assert by_ingress["fake"]["outcome"] == "skip"
+    assert by_ingress["gateway"]["outcome"] == "pass"
+    assert by_ingress["router"]["outcome"] == ("pass" if passes else "fail")
+
+
 def test_a_single_ingress_has_nothing_to_compare_with(tmp_path):
     with fake(prompt_accounting=True) as fleet:
         code, by_case = run(
@@ -186,7 +212,7 @@ def test_two_engines_leave_the_comparison_ambiguous(tmp_path):
         raw = yaml.safe_load(profile.read_text())
         raw["ingresses"].append({**raw["ingresses"][0], "id": "pool-b", "base_url": other.base_url})
         raw["ingresses"].append(
-            {**raw["ingresses"][0], "id": "gateway", "kind": "litellm", "base_url": other.base_url}
+            {**raw["ingresses"][0], "id": "gateway", "kind": "gateway", "base_url": other.base_url}
         )
         profile.write_text(yaml.safe_dump(raw))
         code, records = run_suites(

@@ -29,7 +29,7 @@ name: unit
 model: {public_id: some/model}
 ingresses:
   - id: direct
-    kind: vllm
+    kind: engine
     base_url: http://localhost:9999
     surfaces: [chat_completions]
 """
@@ -45,52 +45,87 @@ def test_minimal_profile_loads_clean(tmp_path):
     profile = loader.load(write(tmp_path, MINIMAL))
     assert profile.name == "unit"
     assert profile.ingress_ids == ("direct",)
-    assert profile.ingress("direct").kind is IngressKind.VLLM
+    assert profile.ingress("direct").kind is IngressKind.ENGINE
     assert [d for d in loader.validate(profile) if d.level == "error"] == []
 
 
-def test_ingress_role_implementation_loads_for_identity(tmp_path):
-    profile = loader.load(
-        write(
-            tmp_path,
-            MINIMAL.replace(
-                "  - id: direct\n",
-                "  - id: direct\n    role: engine\n    implementation: vllm\n",
-            ),
-        )
+def test_kind_is_required(tmp_path):
+    """A silent default would place the layer somewhere nobody chose."""
+    with pytest.raises(
+        loader.ProfileError, match=r"kind: required; one of gateway, router, engine"
+    ):
+        loader.load(write(tmp_path, MINIMAL.replace("    kind: engine\n", "")))
+
+
+@pytest.mark.parametrize(
+    "product, position",
+    [
+        ("vllm", "engine"),
+        ("llmd_router", "router"),
+        ("litellm", "gateway"),
+        ("VLLM", "engine"),
+        ("LiteLLM", "gateway"),
+        ("' vllm'", "engine"),
+    ],
+)
+def test_a_product_kind_is_refused_naming_its_position(tmp_path, product, position):
+    with pytest.raises(loader.ProfileError, match=rf"names a product.*use '{position}'"):
+        loader.load(write(tmp_path, MINIMAL.replace("kind: engine", f"kind: {product}")))
+
+
+@pytest.mark.parametrize("value", ["[engine]", "{engine: 1}", "3"])
+def test_a_kind_that_is_not_a_word_names_the_field_and_the_valid_kinds(tmp_path, value):
+    """A list or a mapping where a position belongs is reported at its path, with the choices,
+    not as a bare type error."""
+    with pytest.raises(loader.ProfileError, match=r"kind: .* is not one of: gateway, router"):
+        loader.load(write(tmp_path, MINIMAL.replace("kind: engine", f"kind: {value}")))
+
+
+def test_a_retired_field_is_reported_with_the_ingress_s_other_problems(tmp_path):
+    text = MINIMAL.replace("  - id: direct\n", "  - id: direct\n    role: engine\n").replace(
+        "kind: engine", "kind: sidecar"
     )
-    ingress = profile.ingress("direct")
-    assert (ingress.role, ingress.implementation) == ("engine", "vllm")
+    with pytest.raises(loader.ProfileError) as exc:
+        loader.load(write(tmp_path, text))
+    message = str(exc.value)
+    assert "role: no longer an ingress field" in message
+    assert "kind: 'sidecar' is not one of" in message
 
 
-def test_ingress_role_rejects_typos(tmp_path):
-    with pytest.raises(loader.ProfileError, match="role"):
+def test_an_unknown_kind_is_refused_with_the_valid_ones(tmp_path):
+    with pytest.raises(loader.ProfileError, match="not one of: gateway, router, engine"):
+        loader.load(write(tmp_path, MINIMAL.replace("kind: engine", "kind: sidecar")))
+
+
+@pytest.mark.parametrize("value", ["Engine", " ENGINE "])
+def test_a_position_is_read_whatever_its_case(tmp_path, value):
+    """As a product name is recognised in any case, so is a position."""
+    profile = loader.load(write(tmp_path, MINIMAL.replace("kind: engine", f"kind: '{value}'")))
+    assert profile.ingresses[0].kind is IngressKind.ENGINE
+
+
+@pytest.mark.parametrize(
+    "key, replacement",
+    [
+        ("role", "use kind for the layer's position, and the top-level engine or gateway"),
+        ("implementation", "top-level engine or gateway"),
+    ],
+)
+def test_a_retired_ingress_field_is_refused_naming_its_replacement(tmp_path, key, replacement):
+    with pytest.raises(
+        loader.ProfileError, match=rf"{key}: no longer an ingress field.*{replacement}"
+    ):
         loader.load(
-            write(
-                tmp_path,
-                MINIMAL.replace(
-                    "  - id: direct\n",
-                    "  - id: direct\n    role: engnie\n    implementation: vllm\n",
-                ),
-            )
+            write(tmp_path, MINIMAL.replace("  - id: direct\n", f"  - id: direct\n    {key}: x\n"))
         )
 
 
-def test_ingress_role_rejects_duplicate_sources(tmp_path):
-    profile = loader.load(
-        write(
-            tmp_path,
-            MINIMAL.replace(
-                "name: unit",
-                "name: unit\nengine: legacy",
-            ).replace(
-                "  - id: direct\n",
-                "  - id: direct\n    role: engine\n    implementation: vllm\n",
-            ),
-        )
-    )
-    errors = [item for item in loader.validate(profile) if item.level == "error"]
-    assert any("not both engine and ingress" in item.message for item in errors)
+def test_two_engine_ingresses_load_as_peers(tmp_path):
+    """A prefill and a decode engine sit at one position and are never compared."""
+    second = "  - id: decode\n    kind: engine\n    base_url: http://localhost:9998\n"
+    profile = loader.load(write(tmp_path, MINIMAL + second))
+    assert [d for d in loader.validate(profile) if d.level == "error"] == []
+    assert profile.topology().fronts == {"direct": (), "decode": ()}
 
 
 def test_negative_context_length_is_an_invalid_profile(tmp_path):
@@ -211,7 +246,7 @@ def test_invalid_yaml_raises_profile_error(tmp_path):
 
 def test_bad_enum_names_the_allowed_values(tmp_path):
     with pytest.raises(loader.ProfileError, match="is not one of"):
-        loader.load(write(tmp_path, MINIMAL.replace("kind: vllm", "kind: not_a_kind")))
+        loader.load(write(tmp_path, MINIMAL.replace("kind: engine", "kind: not_a_kind")))
 
 
 def test_non_http_base_url_is_an_error(tmp_path):
@@ -322,7 +357,7 @@ model:
   public_id: m
   reasoning: {parser: null, inline_tag: think, default_on: true}
 ingresses:
-  - {id: a, kind: vllm, base_url: 'http://x:1', surfaces: [chat_completions]}
+  - {id: a, kind: engine, base_url: 'http://x:1', surfaces: [chat_completions]}
 """,
         )
     )
@@ -464,7 +499,7 @@ def test_laptop_is_accepted_as_a_deprecated_alias(tmp_path):
             model: {public_id: m}
             ingresses:
               - id: a
-                kind: vllm
+                kind: engine
                 base_url: http://localhost:1
                 surfaces: [chat_completions]
         """)
@@ -481,7 +516,7 @@ def test_vantage_defaults_to_external(tmp_path):
             model: {public_id: m}
             ingresses:
               - id: a
-                kind: vllm
+                kind: engine
                 base_url: http://localhost:1
                 surfaces: [chat_completions]
         """)
@@ -530,7 +565,7 @@ def resolve(document, path):
     return node
 
 
-INGRESS = "  - id: direct\n    kind: vllm\n    base_url: http://localhost:9999\n"
+INGRESS = "  - id: direct\n    kind: engine\n    base_url: http://localhost:9999\n"
 
 
 @pytest.mark.parametrize(
@@ -587,7 +622,10 @@ def test_one_load_reports_every_shape_error(tmp_path):
 
 def test_an_inherited_load_error_is_reported_once_where_it_was_declared(tmp_path):
     text = MINIMAL.replace("public_id: some/model", "public_id: some/model, aliases: other")
-    text += "  - {id: second, base_url: 'http://localhost:9998', model: {aliases: [x, 1]}}\n"
+    text += (
+        "  - {id: second, kind: engine, base_url: 'http://localhost:9998',"
+        " model: {aliases: [x, 1]}}\n"
+    )
     with pytest.raises(loader.ProfileError) as exc:
         loader.load(write(tmp_path, text))
     paths = [line.split(": ")[1] for line in str(exc.value).splitlines()]
@@ -596,7 +634,10 @@ def test_an_inherited_load_error_is_reported_once_where_it_was_declared(tmp_path
 
 def test_an_inherited_model_problem_is_validated_once(tmp_path):
     text = MINIMAL.replace("model: {public_id: some/model}", "model: {}")
-    text += "  - {id: second, base_url: 'http://localhost:9998', surfaces: [chat_completions]}\n"
+    text += (
+        "  - {id: second, kind: engine, base_url: 'http://localhost:9998',"
+        " surfaces: [chat_completions]}\n"
+    )
     errors = [d for d in loader.validate(loader.load(write(tmp_path, text))) if d.level == "error"]
     assert errors == [loader.Diagnostic("error", "model.public_id", "required")]
 

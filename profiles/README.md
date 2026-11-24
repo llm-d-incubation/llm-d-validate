@@ -23,9 +23,9 @@ profiles/
 
 | File | What it is |
 | --- | --- |
-| `examples/example-engine-only.yaml` | One `vllm` ingress reached directly, with no gateway or router and no cluster access: a single model server. |
-| `examples/example-gateway-only.yaml` | One `litellm` ingress and no cluster access. The shape you get when a key is all you have. |
-| `examples/example-two-ingress.yaml` | An llm-d fleet without LiteLLM: a `vllm` engine and an `llmd_router` gateway. Captured from a live stack; the environment and service names are placeholders. |
+| `examples/example-engine-only.yaml` | One vLLM `engine` ingress reached directly, with no gateway or router and no cluster access: a single model server. |
+| `examples/example-gateway-only.yaml` | One LiteLLM `gateway` ingress and no cluster access. The shape you get when a key is all you have. |
+| `examples/example-two-ingress.yaml` | An llm-d fleet without LiteLLM: a vLLM `engine` and the llm-d `router`. Captured from a live stack; the environment and service names are placeholders. |
 | `examples/example-three-ingress.yaml` | The full shape with LiteLLM in front of the router and engine, including header dispositions. A template: replace each value with what you measure. |
 | `examples/example-two-ingress-staging.yaml` | The two-ingress stack in a second namespace, written with [`extends`](#reuse-a-profile-with-extends) as only its changes. |
 | `examples/custom-llm-d/` | A custom llm-d stack (LiteLLM, the llm-d router, vLLM) for two models, built from shared parts with `extends`. |
@@ -88,7 +88,7 @@ model:
 
 ingresses:
   - id: gateway                # becomes the column name; `-k gateway` selects it
-    kind: litellm              # vllm (default), llmd_router or litellm
+    kind: gateway              # where it sits: gateway, router or engine (required)
     base_url_env: MY_BASE_URL  # the URL comes from $MY_BASE_URL, never the file
     auth:
       type: bearer

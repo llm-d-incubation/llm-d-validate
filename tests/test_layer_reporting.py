@@ -53,14 +53,14 @@ def _banner(monkeypatch, records: list[dict], layers: list[str] | None) -> str:
 def test_the_order_is_outermost_first_whatever_the_records_say(tmp_path):
     """Records arrive in execution order; the report reads in request order."""
     records = [_rec("engine", "pass"), _rec("gateway", "pass")]
-    profile = _profile(tmp_path, [("engine", "vllm"), ("gateway", "litellm")])
+    profile = _profile(tmp_path, [("engine", "engine"), ("gateway", "gateway")])
     assert layer_order(records, profile) == ["gateway", "engine"]
 
 
 def test_an_undeclared_ingress_keeps_its_place_rather_than_vanishing(tmp_path):
     """It ran, so it has a column. Dropping it would hide a result that exists."""
     records = [_rec("gateway", "pass"), _rec("mystery", "fail")]
-    profile = _profile(tmp_path, [("gateway", "litellm")])
+    profile = _profile(tmp_path, [("gateway", "gateway")])
     assert layer_order(records, profile) == ["gateway", "mystery"]
 
 

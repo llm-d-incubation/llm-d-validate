@@ -29,22 +29,20 @@ def test_profile_assertion_mismatch_is_a_usage_error():
         validate_lane({"model": "wrong"}, {"model": "model-a"})
 
 
-def test_identity_derives_engine_and_gateway_from_role_layer_implementations():
-    class Layer:
-        def __init__(self, role, implementation):
-            self.role = role
-            self.implementation = implementation
+def test_identity_takes_engine_and_gateway_from_the_top_level_fields():
+    """The product behind a layer is named at the top level, where a profile whose engine is
+    not one of its ingresses (a guide profile tested at the router) can still state it."""
 
     class Profile:
         guide = "guide-a"
-        engine = "legacy-engine"
-        gateway = "legacy-gateway"
+        engine = "sglang"
+        gateway = "kong"
         model = type("Model", (), {"public_id": "model-a"})()
-        ingresses = (Layer("engine", "vllm"), Layer("gateway", "litellm"))
+        ingresses = ()
 
     value = build(Profile(), {}, "digest")
-    assert value["engine"] == "vllm"
-    assert value["gateway"] == "litellm"
+    assert value["engine"] == "sglang"
+    assert value["gateway"] == "kong"
 
 
 def test_identity_has_fixed_dimensions_and_reports_non_configuration_notes():

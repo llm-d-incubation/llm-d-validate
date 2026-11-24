@@ -40,7 +40,7 @@ model:
 
 ingresses:
   - id: engine
-    kind: vllm
+    kind: engine
     # MEASURE THIS: where the engine listens. `vllm serve` defaults to port 8000.
     base_url: http://localhost:8000
     # vLLM authenticates only when started with --api-key; then use

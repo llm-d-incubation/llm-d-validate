@@ -190,7 +190,7 @@ schema: llmdv.profile/1
 model: {public_id: m, max_model_len: 4096}
 ingresses:
   - id: gw
-    kind: litellm
+    kind: gateway
     base_url: http://127.0.0.1:1
     auth: {type: none}
     surfaces: [chat_completions]

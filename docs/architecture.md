@@ -33,7 +33,7 @@ Attribution is a reading of that table, not a proof, so which endpoint each requ
 recorded on every result and exchange. Response identity headers are observations only: different
 layers may emit the same values, and correlation headers do not prove forwarding or backend
 logging. The ladder's rows come from the layers a profile declares, ordered by
-`kind` (`litellm` fronts `llmd_router` fronts `vllm`). That order is a graph
+`kind`, a position (`gateway` fronts `router` fronts `engine`), never a product. That order is a graph
 (`profile/topology.py`): two ingresses of one kind, such as a prefill and a decode engine, are
 peers, and a layer is compared only with the nearest layers behind it that reported. Going
 inward one kind at a time, the comparison stops at the first kind where any layer reported. So
@@ -90,8 +90,8 @@ decide independently when their routes answer.
 ## Run identity
 
 Each run records one fixed identity in `outcome.json`, `alerts.json` and `comparison.json`.
-Guide and model come from the profile; engine and gateway come from the `implementation` on their
-role layers; accelerator, provider, `llm_d_ref` and trigger come from `--identity`; llmdv records
+Guide, model, engine and gateway come from the profile (`engine` and `gateway` are top-level
+fields naming the products); accelerator, provider, `llm_d_ref` and trigger come from `--identity`; llmdv records
 its version and the profile digest. Automatic comparisons require matching configuration
 dimensions, so different overlays cannot become one another's baselines. An unreadable archived
 identity is an archive/environment error, not a legacy run.
@@ -260,7 +260,7 @@ test that checked nothing.
 
 ## Extending llmdv
 
-A new surface, ingress kind, case, client or assertion is additive: register it, preserve the
+A new surface, case, client or assertion is additive, and a new product at any layer needs no code: register it, preserve the
 invariants above, and prove the new case can fail: add the defect to `tests/fakes.py` and assert
 the failure, including that a recorded check is marked not-ok. The steps are in the
 [`extending-llmdv`](../.agents/skills/extending-llmdv/SKILL.md) skill.

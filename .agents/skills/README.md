@@ -7,7 +7,7 @@ start. [AGENTS.md](../../AGENTS.md) lists when to use each.
 | --- | --- |
 | [writing-an-infra-profile](writing-an-infra-profile/SKILL.md) | writing or reviewing a profile; splitting one stack into parts; profiles for an llm-d guide's CI lanes; publishing a profile written against a private stack |
 | [probing-a-fleet-before-asserting](probing-a-fleet-before-asserting/SKILL.md) | writing or changing an assertion about a live response |
-| [extending-llmdv](extending-llmdv/SKILL.md) | adding a surface, ingress kind, case, client, assertion or capability |
+| [extending-llmdv](extending-llmdv/SKILL.md) | adding a surface, case, client, assertion or capability, or supporting another gateway, router or engine product |
 | [testing-a-model-deployment](testing-a-model-deployment/SKILL.md) | testing a model you were handed endpoints for |
 | [running-and-comparing-live-runs](running-and-comparing-live-runs/SKILL.md) | starting (from a PC or as a cluster job), publishing, pulling back and comparing live runs |
 | [reporting-a-run](reporting-a-run/SKILL.md) | building the annotated dashboard for a run |
