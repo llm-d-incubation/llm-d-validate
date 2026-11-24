@@ -95,4 +95,4 @@ capabilities:
     use_beam_search: accepted
 
   # INTENT: every vLLM request option, each judged by its effect.
-  vllm_options: [return_token_ids, min_tokens, ignore_eos, truncate_prompt_tokens, include_stop_str_in_output, continue_final_message, echo, continuous_usage_stats, structured_outputs, guided_choice, return_tokens_as_token_ids, prompt_logprobs, allowed_token_ids, bad_words, logit_bias, enable_thinking, include_reasoning, stop_reason, cache_salt, chat_template_kwargs]
+  extension_options: [return_token_ids, min_tokens, ignore_eos, truncate_prompt_tokens, include_stop_str_in_output, continue_final_message, echo, continuous_usage_stats, structured_outputs, guided_choice, return_tokens_as_token_ids, prompt_logprobs, allowed_token_ids, bad_words, logit_bias, enable_thinking, include_reasoning, stop_reason, cache_salt, chat_template_kwargs]

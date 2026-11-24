@@ -130,7 +130,7 @@ capabilities:
   vision: false
   # Engine-specific request options (see REFERENCE.md). Left empty until each is probed, rather
   # than claiming unverified support.
-  vllm_options: []
+  extension_options: []
 
 headers:
   x-request-id:

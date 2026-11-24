@@ -23,7 +23,7 @@ def test_salt_isolation_has_a_warm_control(tmp_path, surface, declaration, defec
         declaration,
         "test_cache_salt_isolation",
         defect,
-        vllm_options=["cache_salt"],
+        extension_options=["cache_salt"],
     )
     assert code == (0 if defect is None else 1), records
     assert records[0]["outcome"] == ("pass" if defect is None else "fail"), records
@@ -40,7 +40,7 @@ def test_salt_isolation_needs_a_cold_rule(tmp_path):
         "chat_completions",
         declaration,
         "test_cache_salt_isolation",
-        vllm_options=["cache_salt"],
+        extension_options=["cache_salt"],
     )
     assert code == 0 and records[0]["outcome"] == "skip", records
     assert "[undeclared]" in records[0]["reason"], records

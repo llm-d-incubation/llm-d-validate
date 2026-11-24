@@ -119,7 +119,7 @@ capabilities:
   structured_output: false
   # Set for a multimodal model served with its vision path on; the image cases then run.
   vision: false
-  vllm_options: []
+  extension_options: []
 
 headers:
   # This is the block that makes the three-ingress shape worth testing. In this example LiteLLM

@@ -8,7 +8,7 @@
 # "Tuning"); its combination file says so, since that is an overlay fact, not an engine-wide one.
 #
 # DECLARES NOTHING YET, on purpose. Everything engine-independent comes from parts/base.yaml; what is
-# left is SGLang's own request extensions, and llmdv's extension vocabularies (`vllm_options` and
+# left is SGLang's own request extensions, and llmdv's extension vocabularies (`extension_options` and
 # the extension entries of `chat_fields` and `completions_fields`) are vLLM's. Which of them SGLang
 # also serves, and with what effect, is not established by the shipped config or by any run, so
 # they stay skip:undeclared rather than borrowing vLLM's answers. The first run against an SGLang

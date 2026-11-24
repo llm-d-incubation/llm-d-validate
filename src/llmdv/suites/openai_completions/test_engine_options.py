@@ -5,7 +5,7 @@ and evaluators read them to score exactly the tokens the engine saw and sampled.
 `truncate_prompt_tokens` caps the prompt the engine reads, so a client can send an overlong
 prompt and still get an answer. A layer that accepts either option and drops its effect
 answers 200, so each case asserts the effect. Each runs where the profile enables the
-contract and `capabilities.vllm_options` names the option.
+contract and `capabilities.extension_options` names the option.
 """
 
 from __future__ import annotations

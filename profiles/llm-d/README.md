@@ -101,7 +101,7 @@ Lanes share a profile when the overlays they deploy give a client the same model
 - **Gateway role** (#24): llmdv has no role for a Gateway in front of the EPP yet, and no lane runs gateway mode.
 - **Surfaces**: the EPP also routes `/v1/embeddings` and `/inference/v1/generate` (both answered on kind), which llmdv has no surface for.
 - **Engine kinds**: no profile declares an engine ingress, because a committed profile names no pod and per-replica URLs are a lane's to provide. When an engine layer is added, `vllm` is the only engine kind and would misdescribe SGLang's and Atom's error envelopes, health paths and metric names.
-- **Non-vLLM extension vocabularies**: llmdv's extension vocabularies (`vllm_options` and the extension entries of `chat_fields` and `completions_fields`) are vLLM's. `parts/engines/sglang.yaml` and `atom.yaml` declare none of them until a run shows which each engine serves.
+- **Non-vLLM extension vocabularies**: llmdv's extension vocabularies (`extension_options` and the extension entries of `chat_fields` and `completions_fields`) are vLLM's. `parts/engines/sglang.yaml` and `atom.yaml` declare none of them until a run shows which each engine serves.
 - **`ocp` provider**: the `ibm-acc-gpu-vllm-x` lane deploys `gpu/vllm/ocp`, but `ocp` is not among `guide.yaml`'s `INFRA_PROVIDER` values or the README's support table.
 - **Unknown context window**: the Atom overlay sets no window and no source states its default, so that profile's context cases skip as undeclared until someone states the value.
 - **Model-name rewrite header**: the EPP overrides the body's model with `x-llm-d-model-name-rewrite`, but `transport.model_rewrite_header` requires the answer to echo the client's name, which the EPP does not promise.

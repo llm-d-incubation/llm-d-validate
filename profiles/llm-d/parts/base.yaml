@@ -19,7 +19,7 @@
 #
 # Not declared here, and why (each stays skip:undeclared by design):
 #   vision, reasoning efforts, thinking modes, reasoning_tokens   model facts; see models/
-#   vllm_options, vLLM extension fields   engine facts; see engines/vllm.yaml
+#   extension_options, vLLM extension fields   engine facts; see engines/vllm.yaml
 #   cache_reuse                  a guide decision; see guides/
 #   model_info                   GET /v1/model/info is a LiteLLM route; no layer here serves it
 #   header_probe, header_rewrites   need the header-echo instrument deployed behind the router,

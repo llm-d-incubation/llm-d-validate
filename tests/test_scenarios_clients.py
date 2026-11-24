@@ -250,7 +250,7 @@ def run_quiet(tmp_path, *, quiet=("low",), options=("chat_template_kwargs",), **
         raw = yaml.safe_load(path.read_text())
         raw["ingresses"][0]["surfaces"] = ["chat_completions"]
         raw["capabilities"]["chat_quiet_efforts"] = list(quiet)
-        raw["capabilities"]["vllm_options"] = list(options)
+        raw["capabilities"]["extension_options"] = list(options)
         path.write_text(yaml.safe_dump(raw))
         code, records = run_suites(path, tmp_path / "run", "-k", "test_quiet_effort")
     return code, {r["variant"].rpartition("/")[2]: r for r in records if r["case_id"] == QUIET_CASE}

@@ -108,7 +108,7 @@ capabilities:
   structured_output: false
   # Set for a multimodal model served with its vision path on; the image cases then run.
   vision: false
-  vllm_options: []
+  extension_options: []
 
 headers:
   # MEASURE THESE. A gateway is the layer most likely to add, drop or rewrite a header, and only

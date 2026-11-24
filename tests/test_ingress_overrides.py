@@ -30,7 +30,7 @@ def configuration():
             "count_tokens": True,
             "stateful_responses": True,
             "structured_output": ["chat_completions", "responses"],
-            "vllm_options": ["priority", "cache_salt"],
+            "extension_options": ["priority", "cache_salt"],
         },
         "ingresses": [
             {
@@ -91,7 +91,11 @@ def test_nested_fields_inherit_and_explicit_values_replace_without_mutating_defa
             },
             "tools": {"parser": None},
         },
-        capabilities={"count_tokens": False, "structured_output": ["messages"], "vllm_options": []},
+        capabilities={
+            "count_tokens": False,
+            "structured_output": ["messages"],
+            "extension_options": [],
+        },
     )
     profile = loader.load(write(tmp_path, config))
     engine, gateway = (profile.ingress(name) for name in ("engine", "gateway"))
@@ -117,7 +121,7 @@ def test_nested_fields_inherit_and_explicit_values_replace_without_mutating_defa
     assert not gateway.capabilities.count_tokens
     assert gateway.capabilities.stateful_responses
     assert gateway.capabilities.structured_output == ("messages",)
-    assert gateway.capabilities.vllm_options == ()
+    assert gateway.capabilities.extension_options == ()
     assert loader.validate(profile) == []
     with pytest.raises(FrozenInstanceError):
         gateway.model.public_id = "changed"
@@ -211,7 +215,7 @@ def test_null_model_info_override_clears_an_inherited_mapping(tmp_path):
         ("capabilities", {"count_tokens": None}, "capabilities.count_tokens"),
         ("capabilities", {"structured_output": ["bogus"]}, "capabilities.structured_output[0]"),
         ("capabilities", {"structured_output": "messages"}, "capabilities.structured_output"),
-        ("capabilities", {"vllm_options": "priority"}, "capabilities.vllm_options"),
+        ("capabilities", {"extension_options": "priority"}, "capabilities.extension_options"),
     ],
 )
 def test_invalid_override_fails_during_loading_with_its_ingress_path(tmp_path, block, value, field):

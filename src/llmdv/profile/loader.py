@@ -739,21 +739,47 @@ def _ingress_model(override: Any, defaults: dict[str, Any], where: str) -> Model
     return _model(compose.merge(defaults, override), where)
 
 
+# Capability keys that were renamed, and the name that replaced each. Refused rather than aliased,
+# so a profile says what it means under one name.
+_RENAMED_CAPABILITIES = {"vllm_options": "extension_options"}
+
+
+def _renamed_capabilities(raw: Any, where: str) -> list[str]:
+    """One problem per renamed key `raw` still declares, reported with the block's others."""
+    if not isinstance(raw, dict):
+        return []  # reported by the block's own parser
+    return [
+        f"{where}.{old}: renamed; declare {where}.{new} instead"
+        for old, new in _RENAMED_CAPABILITIES.items()
+        if old in raw
+    ]
+
+
 def _ingress_capabilities(override: Any, defaults: dict[str, Any], where: str) -> Capabilities:
-    _check_override_keys(
-        override,
-        Capabilities,
-        where,
-        nullable=(
-            "cache_reuse",
-            "effort_rendering",
-            "model_info",
-            "model_retrieval",
-            "responses_input_tokens",
-            "responses_compact",
-        ),
-    )
-    return _capabilities(compose.merge(defaults, override), where)
+    renamed = _renamed_capabilities(override, where)
+    if renamed:
+        # Named as renamed above, not again as an unknown field.
+        override = {
+            key: value for key, value in override.items() if key not in _RENAMED_CAPABILITIES
+        }
+    try:
+        _check_override_keys(
+            override,
+            Capabilities,
+            where,
+            nullable=(
+                "cache_reuse",
+                "effort_rendering",
+                "model_info",
+                "model_retrieval",
+                "responses_input_tokens",
+                "responses_compact",
+            ),
+        )
+    except ProfileError as exc:
+        raise ProfileError(*renamed, *exc.problems) from None
+    # The defaults were checked for renamed keys where they were declared.
+    return _capability_block(compose.merge(defaults, override), where, renamed)
 
 
 def _model(raw: dict[str, Any], where: str = "model") -> Model:
@@ -1074,8 +1100,13 @@ def _contract_surfaces(value: Any, where: str) -> bool | tuple[str, ...]:
 
 
 def _capabilities(raw: dict[str, Any], where: str = "capabilities") -> Capabilities:
-    return Capabilities(
-        **_each(
+    return _capability_block(raw, where, _renamed_capabilities(raw, where))
+
+
+def _capability_block(raw: dict[str, Any], where: str, renamed: list[str]) -> Capabilities:
+    """The block's capabilities, or every problem in it, `renamed` first, raised once."""
+    try:
+        values = _each(
             prefix_stability=lambda: _surface_capability(
                 raw.get("prefix_stability"), f"{where}.prefix_stability"
             ),
@@ -1122,8 +1153,8 @@ def _capabilities(raw: dict[str, Any], where: str = "capabilities") -> Capabilit
             reasoning_tokens=lambda: _surface_capability(
                 raw.get("reasoning_tokens"), f"{where}.reasoning_tokens"
             ),
-            vllm_options=lambda: parse.strings(
-                raw.get("vllm_options", ()), f"{where}.vllm_options"
+            extension_options=lambda: parse.strings(
+                raw.get("extension_options", ()), f"{where}.extension_options"
             ),
             messages_thinking=lambda: _declared_values(
                 raw.get("messages_thinking", ()),
@@ -1215,7 +1246,11 @@ def _capabilities(raw: dict[str, Any], where: str = "capabilities") -> Capabilit
                 raw.get("messages_features", {}), f"{where}.messages_features"
             ),
         )
-    )
+    except ProfileError as exc:
+        raise ProfileError(*renamed, *exc.problems) from None
+    if renamed:
+        raise ProfileError(*renamed)
+    return Capabilities(**values)
 
 
 def _samples(value: Any, where: str) -> dict[str, SampleRule]:
