@@ -21,8 +21,9 @@
 # Excluded, and why:
 #   vision, reasoning efforts, thinking modes, reasoning_tokens   the simulator neither reads
 #                       images nor reasons
-#   stored responses, background responses   the simulator keeps no response state worth
-#                       asserting; compact and input_tokens are left to accept either answer
+#   response state      the simulator generates for unknown ids and ignores store and
+#                       background, so neither stored nor stateless responses are asserted;
+#                       compact and input_tokens are left to accept either answer
 #   engine extensions   no engine part: which vLLM extensions the simulator honours is not
 #                       established
 
@@ -46,7 +47,11 @@ model:
 capabilities:
   # INTENT: the simulator reads no images.
   vision: false
-  # INTENT, overriding parts/base.yaml: no response state is asserted on the simulator.
+  # INTENT, overriding parts/base.yaml: no response state, and no statelessness either, is
+  # asserted on the simulator. FROM docs: it generates for unknown ids and ignores store and
+  # background (llm-d-inference-sim@v1.2.0:pkg/communication/http.go:84-88), so the stateless
+  # refusals would fail on the simulator, not on the router under test.
+  stateless_responses: false
   stateful_responses: false
   background_responses: false
   responses_compact: null

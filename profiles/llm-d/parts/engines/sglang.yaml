@@ -17,10 +17,14 @@
 # they stay skip:undeclared rather than borrowing vLLM's answers. The first run against an SGLang
 # lane settles them: add the fields it accepts here, each with its MEASURED note.
 #
+# FROM docs: SGLang serves /v1/responses, stateless unless launched with --enable-response-store
+# (none of these overlays is); without it chaining, background, GET and cancel answer 400
+# (sglang@v0.5.22:serving_responses.py:257-303). It registers no compact or input_tokens route
+# (sglang@v0.5.22:http_server.py). parts/base.yaml declares both.
+#
 # Unknown, and left to the first run (each surfaces as a failure or a skip there, never a guess
-# here): whether SGLang serves /v1/messages, /v1/messages/count_tokens, /v1/responses and its
-# compact and input_tokens routes; whether it reports reasoning token counts; its error envelope
-# for its own validation errors.
+# here): whether SGLang serves /v1/messages and /v1/messages/count_tokens; whether it reports
+# reasoning token counts; its error envelope for its own validation errors.
 #
 # Not declared here, and why:
 #   the engine ingress          as for vLLM (engines/vllm.yaml): a per-replica SGLang layer is

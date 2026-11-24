@@ -141,15 +141,35 @@ capabilities:
   # Expected to fail until the team triages it.
   model_retrieval: true
 
-  # INTENT: the Responses API stores responses and can cancel a background one. Through a router
-  # that balances across replicas, a retrieval may reach a replica that never saw the response;
-  # that is a finding for the team, not a reason to leave the case out.
-  stateful_responses: true
-  background_responses: true
-  # INTENT: both are Responses API routes. The EPP's supported-API list (FROM docs:
-  # docs/api-reference/epp-http-apis.md) names only /v1/responses itself, so these may be refused.
-  responses_compact: true
-  responses_input_tokens: true
+  # The Responses API keeps no state: retrieval, chaining and background generation of a response
+  # it created are refused.
+  # FROM docs: every engine the guides deploy keeps no Responses state by default. vLLM stores
+  # only with VLLM_ENABLE_RESPONSES_API_STORE=1 (vllm@v0.31.0:vllm/envs.py:1888-1899); otherwise
+  # `store` is dropped (vllm@v0.31.0:vllm/entrypoints/openai/responses/serving.py:337-345), GET
+  # and cancel of an unstored id answer 404 (:1119-1177) and background with store answers 400
+  # (:257-269). Same default in v0.26.0 (fast-model-actuation's launcher), v0.30.0 (llm-d-xpu),
+  # v0.32.0rc2 and main. SGLang stores only with --enable-response-store, which PD mode refuses
+  # (sglang@v0.5.22:python/sglang/srt/arg_groups/validation_hook.py:110); without it chaining,
+  # background, GET and cancel answer 400 (sglang@v0.5.22:serving_responses.py:257-303). Atom has
+  # no store: it serves only POST /v1/responses (atom@v0.1.7:atom/entrypoints/openai/
+  # api_server.py:2340), and background and previous_response_id answer 400.
+  # FROM values: no overlay, InferenceServerConfig or router values under llm-d 9ca8ff0 guides/
+  # sets either flag.
+  # FROM docs: the router sends bodyless requests (GET /v1/responses/{id}, cancel) to a random
+  # endpoint (llm-d-router@v0.11.0:pkg/epp/handlers/request.go:44-50), so replicas would share no
+  # state even if one stored; llm-d 9ca8ff0 guides/agentic-api/README.md:9: "The llm-d Router and
+  # vLLM are stateless".
+  stateless_responses: true
+  stateful_responses: false
+  background_responses: false
+  # FROM docs: no deployed engine registers /v1/responses/compact or /v1/responses/input_tokens
+  # (vllm@v0.31.0:api_router.py, sglang@v0.5.22:http_server.py, atom@v0.1.7:api_server.py); the
+  # router forwards both through its passthrough parser.
+  # INTENT: refused with a 4xx and an OpenAI error envelope. vLLM answers 405 and Atom 404, both in
+  # FastAPI's {"detail": ...} shape, so these cases are expected to fail their envelope check: a
+  # finding for the team (Rule 4), not a profile error.
+  responses_compact: false
+  responses_input_tokens: false
   responses_options: [metadata, logprobs]
   # INTENT: request options accepted; references to stored state and built-in tools ignored, as a
   # self-hosted backend has no built-in tools (references accept only ignored or rejected).
