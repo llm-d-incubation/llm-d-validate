@@ -12,7 +12,7 @@ requires-python = ">=3.10"
 license = "Apache-2.0"
 license-files = ["LICENSE"]
 authors = [{ name = "The llm-d Authors" }]
-keywords = ["llm-d", "llm", "inference", "vllm", "validation", "testing", "openai", "anthropic"]
+keywords = ["llm-d", "llm", "inference", "validation", "testing"]
 # Python versions: only those CI's offline-tests matrix runs.
 classifiers = [
     "Development Status :: 3 - Alpha",
