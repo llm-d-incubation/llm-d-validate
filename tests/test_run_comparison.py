@@ -1335,3 +1335,30 @@ def test_an_unreachable_store_is_the_environment_and_its_secret_is_scrubbed():
     assert result.returncode == 3, result.stderr
     assert "cannot list runs under s3://results/nightly" in result.stderr
     assert secret not in result.stderr + result.stdout
+
+
+def test_the_window_says_which_run_it_judged_against():
+    def night(outcome, digest):
+        return [{"case_id": "a", "ingress": "g", "outcome": outcome, "profile_digest": digest}]
+
+    reverted = compare_window([night("pass", "NEW"), night("pass", "OLD")], night("fail", "NEW"))
+    assert reverted.baseline == 0, "the newest run under tonight's contract, not the newest"
+    fallback = compare_window([night("pass", "OLD"), night("pass", "OLD")], night("fail", "NEW"))
+    assert fallback.baseline == 1, "with no run under the contract, the newest"
+    assert compare_window([], night("fail", "NEW")).baseline is None
+
+
+def test_a_reverted_profile_is_compared_with_and_named_by_the_run_it_was_judged_against(tmp_path):
+    """Profile D2, then D1, then back to D2: tonight is judged against the D2 run, so the report
+    names that run, and its profile did not change, rather than naming the newer D1 run."""
+    runs = {
+        "2026-01-01T00-00-00Z": [rec("a", "pass", digest="D2")],
+        "2026-01-02T00-00-00Z": [rec("a", "pass", digest="D1")],
+    }
+    uri = archive(tmp_path, runs=runs)
+    delta, before_id = compare_cmd._compare_baselines(
+        uri, "p", list(runs), [rec("a", "fail", digest="D2")]
+    )
+    assert before_id == "2026-01-01T00-00-00Z"
+    assert not delta.digest_changed
+    assert delta.newly_failing
