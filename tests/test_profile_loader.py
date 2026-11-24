@@ -861,6 +861,20 @@ def test_a_top_level_capability_typo_is_refused_naming_the_key(tmp_path):
         loader.load(write(tmp_path, MINIMAL + "capabilities:\n  count_token: true\n"))
 
 
+def test_a_capability_typo_names_the_closest_capability(tmp_path):
+    with pytest.raises(loader.ProfileError) as caught:
+        loader.load(write(tmp_path, MINIMAL + "capabilities:\n  count_token: true\n"))
+    assert str(caught.value).endswith(
+        "capabilities.count_token: unknown field; did you mean count_tokens?"
+    )
+
+
+def test_a_capability_name_like_no_other_gets_no_suggestion(tmp_path):
+    with pytest.raises(loader.ProfileError) as caught:
+        loader.load(write(tmp_path, MINIMAL + "capabilities:\n  zzzz: true\n"))
+    assert str(caught.value).endswith("capabilities.zzzz: unknown field")
+
+
 def test_a_top_level_typo_exits_two_from_profile_validate(tmp_path):
     path = write(tmp_path, MINIMAL + "capabilities:\n  vllm_optionz: [ignore_eos]\n")
     result = run_llmdv("profile", "validate", str(path))
@@ -921,4 +935,6 @@ def test_a_top_level_typo_does_not_break_an_ingress_that_refines_an_inherited_va
     with pytest.raises(loader.ProfileError) as caught:
         loader.load(profile)
     problems = [line.split(": ", 1)[1] for line in str(caught.value).splitlines()]
-    assert problems == ["capabilities.count_token: unknown field"], problems
+    assert problems == ["capabilities.count_token: unknown field; did you mean count_tokens?"], (
+        problems
+    )

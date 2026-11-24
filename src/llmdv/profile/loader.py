@@ -829,7 +829,9 @@ def _capability_keys(
         if key in _REMOVED_CAPABILITIES:
             problems.append(f"{where}.{key}: removed; {_REMOVED_CAPABILITIES[key]}")
         elif key not in known:
-            problems.append(f"{where}.{key}: unknown field")
+            close = difflib.get_close_matches(str(key), sorted(known), n=1)
+            hint = f"; did you mean {close[0]}?" if close else ""
+            problems.append(f"{where}.{key}: unknown field{hint}")
         elif nullable is not None and value is None and key not in nullable:
             problems.append(f"{where}.{key}: cannot be null")
         else:
