@@ -27,6 +27,8 @@ from dataclasses import dataclass
 from enum import Enum
 from typing import Any
 
+from ..http.redact import SECRET_HEADERS
+
 
 class Reveals(str, Enum):
     # Names a build or a layer's own signature; safe to publish in `outcome.json`.
@@ -104,6 +106,43 @@ SIGNALS: tuple[Signal, ...] = (
 BACKEND_HEADERS = frozenset(
     signal.header for signal in SIGNALS if signal.reveals is Reveals.BACKEND and signal.header
 )
+
+
+# Headers `served_by` keeps beside the backend: a layer's quota, and the proxies a response
+# passed through (ingress/base.py). Forwarded client addresses and hosts are left out on purpose.
+THROTTLE_PREFIXES = ("x-ratelimit-",)
+THROTTLE_HEADERS = ("retry-after",)
+PROXY_HEADERS = ("via", "x-forwarded-proto")
+
+# Headers whose value changes from one request to the next, so it can never name a build: a
+# request or trace id, a quota, a time, a length, and llmdv's own correlation headers.
+_PER_REQUEST_HEADERS = frozenset(
+    {"request-id", "date", "content-length", "traceparent", "tracestate", *THROTTLE_HEADERS}
+)
+_PER_REQUEST_PREFIXES = (*THROTTLE_PREFIXES, "anthropic-ratelimit-", "x-llmdv-")
+_PER_REQUEST_SUFFIXES = ("-request-id",)
+
+
+def undeclarable(name: str) -> str | None:
+    """Why a header cannot be declared a version header, or None when it can be.
+
+    A declared header names a build: it is published in `outcome.json`, and its values are
+    compared between runs, two of them in one run reading as a rollout. So it must be neither a
+    credential (`secret`), nor something that may name a host (`host`), nor a value that changes
+    with every request (`per_request`). The evidence table's own rows are the loader's to check.
+    """
+    name = name.strip().lower()
+    if name in SECRET_HEADERS:
+        return "secret"
+    if name in PROXY_HEADERS or name == "forwarded" or name.startswith("x-forwarded-"):
+        return "host"
+    if (
+        name in _PER_REQUEST_HEADERS
+        or name.startswith(_PER_REQUEST_PREFIXES)
+        or name.endswith(_PER_REQUEST_SUFFIXES)
+    ):
+        return "per_request"
+    return None
 
 
 @dataclass(frozen=True)

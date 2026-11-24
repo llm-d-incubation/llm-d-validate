@@ -50,9 +50,9 @@ class ServedBy:
 # Recorded on every layer, whatever product answered. Throttling signals are evidence wherever
 # they appear: without them a 429 is a bare status with nothing to say how long to wait or what
 # the quota was. Forwarded IP and host values are left out because they add sensitive data.
-THROTTLE_PREFIXES = ("x-ratelimit-",)
-THROTTLE_HEADERS = ("retry-after",)
-PROXY_HEADERS = ("via", "x-forwarded-proto")
+THROTTLE_PREFIXES = signals.THROTTLE_PREFIXES
+THROTTLE_HEADERS = signals.THROTTLE_HEADERS
+PROXY_HEADERS = signals.PROXY_HEADERS
 
 
 def version_signals(

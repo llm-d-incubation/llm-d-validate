@@ -36,7 +36,7 @@ from typing import Any
 import yaml
 
 from ..http.redact import SECRET_HEADERS
-from ..ingress.signals import Reveals, row_for
+from ..ingress.signals import Reveals, row_for, undeclarable
 from ..surfaces import base as surfaces
 from . import compose, evolution, parse
 from . import transport as transport_contract
@@ -947,25 +947,40 @@ def _version_headers(value: Any, at: str) -> tuple[str, ...]:
     """Headers an operator declares as naming the build, which the evidence table does not know.
 
     Never one any backend row matches, exactly or by prefix (a declared header is published in
-    outcome.json); never one the table already names exactly as a build, recorded value or
-    backend (that would change its meaning for one profile); and never one twice. A header the
-    table publishes without calling it a build, such as `server`, may be declared: it then names
-    the build at that ingress only.
+    outcome.json); never a credential, a forwarded host or one whose value changes with every
+    request (`signals.undeclarable`); never one the table already names exactly as a build,
+    recorded value or backend (that would change its meaning for one profile); and never one
+    twice. A header the table publishes without calling it a build, such as `server`, may be
+    declared: it then names the build at that ingress only.
     """
     raw_names = _optional_strings(value, f"{at}.version_headers")
     names = tuple(name.strip().lower() for name in raw_names)
     problems = []
     for index, name in enumerate(names):
         where = f"{at}.version_headers[{index}]"
+        reason = undeclarable(name)
         if not _HEADER_NAME.fullmatch(name):
             problems.append(f"{where}: {raw_names[index]!r} is not a header name")
-        elif (row := row_for(name)) is not None and row.reveals is Reveals.BACKEND:
+        elif reason == "secret":
+            problems.append(
+                f"{where}: {name!r} carries a credential or a session, and a version header is "
+                "published in outcome.json; it cannot be a version header"
+            )
+        elif reason == "per_request":
+            problems.append(
+                f"{where}: {name!r} changes from one request to the next (a request id, a quota "
+                "or a time), so its values would read as a rollout on every run; it cannot be a "
+                "version header"
+            )
+        elif reason == "host" or (
+            (row := row_for(name)) is not None and row.reveals is Reveals.BACKEND
+        ):
             problems.append(
                 f"{where}: {name!r} may name a host or a Service, so it is recorded for "
                 "attribution and never published; it cannot be a version header"
             )
         elif (
-            row is not None
+            (row := row_for(name)) is not None
             and row.header is not None
             and not (row.reveals is Reveals.VERSION and not row.build)
         ):
