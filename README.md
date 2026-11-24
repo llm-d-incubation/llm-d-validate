@@ -41,10 +41,6 @@ pinpoints the layer that breaks, and flags what regressed since the last run.
 - **Every run produces evidence.** You get the results, every request and response, a replay
   script for each failure, and an optional dashboard to explore the whole run.
 
-<p align="center">
-  <img src="https://raw.githubusercontent.com/llm-d-incubation/llm-d-validate/main/docs/images/llmdv-coverage.svg" width="100%" alt="What llmdv tests: 19 suites and growing, in four groups, each shown with the -m marker that runs it. API surfaces: OpenAI Chat Completions, OpenAI Completions, OpenAI Responses, Anthropic Messages, model discovery. Model behaviour: tool calling, streaming, structured output and options, image input, long context. Failure and resilience: error paths and envelopes, transport and TLS, client scenarios, real clients. Contract and change: declared surfaces and headers, render and token parity, prefix-cache reuse, change sentinels, fleet config, metrics and logs. Every case runs per layer: gateway, router, engine.">
-</p>
-
 > [!NOTE]
 > `llmdv` is read-only: it sends requests and reads what comes back, and it never deploys,
 > patches, scales or restarts anything. Cluster access, when you grant it, runs through a
@@ -85,6 +81,16 @@ llmdv verify --profile profiles/my-stack.local.yaml    # run it against your sta
 Git ignores `*.local.yaml` profiles, so your hosts stay out of the repository.
 [Your own stack](https://github.com/llm-d-incubation/llm-d-validate/blob/main/profiles/README.md#your-own-stack) walks through the other examples, `extends`
 and what to declare.
+
+## What it tests
+
+Nineteen suites and growing, from every API surface to failure paths and fleet invariants. Run any
+one on its own with `-m <marker>`; [test suites](https://github.com/llm-d-incubation/llm-d-validate/blob/main/docs/test-suites.md) describes each one and
+what turns it on.
+
+<p align="center">
+  <img src="https://raw.githubusercontent.com/llm-d-incubation/llm-d-validate/main/docs/images/llmdv-coverage.svg" width="100%" alt="What llmdv tests: 19 suites and growing, in four groups, each shown with the -m marker that runs it. API surfaces: OpenAI Chat Completions, OpenAI Completions, OpenAI Responses, Anthropic Messages, model discovery. Model behaviour: tool calling, streaming, structured output and options, image input, long context. Failure and resilience: error paths and envelopes, transport and TLS, client scenarios, real clients. Contract and change: declared surfaces and headers, render and token parity, prefix-cache reuse, change sentinels, fleet config, metrics and logs. Every case runs per layer: gateway, router, engine.">
+</p>
 
 ## Learn more
 
