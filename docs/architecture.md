@@ -43,6 +43,15 @@ records in `outcome.json`; a recorded graph that misses a layer that reported is
 graph. With fewer than two reporting ingresses there is no ladder: one column is nothing to
 compare.
 
+The graph is built in one of two ways (`Profile.topology`). If no ingress declares `fronts`, it
+is derived from `kind` as above (`Topology.derive`), so every such profile keeps the order and
+attribution it always had. If any ingress declares `fronts`, the declared edges are the whole
+graph (`Topology.declare`): that is how a profile puts two layers of one kind in series, such as
+a router in front of a per-pod routing sidecar that fronts a prefill and a decode engine.
+`loader.load` builds a declared graph, so an unknown id, an id listed twice in one `fronts`, a
+self-edge, a cycle or an ingress on no edge is an invalid profile (exit 2), never a mid-run
+error, and a loaded profile's graph is always readable.
+
 ## How a request reaches the fleet
 
 Two channels, deliberately separate. The **data plane** is the thing under test: ordinary HTTP to

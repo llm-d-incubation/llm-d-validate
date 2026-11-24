@@ -6,6 +6,7 @@ cases below are mostly about it reporting the right thing rather than merely fai
 
 from __future__ import annotations
 
+import dataclasses
 import re
 import textwrap
 
@@ -22,6 +23,7 @@ from llmdv.profile.schema import (
     Vantage,
     Verifiable,
 )
+from tests.fakes import run_llmdv
 
 MINIMAL = """
 schema: llmdv.profile/1
@@ -126,6 +128,87 @@ def test_two_engine_ingresses_load_as_peers(tmp_path):
     profile = loader.load(write(tmp_path, MINIMAL + second))
     assert [d for d in loader.validate(profile) if d.level == "error"] == []
     assert profile.topology().fronts == {"direct": (), "decode": ()}
+
+
+ROUTER = "  - id: epp\n    kind: router\n    base_url: http://localhost:9997\n"
+
+
+def test_fronts_absent_and_empty_are_different_declarations(tmp_path):
+    """Absent leaves the graph to `kind`; `[]` declares an ingress that forwards to nothing."""
+    absent = loader.load(write(tmp_path, MINIMAL + ROUTER))
+    assert [item.fronts for item in absent.ingresses] == [None, None]
+    assert absent.topology().fronts == {"epp": ("direct",), "direct": ()}
+
+    declared = MINIMAL.replace("    kind: engine\n", "    kind: engine\n    fronts: []\n")
+    declared += ROUTER + "    fronts: [direct]\n"
+    profile = loader.load(write(tmp_path, declared))
+    assert [item.fronts for item in profile.ingresses] == [(), ("direct",)]
+    assert [d for d in loader.validate(profile) if d.level == "error"] == []
+    assert profile.chain() == ["epp", "direct"]
+
+
+def test_a_declared_graph_overrides_kind(tmp_path):
+    """Two routers in series: by kind they would be peers; declared, one fronts the other."""
+    text = MINIMAL + ROUTER + "    fronts: [sidecar]\n"
+    text += "  - id: sidecar\n    kind: router\n    base_url: http://localhost:9996\n"
+    text += "    fronts: [direct]\n"
+    profile = loader.load(write(tmp_path, text))
+    assert profile.chain() == ["epp", "sidecar", "direct"]
+    assert profile.topology().fronts["epp"] == ("sidecar",)
+
+
+def test_fronts_must_be_a_list_of_strings(tmp_path):
+    with pytest.raises(loader.ProfileError, match=r"ingresses\[0\]\(direct\)\.fronts: expected"):
+        loader.load(write(tmp_path, MINIMAL + "    fronts: direct\n"))
+
+
+@pytest.mark.parametrize(
+    "fronts, message",
+    [
+        ("[sidcar]", "ingresses[1](epp).fronts[0]: no ingress 'sidcar'"),
+        ("[epp]", "ingresses[1](epp).fronts: lists itself"),
+        ("[direct, direct]", "ingresses[1](epp).fronts[1]: lists 'direct' twice"),
+        ("[]", "ingresses[0](direct): on no edge"),
+    ],
+)
+def test_a_bad_declared_graph_is_an_invalid_profile(tmp_path, fronts, message):
+    """Refused by `load`, so `profile validate` and `verify` exit 2 before any request."""
+    path = write(tmp_path, MINIMAL + ROUTER + f"    fronts: {fronts}\n")
+    with pytest.raises(loader.ProfileError, match=re.escape(message)):
+        loader.load(path)
+    for command in (("profile", "validate", str(path)), ("verify", "--profile", str(path))):
+        result = run_llmdv(*command)
+        assert result.returncode == 2, result.stderr
+        assert message in result.stdout + result.stderr
+
+
+def test_a_bad_graph_in_a_profile_built_in_code_is_a_validation_error(tmp_path):
+    """A profile `load` never saw is still refused before a run, as a diagnostic."""
+    good = loader.load(write(tmp_path, MINIMAL + ROUTER + "    fronts: [direct]\n"))
+    epp = dataclasses.replace(good.ingress("epp"), fronts=("sidcar",))
+    bad = dataclasses.replace(good, ingresses=(good.ingress("direct"), epp))
+    errors = [str(d) for d in loader.validate(bad) if d.level == "error"]
+    assert errors == ["ERROR   ingresses[1](epp).fronts[0]: no ingress 'sidcar'"]
+
+
+def test_a_declared_cycle_is_named_by_its_path(tmp_path):
+    """Two routers fronting each other: a cycle at one position, which only the cycle check
+    catches (an engine fronting a router is refused as against the positions first)."""
+    text = MINIMAL.replace("    kind: engine\n", "    kind: engine\n    fronts: []\n")
+    sidecar = "  - id: sidecar\n    kind: router\n    base_url: http://localhost:9996\n"
+    path = write(
+        tmp_path,
+        text + ROUTER + "    fronts: [sidecar]\n" + sidecar + "    fronts: [epp, direct]\n",
+    )
+    result = run_llmdv("profile", "validate", str(path))
+    assert result.returncode == 2, result.stderr
+    assert "fronts form a cycle: epp -> sidecar -> epp" in result.stdout + result.stderr
+
+
+def test_an_engine_fronting_a_router_is_refused_at_load(tmp_path):
+    text = MINIMAL.replace("    kind: engine\n", "    kind: engine\n    fronts: [epp]\n")
+    with pytest.raises(loader.ProfileError, match="'epp' is at a shallower position than 'direct'"):
+        loader.load(write(tmp_path, text + ROUTER + "    fronts: []\n"))
 
 
 def test_negative_context_length_is_an_invalid_profile(tmp_path):

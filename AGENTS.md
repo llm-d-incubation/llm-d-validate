@@ -44,8 +44,10 @@ carry placeholders; real values live in `profiles/<system>/*.local.yaml`, which 
 
 **The core validates any model-serving stack.** Validating llm-d's guides efficiently is the
 main goal, and a custom llm-d deployment or a stack with no llm-d at all must work just as well:
-any OpenAI- or Anthropic-compatible gateway, router or engine, in series, described by its own
-profile. An ingress's `kind` is its position (`gateway`, `router`, `engine`), never a product.
+any OpenAI- or Anthropic-compatible gateways, routers and engines in any acyclic arrangement,
+described by its own profile. An ingress's `kind` is its position (`gateway`, `router`,
+`engine`), never a product; `fronts` declares which ingresses it forwards to when `kind` alone
+cannot say.
 Nothing in `src/` depends on an llm-d guide, a guide's name, `guide.yaml` or llm-d's
 `llm-d.ai/*` pod labels. Guide support is data (the guide profiles) and optional conveniences
 layered on top; a profile without them behaves exactly as before. Pods are found through

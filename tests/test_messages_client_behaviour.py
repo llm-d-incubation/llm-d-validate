@@ -223,6 +223,34 @@ def test_two_engines_leave_the_comparison_ambiguous(tmp_path):
     assert {r["skip_class"] for r in records} == {"undeclared"}
 
 
+@pytest.mark.parametrize("defect,passes", [(None, True), ("drops_mid_system", False)])
+def test_declared_edges_pick_the_one_engine_behind_a_layer(tmp_path, defect, passes):
+    """Two engines would be ambiguous by kind; declared, the gateway fronts only one."""
+    with fake(prompt_accounting=True) as engine, fake(prompt_accounting=True) as other:
+        with fake(prompt_accounting=True, context_defect=defect) as gateway:
+            profile = declare(tmp_path, engine, prompt_accounting=True)
+            raw = yaml.safe_load(profile.read_text())
+            base = raw["ingresses"][0]
+            raw["ingresses"] += [
+                {**base, "id": "pool-b", "base_url": other.base_url},
+                {**base, "id": "router-b", "kind": "router", "base_url": other.base_url},
+                {**base, "id": "gateway", "kind": "gateway", "base_url": gateway.base_url},
+            ]
+            raw["ingresses"][2]["fronts"] = ["pool-b"]
+            raw["ingresses"][3]["fronts"] = ["fake"]
+            profile.write_text(yaml.safe_dump(raw))
+            code, records = run_suites(
+                profile, tmp_path / "run", "-k", "test_prompt_size_matches_the_engine"
+            )
+            # Only the gateway's comparison reaches the engine it fronts.
+            assert len([s for s in engine.seen if s[:2] == ("POST", "/v1/messages")]) == 1
+    by_ingress = {r["ingress"]: r for r in records}
+    assert code == (0 if passes else 1)
+    assert by_ingress["gateway"]["outcome"] == ("pass" if passes else "fail")
+    assert by_ingress["router-b"]["outcome"] == "pass"
+    assert by_ingress["fake"]["skip_class"] == by_ingress["pool-b"]["skip_class"] == "undeclared"
+
+
 def test_stream_delivery_is_judged_against_the_stream_length():
     from llmdv.assertions.context import assert_incremental
 

@@ -335,6 +335,15 @@ def _diagnostics(profile: Profile) -> list[Diagnostic]:
             if requirement.kind == "port_forward" and not requirement.local_port:
                 out.append(Diagnostic("error", req_at, "port_forward needs local_port"))
 
+    # `load` refuses a declared layer graph that is not one; a profile built in code reaches
+    # here unchecked, and a bad graph blocks its run before any request.
+    try:
+        profile.topology()
+    except ProfileError as exc:
+        for problem in exc.problems:
+            path, _, message = problem.partition(": ")
+            out.append(Diagnostic("error", path, message))
+
     # Cross-section consistency. A client needing a surface no ingress exposes is dead
     # config: it can never run, and nothing at runtime notices.
     exposed = {surface for ingress in profile.ingresses for surface in ingress.surfaces}
@@ -471,7 +480,7 @@ def _build(raw: dict[str, Any], path: Path, clients_dir: Path) -> Profile:
         return run
 
     try:
-        return Profile(
+        profile = Profile(
             **_each(
                 schema=lambda: str(raw.get("schema", SUPPORTED_SCHEMA)),
                 name=lambda: str(raw.get("name") or path.stem),
@@ -510,6 +519,10 @@ def _build(raw: dict[str, Any], path: Path, clients_dir: Path) -> Profile:
     except (TypeError, ValueError, AttributeError) as exc:
         # A shape no parser checks for. The file is named by `load`, which adds it to every line.
         raise ProfileError(str(exc)) from exc
+    # A declared layer graph that is not one makes the profile unusable, so it is refused here
+    # and a loaded profile's `topology()` and `chain()` never raise.
+    profile.topology()
+    return profile
 
 
 def _each(**parsers: Callable[[], Any]) -> dict[str, Any]:
@@ -914,6 +927,10 @@ def _ingress(
             raw.get("capabilities", {}), capability_defaults, f"{at}.capabilities"
         ),
         kind=lambda: _kind(raw.get("kind"), f"{at}.kind"),
+        # Not `_optional_strings`: absent and `[]` mean different graphs.
+        fronts=lambda: (
+            None if raw.get("fronts") is None else parse.strings(raw["fronts"], f"{at}.fronts")
+        ),
         base_url=lambda: _base_url(raw, at),
         base_url_env=lambda: _opt_str(raw.get("base_url_env")),
         auth=lambda: _auth(_block(raw.get("auth"), f"{at}.auth"), f"{at}.auth"),
