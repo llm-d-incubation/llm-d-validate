@@ -43,9 +43,9 @@ class Outcome:
     # Which ingress fronts which (profile/topology.py), so the alert feed can attribute a
     # failure without the profile. None until the profile has loaded.
     topology: dict[str, Any] | None = None
-    # The profile's `selection` globs and whether `--all` set them aside; `in_force` says the
-    # run left cases out, so a reader or `llmdv compare` can tell it from a full one. None until
-    # the profile has loaded.
+    # The profile's `selection` globs, whether `--all` set them aside, and `in_force`: the
+    # selection applied (declared, and not set aside), so the run held only what it selected,
+    # which may still be every case. None until the profile has loaded.
     selection: dict[str, Any] | None = None
     exit_code: int | None = None
     exit_class: str | None = None

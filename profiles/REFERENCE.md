@@ -575,9 +575,9 @@ selection:
 - `llmdv verify`, `llmdv plan` and `llmdv job` apply it; `--all` sets it aside and runs every case. `--ingress`, `--client`, `--surface`, `-k` and `-m` still narrow what it leaves.
 - A case it leaves out is deselected, not skipped: it appears in no `results.jsonl` record and in no skip class. `llmdv plan` reports how many were left out (`selection.profile.left_out` in `--json`).
 - It applies to every suite, the contract suite included, so a selection that should still check the profile's own declarations names `contract.*`. An item without a case id cannot be named short of `*`, so a selection leaves it out; every case under `suites/` has one.
-- A glob that matches no collected case is an invalid selection (exit 2), and the error names it, so a typo cannot quietly select nothing. Globs are checked before `-k` and `-m` narrow, but after `--ingress`, which decides which ingresses are collected at all.
+- A glob that matches no collected case is an invalid selection (exit 2), and the error names it, so a typo cannot quietly select nothing. `llmdv verify` checks this before preflight, so a typo sends no request. Globs are checked before `-k` and `-m` narrow, but after `--ingress`, which decides which ingresses are collected at all.
 - An empty list is an error. In a child profile, `selection: null` clears an inherited selection.
-- `outcome.json` records it under `selection`: the globs (`cases`), whether `--all` was given (`all`), and whether the run left cases out (`in_force`). The selection is a declaration, so changing it changes the profile digest, and `llmdv compare` reports the profile changed. See [docs/compare.md](../docs/compare.md).
+- `outcome.json` records it under `selection`: the globs (`cases`), whether `--all` was given (`all`), and whether the selection applied (`in_force`: declared and not set aside by `--all`). The selection is a declaration, so changing it changes the profile digest, and `llmdv compare` reports the profile changed. See [docs/compare.md](../docs/compare.md).
 
 ## fleet
 

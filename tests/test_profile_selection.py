@@ -207,6 +207,17 @@ def test_a_glob_matching_nothing_is_a_usage_error_from_verify(tmp_path):
     assert outcome["verification"]["class"] == "usage"
 
 
+def test_a_glob_matching_nothing_is_refused_before_preflight(tmp_path):
+    """Nothing listens on the port, so had preflight run first this would be exit 3 (the
+    operator's environment) and never name the typo."""
+    profile = _selected(tmp_path, "http://127.0.0.1:9", "discovry.*")
+    result, records, _ = _verify(profile, tmp_path / "run")
+    assert result.returncode == 2, result.stderr[-3000:]
+    assert "selection: 'discovry.*' matches no case" in result.stderr
+    assert "preflight" not in result.stderr
+    assert records == []
+
+
 def test_verify_without_a_selection_records_none(tmp_path):
     with FakeFleet() as fleet:
         profile = tmp_path / "fake.yaml"

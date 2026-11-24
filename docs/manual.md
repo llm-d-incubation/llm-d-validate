@@ -86,8 +86,8 @@ A profile can declare a [`selection`](../profiles/REFERENCE.md#selection) of cas
 then `verify`, `plan` and `job` run only the cases it names; every selector above still narrows
 within it. `--all` sets it aside and runs every case. The cases it leaves out are deselected, not
 skipped: they appear in no result and no skip class, and the run says how many. A glob that
-matches no case exits `2` and names it. `outcome.json` records the selection in force under
-`selection`.
+matches no case exits `2` and names it, before preflight sends a request. `outcome.json` records
+the selection under `selection`.
 
 `-m` accepts one marker per suite package under `src/llmdv/suites/`;
 [docs/coverage.md](coverage.md#coverage) lists them. A case whose `case_id` starts with another
