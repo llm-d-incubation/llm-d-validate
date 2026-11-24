@@ -289,3 +289,18 @@ def test_a_per_request_header_that_differs_is_not_a_stack_change():
     after = observed_stack([exchange(headers={"x-llm-d-flow-queue-duration-ms": "9"})])
     assert before["litellm"]["x-llm-d-flow-queue-duration-ms"] == {"4": 1}
     assert stack_changes(before, after) == []
+
+
+def test_an_ingress_one_run_did_not_observe_is_not_a_stack_change():
+    """Run one exercised the gateway and the router; run two only the router (`-k`, say). The
+    gateway's build did not disappear; nothing was observed there."""
+    both = observed_stack([exchange(), exchange("epp")])
+    router_only = observed_stack([exchange("epp")])
+    assert stack_changes(both, router_only) == []
+    assert stack_changes(router_only, both) == []
+    # A signal that disappears from an ingress both runs observed is still a change.
+    gone = observed_stack([{"ingress": "litellm", "response_headers": {"server": "uvicorn"}}])
+    assert stack_changes(both, gone) == [
+        f"litellm: system_fingerprint {OLD} → absent",
+        "litellm: x-litellm-version 1.97.0 → absent",
+    ]

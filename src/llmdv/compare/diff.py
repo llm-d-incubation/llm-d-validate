@@ -354,10 +354,15 @@ def stack_changes(before: Stack, after: Stack, declared: Declared | None = None)
     """One line per build signal whose set of values differs between two runs: a different
     build answered. Other published signals (a server name, a router's per-request headers)
     can differ on every run without anything changing, so they are shown on each run's
-    dashboard and not reported as a change."""
+    dashboard and not reported as a change.
+
+    Only an ingress both runs observed is compared. One a run recorded nothing for (it sent no
+    requests there, or a `-k` left it out) says nothing about its build, so reading it as every
+    signal going absent would report a change that did not happen.
+    """
     out = []
-    for ingress in sorted(set(before) | set(after)):
-        theirs, ours = before.get(ingress) or {}, after.get(ingress) or {}
+    for ingress in sorted(set(before) & set(after)):
+        theirs, ours = before[ingress] or {}, after[ingress] or {}
         for signal in sorted((set(theirs) | set(ours)) & _builds(declared, ingress)):
             was, now = set(theirs.get(signal) or {}), set(ours.get(signal) or {})
             if was != now:
