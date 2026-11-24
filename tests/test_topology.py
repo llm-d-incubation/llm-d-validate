@@ -31,7 +31,7 @@ CANDIDATES = sorted(
     + [ROOT / "deploy" / "overlays" / "example" / "profile.yaml"]
 )
 OUTCOMES = ("pass", "fail", "error")
-KINDS = (IngressKind.LITELLM, IngressKind.LLMD_ROUTER, IngressKind.VLLM)
+KINDS = (IngressKind.GATEWAY, IngressKind.ROUTER, IngressKind.ENGINE)
 
 
 def standalone(path: Path) -> Profile | None:

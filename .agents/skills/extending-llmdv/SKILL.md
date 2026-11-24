@@ -1,6 +1,6 @@
 ---
 name: extending-llmdv
-description: Use when adding or changing a surface, ingress kind, test case, client, assertion or profile capability in the llmdv functional test library, when choosing between surface_generic and surface markers, or when a new case has only ever passed.
+description: Use when adding or changing a surface, test case, client, assertion or profile capability in the llmdv functional test library, when supporting another gateway, router or engine product, when choosing between surface_generic and surface markers, or when a new case has only ever passed.
 ---
 
 # Extending llmdv
@@ -17,10 +17,11 @@ Each addition is one module plus one registry line. [docs/architecture.md](../..
 6. Add cases under `suites/<name>/`.
 7. Teach the fake fleet (`tests/fakes.py`, with wire helpers in `tests/fake_openai.py` and `tests/fake_anthropic.py`) to serve it, validating its own shape, with at least one injectable defect. Run the surface-generic suites against it.
 
-## Add an ingress kind
+## Support another gateway, router or engine
 
-1. Add a member to `IngressKind` in `profile/schema.py`, and its depth in `_KIND_DEPTH` beside it (outermost first; the report orders layers by it).
-2. Add its row to `ADAPTERS` in `ingress/base.py`: an `IngressAdapter(...)` that sets only the fields that differ from the base, usually `backend_headers`. Set `version_headers` (and `version_header_prefixes`) to the headers whose value names the layer's build and is safe to publish; `backend_headers` may name a host or Service and never reach `outcome.json`. `extra_headers` adds named headers to `served_by.extra`. A comment above the row says what a failure at this layer points at and what the layer reveals.
+A product needs no code: `kind` is a position (`gateway`, `router`, `engine`), never a product, and a profile names the product in `id` and in the top-level `engine` and `gateway`. Every behaviour (surfaces, statuses, envelopes, headers) is declared per ingress. Never add a product to `IngressKind`; `tests/test_stack_agnostic_core.py` refuses it.
+
+What a product's responses reveal about its build is evidence, not behaviour. Until one table holds it for every layer, it is the position's row in `ADAPTERS` in `ingress/base.py`: an `IngressAdapter(...)` that sets only the fields that differ from the base, usually `backend_headers`. Set `version_headers` (and `version_header_prefixes`) to the headers whose value names the layer's build and is safe to publish; `backend_headers` may name a host or Service and never reach `outcome.json`. `extra_headers` adds named headers to `served_by.extra`. A comment above the row says what a failure at this layer points at and what the layer reveals.
 
 ## Add a case
 

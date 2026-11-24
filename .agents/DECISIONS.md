@@ -42,7 +42,7 @@ of neither. A **client** is a selector over cases, not a fourth abstraction.
 
 *Why:* the deliverable question is "can client X complete its exchanges through ingress Y".
 Keeping the axes independent is what makes a new surface inherit the existing cases, a new
-ingress kind cost one module, and a difference between layers mean something. The moment a
+product at any layer cost no code, and a difference between layers mean something. The moment a
 case reaches into a layer, running it at another layer stops being a comparison.
 
 ## Declare, then verify

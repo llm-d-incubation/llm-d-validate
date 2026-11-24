@@ -33,7 +33,7 @@ def test_sdk_credentials_come_from_the_plugin_without_disk_discovery(
     with FakeFleet(auth_header=("Authorization", expected)) as fleet:
         ingress = Ingress(
             id="fake",
-            kind=IngressKind.VLLM,
+            kind=IngressKind.ENGINE,
             base_url=fleet.base_url,
             model=Model(public_id=fleet.model),
             capabilities=Capabilities(),

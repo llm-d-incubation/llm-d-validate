@@ -90,7 +90,7 @@ def test_cross_ingress_exchanges_keep_their_peer_attribution(tmp_path):
     assert {exchange["ingress"] for exchange in exchanges} == {"fake", "second"}
     for exchange in exchanges:
         assert exchange["url"].startswith(bases[exchange["ingress"]])
-        assert exchange["ingress_kind"] == "vllm"
+        assert exchange["ingress_kind"] == "engine"
 
 
 def test_cross_ingress_skips_an_ingress_outside_the_group(tmp_path):

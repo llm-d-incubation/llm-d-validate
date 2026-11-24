@@ -120,7 +120,7 @@ capabilities:
   effort_rendering: %s
 ingresses:
   - id: a
-    kind: vllm
+    kind: engine
     base_url: http://localhost:1
     auth: {type: none}
     surfaces: [chat_completions]

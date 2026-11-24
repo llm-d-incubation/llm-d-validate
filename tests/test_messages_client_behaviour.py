@@ -146,7 +146,7 @@ def two_layers(tmp_path, engine, gateway):
     profile = declare(tmp_path, engine, prompt_accounting=True)
     raw = yaml.safe_load(profile.read_text())
     raw["ingresses"].append(
-        {**raw["ingresses"][0], "id": "gateway", "kind": "litellm", "base_url": gateway.base_url}
+        {**raw["ingresses"][0], "id": "gateway", "kind": "gateway", "base_url": gateway.base_url}
     )
     profile.write_text(yaml.safe_dump(raw))
     code, records = run_suites(
@@ -186,7 +186,7 @@ def test_two_engines_leave_the_comparison_ambiguous(tmp_path):
         raw = yaml.safe_load(profile.read_text())
         raw["ingresses"].append({**raw["ingresses"][0], "id": "pool-b", "base_url": other.base_url})
         raw["ingresses"].append(
-            {**raw["ingresses"][0], "id": "gateway", "kind": "litellm", "base_url": other.base_url}
+            {**raw["ingresses"][0], "id": "gateway", "kind": "gateway", "base_url": other.base_url}
         )
         profile.write_text(yaml.safe_dump(raw))
         code, records = run_suites(

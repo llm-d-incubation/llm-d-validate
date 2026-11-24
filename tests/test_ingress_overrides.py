@@ -33,8 +33,20 @@ def configuration():
             "vllm_options": ["priority", "cache_salt"],
         },
         "ingresses": [
-            {"id": "engine", "base_url": "http://localhost:1", "surfaces": ["chat_completions"]},
-            {"id": "gateway", "base_url": "http://localhost:2", "surfaces": ["chat_completions"]},
+            {
+                "id": "engine",
+                "kind": "engine",
+                "base_url": "http://localhost:1",
+                "surfaces": ["chat_completions"],
+            },
+            {
+                # Deliberately an engine despite its id: two peers at one position, as when both
+                # ingresses used to default to the same kind.
+                "id": "gateway",
+                "kind": "engine",
+                "base_url": "http://localhost:2",
+                "surfaces": ["chat_completions"],
+            },
         ],
     }
 

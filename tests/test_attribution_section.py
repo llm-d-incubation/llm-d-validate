@@ -145,21 +145,22 @@ def chain_profile(tmp_path, kinds: list[tuple[str, str]], name: str = "chain"):
 
 
 def test_the_chain_orders_outermost_first_whatever_the_declaration_order(tmp_path):
-    """Order comes from kind, so a profile listing the engine first still reports gateway first."""
+    """Order comes from kind, so a profile listing the engine first still reports gateway first.
+    The ids differ from the kinds, so the chain is shown to be ids ordered by kind."""
     profile = chain_profile(
-        tmp_path, [("engine", "vllm"), ("gateway", "litellm"), ("router", "llmd_router")]
+        tmp_path, [("vllm", "engine"), ("litellm", "gateway"), ("epp", "router")]
     )
-    assert profile.chain() == ["gateway", "router", "engine"]
+    assert profile.chain() == ["litellm", "epp", "vllm"]
 
 
 def test_a_single_ingress_chain_is_just_that_ingress(tmp_path):
-    profile = chain_profile(tmp_path, [("router", "llmd_router")], name="one")
+    profile = chain_profile(tmp_path, [("router", "router")], name="one")
     assert profile.chain() == ["router"]
 
 
 def test_the_ladder_names_the_declared_layers(tmp_path):
     profile = chain_profile(
-        tmp_path, [("engine", "vllm"), ("router", "llmd_router"), ("gateway", "litellm")]
+        tmp_path, [("engine", "engine"), ("router", "router"), ("gateway", "gateway")]
     )
     lines = "\n".join(_attribution_section(["engine", "router", "gateway"], profile))
     assert "chain, outermost first: gateway -> router -> engine" in lines
@@ -170,7 +171,7 @@ def test_the_ladder_names_the_declared_layers(tmp_path):
 
 def test_a_non_adjacent_pair_gets_one_row_and_no_invented_layer(tmp_path):
     """A gateway and an engine with no router between them is one comparison, not two."""
-    profile = chain_profile(tmp_path, [("engine", "vllm"), ("gateway", "litellm")], name="two")
+    profile = chain_profile(tmp_path, [("engine", "engine"), ("gateway", "gateway")], name="two")
     lines = "\n".join(_attribution_section(["engine", "gateway"], profile))
     assert "router" not in lines.lower()
     assert "engine passes, gateway fails" in lines
@@ -179,7 +180,7 @@ def test_a_non_adjacent_pair_gets_one_row_and_no_invented_layer(tmp_path):
 
 def test_a_single_ingress_run_prints_no_ladder(tmp_path):
     """Already true, and must stay true now the rows are generated."""
-    profile = chain_profile(tmp_path, [("router", "llmd_router")], name="solo")
+    profile = chain_profile(tmp_path, [("router", "router")], name="solo")
     lines = "\n".join(_attribution_section(["router"], profile))
     assert "Not available in this run" in lines
     assert "passes," not in lines
@@ -198,7 +199,7 @@ def test_a_profile_mismatch_produces_no_ladder_and_invents_no_layer(tmp_path):
     say which layers it was talking about would just be a worse version of those. What is
     withheld is the ordering claim, which is the part the profile never supplied.
     """
-    profile = chain_profile(tmp_path, [("router", "llmd_router")], name="mismatch")
+    profile = chain_profile(tmp_path, [("router", "router")], name="mismatch")
     lines = "\n".join(_attribution_section(["gateway", "engine"], profile))
     assert "Not available in this run" in lines
     assert "passes," not in lines
@@ -219,7 +220,9 @@ def test_a_single_overlapping_layer_still_names_both_layers_that_ran(tmp_path):
     This is the case that used to answer differently from the zero-overlap test above, from the
     same function and the same question. They now agree.
     """
-    profile = chain_profile(tmp_path, [("engine", "vllm"), ("gateway", "litellm")], name="partial")
+    profile = chain_profile(
+        tmp_path, [("engine", "engine"), ("gateway", "gateway")], name="partial"
+    )
     lines = "\n".join(_attribution_section(["gateway", "router"], profile))
     assert "Not available in this run" in lines
     assert "passes," not in lines
@@ -236,9 +239,9 @@ def test_the_ladder_is_the_only_section_that_withholds_a_name(tmp_path):
     Two undeclared ingresses and one undeclared ingress are the same question, and the one
     thing neither may produce is a pattern table.
     """
-    none_declared = chain_profile(tmp_path, [("other", "vllm")], name="none")
+    none_declared = chain_profile(tmp_path, [("other", "engine")], name="none")
     one_declared = chain_profile(
-        tmp_path, [("engine", "vllm"), ("gateway", "litellm")], name="one-of"
+        tmp_path, [("engine", "engine"), ("gateway", "gateway")], name="one-of"
     )
     for profile in (none_declared, one_declared):
         lines = "\n".join(_attribution_section(["gateway", "router"], profile))
@@ -254,7 +257,7 @@ def test_summary_md_orders_columns_by_the_chain_not_by_the_records(tmp_path):
     put `engine` on the left. Only the chain reorder in `_summarise` puts the gateway there --
     delete those three lines and this test fails.
     """
-    profile = chain_profile(tmp_path, [("engine", "vllm"), ("gateway", "litellm")], name="order")
+    profile = chain_profile(tmp_path, [("engine", "engine"), ("gateway", "gateway")], name="order")
     run_dir = write_results(tmp_path, ["engine", "gateway"])
     _summarise(run_dir, _read_records(run_dir), profile=profile)
     text = (run_dir / "summary.md").read_text(encoding="utf-8")

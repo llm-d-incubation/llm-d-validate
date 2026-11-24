@@ -36,7 +36,7 @@
 
 ingresses:
   - id: router
-    kind: llmd_router
+    kind: router
     base_url_env: LLMDV_ROUTER_URL
     # MEASURED on one deployment: /v1/models, /health and every inference surface answer
     # without credentials.

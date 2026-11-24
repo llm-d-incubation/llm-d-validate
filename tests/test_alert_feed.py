@@ -22,7 +22,7 @@ from llmdv.output import manifest
 from tests.fakes import SRC, FakeFleet, profile_yaml
 
 
-def rec(case, outcome, ingress="gateway", kind="litellm", variant="chat_completions", **extra):
+def rec(case, outcome, ingress="gateway", kind="gateway", variant="chat_completions", **extra):
     return {
         "case_id": case,
         "outcome": outcome,
@@ -36,11 +36,11 @@ def rec(case, outcome, ingress="gateway", kind="litellm", variant="chat_completi
 
 
 def gateway(case, outcome, **extra):
-    return rec(case, outcome, "gateway", "litellm", **extra)
+    return rec(case, outcome, "gateway", "gateway", **extra)
 
 
 def router(case, outcome, **extra):
-    return rec(case, outcome, "router", "llmd_router", **extra)
+    return rec(case, outcome, "router", "router", **extra)
 
 
 def transitions(history, after):
@@ -169,7 +169,7 @@ def test_failing_at_the_outer_layer_only_points_at_the_outer_layer(tmp_path):
     got = results_of(alerts.build(run_dir(tmp_path, records)))[("a", "gateway")]
 
     assert got["points_at"] == "gateway"
-    assert got["points_at_kind"] == "litellm"
+    assert got["points_at_kind"] == "gateway"
     assert got["basis"] == "fails at gateway, passes at router"
 
 
@@ -180,7 +180,7 @@ def test_failing_at_every_layer_points_at_the_innermost(tmp_path):
     got = results_of(alerts.build(run_dir(tmp_path, records)))
 
     assert got[("a", "gateway")]["points_at"] == "router"
-    assert got[("a", "gateway")]["points_at_kind"] == "llmd_router"
+    assert got[("a", "gateway")]["points_at_kind"] == "router"
     assert "and at gateway" in got[("a", "gateway")]["basis"]
     assert got[("a", "router")]["points_at"] == "router"
 

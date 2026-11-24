@@ -30,7 +30,7 @@ environment: {namespace: ns}
 model: {public_id: m}
 ingresses:
   - id: vllm
-    kind: vllm
+    kind: engine
     base_url: http://localhost:1
     surfaces: [chat_completions]
     setup:
@@ -40,7 +40,7 @@ ingresses:
           local_port: 1
           remote_port: 8000
   - id: router
-    kind: llmd_router
+    kind: router
     base_url: http://localhost:2
     surfaces: [chat_completions]
     logs:

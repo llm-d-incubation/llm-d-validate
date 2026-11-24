@@ -224,7 +224,7 @@ def test_unobservable_dispositions_skip_with_the_right_class(tmp_path):
             model: {{public_id: {fleet.model}}}
             ingresses:
               - id: fake
-                kind: vllm
+                kind: engine
                 base_url: {fleet.base_url}
                 health_path: /health
                 surfaces: [chat_completions]
@@ -283,7 +283,7 @@ def test_every_case_records_checks_and_exchanges(tmp_path):
     for exchange in exchanges:
         assert exchange["method"] and exchange["url"]
         assert exchange["status"] is not None or exchange["transport_error"]
-        assert exchange["ingress_kind"] == "vllm"
+        assert exchange["ingress_kind"] == "engine"
         assert exchange["request_headers"]["x-llmdv-case-id"] == exchange["case_id"]
 
     assert {e["case_id"] for e in exchanges if "streaming" in e["case_id"]}
@@ -958,11 +958,11 @@ def test_ingresses_that_differ_on_responses_each_pass_their_own_declaration(tmp_
             model: {{public_id: {serves.model}}}
             ingresses:
               - id: serves
-                kind: vllm
+                kind: engine
                 base_url: {serves.base_url}
                 surfaces: [chat_completions, completions, messages, responses]
               - id: lacks
-                kind: vllm
+                kind: engine
                 base_url: {lacks.base_url}
                 surfaces: [chat_completions, completions, messages]
             """)

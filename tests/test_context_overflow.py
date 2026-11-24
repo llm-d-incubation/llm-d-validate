@@ -18,7 +18,7 @@ from tests.test_suites_against_fake import run_suites, write_profile
 
 INGRESS = Ingress(
     id="test",
-    kind=IngressKind.VLLM,
+    kind=IngressKind.ENGINE,
     base_url="http://unused",
     model=Model(public_id="m"),
     capabilities=Capabilities(),

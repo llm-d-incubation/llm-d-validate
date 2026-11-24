@@ -15,11 +15,11 @@ Field reference: [`profiles/REFERENCE.md`](../../../profiles/REFERENCE.md). How 
 
    | Start from | Ingress kinds | Use for |
    |---|---|---|
-   | `examples/example-engine-only.yaml` | `vllm` | a single model server reached directly, with nothing in front |
-   | `examples/example-gateway-only.yaml` | `litellm` | a model behind a LiteLLM gateway: a URL and a key are all you have |
-   | `examples/example-two-ingress.yaml` | `vllm` + `llmd_router` | engine and router, with port-forwards |
-   | `examples/example-three-ingress.yaml` | `litellm` + `llmd_router` + `vllm` | all three layers; a template to measure against |
-   | `examples/custom-llm-d/glm-5.3.yaml` | `litellm` + `llmd_router` | a full profile for a custom llm-d stack, built from shared parts with `extends` |
+   | `examples/example-engine-only.yaml` | `engine` (vLLM) | a single model server reached directly, with nothing in front |
+   | `examples/example-gateway-only.yaml` | `gateway` (LiteLLM) | a model behind a LiteLLM gateway: a URL and a key are all you have |
+   | `examples/example-two-ingress.yaml` | `engine` + `router` | engine and router, with port-forwards |
+   | `examples/example-three-ingress.yaml` | `gateway` + `router` + `engine` | all three layers; a template to measure against |
+   | `examples/custom-llm-d/glm-5.3.yaml` | `gateway` + `router` | a full profile for a custom llm-d stack, built from shared parts with `extends` |
 
    A variant of an existing profile (another namespace, an in-cluster copy) is a short file with `extends: <parent>.yaml` that names only what differs; see `examples/example-two-ingress-staging.yaml`. Several configurations of one stack (models, engines, an llm-d guide's CI lanes) share parts; see [More than one configuration](#more-than-one-configuration-parts-and-combinations).
 
@@ -30,8 +30,8 @@ Field reference: [`profiles/REFERENCE.md`](../../../profiles/REFERENCE.md). How 
 3. **Fill what exists by measuring it.** Model id and context length from the gateway's `GET /v1/models` (a gateway's ids are usually not the engine's). If you have cluster access, the `environment` block (`cluster`, `context`, `namespace`, `kubeconfig`, `metrics`; optional, and no gateway-only profile has one); check the kubeconfig holds the context, or `profile show --setup` prints `-l <selector>` instead of a pod. Selectors, never pod names, in `setup.requires`. The reasoning shape from one request: a populated reasoning field means declare `parser` and the `field` you saw (`reasoning` on recent vLLM; `reasoning_content` on older vLLM, on SGLang and through LiteLLM, which renames it); an inline `<think>` block means `parser: null`. Surfaces by sending a **shape-valid** body to each path at each layer (an empty `{}` answers 400 on an absent route).
 
    Per layer:
-   - **`litellm`:** `rate_limited: true` (a 429 then skips as `throttled`), `health_path: /health/liveliness`, `capabilities.model_info` from its `GET /v1/model/info`. Its model id is the gateway's (often prefixed, e.g. `<provider>/…`, and suffixed per gateway, e.g. `-staging`), not the engine's.
-   - **`llmd_router`:** no auth (`{type: none}`), the engine's model id, and no `/v1/model/info`. Older EPP builds answer some malformed bodies with plain text (`error extracting request body: …`) and newer ones with a JSON envelope, so measure yours and see [`.agents/GROUND-TRUTH.md`](../../GROUND-TRUTH.md) before declaring `unstructured_errors`.
+   - **LiteLLM (`kind: gateway`):** `rate_limited: true` (a 429 then skips as `throttled`), `health_path: /health/liveliness`, `capabilities.model_info` from its `GET /v1/model/info`. Its model id is the gateway's (often prefixed, e.g. `<provider>/…`, and suffixed per gateway, e.g. `-staging`), not the engine's.
+   - **The llm-d router (`kind: router`):** no auth (`{type: none}`), the engine's model id, and no `/v1/model/info`. Older EPP builds answer some malformed bodies with plain text (`error extracting request body: …`) and newer ones with a JSON envelope, so measure yours and see [`.agents/GROUND-TRUTH.md`](../../GROUND-TRUTH.md) before declaring `unstructured_errors`.
 
    Declare `fleet_policy: dedicated` (the default): it runs the disruptive families too, and they have not disturbed the deployments they ran against. Use `shared`, which skips them as `excluded_by_policy`, only when the deployment's owner asks for it, and say so in a comment.
 

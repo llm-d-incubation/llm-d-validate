@@ -46,7 +46,7 @@ ingresses:
   # passes against decode and fails against prefill is a role asymmetry, not a gateway bug;
   # declare each role as its own ingress if you test both.
   - id: vllm
-    kind: vllm
+    kind: engine
     base_url: http://localhost:18200
     auth: {type: none}
     health_path: /health
@@ -66,7 +66,7 @@ ingresses:
   # The EPP. Clients drive the EPP Service (port 80 here), never a decode Service directly; the
   # direct engine ingress above is for comparison only.
   - id: router
-    kind: llmd_router
+    kind: router
     base_url: http://localhost:18080
     auth: {type: none}
     health_path: /health
@@ -87,7 +87,7 @@ ingresses:
   # is reachable. This one lists the model over its OpenAI provider only, so /v1/messages is
   # NOT exposed here even though the engine serves it.
   - id: litellm
-    kind: litellm
+    kind: gateway
     base_url: http://localhost:14000
     auth: {type: bearer, key_env: LLMDV_LITELLM_KEY}
     # A health path behind authentication can only ever answer 401 to a probe, which carries no

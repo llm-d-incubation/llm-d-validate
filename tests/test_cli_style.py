@@ -86,8 +86,8 @@ def test_rules_degrade_to_ascii():
 def test_a_long_base_url_is_separated_from_the_ingress_kind(tmp_path, caplog):
     """An external Route's hostname overflows the pad; it must not run into the kind.
 
-    Observed as `...example.comllmd_router` in a real run: the base_url is padded to a fixed width
-    and a longer one simply overflows it.
+    Observed as `...example.comllmd_router` in a real run (the kind was a product name then): the
+    base_url is padded to a fixed width and a longer one simply overflows it.
     """
     import logging
     from argparse import Namespace
@@ -113,5 +113,5 @@ def test_a_long_base_url_is_separated_from_the_ingress_kind(tmp_path, caplog):
         )
 
     line = next(record.message for record in caplog.records if url in record.message)
-    assert f"{url}vllm" not in line, f"url ran into the kind: {line!r}"
+    assert f"{url}{profile.ingresses[0].kind.value}" not in line, f"url ran into the kind: {line!r}"
     assert f"{url} " in line, f"no separator after the url: {line!r}"

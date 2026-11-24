@@ -14,7 +14,7 @@
 # Not declared here, and why:
 #   the engine ingress          llmdv reaches each replica only by a URL, and a committed profile
 #                               names no pod; the per-replica layer waits for lane-provided URLs.
-#                               When it lands it is `kind: vllm`
+#                               When it lands it is `kind: engine`
 #   tools.strict_level          vLLM's --tool-strict-level; no overlay passes it, so the default
 #                               (`auto`, the schema default) applies and nothing is declared
 

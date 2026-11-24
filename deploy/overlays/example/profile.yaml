@@ -18,7 +18,7 @@ model:
 
 ingresses:
   - id: router
-    kind: llmd_router
+    kind: router
     base_url: http://gateway-service.fleet-namespace.svc.cluster.local
     auth: {type: none}
     health_path: /health

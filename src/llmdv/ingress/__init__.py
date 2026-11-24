@@ -1,6 +1,7 @@
-"""Ingress adapters: one class, and a table of what each kind reveals about itself.
+"""Ingress adapters: one class, and a table of what the layer at each position reveals.
 
-Adding an ingress kind is one `IngressKind` member and one row in `ADAPTERS`.
+A product needs no code here: `kind` is a position, and a product in it reads the headers of
+its position's row, recording only those it sends.
 """
 
 from .base import ADAPTERS, IngressAdapter, ServedBy, adapter_for, client_for

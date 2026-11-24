@@ -124,7 +124,7 @@ def test_exchange_metadata_is_attributable_and_identity_headers_are_redacted(tmp
         _write_exchanges(
             config,
             item,
-            SimpleNamespace(id="edge", kind=IngressKind.LLMD_ROUTER),
+            SimpleNamespace(id="edge", kind=IngressKind.ROUTER),
             recorded,
             "chat_completions",
             marker,
@@ -132,7 +132,7 @@ def test_exchange_metadata_is_attributable_and_identity_headers_are_redacted(tmp
         handle.close()
         payload = json.loads(path.read_text())
         assert payload["ingress"] == "edge"
-        assert payload["ingress_kind"] == "llmd_router"
+        assert payload["ingress_kind"] == "router"
         assert payload["case_id"] == "case-c"
 
         adapter = IngressAdapter()

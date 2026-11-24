@@ -43,12 +43,9 @@ class IdentityError(ValueError):
     """A lane identity is malformed or contradicts the profile."""
 
 
-def _layer_implementation(profile: Profile, role: str, legacy: str) -> str | None:
-    """Read an implementation from its role layer, with legacy top-level compatibility."""
-    for ingress in profile.ingresses:
-        if getattr(ingress, "role", None) == role:
-            return getattr(ingress, "implementation", None)
-    return getattr(profile, legacy, None)
+def _layer_implementation(profile: Profile, layer: str) -> str | None:
+    """The product a profile names for a layer, at the top level (`engine`, `gateway`)."""
+    return getattr(profile, layer, None)
 
 
 def parse(values: list[str] | None) -> dict[str, str]:
@@ -74,9 +71,9 @@ def build(
     values: dict[str, str | None] = {
         "guide": profile.guide,
         "accelerator": lane.get("accelerator"),
-        "engine": _layer_implementation(profile, "engine", "engine"),
+        "engine": _layer_implementation(profile, "engine"),
         "provider": lane.get("provider"),
-        "gateway": _layer_implementation(profile, "gateway", "gateway"),
+        "gateway": _layer_implementation(profile, "gateway"),
         "model": profile.model.public_id,
         "llm_d_ref": lane.get("llm_d_ref"),
         "llmdv_version": __version__,

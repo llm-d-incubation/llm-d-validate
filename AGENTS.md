@@ -19,7 +19,7 @@ Each lives at `.agents/skills/<name>/SKILL.md`. Load the one that matches before
 |---|---|
 | [writing-an-infra-profile](.agents/skills/writing-an-infra-profile/SKILL.md) | writing, updating or reviewing a profile; choosing any declaration; naming a component behind an ingress; several profiles for one stack or an llm-d guide; publishing a profile written against a private stack |
 | [probing-a-fleet-before-asserting](.agents/skills/probing-a-fleet-before-asserting/SKILL.md) | writing or changing an assertion about a live response, or a live case fails |
-| [extending-llmdv](.agents/skills/extending-llmdv/SKILL.md) | adding a surface, ingress kind, case, client, assertion or capability |
+| [extending-llmdv](.agents/skills/extending-llmdv/SKILL.md) | adding a surface, case, client, assertion or capability, or supporting another gateway, router or engine product |
 | [testing-a-model-deployment](.agents/skills/testing-a-model-deployment/SKILL.md) | testing a model you were handed endpoints for (a LiteLLM gateway, a router or EPP route, or both): picking and pointing a profile, first checks, the run, the comparison |
 | [running-and-comparing-live-runs](.agents/skills/running-and-comparing-live-runs/SKILL.md) | starting a live run (PC, unattended or cluster job), publishing one, pulling one back, comparing runs |
 | [reporting-a-run](.agents/skills/reporting-a-run/SKILL.md) | sharing a run directory; building the annotated HTML dashboard and its notes |
@@ -44,7 +44,8 @@ carry placeholders; real values live in `profiles/<system>/*.local.yaml`, which 
 
 **The core validates any model-serving stack.** Validating llm-d's guides efficiently is the
 main goal, and a custom llm-d deployment or a stack with no llm-d at all must work just as well:
-any OpenAI- or Anthropic-compatible gateway, router or engine, described by its own profile.
+any OpenAI- or Anthropic-compatible gateway, router or engine, in series, described by its own
+profile. An ingress's `kind` is its position (`gateway`, `router`, `engine`), never a product.
 Nothing in `src/` depends on an llm-d guide, a guide's name, `guide.yaml` or llm-d's
 `llm-d.ai/*` pod labels. Guide support is data (the guide profiles) and optional conveniences
 layered on top; a profile without them behaves exactly as before. Pods are found through

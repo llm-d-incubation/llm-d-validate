@@ -33,7 +33,7 @@ model:
   max_model_len: {window}
 ingresses:
   - id: engine
-    kind: vllm
+    kind: engine
     base_url_env: {url_env}
     auth: {{type: none}}
     surfaces: [chat_completions]

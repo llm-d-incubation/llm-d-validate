@@ -58,7 +58,7 @@ Record: the gateway version, the engine build (`system_fingerprint`), and which 
 |---|---|
 | A committed profile for this model and layer (under `profiles/<system>/`) | use it |
 | One for the model through another layer | copy it to `<system>/<model>.local.yaml` and change what differs: `kind`, `auth`, `model.public_id`, `health_path`, `rate_limited`, the surfaces |
-| A gateway and the router for the same model | a two-ingress `.local.yaml`: the gateway profile plus an `llmd_router` ingress (below); llmdv then reports each layer as a column and attributes differences |
+| A gateway and the router for the same model | a two-ingress `.local.yaml`: the gateway profile plus a `kind: router` ingress (below); llmdv then reports each layer as a column and attributes differences |
 | Nothing for this model | writing-an-infra-profile |
 
 Every `.local.yaml` is gitignored and may write `base_url` inline. A committed profile names its URL and key by variable (`base_url_env`, `auth.key_env`) and never stores either. A profile argument is always a file path, not the profile's `name:`.
@@ -66,7 +66,7 @@ Every `.local.yaml` is gitignored and may write `base_url` inline. A committed p
 **A copy changes its `name:`** (e.g. add `-router`), or its runs mix with the committed profile's in the results folders.
 
 **Adding the router to a gateway profile.** The new ingress inherits the top-level `model`, `capabilities` and `known_failures`, so override what differs at the router:
-- `kind: llmd_router`, `auth: {type: none}`, `rate_limited: false`, `health_path: /health`;
+- `kind: router`, `auth: {type: none}`, `rate_limited: false`, `health_path: /health`;
 - `model: {public_id: <the id from the router's /v1/models>}` (the engine's served name, not the gateway's);
 - `error_status` and `unstructured_errors`: start from `examples/example-two-ingress.yaml`'s router ingress, and read [`.agents/GROUND-TRUTH.md`](../../GROUND-TRUTH.md) on the EPP's plain-text errors;
 - `surfaces`: what the router serves (often the render routes too); the contract run checks them;
@@ -87,8 +87,8 @@ for i in loader.load(sys.argv[1]).ingresses:
 Then export each named variable: a gateway ingress's URL and key from wherever the user keeps them (step 1), a router ingress's URL from step 2.
 
 ```sh
-export <url variable>="$GATEWAY_URL" <key variable>="$GATEWAY_KEY"   # a litellm ingress
-export <url variable>='https://<router route host>'                 # an llmd_router ingress: no key
+export <url variable>="$GATEWAY_URL" <key variable>="$GATEWAY_KEY"   # a gateway ingress
+export <url variable>='https://<router route host>'                 # a router ingress: no key
 ```
 
 For example, `examples/example-gateway-only.yaml` writes `base_url` inline and reads its key from `LLMDV_GATEWAY_KEY`.

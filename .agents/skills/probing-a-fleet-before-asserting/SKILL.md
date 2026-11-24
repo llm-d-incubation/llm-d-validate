@@ -25,7 +25,7 @@ The recurring failure here is an assertion that is plausible, reads correctly in
    ```
    Drop the `Authorization` line for a router reached directly; it authenticates nothing. The best capture is often a recorded one: `llmdv verify --profile <profile> --evidence all -k <case>` writes every exchange to `exchanges.jsonl`.
 
-4. **Probe every declared layer, not one.** `vllm`, `llmd_router` and `litellm` ingresses disagree on error status, on which paths exist, on which headers come back, and on whether a response is transformed.
+4. **Probe every declared layer, not one.** Engine, router and gateway ingresses disagree on error status, on which paths exist, on which headers come back, and on whether a response is transformed.
 
 5. **For a stream, capture the raw frames.** Count them, find which carry a finish reason, check for the terminal sentinel, and run it with and without any option you will assert on. The absence case is as much a contract as the presence case.
 

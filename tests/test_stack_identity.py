@@ -15,7 +15,7 @@ from llmdv.evidence.stack import ingress_kinds, observed_stack, stack_from_run
 from llmdv.output import manifest
 from tests.fakes import FakeFleet, profile_yaml
 
-KINDS = {"litellm": "litellm", "epp": "llmd_router", "engine": "vllm"}
+KINDS = {"litellm": "gateway", "epp": "router", "engine": "engine"}
 OLD = "vllm-0.31.0+g5b2a143-tp8-dp4-ep-926de753"
 NEW = "vllm-0.31.0+g2107750-tp8-dp4-ep-926de753"
 
@@ -68,17 +68,17 @@ def test_an_ingress_of_unknown_kind_gets_the_base_signals():
 
 def test_ingress_kinds_come_from_the_results():
     records = [
-        {"ingress": "litellm", "ingress_kind": "litellm"},
-        {"ingress": "epp", "ingress_kind": "llmd_router"},
+        {"ingress": "litellm", "ingress_kind": "gateway"},
+        {"ingress": "epp", "ingress_kind": "router"},
     ]
-    assert ingress_kinds(records) == {"litellm": "litellm", "epp": "llmd_router"}
+    assert ingress_kinds(records) == {"litellm": "gateway", "epp": "router"}
 
 
 def test_a_run_directory_is_read_through_a_torn_last_line(tmp_path):
     lines = [json.dumps(exchange()), json.dumps(exchange(fingerprint=NEW)), '{"ingress": "lit']
     (tmp_path / "exchanges.jsonl").write_text("\n".join(lines))
     (tmp_path / "results.jsonl").write_text(
-        json.dumps({"outcome": "pass", "ingress": "litellm", "ingress_kind": "litellm"})
+        json.dumps({"outcome": "pass", "ingress": "litellm", "ingress_kind": "gateway"})
     )
     stack = stack_from_run(tmp_path)
     assert stack["litellm"]["system_fingerprint"] == {OLD: 1, NEW: 1}

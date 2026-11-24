@@ -113,7 +113,7 @@ def test_output_overflow_fails_a_generation_that_outlasts_its_timeout(tmp_path):
 
 INGRESS = Ingress(
     id="test",
-    kind=IngressKind.VLLM,
+    kind=IngressKind.ENGINE,
     base_url="http://unused",
     model=Model(public_id="m"),
     capabilities=Capabilities(),

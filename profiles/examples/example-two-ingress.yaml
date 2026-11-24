@@ -50,7 +50,7 @@ ingresses:
   # directly means port-forwarding a pod. The pod name is NOT written here: it changes on
   # every reschedule. The selector is resolved live instead.
   - id: vllm
-    kind: vllm
+    kind: engine
     base_url: http://localhost:18100
     auth: {type: none}
     health_path: /health
@@ -83,7 +83,7 @@ ingresses:
   # There are no InferenceObjectives in this namespace, so there are no priority bands --
   # which is why x-llm-d-inference-objective is `ignored` here and not `consumed`.
   - id: router
-    kind: llmd_router
+    kind: router
     base_url: http://localhost:18180
     auth: {type: none}
     health_path: /health

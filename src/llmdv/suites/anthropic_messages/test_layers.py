@@ -28,13 +28,13 @@ def test_prompt_size_matches_the_engine(
     engines = [
         candidate
         for candidate in profile.ingresses
-        if candidate.kind is IngressKind.VLLM
+        if candidate.kind is IngressKind.ENGINE
         and surface.name in candidate.surfaces
         and "prompt_accounting" in candidate.capabilities.messages_checks
     ]
     # Two engines may serve different models, and nothing in a profile says which one a layer
     # fronts, so the comparison is only made when there is exactly one.
-    if ingress.kind is IngressKind.VLLM or len(engines) != 1:
+    if ingress.kind is IngressKind.ENGINE or len(engines) != 1:
         pytest.skip(
             f"[undeclared] comparing {ingress.id!r} needs exactly one engine ingress declaring "
             f"prompt_accounting on Messages, and a layer in front of it; found {len(engines)}"

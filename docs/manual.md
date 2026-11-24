@@ -356,7 +356,7 @@ running from your PC or as a cluster job is in [docs/end-to-end.md](end-to-end.m
 
 ## Extending
 
-A new ingress kind, surface, case or client is additive. See
+A new surface, case or client is additive, and a new gateway, router or engine product needs no code. See
 [docs/architecture.md](architecture.md#extending-llmdv).
 
 ## Running llmdv's own tests
