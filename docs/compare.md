@@ -60,15 +60,19 @@ parsed declarations, not the file: comments and the `known_failures` block do no
 recorded before that rule carry a digest of the file bytes, so the first run after it reports
 the profile as changed once, with nothing listed under what changed.
 
-Every run records in `outcome.json` what its traffic said about each ingress: the engine's
-`system_fingerprint`, `x-litellm-version`, `server`, the router's signature headers, each with
-the number of responses that carried it. When the two runs saw different values, the report
-says **the stack changed** before anything else and names the change (`litellm:
-system_fingerprint …g5b2a143 → …g2107750`), because a case that moved with the build is a
-different question from one that moved on the same build. When one run saw more than one
-build behind an ingress, it says so: that run straddled a rollout and its verdicts mix two
-fleets. Internal service names are never recorded. `comparison.json` carries the same under
-`stack`.
+Every run records in `outcome.json` what its traffic said about each ingress, read the same way
+at every layer from one table (`src/llmdv/ingress/signals.py`) plus the `version_headers` the
+profile declares: the engine's `system_fingerprint`, `x-litellm-version`, `server`, the router's
+signature headers, each with the number of responses that carried it. When the two runs saw
+different values for a signal that names a **build** (the engine's fingerprint, LiteLLM's version,
+or a declared version header), the report says **the stack changed** before anything else and
+names the change (`litellm: system_fingerprint …g5b2a143 → …g2107750`), because a case that moved
+with the build is a different question from one that moved on the same build. Other published
+signals, such as a server name or a router's per-request headers, can differ on every run without
+anything changing; they are on each run's dashboard and are not reported as a change. When one
+run saw more than one build behind an ingress, it says so: that run straddled a rollout and its
+verdicts mix two fleets. Headers that may name a backend are never recorded in `outcome.json`.
+`comparison.json` carries the same under `stack`.
 
 ## Exit codes
 
@@ -124,7 +128,7 @@ when it cannot be built the job logs a warning, keeps its exit code, and prints 
 | --- | --- |
 | `fleet_observed` | true only for verification class `ok` or `fleet`; any other run says nothing about the fleet |
 | `results[].transition` | `regressed`, `failing`, `recovered`, `passing`, `flaky`, `new` or `known`; `unbaselined` when no comparison was made |
-| `results[].points_at` | the layer the failure points at, read off the layer graph in `outcome.json` (by kind depth for a run that has none); `basis` says why |
+| `results[].points_at` | the layer the failure points at, read off the layer graph in `outcome.json` (for a run that recorded none, the graph is derived from the positions its results recorded, as for a profile without declared edges); `basis` says why |
 | `results[].evidence` | the failure bundle, relative to `publication.location` |
 | `comparison` | `made`, and the baseline and window, or the reason none was made |
 | `publication`, `job_exit_code` | as in `outcome.json` |

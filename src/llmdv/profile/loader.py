@@ -36,6 +36,7 @@ from typing import Any
 import yaml
 
 from ..http.redact import SECRET_HEADERS
+from ..ingress.signals import BACKEND_HEADERS, KNOWN_HEADERS
 from ..surfaces import base as surfaces
 from . import compose, evolution, parse
 from . import transport as transport_contract
@@ -831,6 +832,41 @@ _RETIRED_INGRESS_KEYS = {
 }
 
 
+# An HTTP field name (RFC 9110 token): no spaces, no colon, not empty.
+_HEADER_NAME = re.compile(r"[!#$%&'*+.^_`|~0-9a-z-]+")
+
+
+def _version_headers(value: Any, at: str) -> tuple[str, ...]:
+    """Headers an operator declares as naming the build, which the evidence table does not know.
+
+    Never one that may name a backend (a declared header is published in outcome.json), never
+    one the table already knows (that would change its meaning for one profile), and never one
+    twice.
+    """
+    raw_names = _optional_strings(value, f"{at}.version_headers")
+    names = tuple(name.strip().lower() for name in raw_names)
+    problems = []
+    for index, name in enumerate(names):
+        where = f"{at}.version_headers[{index}]"
+        if not _HEADER_NAME.fullmatch(name):
+            problems.append(f"{where}: {raw_names[index]!r} is not a header name")
+        elif name in BACKEND_HEADERS:
+            problems.append(
+                f"{where}: {name!r} may name a host or a Service, so it is recorded for "
+                "attribution and never published; it cannot be a version header"
+            )
+        elif name in KNOWN_HEADERS:
+            problems.append(
+                f"{where}: {name!r} is already in the evidence table (src/llmdv/ingress/"
+                "signals.py), which says what it reveals; declare only headers it does not know"
+            )
+        elif name in names[:index]:
+            problems.append(f"{where}: {name!r} is declared twice")
+    if problems:
+        raise ProfileError(*problems)
+    return names
+
+
 def _refuse_retired_keys(raw: dict[str, Any], at: str) -> None:
     problems = [
         f"{at}.{key}: no longer an ingress field; use {replacement}"
@@ -875,6 +911,7 @@ def _ingress(
         base_url_env=lambda: _opt_str(raw.get("base_url_env")),
         auth=lambda: _auth(_block(raw.get("auth"), f"{at}.auth"), f"{at}.auth"),
         health_path=lambda: str(raw.get("health_path") or "/health"),
+        version_headers=lambda: _version_headers(raw.get("version_headers"), at),
         surfaces=lambda: _optional_strings(raw.get("surfaces"), f"{at}.surfaces"),
         timeouts=lambda: _timeouts(_block(raw.get("timeouts"), f"{at}.timeouts"), at),
         error_status=lambda: _error_status(

@@ -25,6 +25,34 @@ from llmdv.profile.schema import IngressKind, Profile, depth
 from llmdv.profile.topology import Topology
 from llmdv.suites.fleet.conftest import innermost
 
+
+def _depth_of(record: dict) -> int | None:
+    try:
+        return depth(record.get("ingress_kind") or "")
+    except (KeyError, ValueError):
+        return None
+
+
+def _depth_reading(record: dict, column: dict[str, dict]) -> tuple[dict, str]:
+    """The attribution the alert feed gave before the graph existed, kept here as a literal
+    oracle: only layers strictly inside this one count, nearest first. Without peers the graph
+    walk must agree with it exactly."""
+    here = record.get("ingress") or "-"
+    mine = _depth_of(record)
+
+    def deeper(other: dict) -> bool:
+        theirs = _depth_of(other)
+        return mine is not None and theirs is not None and theirs > mine
+
+    culprit = record
+    for other in sorted(filter(deeper, column.values()), key=_depth_of):
+        if other["outcome"] in ("fail", "error"):
+            culprit = other
+            continue
+        return culprit, f"fails at {culprit.get('ingress')}, passes at {other.get('ingress')}"
+    return alerts._innermost(culprit, here)
+
+
 ROOT = Path(__file__).resolve().parents[1]
 CANDIDATES = sorted(
     [p for p in (ROOT / "profiles").rglob("*.yaml") if not p.name.endswith(".local.yaml")]
@@ -143,7 +171,7 @@ def test_without_peers_attribution_is_unchanged(profile):
                 for record in col.values():
                     if record["outcome"] == "pass":
                         continue
-                    want = alerts._attribute_by_depth(record, col)
+                    want = _depth_reading(record, col)
                     assert alerts.attribute(record, col, topology) == want
 
 
@@ -233,17 +261,14 @@ def test_a_layer_whose_peers_behind_it_all_pass_names_them_all():
     assert basis == "fails at epp, passes at decode, prefill"
 
 
-def test_an_archived_run_without_a_graph_keeps_the_depth_reading(tmp_path):
-    """A run with no recorded graph is read by kind depth, the depth walk's peer step included.
-
-    Known wrong, kept on purpose: with no graph recorded, the depth walk steps from the
-    failing prefill to its passing peer. A run that records its graph never reads this way.
-    """
+def test_a_run_without_a_graph_derives_one_and_never_compares_peers(tmp_path):
+    """With no graph recorded, the feed derives one from the positions the results carry, by
+    the rule a profile uses, so the failing prefill is never read against its passing peer."""
     outcomes = {"epp": "fail", "prefill": "fail", "decode": "pass"}
     records = [{**r, "case_id": "c", "variant": "chat"} for r in column(PD, outcomes).values()]
     feed = alerts.build(run_dir(tmp_path, records, None))
     (epp,) = [r for r in feed["results"] if r["ingress"] == "epp"]
-    assert epp["basis"] == "fails at prefill, passes at decode"
+    assert epp["basis"] == "fails at prefill, the innermost layer that ran this case, and at epp"
 
 
 # ------------------------------------------------------------- a peer that did not report
@@ -280,7 +305,7 @@ def test_the_feed_with_a_silent_peer_reads_as_the_chain_that_reported(outcomes):
     col = column(WIDE, dict(zip(("lite", "ra", "e1"), outcomes, strict=True)))
     for record in col.values():
         if record["outcome"] != "pass":
-            want = alerts._attribute_by_depth(record, col)
+            want = _depth_reading(record, col)
             assert alerts.attribute(record, col, WIDE.topology()) == want
 
 
@@ -336,7 +361,7 @@ def test_the_feed_and_the_ladder_agree_for_every_reported_subset(reported):
             else:
                 assert "the innermost layer that ran this case" in basis
             if chain:
-                assert (culprit, basis) == alerts._attribute_by_depth(record, col)
+                assert (culprit, basis) == _depth_reading(record, col)
 
 
 # ------------------------------------------------------------------------- the recorded graph

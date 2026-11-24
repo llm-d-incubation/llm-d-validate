@@ -15,8 +15,8 @@ engine behind it, which is that router's to be compared with. Peers are never co
 "prefill fails where decode passes" can no longer be printed as if decode sat behind prefill.
 
 A run records its graph in outcome.json (`as_record`), so the alert feed reads the run without
-the profile. A run recorded before the graph existed has none, and its readers keep the depth
-rule they had (see `evidence/alerts.py`).
+the profile. For a run that recorded none, the feed derives one from the positions its results
+recorded (see `evidence/alerts.py`).
 """
 
 from __future__ import annotations

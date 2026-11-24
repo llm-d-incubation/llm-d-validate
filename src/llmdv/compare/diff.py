@@ -22,6 +22,7 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass, field
 
+from ..ingress.signals import build_signal_names
 from ..profile.known import FIX_EXPECTED, KNOWN, LABELLED, first_failed_check
 
 # A verdict was reached. Anything else is an absence of evidence, not evidence of health.
@@ -299,25 +300,49 @@ def digests(records: list[dict]) -> set[str]:
 
 # What a run records about each ingress (evidence/stack.py): signal -> value -> responses.
 Stack = dict[str, dict[str, dict[str, int]]]
-# Which signals mean a different build answered, whatever the layer.
-BUILD_SIGNALS = ("system_fingerprint", "x-litellm-version")
 
 
-def attach_stack(delta: Delta, before: Stack, after: Stack) -> Delta:
-    """Record what each run saw behind its ingresses, and what differs."""
+# Ingress id to the version headers a profile declared for it (evidence/stack.py).
+Declared = dict[str, tuple[str, ...]]
+
+
+def attach_stack(
+    delta: Delta,
+    before: Stack,
+    after: Stack,
+    shared: Declared | None = None,
+    after_declared: Declared | None = None,
+) -> Delta:
+    """Record what each run saw behind its ingresses, and what differs.
+
+    A declared version header names a build, but only a run whose profile declared it recorded
+    it. So a change is read only for headers both runs declared (`shared`), and a rollout within
+    the finishing run for the headers its own profile declared (`after_declared`).
+    """
     delta.stack_before, delta.stack_after = before or {}, after or {}
     delta.stack_changes = (
-        stack_changes(delta.stack_before, delta.stack_after) if before and after else []
+        stack_changes(delta.stack_before, delta.stack_after, shared) if before and after else []
     )
-    delta.mixed_stack = mixed_builds(delta.stack_after)
+    delta.mixed_stack = mixed_builds(delta.stack_after, after_declared)
     return delta
 
 
-def mixed_builds(stack: Stack) -> list[str]:
-    """Build signals that took more than one value in one run: a rollout in progress."""
+def _builds(declared: Declared | None, ingress: str) -> frozenset[str]:
+    """The signals that name a build at one ingress: the evidence table's build rows, plus the
+    headers that ingress's profile declared. A declaration at one ingress says nothing about
+    the same header at another."""
+    return build_signal_names((declared or {}).get(ingress, ()))
+
+
+def mixed_builds(stack: Stack, declared: Declared | None = None) -> list[str]:
+    """Build signals that took more than one value in one run: a rollout in progress.
+
+    Which signals name a build comes from the evidence table (`ingress/signals.py`), plus any
+    the profile declared; routing timings and model names change per request and are not one.
+    """
     out = []
     for ingress, signals in stack.items():
-        for signal in BUILD_SIGNALS:
+        for signal in sorted(_builds(declared, ingress)):
             values = signals.get(signal) or {}
             if len(values) > 1:
                 seen = ", ".join(f"{value} ×{count}" for value, count in values.items())
@@ -325,12 +350,15 @@ def mixed_builds(stack: Stack) -> list[str]:
     return out
 
 
-def stack_changes(before: Stack, after: Stack) -> list[str]:
-    """One line per signal whose set of values differs between two runs."""
+def stack_changes(before: Stack, after: Stack, declared: Declared | None = None) -> list[str]:
+    """One line per build signal whose set of values differs between two runs: a different
+    build answered. Other published signals (a server name, a router's per-request headers)
+    can differ on every run without anything changing, so they are shown on each run's
+    dashboard and not reported as a change."""
     out = []
     for ingress in sorted(set(before) | set(after)):
         theirs, ours = before.get(ingress) or {}, after.get(ingress) or {}
-        for signal in sorted(set(theirs) | set(ours)):
+        for signal in sorted((set(theirs) | set(ours)) & _builds(declared, ingress)):
             was, now = set(theirs.get(signal) or {}), set(ours.get(signal) or {})
             if was != now:
                 out.append(f"{ingress}: {signal} {_show(was)} → {_show(now)}")

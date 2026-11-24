@@ -407,3 +407,20 @@ def test_a_feed_that_cannot_be_written_is_still_the_last_line_of_the_log(tmp_pat
     assert calls == ["publish", "notify"]
     feed = json.loads(lines[-1])
     assert feed["schema"] == alerts.SCHEMA and feed["job_exit_code"] == OK
+
+
+def test_a_layer_with_no_readable_position_is_compared_with_nothing(tmp_path):
+    """With no graph recorded, positions come from the results; one that names no position
+    (a run written by a llmdv that recorded products) fronts nothing and is fronted by nothing,
+    so it is never read as passing a failure through."""
+    records = [gateway("a", "fail"), rec("a", "pass", ingress="mystery", kind="vllm")]
+    got = results_of(alerts.build(run_dir(tmp_path, records)))[("a", "gateway")]
+    assert got["points_at"] == "gateway"
+    assert got["basis"] == "fails at gateway, the innermost layer that ran this case"
+
+
+def test_a_recorded_graph_that_misses_a_reported_layer_is_replaced_by_a_derived_one(tmp_path):
+    records = [gateway("a", "fail"), router("a", "pass")]
+    incomplete = {"order": ["gateway"], "fronts": {"gateway": []}}
+    got = results_of(alerts.build(run_dir(tmp_path, records, topology=incomplete)))
+    assert got[("a", "gateway")]["basis"] == "fails at gateway, passes at router"

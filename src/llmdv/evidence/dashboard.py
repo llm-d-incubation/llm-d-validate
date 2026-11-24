@@ -39,7 +39,9 @@ import yaml
 
 from ..cli import exit_codes
 from ..cli.exit_codes import class_of
+from ..evidence.stack import version_headers_in
 from ..http import redact
+from ..ingress import signals
 from ..log.setup import get_logger
 from ..results import read as results_file
 from ..results.record import strict
@@ -195,48 +197,55 @@ def curl_for(exchange: dict, key_env: str | None, body_cap: int) -> str:
 # ------------------------------------------------------------------------------ stack signals
 
 
-def stack_signals(exchanges_by_node: dict[str, list[dict]]) -> list[dict]:
-    """What the recorded traffic says about the layers behind each ingress, found or not.
+def stack_signals(
+    exchanges_by_node: dict[str, list[dict]], declared: dict[str, tuple[str, ...]] | None = None
+) -> list[dict]:
+    """For each ingress, every row of the evidence table (`ingress/signals.py`) and every header
+    its profile declares, each with what the recorded traffic carried for it or nothing.
 
+    Every row is listed whether or not it was seen, so an absent signal is visible as absent.
     Deliberately broader than the `stack` block outcome.json publishes (evidence/stack.py):
-    this page stays with the run directory, so it may show the gateway's api-base and the
-    whole router header family, which name internal services. dashboard.html reads these
-    exact keys, including the `router header: ` prefix.
+    this page stays with the run directory, so it shows `backend` rows too, which may name
+    internal services. dashboard.html renders the rows in this order.
     """
-    per = collections.defaultdict(lambda: collections.defaultdict(collections.Counter))
-    epp = collections.Counter()
+    declared = declared or {}
+    seen: dict[str, dict[str, dict[str, collections.Counter]]] = collections.defaultdict(
+        lambda: collections.defaultdict(lambda: collections.defaultdict(collections.Counter))
+    )
+    ingresses: set[str] = set(declared)
     for ex_list in exchanges_by_node.values():
         for e in ex_list:
             ing = e.get("ingress") or "?"
-            h = {k.lower(): str(v) for k, v in (e.get("response_headers") or {}).items()}
-            for name in (
-                "server",
-                "x-litellm-version",
-                "x-litellm-model-name",
-                "x-litellm-model-api-base",
+            ingresses.add(ing)
+            for found in signals.classify(
+                e.get("response_headers") or {},
+                e.get("response_body"),
+                declared.get(ing, ()),
+                text=str(e.get("response_text") or ""),
             ):
-                if name in h:
-                    per[ing][name][h[name][:120]] += 1
-            for name in h:
-                if name.startswith(
-                    ("x-llm-d", "x-went", "x-envoy", "x-gateway", "x-inference", "x-epp")
-                ):
-                    per[ing]["router header: " + name][h[name][:80]] += 1
-            body = e.get("response_body")
-            if isinstance(body, dict) and body.get("system_fingerprint"):
-                per[ing]["system_fingerprint"][str(body["system_fingerprint"])[:80]] += 1
-            text = (
-                json.dumps(body)[:4000]
-                if body is not None
-                else str(e.get("response_text") or "")[:4000]
-            )
-            if "inference error:" in text:
-                epp[ing] += 1
-    rows = []
-    for ing, signals in per.items():
-        found = {k: dict(v.most_common(3)) for k, v in signals.items()}
-        rows.append({"ingress": ing, "found": found, "epp_error_bodies": epp.get(ing, 0)})
-    return rows
+                seen[ing][found.row][found.signal][found.value[:120]] += 1
+    rows = [(signals.row_label(row), row.reveals.value) for row in signals.SIGNALS]
+    out = []
+    for ing in sorted(ingresses):
+        looked = rows + [(name, signals.Reveals.VERSION.value) for name in declared.get(ing, ())]
+        out.append(
+            {
+                "ingress": ing,
+                "rows": [
+                    {
+                        "row": label,
+                        "reveals": reveals,
+                        "declared": label in declared.get(ing, ()),
+                        "seen": {
+                            name: dict(values.most_common(3))
+                            for name, values in sorted(seen[ing][label].items())
+                        },
+                    }
+                    for label, reveals in looked
+                ],
+            }
+        )
+    return out
 
 
 # --------------------------------------------------------------------------------------- build
@@ -443,7 +452,7 @@ def build(run: Path, body_cap: int, max_exchanges: int) -> dict:
         "alerts": alerts,
         "comparison": comparison,
         "logs": logs,
-        "stack": stack_signals(exchanges_by_node),
+        "stack": stack_signals(exchanges_by_node, version_headers_in(profile_raw)),
         "slowest": sorted(
             (
                 {

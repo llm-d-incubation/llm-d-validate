@@ -7,15 +7,22 @@ import subprocess
 import sys
 from pathlib import Path
 
+import pytest
+import yaml
+
 from llmdv.cli.main import main
 from llmdv.compare.archive import read_stack
 from llmdv.compare.diff import attach_stack, compare, mixed_builds, stack_changes
 from llmdv.compare.report import as_record, render
-from llmdv.evidence.stack import ingress_kinds, observed_stack, stack_from_run
+from llmdv.evidence.stack import (
+    declared_in_both,
+    observed_stack,
+    stack_from_run,
+    version_headers_in,
+)
 from llmdv.output import manifest
 from tests.fakes import FakeFleet, profile_yaml
 
-KINDS = {"litellm": "gateway", "epp": "router", "engine": "engine"}
 OLD = "vllm-0.31.0+g5b2a143-tp8-dp4-ep-926de753"
 NEW = "vllm-0.31.0+g2107750-tp8-dp4-ep-926de753"
 
@@ -35,7 +42,9 @@ def exchange(ingress="litellm", fingerprint=OLD, headers=None):
     }
 
 
-def test_each_layer_records_the_signals_its_adapter_declares_and_internal_names_stay_out():
+def test_every_layer_reads_one_table_and_internal_names_stay_out():
+    """What a header means is a fact about the product that sends it, so every layer is read
+    against the same table: a header that passed through still describes the request."""
     exchanges = [
         exchange(),
         exchange(),
@@ -43,35 +52,25 @@ def test_each_layer_records_the_signals_its_adapter_declares_and_internal_names_
         exchange("epp"),
         exchange("engine"),
     ]
-    stack = observed_stack(exchanges, KINDS)
+    stack = observed_stack(exchanges)
     litellm = stack["litellm"]
     assert litellm["system_fingerprint"] == {OLD: 2, NEW: 1}
     assert litellm["x-litellm-version"] == {"1.97.0": 3}
     assert litellm["server"] == {"uvicorn": 3}
-    # The gateway adapter does not claim the router's headers; the router adapter does.
-    assert "x-llm-d-inference-objective" not in litellm
-    assert stack["epp"]["x-llm-d-inference-objective"] == {"default": 1}
     assert stack["epp"]["system_fingerprint"] == {OLD: 1}
-    # The engine knows only the base signals.
-    assert set(stack["engine"]) == {"server", "system_fingerprint"}
+    published = {"server", "system_fingerprint", "x-litellm-version", "x-llm-d-inference-objective"}
     for layer in stack.values():
-        assert (
-            "x-litellm-model-api-base" not in layer and "x-envoy-decorator-operation" not in layer
-        )
+        assert set(layer) == published
+        # A backend header and a recorded-only one are never published.
+        assert "x-litellm-model-api-base" not in layer
+        assert "x-envoy-decorator-operation" not in layer
 
 
-def test_an_ingress_of_unknown_kind_gets_the_base_signals():
-    stack = observed_stack([exchange()], {"litellm": "not-a-kind"})
-    assert set(stack["litellm"]) == {"server", "system_fingerprint"}
-    assert set(observed_stack([exchange()])["litellm"]) == {"server", "system_fingerprint"}
-
-
-def test_ingress_kinds_come_from_the_results():
-    records = [
-        {"ingress": "litellm", "ingress_kind": "gateway"},
-        {"ingress": "epp", "ingress_kind": "router"},
-    ]
-    assert ingress_kinds(records) == {"litellm": "gateway", "epp": "router"}
+def test_a_declared_version_header_is_published_for_its_own_ingress_only():
+    exchanges = [exchange(headers={"x-kong-version": "3.9.1"}), exchange("epp")]
+    stack = observed_stack(exchanges, {"litellm": ("x-kong-version",)})
+    assert stack["litellm"]["x-kong-version"] == {"3.9.1": 1}
+    assert "x-kong-version" not in stack["epp"]
 
 
 def test_a_run_directory_is_read_through_a_torn_last_line(tmp_path):
@@ -93,15 +92,13 @@ def test_two_builds_in_one_run_is_a_rollout():
 
 
 def test_a_changed_engine_is_one_line_and_an_unchanged_one_is_none():
-    before = observed_stack([exchange()], KINDS)
-    after = observed_stack(
-        [exchange(fingerprint=NEW, headers={"x-litellm-version": "1.104.1"})], KINDS
-    )
+    before = observed_stack([exchange()])
+    after = observed_stack([exchange(fingerprint=NEW, headers={"x-litellm-version": "1.104.1"})])
     assert stack_changes(before, after) == [
         f"litellm: system_fingerprint {OLD} → {NEW}",
         "litellm: x-litellm-version 1.97.0 → 1.104.1",
     ]
-    assert stack_changes(before, observed_stack([exchange()], KINDS)) == []
+    assert stack_changes(before, observed_stack([exchange()])) == []
 
 
 def test_a_signal_that_appears_or_disappears_is_named():
@@ -163,7 +160,7 @@ def test_a_router_prefix_never_captures_a_backend_endpoint():
     """`x-llm-d-destination-endpoint` is a backend header (an IP and port) that happens to share
     the router's prefix; it must stay out of the published outcome."""
     ex = exchange("epp", headers={"x-llm-d-destination-endpoint": "10.0.0.7:8000"})
-    epp = observed_stack([ex], KINDS)["epp"]
+    epp = observed_stack([ex])["epp"]
     assert "x-llm-d-destination-endpoint" not in epp
     assert epp["x-llm-d-inference-objective"] == {"default": 1}
 
@@ -190,3 +187,105 @@ def test_a_finished_run_records_the_stack_it_saw(tmp_path):
     assert stack, outcome
     ((ingress, signals),) = stack.items()
     assert "server" in signals and sum(signals["server"].values()) >= 1, signals
+
+
+def test_a_declared_version_header_is_compared_and_can_show_a_rollout():
+    """An operator's product the table does not know is compared like the table's own builds."""
+    declared = {"litellm": ("x-kong-version",)}
+    before = observed_stack([exchange(headers={"x-kong-version": "3.9.1"})], declared)
+    after = observed_stack(
+        [
+            exchange(headers={"x-kong-version": "3.9.1"}),
+            exchange(headers={"x-kong-version": "3.10.0"}),
+        ],
+        declared,
+    )
+    assert "litellm: x-kong-version 3.9.1 → 3.10.0, 3.9.1" in stack_changes(before, after, declared)
+    delta = attach_stack(compare([], []), before, after, declared, declared)
+    assert delta.mixed_stack == ["litellm: x-kong-version 3.9.1 ×1, 3.10.0 ×1"]
+    # Without the declaration the header is not read at all.
+    assert (
+        "x-kong-version"
+        not in observed_stack([exchange(headers={"x-kong-version": "1"})])["litellm"]
+    )
+
+
+def test_a_declaration_names_a_build_only_at_its_own_ingress():
+    before = {"a": {"x-kong-version": {"1": 1}}, "b": {"x-kong-version": {"1": 1}}}
+    after = {"a": {"x-kong-version": {"2": 1}}, "b": {"x-kong-version": {"2": 1}}}
+    assert stack_changes(before, after, {"a": ("x-kong-version",)}) == ["a: x-kong-version 1 → 2"]
+
+
+KONG = "ingresses:\n  - id: a\n    version_headers: [x-kong-version]\n"
+PLAIN = "ingresses:\n  - id: a\n"
+
+
+@pytest.mark.parametrize("before_profile, after_profile", [(PLAIN, KONG), (KONG, PLAIN)])
+def test_adding_or_dropping_a_declaration_is_not_a_stack_change(before_profile, after_profile):
+    """Only a run whose profile declared a header recorded it, so the other run's stack lacks it
+    whatever the fleet sent: comparing it would invent `absent -> 3.9.1`."""
+
+    def stack(profile):
+        return observed_stack(
+            [exchange("a", headers={"x-kong-version": "3.9.1"})], version_headers_in(profile)
+        )
+
+    before, after = stack(before_profile), stack(after_profile)
+    shared = declared_in_both(before_profile, after_profile)
+    assert shared == {}
+    assert stack_changes(before, after, shared) == []
+
+
+def test_a_header_both_runs_declared_is_compared():
+    before = observed_stack(
+        [exchange("a", headers={"x-kong-version": "3.9.1"})], version_headers_in(KONG)
+    )
+    after = observed_stack(
+        [exchange("a", headers={"x-kong-version": "3.10.0"})], version_headers_in(KONG)
+    )
+    shared = declared_in_both(KONG, KONG)
+    assert shared == {"a": ("x-kong-version",)}
+    assert stack_changes(before, after, shared) == ["a: x-kong-version 3.9.1 → 3.10.0"]
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        None,
+        "",
+        ": not yaml : [",
+        "[1, 2]",
+        "ingresses: {a: 1}",
+        "ingresses:\n  - version_headers: [x]\n",
+        "ingresses:\n  - id: a\n    version_headers: x-not-a-list\n",
+    ],
+)
+def test_declared_headers_are_read_from_any_profile_text_without_raising(text):
+    assert version_headers_in(text) == {}
+
+
+def test_a_finished_run_publishes_a_declared_version_header(tmp_path):
+    """From the profile to outcome.json through a real verify, as a lane runs it."""
+    with FakeFleet(extra_response_headers={"x-kong-version": "3.9.1"}) as fleet:
+        raw = yaml.safe_load(profile_yaml(fleet.base_url, fleet.model))
+        raw["ingresses"][0]["version_headers"] = ["x-kong-version"]
+        profile = tmp_path / "fake.yaml"
+        profile.write_text(yaml.safe_dump(raw))
+        run_dir = tmp_path / "run"
+        result = subprocess.run(  # noqa: S603 - fixed interpreter and args
+            [sys.executable, "-m", "llmdv.cli.main", "verify", "--profile", str(profile),
+             "--local-output", str(run_dir), "--pod-logs", "off", "-k", "models_lists"],
+            cwd=SRC.parent, env={"PYTHONPATH": str(SRC), "PATH": "/usr/bin:/bin"},
+            capture_output=True, text=True,
+        )  # fmt: skip
+    assert result.returncode == 0, result.stderr[-2000:]
+    ((ingress, signals),) = json.loads((run_dir / "outcome.json").read_text())["stack"].items()
+    assert signals["x-kong-version"] == {"3.9.1": sum(signals["server"].values())}
+
+
+def test_a_per_request_header_that_differs_is_not_a_stack_change():
+    """compare reports a different build answering, not a router's per-request timings."""
+    before = observed_stack([exchange(headers={"x-llm-d-flow-queue-duration-ms": "4"})])
+    after = observed_stack([exchange(headers={"x-llm-d-flow-queue-duration-ms": "9"})])
+    assert before["litellm"]["x-llm-d-flow-queue-duration-ms"] == {"4": 1}
+    assert stack_changes(before, after) == []

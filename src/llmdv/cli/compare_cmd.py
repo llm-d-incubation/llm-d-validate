@@ -36,7 +36,7 @@ from ..compare.archive import (
 from ..compare.diff import Delta, attach_stack, compare_window, digests
 from ..compare.report import COMPARISON_FILE, COMPARISON_JSON, as_record, not_made, render
 from ..evidence import outcome
-from ..evidence.stack import stack_from_run
+from ..evidence.stack import declared_in_both, stack_from_run, version_headers_in
 from ..http.redact import scrub
 from ..identity import CONFIGURATION_DIMENSIONS, differences
 from ..log.setup import emit, get_logger
@@ -162,14 +162,13 @@ def _compare_run(
             if mismatch:
                 raise NoSuchRun("baseline identity differs in: " + ", ".join(mismatch))
     delta, before_id = _compare_baselines(source, profile, chosen, after)
+    local = run_dir / PROFILE_FILE
+    before_profile = read_profile(source, profile, before_id)
+    after_profile = local.read_text(encoding="utf-8") if local.is_file() else None
     if delta.digest_changed:
         # Say WHICH declaration moved. One tightened line can account for every case that
         # changed, and without it a reader has to diff two profiles by hand.
-        local = run_dir / PROFILE_FILE
-        delta.profile_diff = declaration_diff(
-            read_profile(source, profile, before_id),
-            local.read_text(encoding="utf-8") if local.is_file() else None,
-        )
+        delta.profile_diff = declaration_diff(before_profile, after_profile)
 
     # Configuration-compatible runs may still differ in provenance or the profile itself.
     # Keep those differences visible in standalone comparisons as well as job comparisons.
@@ -179,7 +178,13 @@ def _compare_run(
     # The finishing run's stack from its own outcome, or from its exchanges when the outcome
     # was written by a llmdv that did not record one.
     local_stack = (outcome.read(run_dir) or {}).get("stack") or stack_from_run(run_dir)
-    attach_stack(delta, read_stack(source, profile, before_id), local_stack)
+    attach_stack(
+        delta,
+        read_stack(source, profile, before_id),
+        local_stack,
+        declared_in_both(before_profile, after_profile),
+        version_headers_in(after_profile),
+    )
 
     after_id = _run_id(after)
     text = render(delta, profile, before_id, after_id or run_dir.name)
@@ -321,15 +326,16 @@ def run(args: argparse.Namespace) -> int:
         return PREFLIGHT
 
     try:
+        before_profile = read_profile(args.source, args.profile, before_id)
+        after_profile = read_profile(args.source, args.profile, after_id)
         if delta.digest_changed:
-            delta.profile_diff = declaration_diff(
-                read_profile(args.source, args.profile, before_id),
-                read_profile(args.source, args.profile, after_id),
-            )
+            delta.profile_diff = declaration_diff(before_profile, after_profile)
         attach_stack(
             delta,
             read_stack(args.source, args.profile, before_id),
             read_stack(args.source, args.profile, after_id),
+            declared_in_both(before_profile, after_profile),
+            version_headers_in(after_profile),
         )
 
         notes = _identity_notes(

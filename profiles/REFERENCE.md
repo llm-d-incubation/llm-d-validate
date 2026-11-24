@@ -113,6 +113,7 @@ One entry per addressable layer. One ingress is a complete profile; each further
 | `base_url_env` | string | none | Environment variable holding the URL. A committed profile uses it so no hostname enters the repository. Declaring both is an error; an unset variable fails preflight. |
 | `auth` | mapping | `{type: none}` | See [ingresses[].auth](#ingressesauth). |
 | `health_path` | string | `/health` | Used by preflight. A non-2xx still counts as reachable. |
+| `version_headers` | list of strings | `[]` | Response headers this layer's product sends that name its build and that llmdv's evidence table (`src/llmdv/ingress/signals.py`) does not know yet, such as an unknown gateway's version header. Recorded on every result, published in `outcome.json` and compared by `llmdv compare` like the table's own build signals. A header the table marks as possibly naming a backend is refused, since it would be published. |
 | `surfaces` | list | `[]` | Surfaces this ingress serves. Anything absent skips as `undeclared`. See [Surface names](#surface-names). |
 | `model` | mapping | inherited | Partial override of the top-level `model`. |
 | `capabilities` | mapping | inherited | Partial override of the top-level `capabilities`. |

@@ -37,7 +37,7 @@ from .assertions import samples as sampling
 from .cli import style
 from .evidence import FailureContext, journal
 from .evidence import write as write_evidence
-from .ingress import adapter_for, client_for
+from .ingress import client_for, served_by, version_signals
 from .log.setup import get_logger
 from .output import Offloader, reference, run_prefix, whole
 from .profile import known, loader
@@ -1095,12 +1095,12 @@ def pytest_runtest_makereport(item: pytest.Item, call: pytest.CallInfo):
     case_marker = item.get_closest_marker("case_id")
     surface = surface_of(item)
 
-    served_by: dict[str, Any] = {}
+    served: dict[str, Any] = {}
     http_status = None
     if http is not None and http.last is not None:
         http_status = http.last.status
         if ingress is not None:
-            served_by = adapter_for(ingress.kind).served_by(http.last).to_dict()
+            served = served_by(http.last, ingress.version_headers).to_dict()
 
     active = journal.current()
     checks = [check.to_dict() for check in active.checks] if active else []
@@ -1197,7 +1197,7 @@ def pytest_runtest_makereport(item: pytest.Item, call: pytest.CallInfo):
                     for exchange in recorded.exchanges
                 ],
                 artifacts=dict(state.get("artifacts") or {}),
-                served_by=served_by,
+                served_by=served,
                 setup_commands=getattr(config, "_llmdv_setup_commands", {}).get(
                     ingress.id if ingress else "", []
                 ),
@@ -1230,7 +1230,7 @@ def pytest_runtest_makereport(item: pytest.Item, call: pytest.CallInfo):
                 reason=reason,
                 duration_s=round(report.duration, 4),
                 http_status=http_status,
-                served_by=served_by,
+                served_by=served,
                 checks=checks,
                 evidence=evidence_ref,
                 known_failure=known_failure,
@@ -1243,22 +1243,20 @@ def pytest_runtest_makereport(item: pytest.Item, call: pytest.CallInfo):
 
 def _build_signals(state: dict, http, ingress: Ingress | None) -> list[tuple[str | None, dict]]:
     """The build signals each of this case's responses carried, with the ingress each came
-    from, named by that ingress's own adapter: what a `known_failures` entry's `until` is
-    judged against. A cross-layer case holds clients for two ingresses, so the per-client map
-    decides which adapter reads which response."""
+    from: what a `known_failures` entry's `until` is judged against. A cross-layer case holds
+    clients for two ingresses, so the per-client map decides whose declared headers apply."""
     client_ingresses = state.get("client_ingresses", {})
     out: list[tuple[str | None, dict]] = []
     for recorded in state.get("clients") or ([http] if http is not None else []):
         owner: Ingress | None = client_ingresses.get(id(recorded), ingress)
         if owner is None:
             continue
-        adapter = adapter_for(owner.kind)
         for exchange in recorded.exchanges:
             headers = {
                 str(name).lower(): str(value)
                 for name, value in (exchange.response_headers or {}).items()
             }
-            carried = adapter.version_signals(headers, exchange.response_body)
+            carried = version_signals(headers, exchange.response_body, owner.version_headers)
             if carried:
                 out.append((owner.id, carried))
     return out

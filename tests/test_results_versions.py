@@ -29,7 +29,6 @@ from llmdv.compare import archive
 from llmdv.compare.diff import compare_window
 from llmdv.compare.report import COMPARISON_JSON, as_record
 from llmdv.evidence import alerts, dashboard, outcome
-from llmdv.evidence.stack import ingress_kinds
 from llmdv.output import manifest
 from llmdv.profile.known import first_failed_check
 from llmdv.results import read as results_file
@@ -255,8 +254,11 @@ def test_the_comparison_is_the_same_and_a_window_may_mix_both(tmp_path):
 
 def test_the_stack_reading_is_the_same(runs):
     v1, full = (outcome.read_results(run) for run in runs)
-    expected = {"gateway": "gateway", "router": "router"}
-    assert ingress_kinds(full) == ingress_kinds(v1) == expected
+
+    def kinds(records):
+        return {r["ingress"]: r["ingress_kind"] for r in records if r.get("ingress_kind")}
+
+    assert kinds(full) == kinds(v1) == {"gateway": "gateway", "router": "router"}
 
 
 def live_summary():

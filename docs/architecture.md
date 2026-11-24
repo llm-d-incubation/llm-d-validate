@@ -181,11 +181,13 @@ value shapes every parser uses, and `errors.py` the two ways a profile is report
 and the evolution declarations.
 
 ### `ingress/`
-`base.py` defines `ServedBy`, which endpoint answered, and one `IngressAdapter` class. The
-`ADAPTERS` table holds one row per `IngressKind` with what differs between layers: the headers
-that name the backend, `version_headers`, the headers whose value names the layer's build
-(recorded per run in `outcome.json`, see `evidence/stack.py`), and any extra headers worth
-recording. An unknown kind gets the base adapter.
+`signals.py` is the one table of what a response reveals: each row is a header, a header
+prefix, a body field or a body marker, and whether it names a build or layer (`version`,
+published per run in `outcome.json`, see `evidence/stack.py`), may name a backend (`backend`,
+recorded for attribution, never published), is evidence only (`recorded`) or is a product's own
+wording (`signature`). Every ingress is read against the whole table, whatever its kind, and
+against the `version_headers` its profile declares. `base.py` builds `ServedBy`, which endpoint
+answered, from it; the dashboard and `llmdv compare` read the same table.
 
 ### `surfaces/`
 `base.py` defines `WireSurface` (requests and errors) and `Surface` (generation responses).
