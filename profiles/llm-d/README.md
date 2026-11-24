@@ -88,7 +88,7 @@ These profiles follow llm-d's CI: there is one for every configuration the guide
 
 Three lanes set no provider. They apply the accelerator and engine folder's own kustomization, which includes only `base`, so they deploy what the `base` overlay does.
 
-Lanes share a profile when the overlays they deploy give a client the same model, context window, parsers and engine: a provider overlay changes only node, cache and NCCL settings. Pass the lane's accelerator and provider with `--identity` to keep their runs apart. `sim-qwen3-32b-standalone` is not a lane: it runs the guide's router in front of llm-d-inference-sim, for kind or CI without accelerators.
+Lanes share a profile when the overlays they deploy give a client the same model, context window, parsers and engine: a provider overlay changes only node, cache and NCCL settings. Pass the lane's accelerator and provider with `--identity` to keep their runs apart. Lanes that share a profile and still differ in something those do not name, such as tiered-prefix-cache's lmcache and native offload, add `--identity flavor=<value>` (`flavor=lmcache-cpu`). `sim-qwen3-32b-standalone` is not a lane: it runs the guide's router in front of llm-d-inference-sim, for kind or CI without accelerators.
 
 **Not covered, because no lane runs them:** the community overlays (TPU v6e and v7, TPU v7 dynamic slicing, Rebellions NPU, CPU, Iluvatar, MetaX, Biren, Moore Threads, TensorRT-LLM, and SGLang on Intel XPU), gateway mode, and agentgateway as the standalone sidecar proxy. Each follows the same pattern, a model part and a few-line combination, and is added when a lane runs it.
 

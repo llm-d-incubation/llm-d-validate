@@ -85,6 +85,24 @@ def test_a_profile_identity_assertion_mismatch_exits_two(tmp_path):
     assert result.returncode == 2
 
 
+def test_a_flavor_identity_is_recorded_and_an_empty_one_is_refused(tmp_path):
+    with FakeFleet() as fleet:
+        profile = write_profile(tmp_path, fleet)
+        run_dir = tmp_path / "run"
+        result = run_llmdv(
+            "verify", "--profile", str(profile), "--local-output", str(run_dir),
+            "--pod-logs", "off", "-k", "discovery", "--identity", "flavor=lmcache-cpu",
+        )  # fmt: skip
+        assert result.returncode == 0, result.stderr
+        assert outcome_of(run_dir)["identity"]["flavor"] == "lmcache-cpu"
+        refused = run_llmdv(
+            "verify", "--profile", str(profile), "--local-output", str(tmp_path / "empty"),
+            "--pod-logs", "off", "--identity", "flavor=",
+        )  # fmt: skip
+    assert refused.returncode == 2
+    assert "flavor=" in refused.stderr
+
+
 def test_identity_dimensions_are_reserved_from_labels(tmp_path):
     with FakeFleet() as fleet:
         profile = write_profile(tmp_path, fleet)

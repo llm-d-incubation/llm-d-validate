@@ -60,7 +60,7 @@ Arguments after `--` replace the CronJob's args. Use `--cli oc` for OpenShift an
 
 ## Prefixes and triggers
 
-A scheduled run, including a scheduled cluster job, passes `--identity trigger=nightly`; manual runs default to `trigger=manual`. Both job and standalone compare select only matching configuration identities, including trigger.
+A scheduled run, including a scheduled cluster job, passes `--identity trigger=nightly`; manual runs default to `trigger=manual`. Both job and standalone compare select only matching configuration identities, including trigger and flavor.
 
 ## Pull a run back
 

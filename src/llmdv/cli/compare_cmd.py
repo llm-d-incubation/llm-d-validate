@@ -149,7 +149,12 @@ def _compare_run(
                 if len(chosen) == max(1, window):
                     break
         if not chosen:
-            raise NoSuchRun("the archive holds no earlier nightly run of this profile")
+            earlier = [candidate for candidate in runs if candidate != _run_id(after)]
+            if not earlier:
+                raise NoSuchRun("the archive holds no earlier run of this profile")
+            if not isinstance(current_identity, dict):
+                raise NoSuchRun("this run recorded no identity to match a baseline by")
+            raise NoSuchRun("no earlier run has this run's configuration identity")
         chosen.reverse()
     if baseline:
         baseline_identity = read_identity(source, profile, chosen[0])

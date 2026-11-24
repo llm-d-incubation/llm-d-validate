@@ -104,9 +104,12 @@ llmdv job --profile P --remote-output s3://bucket/llmdv --compare --compare-base
 
 `llmdv job --compare` judges the finishing run's local results against published runs. Without
 `--compare-baseline`, baselines are selected by recorded identity, matching guide, accelerator, engine, provider,
-gateway, model and trigger. Runs without identity are never selected automatically; an older run
+gateway, model, trigger and flavor. Runs without identity are never selected automatically; an older run
 may still be named explicitly. `--identity trigger=nightly` marks a scheduled lane; the default
-trigger is `manual`. Differences in llm-d ref, llmdv version and profile digest are notes.
+trigger is `manual`. `--identity flavor=<value>` separates lanes that share a profile but differ
+in something else (lmcache or native offload, say); a run without a flavor compares only with runs
+without one, so adding a flavor to an existing lane starts its comparison history afresh.
+Differences in llm-d ref, llmdv version and profile digest are notes.
 
 The comparison is written to `comparison.md` and `comparison.json` in the run directory,
 published with the run, and posted with the Slack notification. **A regression makes `llmdv job`

@@ -159,7 +159,7 @@ from llmdv.output import manifest  # noqa: E402
 from tests.fakes import run_llmdv  # noqa: E402
 
 
-def archive(tmp_path, profile="p", runs=None, triggers=None, accelerators=None):
+def archive(tmp_path, profile="p", runs=None, triggers=None, accelerators=None, flavors=None):
     """A published-run layout: <root>/<profile>/<run-id>/results.jsonl."""
     for run_id, records in (runs or {}).items():
         d = tmp_path / profile / run_id
@@ -180,6 +180,9 @@ def archive(tmp_path, profile="p", runs=None, triggers=None, accelerators=None):
                 "profile_digest": "d",
                 "trigger": trigger,
             }
+            if run_id in (flavors or {}):
+                # None writes `"flavor": null`, as a real run without a flavor does.
+                body["identity"]["flavor"] = flavors[run_id]
         (d / "outcome.json").write_text(json.dumps(body))
         manifest.write(d)
     return f"file://{tmp_path}"
@@ -341,8 +344,19 @@ def test_a_first_run_does_not_fail_the_job_it_belongs_to(tmp_path):
     run_dir = _run_dir(tmp_path, [rec("a", "pass")])
     code, text = compare_run(run_dir, uri, "p")
     assert code == 0
-    assert text.startswith("Comparison unavailable:") and "no earlier nightly run" in text
+    assert text == "Comparison unavailable: the archive holds no earlier run of this profile"
     assert (run_dir / COMPARISON_FILE).read_text() == text + "\n"
+
+
+def test_earlier_runs_of_another_configuration_say_so(tmp_path):
+    """Runs exist, but none shares this run's configuration identity: a different reason from an
+    empty archive, and the message says which."""
+    uri = archive(tmp_path / "a", runs={"r1": [rec("a", "pass")]}, accelerators={"r1": "gpu"})
+    run_dir = _run_dir(tmp_path, [rec("a", "pass")])
+    _write_identity(run_dir, accelerator="amd")
+    code, text = compare_run(run_dir, uri, "p")
+    assert code == 0
+    assert text == "Comparison unavailable: no earlier run has this run's configuration identity"
 
 
 def test_a_regression_is_written_beside_the_results_and_reported(tmp_path):
@@ -423,6 +437,73 @@ def test_accelerator_lanes_compare_only_against_their_own_history(tmp_path):
     _write_identity(current, accelerator="amd")
     code, text = compare_run(current, uri, "p")
     assert code == 0 and "`amd-2` → `amd-3`" in text
+
+
+def test_flavor_lanes_compare_only_against_their_own_history(tmp_path):
+    """Lanes sharing a profile (lmcache vs native offload) differ only by flavor."""
+    uri = archive(
+        tmp_path / "archive",
+        runs={
+            "lmcache-1": [rec("a", "pass")],
+            "native-1": [rec("a", "fail")],
+            "plain-1": [rec("a", "fail")],
+            # Newest of all, so a run without a flavor has to skip it to reach plain-1.
+            "zz-lmcache": [rec("a", "pass")],
+        },
+        flavors={"lmcache-1": "lmcache-cpu", "native-1": "native-fs", "zz-lmcache": "lmcache-fs"},
+    )
+    current = _run_dir(tmp_path, [dict(rec("a", "pass"), run_id="native-2")], name="native-2")
+    _write_identity(current, flavor="native-fs")
+    code, text = compare_run(current, uri, "p")
+    assert code == 0 and "`native-1` → `native-2`" in text
+    current = _run_dir(tmp_path, [dict(rec("a", "fail"), run_id="lmcache-2")], name="lmcache-2")
+    _write_identity(current, flavor="lmcache-cpu")
+    code, text = compare_run(current, uri, "p")
+    assert code == 1 and "`lmcache-1` → `lmcache-2`" in text
+    # A run without a flavor still compares with runs without one, exactly as before.
+    current = _run_dir(tmp_path, [dict(rec("a", "pass"), run_id="plain-2")], name="plain-2")
+    _write_identity(current)
+    code, text = compare_run(current, uri, "p")
+    assert code == 0 and "`plain-1` → `plain-2`" in text
+
+
+def test_an_explicit_baseline_with_a_different_flavor_is_refused(tmp_path):
+    uri = archive(
+        tmp_path / "archive",
+        runs={"r1": [rec("a", "pass")], "r2": [rec("a", "pass")]},
+        flavors={"r1": "lmcache-cpu", "r2": "native-fs"},
+    )
+    current = _run_dir(tmp_path, [dict(rec("a", "fail"), run_id="r3")], name="r3")
+    _write_identity(current, flavor="native-fs")
+    code, text = compare_run(current, uri, "p", baseline="r1")
+    assert code == 0 and "baseline identity differs in: flavor" in text
+    code, text = compare_run(current, uri, "p", baseline="r2")
+    assert code == 1 and "`r2` → `r3`" in text
+
+
+def test_standalone_compare_keeps_flavor_lanes_separate(tmp_path, capsys):
+    uri = archive(
+        tmp_path / "archive",
+        runs={
+            "r1": [rec("a", "fail")],
+            "r2": [rec("a", "pass")],
+            "r3": [rec("a", "fail")],
+        },
+        flavors={"r1": "native-fs", "r2": "lmcache-cpu", "r3": "native-fs"},
+    )
+    assert main(["compare", "--from", uri, "--profile", "p"]) == 0
+    assert main(["compare", "--from", uri, "--profile", "p", "--baseline", "r2"]) == 2
+    assert "flavor" in capsys.readouterr().err
+
+
+def test_standalone_compare_without_flavors_is_unchanged(tmp_path):
+    """A recorded `"flavor": null` matches an older identity that has no flavor key at all."""
+    uri = archive(
+        tmp_path / "archive",
+        runs={"r1": [rec("a", "pass")], "r2": [rec("a", "fail")]},
+        flavors={"r2": None},
+    )
+    assert main(["compare", "--from", uri, "--profile", "p"]) == 1
 
 
 def test_standalone_compare_reports_provenance_notes(tmp_path, capsys):
@@ -517,7 +598,7 @@ def test_a_run_without_a_trigger_label_is_not_a_baseline(tmp_path):
     uri = archive(tmp_path / "archive", runs={"r1": [rec("a", "pass")]}, triggers={"r1": None})
     current = _run_dir(tmp_path, [rec("a", "pass")])
     code, text = compare_run(current, uri, "p")
-    assert code == 0 and "no earlier nightly run" in text
+    assert code == 0 and "no earlier run has this run's configuration identity" in text
 
 
 def test_the_comparison_lands_in_the_run_directory_the_uploader_walks(tmp_path):
@@ -585,25 +666,22 @@ def _run_dir(tmp_path, records, name="2026-01-03T00Z"):
     return d
 
 
-def _write_identity(run_dir, trigger="nightly", accelerator="amd"):
-    (run_dir / "outcome.json").write_text(
-        json.dumps(
-            {
-                "identity": {
-                    "guide": "g",
-                    "accelerator": accelerator,
-                    "engine": "vllm",
-                    "provider": "p",
-                    "gateway": None,
-                    "model": "m",
-                    "llm_d_ref": None,
-                    "llmdv_version": "v",
-                    "profile_digest": "d",
-                    "trigger": trigger,
-                }
-            }
-        )
-    )
+def _write_identity(run_dir, trigger="nightly", accelerator="amd", flavor=None):
+    identity = {
+        "guide": "g",
+        "accelerator": accelerator,
+        "engine": "vllm",
+        "provider": "p",
+        "gateway": None,
+        "model": "m",
+        "llm_d_ref": None,
+        "llmdv_version": "v",
+        "profile_digest": "d",
+        "trigger": trigger,
+    }
+    if flavor is not None:
+        identity["flavor"] = flavor
+    (run_dir / "outcome.json").write_text(json.dumps({"identity": identity}))
 
 
 def test_an_unreachable_archive_never_costs_the_notification(tmp_path, monkeypatch):
