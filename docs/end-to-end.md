@@ -90,7 +90,8 @@ llmdv job --profile /etc/llmdv/profile.yaml --remote-output "s3://$AWS_BUCKET/<p
 
 - **Settings** come from flags or the environment: `LLMDV_PROFILE`, `LLMDV_RESULTS_URI`,
   `LLMDV_NOTIFY_WEBHOOK`. Run `llmdv job --help` for the full list.
-- **Arguments after `--`** go to `llmdv verify`, such as `-- -m contract`. `--analyze` and
+- **Flags the job does not know** go to `llmdv verify`, such as `--all` or `--evidence all`;
+  arguments after `--` reach pytest unparsed, such as `-- -m contract`. `--analyze` and
   `--compare` are the job's own flags: a dashboard in the run, and a comparison after publishing.
 - **Scheduled runs** pass `--identity trigger=nightly` and are the baselines for `--compare`
   ([docs/compare.md](compare.md)). Label one-off runs differently so they never become baselines.

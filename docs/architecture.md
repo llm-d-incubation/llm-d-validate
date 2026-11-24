@@ -22,7 +22,7 @@ flowchart LR
     CASE["unhappy.malformed_json<br/>written once"]
     CASE --> E["engine"] --> RE["pass"]
     CASE --> G["gateway"] --> RG["pass"]
-    CASE --> L["proxy"] --> RL["fail"]
+    CASE --> L["router"] --> RL["fail"]
     RE --> A
     RG --> A
     RL --> A
@@ -144,7 +144,7 @@ llm-d-validate/
   src/llmdv/
     cli/                  argument parsing, output rendering, exit codes
     profile/              the profile schema and its offline validation
-    ingress/              per-layer transport adapters
+    ingress/              the evidence table of what responses reveal, served_by, the recording client
     surfaces/             per-API wire shapes
     http/                 recording client, SSE reader, redaction, curl generation
     clients/              bounded real-client invocation and the native-request relay

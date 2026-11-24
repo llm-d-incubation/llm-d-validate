@@ -71,7 +71,7 @@ which it was under `selection`: the globs, whether `--all` was given, and `in_fo
 Every run records in `outcome.json` what its traffic said about each ingress, read the same way
 at every layer from one table (`src/llmdv/ingress/signals.py`) plus the `version_headers` the
 profile declares: the engine's `system_fingerprint`, `x-litellm-version`, `server`, the router's
-signature headers, each with the number of responses that carried it. When the two runs saw
+`x-llm-d-*` headers, each with the number of responses that carried it. When the two runs saw
 different values for a signal that names a **build** (the engine's fingerprint, LiteLLM's version,
 or a declared version header), the report says **the stack changed** before anything else and
 names the change (`litellm: system_fingerprint …g5b2a143 → …g2107750`), because a case that moved

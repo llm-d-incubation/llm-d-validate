@@ -218,9 +218,11 @@ def stack_signals(
     its profile declares, each with what the recorded traffic carried for it or nothing.
 
     Every row is listed whether or not it was seen, so an absent signal is visible as absent.
-    Deliberately broader than the `stack` block outcome.json publishes (evidence/stack.py):
-    this page stays with the run directory, so it shows `backend` rows too, which may name
-    internal services. dashboard.html renders the rows in this order.
+    Deliberately broader than the `stack` block in outcome.json (evidence/stack.py): this page
+    is evidence, like exchanges.jsonl beside it, which already holds every raw header, so it
+    shows `backend` rows too, which may name internal services. It is published with the run
+    directory (`llmdv job --analyze`); outcome.json is the boundary those values never cross.
+    dashboard.html renders the rows in this order.
     """
     declared = declared or {}
     seen: dict[str, dict[str, dict[str, collections.Counter]]] = collections.defaultdict(

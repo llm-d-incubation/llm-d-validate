@@ -42,7 +42,7 @@ llmdv verify --profile profiles/examples/example-two-ingress.yaml
 A run opens with a banner and ends with a summary:
 
 ```
-  llmdv 0.1.0  verify · example-two-ingress · 2 ingresses
+  llmdv 0.1.1  verify · example-two-ingress · 2 ingresses
 
 ── preflight · 2 ingresses ──────────────────────────────────────
    ok    vllm     http://localhost:18100                               81ms
@@ -386,7 +386,7 @@ Parallel is for these offline tests only. `llmdv verify` refuses `-n`, `--numpro
 `--maxprocesses`, `--dist` and `--tx` with exit `2`, because live cases depend on order and a
 rate-limited key must not be multiplied.
 
-CI runs lint and these tests on Python 3.10 and 3.11 for every pull request
+CI runs lint, and these tests on Python 3.10 through 3.15, for every pull request
 ([`offline-tests.yaml`](../.github/workflows/offline-tests.yaml)).
 
 ## Coverage

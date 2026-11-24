@@ -182,8 +182,8 @@ upload only preserves evidence.
 ## Attribution is a hypothesis
 
 Within one run, the summary reads a ladder off the profile: which layer failed where the layer
-inside it passed. The rows come from the declared layers, ordered by `kind` (proxy, router,
-engine), and a run that cannot establish an order offers none. Every result records
+inside it passed. The rows come from the declared layers, ordered by `kind` (gateway, router,
+engine) or by the declared `fronts` edges, and a run that cannot establish an order offers none. Every result records
 `served_by`. The summary and the alert feed pair layers by one rule: a layer is compared only
 with the nearest layers behind it that reported. Going inward one kind at a time, the first kind
 with any layer that reported is where the comparison stops; a layer of that kind that did not
