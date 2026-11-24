@@ -2,14 +2,15 @@
 # Not a profile on its own: it declares no ingress and no model. A combination file under
 # profiles/llm-d/<guide>/ lists it first in `extends`, then a topology part, an engine part, a
 # model part and the guide's own parts/common.yaml. A part never extends anything, so no file is
-# reached by two routes. See profiles/llm-d/README.md.
+# reached by two routes. See .agents/skills/writing-an-infra-profile/SKILL.md, "How
+# profiles/llm-d is built".
 #
 # Everything here is either an API's own definition (INTENT) or a fact of the llm-d stack that
 # does not depend on the engine. Engine extensions (vLLM's request fields and options) are in
 # engines/, the model and its parsers in models/, the router's ingress, error statuses and
 # header dispositions in topology/, because llmdv keys those by ingress id.
 #
-# Provenance tags, one per declaration (profiles/llm-d/README.md has the full table):
+# Provenance tags, one per declaration (the full table is in the same skill section):
 #   FROM values: <path>   the guide's shipped config at llm-d 9ca8ff0
 #   FROM docs: <path>     the llm-d documentation at that commit, or profiles/REFERENCE.md here
 #   INTENT                how a correct stack behaves, as the API itself defines it (Rule 1)

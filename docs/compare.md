@@ -1,8 +1,8 @@
 # Comparing runs
 
 A run says whether the fleet holds now. `llmdv compare` says whether it got worse: it reads runs of
-the same profile back from the archive `--remote-output` wrote, matches cases, and reports which
-ones changed their answer.
+one profile back from the archive `--remote-output` wrote, matches cases, and reports which ones
+changed their answer.
 
 ```sh
 llmdv compare --from s3://bucket/llmdv --profile qwen-router --list                # runs for this profile, oldest first
@@ -25,74 +25,81 @@ Slack:
 *Existing passing*: 2
 ```
 
+## How a baseline is chosen
+
+A run is listed or used only when both `results.jsonl` and `MANIFEST.json` exist. Run ids begin
+with a UTC timestamp, so runs order by start time.
+
+**Identity.** Without an explicit baseline, `llmdv job --compare` picks runs whose guide,
+accelerator, engine, provider, gateway, model, trigger and flavor match
+([run identity](architecture.md#run-identity)). A run without an identity is never picked, but
+can be named. `--identity trigger=nightly` marks a scheduled lane (default `manual`);
+`--identity flavor=<value>` separates lanes that share a profile, such as `lmcache-connector/cpu`
+and `native/cpu` offload. A run without a flavor matches only runs without one. A different
+llm-d ref, llmdv version or profile digest is a note.
+
+**Digest.** Every result carries its `profile_digest`, a hash of the parsed declarations:
+comments, `known_failures` and `selection` do not move it. Runs under another digest are dropped
+from the window and counted. When the two runs differ, the report first says **the profile
+changed** and names the declarations that moved. Runs recorded before this rule hashed the file
+bytes, so the first comparison after it reports one change with nothing listed; so does a
+profile with a `selection`, once.
+
+**Window.** `--window N` (`--compare-window N` on `llmdv job`) is how many earlier runs must
+agree; the default, `1`, is the run before. A case is newly failing only when every run of the
+window passed it; a mixed history is flaky. A skip is not a verdict, so a throttled night does
+not dilute a window. Each case is read against the newest run of the window that holds it.
+
 ## What the sections mean
 
-Cases are matched on `(ingress, case_id, variant)`, so the same case at the gateway and at the
-engine are different questions. Only sections with something in them are printed, except the
-*Existing passing* count, which always is.
+Cases are matched on `(ingress, case_id, variant)`. Only sections with something in them are
+printed, except the *Existing passing* count.
 
 | Section | Meaning |
 | --- | --- |
 | **Newly failing** | passed before, fails now: the regression |
-| **Existed failing** | failing in both runs: known, not new |
+| **…got no HTTP answer** | a note under *Newly failing*: a timeout or dropped connection (`transient` in `comparison.json`). Still a regression; rerun before triage. A 5xx is not transient |
+| **A regression is never known** | a note under *Newly failing*: passed in every run of the window, now fails a check its `known_failures` entry declares. It stays a regression: the entry excuses a new failure or outlived its fix |
+| **Existed failing** | failing in both runs |
 | **Newly passing** | failed before, passes now |
-| **Existing passing** | a count, not a list |
-| **Flaky across the window** | the runs in the window disagree; not a regression |
-| **…got no HTTP answer** | a note under *Newly failing*: a timeout or a dropped connection, named in `comparison.json` as `transient`. Still a regression; rerun before triage, since a rollout looks the same. An HTTP 5xx is not transient: the fleet answered |
-| **Stopped running** | had a verdict before, skipped now. Not a failure: lost evidence |
-| **Now running and failing** | skipped before, fails now. New evidence, not new breakage |
+| **Existing passing** | a count |
+| **Flaky across the window** | the window disagrees; not a regression |
+| **Stopped running** | had a verdict, skipped now: lost evidence, not a failure |
+| **Now running and failing** | skipped before, fails now: new evidence, not new breakage |
 | **Started running and passing** | skipped before, passes now; a count |
 | **Failing new cases** | absent from the window, failing now; not regressions |
 | **Suite changed** | cases appeared or disappeared: a change to llmdv, not the fleet |
-| **Outside the selection** | cases only one of the runs selected, after a note that **the selection changed**: nothing to compare, never a regression or a new case. `selection.outside` in `comparison.json` |
-| **Known failures, fix pending** | failing in the window too, and declared in the profile's `known_failures` with the issue that tracks them. Not a regression: the team knows. Named in `comparison.json` under `known.failing`, with the transition `known` |
-| **A regression is never known** | a note under *Newly failing*: the case passed in every run of the window and now fails a declared check. It stays a regression; the entry either excuses a failure or outlived its fix |
-| **Fix landed** | a case the newest run of the window that held it labelled as a known failure passes now: remove its entry |
-| **Fix expected, still failing** | a known failure whose `until` build has answered and which still fails. Kept in its regression bucket, and named |
-| **No longer covered** | was a known failure in the previous run and is a plain failure now: the entry was removed, or the case fails a different check. Kept in its bucket, and named with the old issue and both checks |
+| **Outside the selection** | cases a run of the window held and a selection left out of this run, or that this run held and every run of the window left out, so there is nothing to compare them with. Never regressions or new failures; a known failure among them is listed under known failures instead. `selection.outside` in `comparison.json` |
+| **Known failures, fix pending** | failing in the window too and declared in `known_failures` with its issue. Transition `known`, under `known.failing` in `comparison.json` |
+| **Fix landed** | labelled a known failure by the newest run of the window that held it, passes now: remove the entry |
+| **Fix expected, still failing** | a known failure whose `until` build has answered and still fails; named, kept in its bucket |
+| **No longer covered** | a known failure in the newest run of the window that held it, a plain failure now (entry removed, or a different check fails); named with the old issue and both checks, kept in its bucket |
 
-Every result carries the `profile_digest` it was produced under. When the two runs disagree, the
-report says **the profile changed** before anything else and names the declarations that moved,
-because a case can move with the contract rather than with the fleet.
+## Selection changes
 
-A skip is not a verdict, so a throttled night does not dilute a window. Runs made under a
-different profile are dropped from the window and the count is stated. The digest hashes the
-parsed declarations, not the file: comments, the `known_failures` block and the `selection` do
-not move it. Runs recorded before that rule carry a digest of the file bytes, so the first run
-after it reports the profile as changed once, with nothing listed under what changed. The same
-happens once for a profile that declares a `selection`, at the first comparison after the
-selection left the digest.
+A run under a [`selection`](../profiles/REFERENCE.md#selection) holds only the cases it
+selected; the rest are deselected, not skipped, and have no record. A selection changes which
+cases run, never what they assert, so selected, full and differently selected runs share one
+window, and `--all` runs keep their history. `outcome.json` records the globs, whether `--all`
+was given, and `in_force`. When these differ between the baseline and the later run, the report
+says **the selection changed** and names the globs added and removed and any `--all` run
+(`selection.changes`).
 
-A run under a profile's [`selection`](../profiles/REFERENCE.md#selection) holds only the cases
-it selected. The ones it left out are deselected, not skipped, so they have no record at all.
-A selection changes which cases run, never what a case asserts, so it is not part of the
-digest: a selected run, a full one and a run under another selection share one window, and
-`--all` runs keep their history. `outcome.json` records which it was under `selection`: the
-globs, whether `--all` was given, and `in_force`. When the baseline and the later run differ
-there (different globs, or the selection in force in one only), the report says **the
-selection changed** and names the globs added and removed and a run made with `--all`. A case
-that vanished because the later run's selection left it out, or appeared because every run of
-the window left it out, is listed under **Outside the selection**, apart from **Suite
-changed**: never a regression, a new case, *Stopped running* or a failing new case, and without
-a transition in `comparison.json`, which lists them under `selection.outside` beside the
-changes in `selection.changes`. Each case is read against the newest run of the window that
-holds it, so a case a selected run left out is still judged against, labelled from and seen to
-stop running by the full run before it; a known failure that passes now is a fix landed even
-when the previous run did not select it, given a `--window` that reaches the run that did.
+Because each case is read against the newest run that holds it, a case a selected run left out
+is judged against, labelled from and seen to stop running by the full run before it. A known
+failure that passes now is a fix landed, given a `--window` that reaches the run that selected
+it.
 
-Every run records in `outcome.json` what its traffic said about each ingress, read the same way
-at every layer from one table (`src/llmdv/ingress/signals.py`) plus the `version_headers` the
-profile declares: the engine's `system_fingerprint`, `x-litellm-version`, `server`, the router's
-`x-llm-d-*` headers, each with the number of responses that carried it. When the two runs saw
-different values for a signal that names a **build** (the engine's fingerprint, LiteLLM's version,
-or a declared version header), the report says **the stack changed** before anything else and
-names the change (`litellm: system_fingerprint …g5b2a143 → …g2107750`), because a case that moved
-with the build is a different question from one that moved on the same build. Other published
-signals, such as a server name or a router's per-request headers, can differ on every run without
-anything changing; they are on each run's dashboard and are not reported as a change. When one
-run saw more than one build behind an ingress, it says so: that run straddled a rollout and its
-verdicts mix two fleets. Headers that may name a backend are never recorded in `outcome.json`.
-`comparison.json` carries the same under `stack`.
+## Stack changes
+
+`outcome.json` records what each ingress's traffic revealed, read from one table
+(`src/llmdv/ingress/signals.py`) plus the profile's `version_headers`, with how many responses
+carried each value. When a signal that names a build (the engine's `system_fingerprint`,
+`x-litellm-version`, a declared version header) differs, the report first says **the stack
+changed** and names it (`litellm: system_fingerprint …g5b2a143 → …g2107750`). Other signals,
+such as `server` or the router's per-request `x-llm-d-*` headers, vary freely and stay on the
+dashboard. A run that saw two builds behind one ingress straddled a rollout, and the report says
+so. Backend-naming headers never reach `outcome.json`. `comparison.json` has this under `stack`.
 
 ## Exit codes
 
@@ -100,62 +107,45 @@ verdicts mix two fleets. Headers that may name a backend are never recorded in `
 | --- | --- |
 | `0` | no regression, or `--no-fail` |
 | `1` | a case that passed now fails |
-| `2` | no usable baseline, a single run, the latest run has empty or malformed results, a profile name or run id that is not a single path segment, or `--from` names a scheme or store setup that can never work |
-| `3` | the archive cannot be read: no store credentials, the store or its sign-in refuses or cannot be reached, or a run's results are there but unreadable (permissions, or not UTF-8 text) |
+| `2` | nothing to compare: no usable baseline, a single run, empty or malformed latest results, a profile name or run id that is not one path segment, or a `--from` that can never work |
+| `3` | the archive cannot be read: no credentials, the store refuses or cannot be reached, or results are unreadable |
 
-A comparison against nothing is never a clean bill of health, so a first run or a mistyped
-profile name exits `2`, never `0`.
+A first run or a mistyped profile name exits `2`, never `0`. All codes:
+[cli.md](cli.md#exit-codes).
 
 ## In CI
 
-A CI pipeline gets the most from `llmdv compare` by publishing each kind of run under its own
-prefix, so the latest run is always compared with earlier runs of the same kind. A window of three
-(`--window 3`) keeps one flaky case from reading as a regression: a case is newly failing only when
-all three earlier runs passed it, and a mixed history is reported as flaky. Pass `--no-fail` to
-report without failing the job.
+Publish each kind of run under its own prefix, so the latest run is compared with runs of the
+same kind. `--window 3` keeps one flaky case from reading as a regression; `--no-fail` reports
+without failing the job.
 
 ## In a cluster job
 
 ```sh
-llmdv job --profile P --remote-output s3://bucket/llmdv --compare
 llmdv job --profile P --remote-output s3://bucket/llmdv --compare --compare-window 3
 llmdv job --profile P --remote-output s3://bucket/llmdv --compare --compare-baseline <run-id>
 ```
 
-`llmdv job --compare` judges the finishing run's local results against published runs. Without
-`--compare-baseline`, baselines are selected by recorded identity, matching guide, accelerator, engine, provider,
-gateway, model, trigger and flavor. Runs without identity are never selected automatically; an older run
-may still be named explicitly. `--identity trigger=nightly` marks a scheduled lane; the default
-trigger is `manual`. `--identity flavor=<value>` separates lanes that share a profile but differ
-in something else (`flavor=lmcache-connector/cpu` or `native/cpu` offload, say); a run without a flavor compares only with runs
-without one, so adding a flavor to an existing lane starts its comparison history afresh.
-Differences in llm-d ref, llmdv version and profile digest are notes.
-
-The comparison is written to `comparison.md` and `comparison.json` in the run directory,
-published with the run, and posted with the Slack notification. **A regression makes `llmdv job`
-exit `1` even when every case passed.** A comparison that cannot be made (no baseline, an
-unreachable archive) is advisory: `comparison.md` says `Comparison unavailable: <reason>`, and
-publication, notification and the exit code are unaffected.
-
-Both `results.jsonl` and `MANIFEST.json` must exist for an archived run to be listed or used as a
-baseline. Run ids begin with a UTC timestamp, so ordering is by start time.
+`llmdv job --compare` judges the finishing run against published runs and writes
+`comparison.md` and `comparison.json`, which are published with the run and posted with the Slack
+notification. **A regression makes `llmdv job` exit `1` even when every case passed.** A
+comparison that cannot be made is advisory: `comparison.md` says
+`Comparison unavailable: <reason>` and nothing else changes.
 
 ## Feeding an alerting system
 
-Every `llmdv job` run leaves `alerts.json` beside `outcome.json`: the verdicts joined with the comparison,
-one entry per case, ingress and variant. `llmdv job` prints it as the last line of its log, so a
-reader of the finished Job's log needs no access to the results store. The feed is advisory:
-when it cannot be built the job logs a warning, keeps its exit code, and prints no feed line.
+Every `llmdv job` run leaves `alerts.json` beside `outcome.json`, one entry per case, ingress and
+variant, and prints it as the last line of its log, so a reader needs no access to the results
+store. If it cannot be built, the job logs a warning and keeps its exit code.
 
 | Field | Meaning |
 | --- | --- |
-| `fleet_observed` | true only for verification class `ok` or `fleet`; any other run says nothing about the fleet |
-| `results[].transition` | `regressed`, `failing`, `recovered`, `passing`, `flaky`, `new` or `known`; `unbaselined` when no comparison was made |
-| `results[].points_at` | the layer the failure points at, read off the layer graph in `outcome.json` (for a run that recorded none, the graph is derived from the positions its results recorded, as for a profile without declared edges); `basis` says why |
+| `fleet_observed` | true only for verification class `ok` or `fleet` |
+| `results[].transition` | `regressed`, `failing`, `recovered`, `passing`, `flaky`, `new`, `known`, or `unbaselined` with no comparison |
+| `results[].points_at` | the layer the failure points at, from the layer graph in `outcome.json` (derived from recorded positions when none was recorded); `basis` says why |
 | `results[].evidence` | the failure bundle, relative to `publication.location` |
-| `comparison` | `made`, and the baseline and window, or the reason none was made |
+| `comparison` | `made`, and the baseline and window, or why none was made |
 | `publication`, `job_exit_code` | as in `outcome.json` |
 
-Alert on `regressed`, not on failure. Run with `--compare --compare-window 3` or more so a flaky
-case reads as `flaky` rather than paging, and leave `LLMDV_NOTIFY_WEBHOOK` unset when the consumer
-posts to the channel itself.
+Alert on `regressed`, not on failure, with `--compare-window 3` or more so a flaky case reads as
+`flaky`. Leave `LLMDV_NOTIFY_WEBHOOK` unset when the consumer posts to the channel itself.

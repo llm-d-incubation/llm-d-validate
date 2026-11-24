@@ -7,12 +7,9 @@
 # header dispositions. The gateway topology (gateway.yaml) declares the same behaviour under its
 # own id; keep the two in step.
 #
-# No `setup.requires` is committed: the namespace is cluster detail, and how the URL comes to
-# exist (Service DNS from inside the cluster, a route, a port-forward the lane runs) is the lane's
-# concern. For example:
-#   export LLMDV_EPP_URL=http://<GUIDE_NAME>-epp.<namespace>.svc.cluster.local   # in-cluster
-#   kubectl port-forward -n <namespace> svc/<GUIDE_NAME>-epp 18080:80 &          # or from outside
-#   export LLMDV_EPP_URL=http://localhost:18080
+# No `setup.requires` is committed: the namespace is cluster detail, and how the EPP is reached is
+# the deployment's concern. llmdv reads its URL from the variable:
+#   export LLMDV_EPP_URL=<the EPP's URL>
 #
 # What is NOT declared, and why (these rows stay skip:undeclared by design):
 #   embeddings, /inference/v1/generate   routed by the EPP (FROM docs:

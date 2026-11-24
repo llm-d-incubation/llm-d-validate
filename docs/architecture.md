@@ -2,11 +2,11 @@
 
 How `llmdv` is laid out, what each part does, and the invariants that keep its results meaningful.
 For the profile format see [profiles/README.md](../profiles/README.md); for what is tested, see
-[docs/coverage.md](coverage.md).
+[test-suites.md](test-suites.md).
 
 ## The core model
 
-Three axes, kept orthogonal. Everything else follows from this.
+Three axes, kept orthogonal.
 
 | Axis | What varies | Lives in |
 | --- | --- | --- |
@@ -29,34 +29,35 @@ flowchart LR
     A["the columns disagree,<br/>so the layer that differs<br/>is the hypothesis"]
 ```
 
-Attribution is a reading of that table, not a proof, so which endpoint each request was sent to is
-recorded on every result and exchange. Response identity headers are observations only: different
-layers may emit the same values, and correlation headers do not prove forwarding or backend
-logging. The ladder's rows come from the layers a profile declares, ordered by
-`kind`, a position (`gateway` fronts `router` fronts `engine`), never a product. That order is a graph
-(`profile/topology.py`): two ingresses of one kind, such as a prefill and a decode engine, are
-peers, and a layer is compared only with the nearest layers behind it that reported. Going
-inward one kind at a time, the comparison stops at the first kind where any layer reported. So
-a gateway in front of two routers, only one of which reported, is compared with that router,
-and that router with the engine. The alert feed uses the same rule, from the graph the run
-records in `outcome.json`; a recorded graph that misses a layer that reported is read as no
-graph. With fewer than two reporting ingresses there is no ladder: one column is nothing to
-compare.
+Attribution is a reading of that table, not a proof, so every result and exchange records which
+endpoint it was sent to. Response identity headers are observations only: layers may emit the
+same values, and a correlation header proves neither forwarding nor backend logging.
 
-The graph is built in one of two ways (`Profile.topology`). If no ingress declares `fronts`, it
-is derived from `kind` as above (`Topology.derive`), so every such profile keeps the order and
-attribution it always had. If any ingress declares `fronts`, the declared edges are the whole
-graph (`Topology.declare`): that is how a profile puts two layers of one kind in series, such as
-a router in front of a per-pod routing sidecar that fronts a prefill and a decode engine.
+The layers form a graph (`profile/topology.py`, `Profile.topology`), built one of two ways:
+
+- **Derived** (`Topology.derive`), when no ingress declares `fronts`: from `kind`, a position
+  (`gateway` fronts `router` fronts `engine`), never a product. Two ingresses of one kind, such
+  as a prefill and a decode engine, are peers.
+- **Declared** (`Topology.declare`), when any ingress declares `fronts`: the declared edges are
+  the whole graph. That is how a profile puts two layers of one kind in series, such as a router
+  in front of a per-pod routing sidecar that fronts a prefill and a decode engine.
+
 `loader.load` builds a declared graph, so an unknown id, an id listed twice in one `fronts`, a
 self-edge, a cycle or an ingress on no edge is an invalid profile (exit 2), never a mid-run
-error, and a loaded profile's graph is always readable.
+error.
+
+A layer is compared only with the nearest layers behind it that reported. Going inward one kind
+at a time, the comparison stops at the first kind where any layer reported: a gateway in front
+of two routers, one of which reported, is compared with that router, and that router with the
+engine. The alert feed reads the graph the run records in `outcome.json` by the same rule; a
+recorded graph that misses a layer that reported is read as no graph. Fewer than two reporting
+ingresses make no ladder.
 
 ## How a request reaches the fleet
 
-Two channels, deliberately separate. The **data plane** is the thing under test: ordinary HTTP to
-whatever address the profile declares. The **control plane** only makes the data plane legible:
-resolving a selector to a pod that exists now, and pulling logs for the run window.
+Two channels, kept separate. The **data plane** is the thing under test: ordinary HTTP to the
+address the profile declares. The **control plane** only makes the data plane legible: resolving
+a selector to a pod that exists now, and pulling logs for the run window.
 
 ```mermaid
 flowchart LR
@@ -73,37 +74,39 @@ flowchart LR
 ```
 
 Every `kubectl` or `oc` call goes through `kube.py`, whose allowlist admits `get`, `version`,
-`config` and `logs` and nothing else: there is no code path to `apply`, `delete`, `scale` or
-`exec`. A declared metrics source is read the same way: `fleet/prometheus.py` sends
+`config` (`current-context` only) and `logs`: there is no code path to `apply`, `delete`,
+`scale` or `exec`. A declared metrics source is read the same way: `fleet/prometheus.py` sends
 `GET /api/v1/query` only.
 
-`KubeContext` resolves the CLI once: `--kube-cli` (a name or path) if given, otherwise `kubectl`,
-then `oc`; `env.json` records the choice as `kube_cli`. Generated setup commands never include a
-local kubeconfig path. With no CLI, preflight warns and URL-only testing proceeds; `--pod-logs all`
-makes missing log access a preflight failure instead.
+`KubeContext` resolves the CLI once (`--kube-cli`, else `kubectl`, then `oc`) and `env.json`
+records it as `kube_cli`. With no CLI, URL-only testing proceeds unless `--pod-logs all` asks for
+logs.
 
 From outside the cluster the data plane arrives over a port-forward, which llmdv declares and
-checks but never starts, so a dead tunnel fails preflight as your environment rather than as the
-fleet. In-cluster, the same profile points at Service DNS and `setup` is empty.
+checks but never starts, so a dead tunnel fails preflight as your environment, not the fleet.
+In-cluster, the same profile points at Service DNS and `setup` is empty.
 
-Preflight also sends one authenticated `GET /v1/models` per reachable ingress, since health paths
-are exempt from auth. A 401 is a `credentials` problem and a list that omits the profile's
-`public_id` is an `access` problem, both exit 3 before any case runs. If the profile declares
-`model.max_model_len`, the same response is compared when it reports `max_model_len`; an omitted
-window is recorded as unchecked and does not stop the run. Finally, each declared API is probed
-with the same shape-valid body used by the contract suite. A mismatch names the profile field and
-the deployment's observed value, exits 3, and says only that the two disagree. A 403, a 404 or an
-unreadable model list is a warning for the model-list check; declared API probes still run and
-decide independently when their routes answer.
+Preflight checks the operator's side before any case runs: reachability, credentials and model
+access (one authenticated `GET /v1/models` per ingress), and that each declared API answers a
+shape-valid probe. A mismatch names the profile field and the observed value and exits 3; see
+[cli.md](cli.md).
 
 ## Run identity
 
-Each run records one fixed identity in `outcome.json`, `alerts.json` and `comparison.json`.
-Guide, model, engine and gateway come from the profile (`engine` and `gateway` are top-level
-fields naming the products); accelerator, provider, `llm_d_ref`, trigger and flavor come from `--identity`; llmdv records
-its version and the profile digest. Automatic comparisons require matching configuration
-dimensions, so different overlays cannot become one another's baselines. An unreadable archived
-identity is an archive/environment error, not a legacy run.
+Each run records one identity (`identity.py`) in `outcome.json`, `alerts.json` and
+`comparison.json`:
+
+| From | Dimensions |
+| --- | --- |
+| the profile | `guide`, `model`, `engine`, `gateway` (top-level fields naming the products) |
+| `--identity` | `accelerator`, `provider`, `llm_d_ref`, `trigger` (default `manual`), `flavor` |
+| llmdv | `llmdv_version`, `profile_digest` |
+
+`--identity` also accepts `guide`, `engine`, `gateway` and `model` as assertions: a value that
+disagrees with the profile is an error. Automatic comparisons require matching configuration
+dimensions (all but `llm_d_ref`, `llmdv_version` and `profile_digest`), so different overlays
+never become one another's baselines. An unreadable archived identity is an archive or
+environment error, not a legacy run. See [compare.md](compare.md).
 
 ## A run, end to end
 
@@ -128,153 +131,82 @@ flowchart TB
     P -->|"no"| E0["exit 0"]
 ```
 
-The codes are listed in [docs/manual.md](manual.md#exit-codes). Widening `1` to cover an environment
-problem is the failure this exists to prevent.
+The codes are listed in [cli.md](cli.md#exit-codes).
 
 ## Directory layout
 
 ```
 llm-d-validate/
-  install.sh              creates .venv and installs llmdv (see docs/manual.md)
-  pyproject.toml          console script `llmdv`; pytest11 entry point
-  Containerfile           the unattended runner image, pinned by requirements.lock
-  deploy/                 trigger.sh, the smoke test and the kustomize base (see deploy/README.md)
-  docs/                   the manual, architecture, end-to-end runs, comparing runs, coverage
-  profiles/               fleet profiles (see profiles/README.md)
-  src/llmdv/
-    cli/                  argument parsing, output rendering, exit codes
-    profile/              the profile schema and its offline validation
-    ingress/              the evidence table of what responses reveal, served_by, the recording client
-    surfaces/             per-API wire shapes
-    http/                 recording client, SSE reader, redaction, curl generation
-    clients/              bounded real-client invocation and the native-request relay
-    assertions/           shared assertions, so each lesson is encoded once
-    evidence/             what backs a verdict: checks, bundles, reproduction, alerts, dashboard
-    compare/              reading archived runs back and diffing them
-    collect/              each layer's own logs
-    fleet/                configuration, metrics and log invariants; the read-only metrics client
-    instruments/          operator-run helpers, such as a header-echo backend
-    output/               where a run's artifacts go
-    results/              the structured result record
-    log/                  the logger tree
-    notify.py             a finished run, told to Slack
-    preflight.py          is the environment ready, before anything is tested
-    kube.py               read-only kubectl/oc adapter
-    plugin.py             the pytest plugin that ties it together
-    suites/               the functional tests themselves
-  tests/                  llmdv's own unit tests; no cluster required
+  install.sh        creates .venv and installs llmdv (see docs/getting-started.md)
+  pyproject.toml    console script `llmdv`; pytest11 entry point
+  Containerfile     the unattended runner image, pinned by requirements.lock
+  deploy/           trigger.sh, the smoke test and the kustomize base (see deploy/README.md)
+  docs/             getting started, the CLI, architecture, comparing runs, coverage
+  profiles/         llm-d guide profiles, examples and parts (see profiles/README.md)
+  src/llmdv/        the package: library, CLI and suites (see the module map below)
+  tests/            llmdv's own unit tests; no cluster required
 ```
 
-The suites ship inside the package so `llmdv verify` finds them when installed into a pod. `tests/`
-is not shipped.
+The suites ship inside the package so `llmdv verify` finds them when installed into a pod.
+`tests/` is not shipped.
 
-## What each module does
+## Module map
 
-### `cli/`
-One module per subcommand: `verify_cmd.py` (embeds pytest and owns the run directory, which it
-publishes however verification ends), `plan_cmd.py` (the same collection stopped before any
-case runs, including resolved statistical sample counts), `job_cmd.py`, `publish_cmd.py`,
-`notify_cmd.py`, `compare_cmd.py`, `analyze_cmd.py`
-and `profile_cmd.py` (offline except `show --setup`).
-`main.py` holds the shared flags; `banner.py`, `contract_display.py` and `style.py` render output;
-`exit_codes.py` holds the codes; `verify_cmd._finish` and `job_cmd._exit_code` apply their precedence.
+The one place modules are described. Paths are under `src/llmdv/`.
 
-### `profile/`
-`schema.py` holds the dataclasses and two vocabularies: `Disposition` (what a layer does to a
-header, and what can verify it) and `SkipClass`. `loader.py` turns YAML into them, reports every
-problem with its path, and merges ingress overrides over profile defaults, so every `Ingress`
-carries a complete `model` and `capabilities`. `compose.py` resolves `extends` and merges a
-profile over its parent by the same rule before anything is checked. `parse.py` holds the strict
-value shapes every parser uses, and `errors.py` the two ways a profile is reported wrong.
-`transport.py`, `fleet.py` and `evolution.py` parse per-ingress HTTP behaviour, fleet invariants
-and the evolution declarations.
-
-### `ingress/`
-`signals.py` is the one table of what a response reveals: each row is a header, a header
-prefix, a body field or a body marker, and whether it names a build or layer (`version`,
-published per run in `outcome.json`, see `evidence/stack.py`), may name a backend (`backend`,
-recorded for attribution, never published), is evidence only (`recorded`) or is a product's own
-wording (`signature`). Every ingress is read against the whole table, whatever its kind, and
-against the `version_headers` its profile declares. `base.py` builds `ServedBy`, which endpoint
-answered, from it; the dashboard and `llmdv compare` read the same table.
-
-### `surfaces/`
-`base.py` defines `WireSurface` (requests and errors) and `Surface` (generation responses).
-`chat_completions.py`, `completions.py`, `responses.py` and `messages.py` implement the surfaces;
-`openai.py` holds what the OpenAI ones share; `render.py` the render routes. `SURFACE_PATHS` lists
-every declarable surface, deliberately wider than the drivable set. Adapters own their stream
-checks, so shared checks never dispatch on surface names.
-
-### `clients/`
-`process.py` bounds a subprocess's output and lifetime; `claude_code.py` owns the
-version-specific flags. `relay.py` forwards the child's native requests through the recording
-client, which owns credentials and blocks hidden retries.
-
-### `http/`
-`client.py` is the recording client: raw httpx, because SDKs normalise away what needs proving;
-`SdkRecorder` hooks SDK cases into the same evidence. `sse.py` reads streams, keeping partial
-transcripts. `redact.py` is the single source of scrubbing; `repro.py` turns an exchange into curl.
-
-### `assertions/`
-Shared, so a lesson is encoded once and every surface inherits it. `common.py` holds
-finish-reason, output and usage checks; `errors.py` status and envelope checks; surface-specific
-modules check native lifecycles before the shared checks. Each records what it observed before
-it asserts.
-
-### `evidence/`
-`journal.py` records what each case checked; `bundle.py` writes case bundles; `reproduce.py`
-writes `reproduce.sh`; `outcome.py` writes `outcome.json`, with the builds each ingress answered from (`stack.py`, read from `exchanges.jsonl` when the run ends) and the layer graph (`topology`); `alerts.py` writes `alerts.json`.
-`dashboard.py` renders `dashboard.html` from recorded evidence only, refuses to write a page whose
-data holds a credential, and never changes how a run ends.
-
-### `collect/`, `output/`, `results/`, `log/`
-Log collection through the read-only adapter. Local and remote sinks (`file://`, and `s3://` in
-`output/s3.py`, or `output/ibm_cos.py` under `LLMDV_S3_AUTH=ibm-iam`) also expose object puts for
-opt-in oversized-artifact offloading; publication still writes `MANIFEST.json` last. Both S3
-paths use redaction-registered credentials, because an S3 error can
-echo the access key id into `outcome.json`. `results/` writes versioned `results.jsonl` records, and
-`results/read.py` is the one reader of them: it refuses any schema but `llmdv.results/1`.
-`log/` provides two streams: diagnostics (per-case progress) to stderr under `--log-level`, and
-primary output (banner and summary) to stdout, never suppressed, so `llmdv verify > report.txt`
-keeps the report. Colour follows whether each stream is a terminal; `NO_COLOR` and `--no-color`
-are honoured.
-
-### `plugin.py`
-The pytest plugin: profile loading, the ingress parametrisation, phase ordering, skip
-classification, evidence capture and the result records. If you wonder where a fixture comes
-from, it is here.
+| Module | Responsible for |
+| --- | --- |
+| `cli/` | One `*_cmd.py` per subcommand; `verify_cmd.py` embeds pytest and owns the run directory, publishing it however verification ends. `exit_codes.py` holds the codes. |
+| `profile/` | The profile schema (`schema.py`: dataclasses, `Disposition`, `SkipClass`), loading with every problem reported by path (`loader.py`), `extends` (`compose.py`), the layer graph (`topology.py`). Fields: [REFERENCE.md](../profiles/REFERENCE.md). |
+| `ingress/` | What a response reveals, not per-product adapters: `signals.py` is the one table of headers and body markers (`version`, `backend`, `recorded`, `signature`), read at every ingress; `base.py` builds `ServedBy` and the ingress's recording client. A new product needs no code. |
+| `surfaces/` | Per-API wire shapes: Chat, Completions, Responses, Messages and render, plus surface-neutral builders so a case never writes a wire field. `SURFACE_PATHS` lists every declarable surface. |
+| `http/` | The recording client (raw httpx; `SdkRecorder` for SDK cases), the SSE reader, `redact.py` (the single source of scrubbing) and curl generation. |
+| `clients/` | Bounded real-client subprocesses and the relay that sends their native requests through the recording client. |
+| `assertions/` | Shared checks, so a lesson is encoded once; `samples.py` is the one statistical check (`count`, `ratio` or `order` over n recorded samples). |
+| `evidence/` | Checks (`journal.py`), failure bundles, `reproduce.sh`, `outcome.json` with the builds seen per ingress (`stack.py`), `alerts.json`, and `dashboard.html`, which refuses to write a page holding a credential. |
+| `compare/` | Reading archived runs and diffing them over a window ([compare.md](compare.md)). |
+| `collect/` | Each layer's logs for the run window, through `kube.py`. |
+| `fleet/` | Configuration, metrics and log invariants; `prometheus.py` is the read-only metrics client. |
+| `instruments/` | Operator-run helpers llmdv never deploys, such as `header_echo.py`, a backend that echoes allowlisted headers. |
+| `output/` | The run directory and publication to `file://` or `s3://` (`ibm_cos.py` under `LLMDV_S3_AUTH=ibm-iam`); `MANIFEST.json` is written last. |
+| `results/` | `results.jsonl`; `read.py` is its one reader and refuses any schema but `llmdv.results/1`, which grows only by optional fields. |
+| `log/` | The logger tree: diagnostics to stderr, primary output to stdout, a redaction filter on every record. |
+| `suites/` | The functional tests, one package per suite and marker ([test-suites.md](test-suites.md)). |
+| `plugin.py` | The pytest plugin: profile loading, ingress parametrisation, skip classes, evidence capture. Every fixture comes from here. |
+| `preflight.py`, `kube.py`, `identity.py`, `notify.py` | Environment checks before any case; the read-only kubectl/oc adapter; the run identity; the Slack message. |
 
 ## Invariants
 
 These are load-bearing. Changing one changes what a result means.
 
-**Ingress and surface stay orthogonal.** The moment a case reaches into a layer's internals,
-running it elsewhere stops being a comparison.
+**Ingress and surface stay orthogonal.** Once a case reaches into a layer's internals, running
+it elsewhere stops being a comparison.
 
-**A skip carries its class.** One of the [six skip classes](manual.md#skip-classes):
-`undeclared`, `not_implemented`, `requires_instrumentation`, `requires_load`,
-`excluded_by_policy`, `throttled`. Collapsing them makes a matrix read as coverage when it is not.
+**A skip carries its class.** One of the [six skip classes](cli.md#skip-classes): `undeclared`,
+`not_implemented`, `requires_instrumentation`, `requires_load`, `excluded_by_policy`,
+`throttled`. Collapsing them makes a matrix read as coverage when it is not.
 
-**Exit codes separate the fleet from the operator.** `1` is the fleet, `3` is your vantage point,
-`5` is delivery, `6` is an interruption. A delivery failure never masks a test failure.
+**Exit codes separate the fleet from the operator.** `1` is the fleet, `3` your vantage point,
+`5` delivery, `6` an interruption. A delivery failure never masks a test failure, and `1` never
+covers an environment problem.
 
 **No `print`.** Ruff rule `T20` enforces it. Output goes through the logger tree so one flag
 governs everything the process emits.
 
 **Redaction happens at capture, at the logging layer, and at every run-file writer.** The
 logging filter covers httpx, which logs request headers at DEBUG. The writers redact again,
-because a fleet can echo a credential inside a body, and the run directory is what
-`--remote-output` publishes. `repro.sh` keeps its own `Bearer ${KEY}` so it stays replayable.
+because a fleet can echo a credential inside a body, and `--remote-output` publishes the run
+directory. `repro.sh` keeps its own `Bearer ${KEY}` so it stays replayable.
 
 **A verdict carries its evidence.** A pass with no recorded checks is indistinguishable from a
 test that checked nothing.
 
 ## Extending llmdv
 
-A new surface, case, client or assertion is additive, and a new product at any layer needs no code: register it, preserve the
-invariants above, and prove the new case can fail: add the defect to `tests/fakes.py` and assert
-the failure, including that a recorded check is marked not-ok. The steps are in the
-[`extending-llmdv`](../.agents/skills/extending-llmdv/SKILL.md) skill.
+A new surface, case, client or assertion is additive, and a new product at any layer needs no
+code. Preserve the invariants above and prove the new case can fail: add the defect to
+`tests/fakes.py` and assert the failure, including that a recorded check is marked not-ok. The
+steps are in the [`extending-llmdv`](../.agents/skills/extending-llmdv/SKILL.md) skill.
 
 ## Testing your change
 

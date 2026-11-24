@@ -1,6 +1,6 @@
 # tiered-prefix-cache
 
-Profiles for llm-d's [tiered-prefix-cache](https://github.com/llm-d/llm-d/tree/main/guides/tiered-prefix-cache) guide at llm-d `9ca8ff0`. Engines offload evicted KV-cache blocks to CPU RAM (and, with the `fs` variant, a shared filesystem) and load them back instead of recomputing them; the router scores pods on both tiers. Written from the shipped configuration (each lane's overlay rendered with `kubectl kustomize`) and the API definitions; none has been run yet. Layout, provenance tags and the shared router claims are in [../README.md](../README.md) and [../optimized-baseline/parts/common.yaml](../optimized-baseline/parts/common.yaml); this guide's claims and where each lands are in [parts/common.yaml](parts/common.yaml).
+Profiles for llm-d's [tiered-prefix-cache](https://github.com/llm-d/llm-d/tree/main/guides/tiered-prefix-cache) guide at llm-d `9ca8ff0`. Engines offload evicted KV-cache blocks to CPU RAM (and, with the `fs` variant, a shared filesystem) and load them back instead of recomputing them; the router scores pods on both tiers. Written from the shipped configuration (each lane's overlay rendered with `kubectl kustomize`) and the API definitions; none has been run yet. The layout and provenance tags are in the [profile skill](../../../.agents/skills/writing-an-infra-profile/SKILL.md#how-profilesllm-d-is-built), and the shared router claims in [../optimized-baseline/parts/common.yaml](../optimized-baseline/parts/common.yaml); this guide's claims and where each lands are in [parts/common.yaml](parts/common.yaml).
 
 ## Lanes
 
@@ -27,7 +27,7 @@ The overlay is `modelserver/<ACCELERATOR_TYPE>/<MODEL_SERVER>/<CONNECTOR>/<VARIA
 `accelerator` is the lane's `ACCELERATOR_TYPE` and `provider` the `INFRA_PROVIDER` folder it renders (`base` for the two TPU lanes, which set none). `flavor` is `<CONNECTOR>/<VARIANT>`, the workflow's `connector` and `offloading_target` in overlay-path order, and every lane passes it, as [../README.md](../README.md) sets out. Lanes that would otherwise share a profile, accelerator and provider need it to stay apart: the six NVIDIA vLLM lanes (two connectors per provider) and the four AMD lanes (one provider, two connectors by two tiers).
 
 ```sh
-export LLMDV_EPP_URL=http://<GUIDE_NAME>-epp.<namespace>.svc.cluster.local   # GUIDE_NAME=tiered-prefix-cache
+export LLMDV_EPP_URL=<the EPP's URL>
 llmdv verify --profile profiles/llm-d/tiered-prefix-cache/<profile>.yaml <identity flags>
 ```
 

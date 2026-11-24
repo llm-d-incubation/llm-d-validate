@@ -41,8 +41,8 @@
 #       -> fleet.config rules, which need cluster access
 #   6   SGLang answers /health with 503 until the snapshot and wake-up finish (README)
 #       -> NOT COVERED: startup behaviour; llmdv runs against a Ready stack
-#   7   kubectl port-forward to a gVisor pod fails; forward the router Service instead (README)
-#       -> the run block in each combination forwards the `<GUIDE_NAME>-epp` Service
+#   7   gVisor isolates each pod's localhost ("gVisor Localhost Isolation", README)
+#       -> not llmdv's concern: llmdv takes the EPP's URL as the deployment provides it
 #   8   gateway mode (guide.yaml deploy.gateway)
 #       -> NOT COVERED: no lane runs it (the workflows pass gateway_host `<GUIDE_NAME>-epp`)
 

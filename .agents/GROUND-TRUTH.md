@@ -230,6 +230,83 @@ declared context degrades selector resolution silently to an unresolved label. I
 
 ---
 
+## Why some checks exist
+
+The reasoning behind checks listed in [docs/test-suites.md](../docs/test-suites.md).
+
+**A 200 must be well-formed, not just successful.** Some defects hide behind correct responses.
+A reasoning model given a small budget can spend it all thinking and stop at `length` with no
+answer; `length` is legal and reasoning counts as output, so the smoke cases pass it. The
+`answer_budget` cases fail that combination. A client that puts a per-request value at the head
+of its prompt destroys prefix reuse while every response is correct, so the `cache` and
+`real_clients` cases assert realised reuse across turns, not a status.
+
+**What the client sent must reach the model.** A gateway can drop or rewrite part of a
+conversation, such as a `role: "system"` entry inside `messages` or earlier thinking blocks, and
+still return a clean 200. The `messages_checks` cases assert on what reached the model, usually
+through input token counts, not on the response shape. The `images` cases do the same for a
+picture: each draws four random colour stripes and requires the answer to name them in order,
+which a layer that drops the image or inlines its base64 as text cannot do. They also run in a
+tool result (`tools`), a Claude Code session (`real_clients`) and a prefix repeat (`cache`).
+
+**Prefix stability needs two requests, not load.** Changing a volatile value (a billing line,
+an inline reminder) must not change the reusable prompt prefix. That is visible in two render
+calls, which makes it a functional test. Cache-hit rates and router scoring accuracy belong to
+system tests.
+
+**Change sentinels go red the night a change lands.** Each `evolution` case pins one declared
+behaviour: how an unknown field, block or header is treated; that integers above 2^53, key order
+and escapes survive every hop; the input token count or render digest of a fixed conversation;
+and the key paths and JSON types of responses, streams and errors. A template edit, tokenizer
+swap or re-encoding hop changes these while every response stays correct.
+
+**Two allowed answers, one forbidden.** Where the spec allows two answers, either passes unless
+the profile pins one under `error_status`. A 5xx, a hang or a dropped connection never passes,
+because SDKs retry them.
+
+**Argument schemas are enforced only where the fleet promised it.** A tool sent without
+`strict: true` has unconstrained arguments on vLLM (below `--tool-strict-level parameter`) and on
+OpenAI alike, so the tools cases hold a call's arguments to the schema only for strict tools, or
+for every tool when the profile declares `tools.strict_level: parameter`. Elsewhere a mismatch
+is recorded (`tool_call_arguments_unconstrained`) as evidence. `tools.strict`,
+`tools.schema_features` and `tools.args_types` send strict tools, so they still verify the
+schema is honoured.
+
+**Call markup is a leak wherever it appears.** Every generation on a tool surface runs
+`tool_markup_in_answer` as part of the shared contract when the profile declares
+`model.tools.markup`, not only the cases that expect a call. A parser that finds no call it can
+parse (a truncated call, an unhandled `tool_choice`, a name outside its charset) can hand the raw
+framing back as the answer: a case expecting a call then fails as a missing call, and one that
+judges only token counts passes. `tools.result_quotes_markup` asks the answer to quote the tags,
+so there the markup found is recorded and not judged.
+
+**A schema constrains the answer, not the reasoning.** Where the profile declares reasoning on
+by default through a reasoning parser, the JSON-schema and JSON-mode cases
+(`field_options.structured_output`, `field_options.structured_output_stream`,
+`field_options.json_object`, `evolution.key_order`, `openai_chat.structured_key_order`,
+`openai_chat.sdk_parse_structured[json]`, `tools.result_quotes_markup`, the answer of
+`tools.with_output_format`) also require reasoning text or a positive reasoning token count
+beside the answer (`structured_output_reasoning`). A grammar applied from the first token leaves
+valid JSON with no reasoning channel, and the model writes its reasoning into the JSON's
+strings. It is judged after the schema, so a broken answer still fails as one.
+`scenarios.structured_client` turns reasoning off, so it is not judged there.
+
+**`max_tool_calls` limits built-in tools only.** `tools.max_tool_calls` checks that a function-tool
+request carrying this field returns valid calls or a clean 4xx refusal; multiple function calls
+are valid even with `max_tool_calls: 1`. The Responses feature probe separately checks the
+declared acceptance and echo. Enforcement of the cap on built-in tools is not covered.
+
+**Fleet checks read, never write.** Configuration reads use kubectl `get` only; a missing tool
+or a forbidden read skips as `requires_instrumentation`. Only `metrics.header_label` sends model
+traffic.
+
+**Layer attribution is a hypothesis.** The attribution ladder is built from the ingresses the
+profile declares, and every result records which endpoint served it, so a per-replica
+difference is not blamed on a gateway. A single-ingress run is complete but cannot compare
+layers.
+
+---
+
 ## Where this suite is blind
 
 Known gaps, recorded so they are not rediscovered as surprises. Each is a consequence of a

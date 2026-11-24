@@ -16,7 +16,7 @@ Both lanes run `guides/flow-control/scripts/nightly-deploy-gke.sh` as a `custom_
 The provider value is the `INFRA_PROVIDER` the lane passes to the deploy script.
 
 ```sh
-export LLMDV_EPP_URL=http://<GUIDE_NAME>-epp.<namespace>.svc.cluster.local
+export LLMDV_EPP_URL=<the EPP's URL>
 llmdv verify --profile profiles/llm-d/flow-control/vllm-qwen3-32b-parsers-standalone.yaml \
   --identity accelerator=gpu --identity provider=gke
 ```

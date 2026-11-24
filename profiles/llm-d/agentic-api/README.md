@@ -13,7 +13,7 @@ Profiles for llm-d's [agentic-api guide](https://github.com/llm-d/llm-d/tree/mai
 The lane's deploy script is `guides/agentic-api/scripts/nightly-deploy-gke.sh` (one model-server replica), and its validator is `.github/scripts/e2e/e2e-validate-agentic-api.sh`, which runs the guide's `verify.py` against agentic-api.
 
 ```sh
-export LLMDV_EPP_URL=http://<GUIDE_NAME>-epp.<namespace>.svc.cluster.local
+export LLMDV_EPP_URL=<the EPP's URL>
 llmdv verify --profile profiles/llm-d/agentic-api/vllm-qwen3-32b-parsers-standalone.yaml \
   --identity accelerator=gpu --identity provider=gke
 ```

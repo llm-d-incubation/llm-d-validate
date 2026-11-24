@@ -15,7 +15,7 @@ scrubs the endpoint hostnames, which are not secret but are cluster-identifying.
 
 There is deliberately no link to the dashboard: a signed S3 link carries the access key ID and
 grants read access to anyone holding it. The dashboard is published with the run; pull it as
-`docs/end-to-end.md` describes.
+`docs/getting-started.md` describes.
 """
 
 from __future__ import annotations
@@ -207,7 +207,7 @@ def main() -> int:
     if (run / "dashboard.html").is_file():
         dashboard_line = (
             "The dashboard is published with the run; "
-            "pull it as `docs/end-to-end.md` describes."
+            "pull it as `docs/getting-started.md` describes."
         )
     else:
         dashboard_line = "No dashboard: start the run with `analyze=true` to publish one."

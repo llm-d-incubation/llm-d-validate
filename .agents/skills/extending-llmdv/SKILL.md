@@ -94,4 +94,4 @@ llmdv verify --profile <profile> -k <your case>
 
 Then **prove the case can fail**: add the defect to the fake fleet and assert the failure. HTTP and SSE defects go in `tests/transport_fakes.py` (`DEFECTS`, through `FakeFleet(transport=…)`); response-content defects in `tests/fakes.py`; fleet-suite fakes in `tests/fleet_fakes.py`. Assert that the case fails, and that a recorded check is marked not-ok. A bundle whose verdict says FAIL while every check says ok means the deciding assertion recorded nothing.
 
-Finally, update the suite's row in [docs/coverage.md](../../../docs/coverage.md) (case count, status) and the Total row; close or edit a Gaps row if the case fills one.
+Finally, update the suite's row in [docs/test-suites.md](../../../docs/test-suites.md) (what it checks, what enables it, its status); close or edit a Gaps row if the case fills one.

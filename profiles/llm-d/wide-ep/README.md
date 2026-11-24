@@ -1,6 +1,6 @@
 # wide-ep profiles
 
-Profiles for llm-d's `wide-ep` guide (wide expert parallelism with P/D disaggregation), written from llm-d 9ca8ff0. How the parts and combinations fit together, and the provenance tags, are in [../README.md](../README.md). Every profile here is **WRITTEN, NOT RUN**: no lane has run llmdv against this guide yet, and the first run of each is its measurement.
+Profiles for llm-d's `wide-ep` guide (wide expert parallelism with P/D disaggregation), written from llm-d 9ca8ff0. How the parts and combinations fit together, and the provenance tags, are in the [profile skill](../../../.agents/skills/writing-an-infra-profile/SKILL.md#how-profilesllm-d-is-built). Every profile here is **WRITTEN, NOT RUN**: no lane has run llmdv against this guide yet, and the first run of each is its measurement.
 
 ## Lanes and profiles
 
@@ -27,7 +27,7 @@ The router differs by accelerator (always-disaggregate on gpu and amd, one aggre
 Run one after deploying the guide in standalone mode:
 
 ```sh
-export LLMDV_EPP_URL=http://<GUIDE_NAME>-epp.<namespace>.svc.cluster.local
+export LLMDV_EPP_URL=<the EPP's URL>
 llmdv verify --profile profiles/llm-d/wide-ep/vllm-deepseek-r1-0528-tools-standalone.yaml \
   --identity accelerator=gpu --identity provider=gke
 ```

@@ -14,7 +14,7 @@ Both lanes run `guides/batch-serving/asynchronous-processing/multitenant/scripts
 | `async-multitenant-holdback-gke-acc-gpu-vllm-x` | `values/router/flow-control-holdback.yaml` | `vllm-qwen3-32b-parsers-standalone` | `--identity accelerator=gpu --identity provider=gke --identity flavor=holdback` |
 
 ```sh
-export LLMDV_EPP_URL=http://<release>-epp.<namespace>.svc.cluster.local
+export LLMDV_EPP_URL=<the EPP's URL>
 llmdv verify --profile profiles/llm-d/async-multitenant/vllm-qwen3-32b-parsers-standalone.yaml \
   --identity accelerator=gpu --identity provider=gke --identity flavor=evictable
 ```
