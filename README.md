@@ -25,8 +25,10 @@
   <img src="https://raw.githubusercontent.com/llm-d-incubation/llm-d-validate/main/docs/images/llmdv-overview.gif" width="100%" alt="Animated overview: a profile defines the test plan; llmdv sends real requests to the gateway (end to end), the llm-d router (router and engine) and the engine alone; each layer gets a verdict; the run's evidence (results, exchanges, repro scripts, a dashboard) is bundled, published to object storage and sent as a notification. Runs launch from a workstation, CI or a cluster job.">
 </p>
 
-`llmdv` tests a deployed [llm-d](https://github.com/llm-d/llm-d) stack, or any OpenAI- or
-Anthropic-compatible one, by sending it real requests and checking every answer.
+## How it works
+
+`llmdv` sends real requests to a deployed [llm-d](https://github.com/llm-d/llm-d) stack, or any
+OpenAI- or Anthropic-compatible one, and checks every answer.
 
 - **Real requests, per layer.** It calls each layer you can reach (gateway, router, engine)
   through Chat, Completions, Messages and Responses, with streaming, tools, caching, headers and
