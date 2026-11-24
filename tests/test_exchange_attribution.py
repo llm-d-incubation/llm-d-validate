@@ -11,7 +11,7 @@ import httpx
 
 from llmdv.http import redact
 from llmdv.http.client import Exchange, RecordingClient, SdkRecorder
-from llmdv.ingress.base import IngressAdapter
+from llmdv.ingress import served_by
 from llmdv.plugin import _correlation_headers, _write_exchanges
 from llmdv.profile.schema import IngressKind
 
@@ -135,8 +135,7 @@ def test_exchange_metadata_is_attributable_and_identity_headers_are_redacted(tmp
         assert payload["ingress_kind"] == "router"
         assert payload["case_id"] == "case-c"
 
-        adapter = IngressAdapter()
-        observed = adapter.served_by(exchanges[0]).to_dict()
+        observed = served_by(exchanges[0]).to_dict()
         assert observed["extra"] == {"server": "secret-server", "via": "proxy"}
         assert "secret-server" not in path.read_text()
     finally:
@@ -145,9 +144,5 @@ def test_exchange_metadata_is_attributable_and_identity_headers_are_redacted(tmp
 
 
 def test_absent_identity_headers_remain_unknown():
-    observed = (
-        IngressAdapter()
-        .served_by(Exchange(method="POST", url="http://unused", status=200))
-        .to_dict()
-    )
+    observed = served_by(Exchange(method="POST", url="http://unused", status=200)).to_dict()
     assert "extra" not in observed

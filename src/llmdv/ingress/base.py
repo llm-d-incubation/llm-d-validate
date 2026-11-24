@@ -16,12 +16,13 @@ from the first pass even though nothing reads it until `llmdv matrix` exists.
 
 from __future__ import annotations
 
-from collections.abc import Callable
+from collections.abc import Callable, Iterable
 from dataclasses import dataclass, field
 from typing import Any
 
 from ..http.client import Exchange, RecordingClient
-from ..profile.schema import Ingress, IngressKind, ProxyMode
+from ..profile.schema import Ingress, ProxyMode
+from . import signals
 
 
 @dataclass(frozen=True)
@@ -46,122 +47,61 @@ class ServedBy:
         }
 
 
-# Forwarded IP and host values are intentionally excluded because they add sensitive data.
-IDENTITY_HEADERS = ("server", "via", "x-forwarded-proto")
+# Recorded on every layer, whatever product answered. Throttling signals are evidence wherever
+# they appear: without them a 429 is a bare status with nothing to say how long to wait or what
+# the quota was. Forwarded IP and host values are left out because they add sensitive data.
+THROTTLE_PREFIXES = ("x-ratelimit-",)
+THROTTLE_HEADERS = ("retry-after",)
+PROXY_HEADERS = ("via", "x-forwarded-proto")
 
 
-@dataclass(frozen=True)
-class IngressAdapter:
-    """What one layer reveals about itself. Kinds differ only in data, which `ADAPTERS` holds.
+def version_signals(
+    headers: dict[str, str], body: Any, declared: Iterable[str] = ()
+) -> dict[str, str]:
+    """The published signals one response carries (the table's `version` rows and the headers
+    the ingress declares), by signal name: never one that may name a host or a Service."""
+    return {
+        found.signal: found.value
+        for found in signals.classify(headers, body, declared)
+        if found.reveals is signals.Reveals.VERSION
+    }
 
-    The defaults are the base layer: an ingress of unknown kind gets them, and reveals no
-    backend.
+
+def served_by(exchange: Exchange, declared: Iterable[str] = ()) -> ServedBy:
+    """Which backend answered, as far as the response admits, read the same way at every layer.
+
+    `backend_pod` is the first row, in table order, that names the endpoint or deployment that
+    served the request; a header that passed through from a deeper layer still names it. Any
+    other such value is kept in `extra`, so a gateway's deployment id is not lost when a
+    router's destination is also present. A backend value that names a Service or an upstream
+    URL is never recorded here, nor a recorded-only header family (`x-envoy-*`, ...), which the
+    run's dashboard shows from the exchanges. Everything is in a fixed order, so one response
+    gives one record whatever order it listed its headers in.
     """
-
-    # Response headers that may name the backend, best-effort and layer-specific.
-    backend_headers: tuple[str, ...] = ()
-    # Response headers and body fields whose value names the build behind this layer, and is
-    # safe to publish: a version, a build id, a signature. Never a hostname or an internal
-    # service name; those stay in `backend_headers`, which attribution reads and the outcome
-    # never records. Bodies pass through every layer, so the engine's fingerprint is a base
-    # field, not a vLLM one.
-    version_headers: tuple[str, ...] = ("server",)
-    version_header_prefixes: tuple[str, ...] = ()
-    version_fields: tuple[str, ...] = ("system_fingerprint",)
-    # Further response headers this layer records in `served_by.extra`, after the base ones.
-    extra_headers: tuple[str, ...] = ()
-    identity_headers: tuple[str, ...] = IDENTITY_HEADERS
-
-    def version_signals(self, headers: dict[str, str], body: Any) -> dict[str, str]:
-        """The build signals one response carries, by signal name, lower-cased header names."""
-        found = {
-            name: value
-            for name, value in headers.items()
-            if (name in self.version_headers or name.startswith(self.version_header_prefixes))
-            # A prefix must never pull in a header that names a host or a Service.
-            and name not in self.backend_headers
-        }
-        if isinstance(body, dict):
-            for name in self.version_fields:
-                value = body.get(name)
-                if isinstance(value, str) and value:
-                    found[name] = value
-        return found
-
-    def served_by(self, exchange: Exchange) -> ServedBy:
-        headers = {name.lower(): value for name, value in (exchange.response_headers or {}).items()}
-        backend = next(
-            (headers[name] for name in self.backend_headers if name in headers),
-            None,
-        )
-        model_echo = None
-        if isinstance(exchange.response_body, dict):
-            model_echo = exchange.response_body.get("model")
-        extra = {
-            k: v
-            for k, v in headers.items()
-            # Throttling signals are evidence whatever the layer: without them a 429 is a
-            # bare status with nothing to say how long to wait or what the quota was.
-            if k.startswith("x-llm-d")
-            or k.startswith("x-ratelimit-")
-            or k == "retry-after"
-            or k in self.identity_headers
-        }
-        for name in self.extra_headers:
-            if name in headers:
-                extra[name] = headers[name]
-        return ServedBy(
-            x_request_id=headers.get("x-request-id"),
-            backend_pod=backend,
-            model_echo=model_echo,
-            extra=extra,
-        )
-
-
-# One row per position, holding the headers of the product measured there so far: vLLM as the
-# engine, the llm-d router as the router, LiteLLM as the gateway. Another product in a position
-# gets that row too; headers it does not send are simply absent. A field a row leaves out takes
-# the base default above.
-ADAPTERS: dict[IngressKind, IngressAdapter] = {
-    # Direct vLLM: the engine's own OpenAI-compatible server. Nothing sits in front, so a
-    # failure here is the backend, the model template, or the fixture. vLLM reveals no backend
-    # identity in its response headers -- verified against v0.30.0, which returns only
-    # `server: uvicorn` and `x-went-into-resp-headers` -- so `backend_pod` stays None and the
-    # port-forward target recorded in the bundle is what identifies the replica.
-    IngressKind.ENGINE: IngressAdapter(),
-    # The llm-d router gateway (EPP + Envoy, or the in-gateway `llm-d-router-gateway` mode).
-    # Failure here with direct vLLM passing points at gateway parsing, mutation, routing or
-    # timeout behaviour -- but only if both layers reached an identically configured replica,
-    # which is why the destination headers are captured when the build emits them. The names
-    # are best-effort across router builds. A build that emits none yields `backend_pod: None`,
-    # which is recorded rather than guessed: a wrong backend attribution costs more than a
-    # missing one. The version headers are the router's own signature and its routing headers;
-    # Envoy's decorator names a Service, so it is not one of them.
-    IngressKind.ROUTER: IngressAdapter(
-        backend_headers=(
-            "x-gateway-destination-endpoint",
-            "x-llm-d-destination-endpoint",
-            "x-envoy-upstream-host",
-        ),
-        version_headers=("server", "x-went-into-resp-headers"),
-        version_header_prefixes=("x-llm-d-",),
-    ),
-    # LiteLLM proxy. Failure here with the router passing points at LiteLLM mapping,
-    # transformation, auth or timeout behaviour. It is also the only layer in a typical stack
-    # that authenticates, so a 401 here is a credential problem rather than a fleet problem.
-    # LiteLLM names the deployment it selected and, with the v3 limiter active, mirrors
-    # rate-limit state into `x-ratelimit-*` (recorded for every layer), so a `promised`
-    # rate-limit-header declaration can be verified from the response alone.
-    IngressKind.GATEWAY: IngressAdapter(
-        backend_headers=("x-litellm-model-id", "x-litellm-deployment"),
-        version_headers=("server", "x-litellm-version", "x-litellm-model-name"),
-        extra_headers=("x-litellm-call-id", "x-litellm-response-cost"),
-    ),
-}
-
-
-def adapter_for(kind: IngressKind) -> IngressAdapter:
-    return ADAPTERS.get(kind) or IngressAdapter()
+    headers = {name.lower(): value for name, value in (exchange.response_headers or {}).items()}
+    found = signals.classify(headers, None, declared)
+    pods = [item for item in found if item.pod]
+    backend = pods[0].value if pods else None
+    model_echo = None
+    if isinstance(exchange.response_body, dict):
+        model_echo = exchange.response_body.get("model")
+    extra = {
+        item.signal: item.value
+        for item in found
+        if item.reveals is signals.Reveals.VERSION
+        or (item.reveals is signals.Reveals.RECORDED and not item.row.endswith("*"))
+    }
+    for item in pods[1:]:
+        extra[item.signal] = item.value
+    for name, value in sorted(headers.items()):
+        if name.startswith(THROTTLE_PREFIXES) or name in THROTTLE_HEADERS or name in PROXY_HEADERS:
+            extra[name] = value
+    return ServedBy(
+        x_request_id=headers.get("x-request-id"),
+        backend_pod=backend,
+        model_echo=model_echo,
+        extra=extra,
+    )
 
 
 def client_for(

@@ -46,6 +46,13 @@ PRODUCT_LITERAL = re.compile(
 # The loader names the product kinds a profile used to declare, only to refuse each one with
 # the position that replaces it.
 PRODUCT_LITERAL_ALLOWED = {("profile/loader.py", "_PRODUCT_KINDS = ")}
+# A product's header name or body wording, as a value. What a response reveals lives in one table
+# read at every layer; anywhere else, a literal like this ties a check to one product.
+PRODUCT_SIGNAL = re.compile(
+    r"""["'](x-litellm-|x-llm-d|x-envoy-|x-gateway-|x-epp|x-inference-|x-went-into"""
+    r"""|inference error:)"""
+)
+SIGNAL_TABLE = "ingress/signals.py"
 
 
 def test_there_are_sources_to_check():
@@ -106,6 +113,27 @@ def test_no_core_module_decides_by_a_product_name(path: Path):
     assert not found, (
         f"{path.relative_to(ROOT)} compares against a product name: {', '.join(found)}. "
         "Decide by position or by what the profile declares instead (see AGENTS.md)."
+    )
+
+
+@pytest.mark.parametrize(
+    "path",
+    [
+        p
+        for p in SOURCES
+        if p.suffix in {".py", ".html"} and str(p.relative_to(SRC)) != SIGNAL_TABLE
+    ],
+    ids=lambda p: str(p.relative_to(SRC)),
+)
+def test_a_product_header_is_named_only_in_the_evidence_table(path: Path):
+    found = [
+        f"{match.group(0)} (line {number})"
+        for number, line in enumerate(path.read_text(encoding="utf-8").splitlines(), 1)
+        if (match := PRODUCT_SIGNAL.search(line))
+    ]
+    assert not found, (
+        f"{path.relative_to(ROOT)} names a product's header or wording: {', '.join(found)}. "
+        f"Add it to src/llmdv/{SIGNAL_TABLE} instead, so every layer reads it the same way."
     )
 
 

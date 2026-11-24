@@ -1,9 +1,9 @@
-"""Ingress adapters: one class, and a table of what the layer at each position reveals.
+"""Ingresses: how a request reaches a layer, and what the layer's responses reveal.
 
-A product needs no code here: `kind` is a position, and a product in it reads the headers of
-its position's row, recording only those it sends.
+A product needs no code here: `kind` is a position, and what any product's responses reveal is
+read from the one table in `signals.py`, at every layer.
 """
 
-from .base import ADAPTERS, IngressAdapter, ServedBy, adapter_for, client_for
+from .base import ServedBy, client_for, served_by, version_signals
 
-__all__ = ["ADAPTERS", "IngressAdapter", "ServedBy", "adapter_for", "client_for"]
+__all__ = ["ServedBy", "client_for", "served_by", "version_signals"]

@@ -158,12 +158,14 @@ details.panel > .body { padding: 0 0.9rem 0.9rem; }
   h += `<h3>What the recorded traffic shows about the layers</h3><p class="muted">Signals only, not conclusions. Name a component behind an ingress as confirmed only with direct read-only evidence; see the writing-an-infra-profile skill.</p>`;
   if (D.stack.length) {
     h += `<div class="tablewrap"><table><thead><tr><th>Ingress</th><th>Signal</th><th>Values seen (count)</th></tr></thead><tbody>`;
-    for (const s of D.stack) {
-      const looked = ['server', 'x-litellm-version', 'x-litellm-model-name', 'x-litellm-model-api-base', 'system_fingerprint'];
-      for (const k of looked) h += `<tr><td>${esc(s.ingress)}</td><td><code>${esc(k)}</code></td><td>${s.found[k] ? esc(Object.entries(s.found[k]).map(([v, n]) => `${v} (${n})`).join('; ')) : '<span class="muted">not seen</span>'}</td></tr>`;
-      const router = Object.keys(s.found).filter(k => k.startsWith('router header: '));
-      h += `<tr><td>${esc(s.ingress)}</td><td>router headers (<code>x-llm-d*</code>, <code>x-went*</code>, <code>x-envoy*</code>, <code>x-gateway*</code>, <code>x-inference*</code>, <code>x-epp*</code>)</td><td>${router.length ? esc(router.map(r => r.slice(15)).join(', ')) : '<span class="muted">none seen</span>'}</td></tr>`;
-      h += `<tr><td>${esc(s.ingress)}</td><td>EPP error bodies (<code>inference error: …</code>)</td><td>${s.epp_error_bodies ? esc(s.epp_error_bodies) : '<span class="muted">none seen</span>'}</td></tr>`;
+    const what = { version: 'names a build or layer (published)', backend: 'may name a backend (this page only)', recorded: 'recorded evidence', signature: 'body text naming a product' };
+    for (const s of D.stack) for (const r of s.rows || []) {
+      const names = Object.entries(r.seen || {});
+      const label = `<code>${esc(r.row)}</code> <span class="muted">${esc(what[r.reveals] || r.reveals)}${r.declared ? ', declared by the profile' : ''}</span>`;
+      const values = names.length
+        ? esc(names.map(([n, vs]) => (n === r.row ? '' : `${n}: `) + Object.entries(vs).map(([v, c]) => `${v} (${c})`).join('; ')).join(' | '))
+        : '<span class="muted">not seen</span>';
+      h += `<tr><td>${esc(s.ingress)}</td><td>${label}</td><td>${values}</td></tr>`;
     }
     h += `</tbody></table></div>`;
   } else h += `<p class="muted">No exchanges recorded.</p>`;

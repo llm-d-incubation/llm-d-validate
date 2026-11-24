@@ -379,6 +379,9 @@ class Ingress:
     # gateway hostname is cluster-identifiable and stays out of the repository, like the key.
     base_url_env: str | None = None
     health_path: str = "/health"
+    # Response headers this layer's product sends that name its build, which the evidence table
+    # (`ingress/signals.py`) does not know yet. Recorded and published like the table's own.
+    version_headers: tuple[str, ...] = ()
     surfaces: tuple[str, ...] = ()
     timeouts: Timeouts = field(default_factory=Timeouts)
     error_status: dict[str, tuple[int, ...]] = field(default_factory=dict)

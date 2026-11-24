@@ -14,9 +14,11 @@ import re
 import textwrap
 
 import pytest
+import yaml
 
 from llmdv.evidence import dashboard
 from llmdv.http import redact
+from llmdv.ingress import signals
 from tests.fakes import FakeFleet, profile_yaml, run_llmdv
 
 PROFILE = textwrap.dedent(
@@ -441,9 +443,14 @@ def test_analyze_prints_every_failure_group_so_notes_can_name_them(tmp_path):
     assert all(f"check_{i}" in result.stdout for i in range(12))
 
 
-def test_the_stack_table_shows_router_headers_and_the_api_base_the_traffic_carried(tmp_path):
-    """dashboard.html reads a fixed key list plus `router header: ` keys; the data must keep
-    emitting that shape, or the table renders "none seen" for headers that were there."""
+def _rows(page, ingress):
+    [entry] = [r for r in payload(page)["stack"] if r["ingress"] == ingress]
+    return {row["row"]: row for row in entry["rows"]}
+
+
+def test_the_stack_table_lists_every_signal_seen_or_not(tmp_path):
+    """Every row of the evidence table is on the page for every ingress, so an absent signal is
+    visible as absent; backend rows too, because the page stays with the run directory."""
     run = make_run(tmp_path)
     exchange = json.loads((run / "exchanges.jsonl").read_text())
     exchange["response_headers"] = {
@@ -451,11 +458,48 @@ def test_the_stack_table_shows_router_headers_and_the_api_base_the_traffic_carri
         "x-litellm-model-api-base": "http://epp.internal:8000",
         "x-llm-d-inference-objective": "default",
         "x-went-into-resp-headers": "true",
+        "x-kong-version": "3.9.1",
     }
     (run / "exchanges.jsonl").write_text(json.dumps(exchange) + "\n")
-    page = dashboard.write_best_effort(run)
-    [row] = [r for r in payload(page)["stack"] if r["ingress"] == "gw"]
-    assert row["found"]["x-litellm-version"] == {"1.97.0": 1}
-    assert row["found"]["x-litellm-model-api-base"] == {"http://epp.internal:8000": 1}
-    assert row["found"]["router header: x-llm-d-inference-objective"] == {"default": 1}
-    assert row["found"]["router header: x-went-into-resp-headers"] == {"true": 1}
+    rows = _rows(dashboard.write_best_effort(run), "gw")
+    assert set(rows) == {signals.row_label(row) for row in signals.SIGNALS}
+    assert rows["x-litellm-version"]["seen"] == {"x-litellm-version": {"1.97.0": 1}}
+    assert rows["x-litellm-model-api-base"]["reveals"] == "backend"
+    assert rows["x-llm-d-*"]["seen"] == {"x-llm-d-inference-objective": {"default": 1}}
+    assert rows["x-litellm-deployment"]["seen"] == {}, "not seen is listed, not dropped"
+    assert all("x-kong-version" not in row["seen"] for row in rows.values())
+
+
+def test_the_stack_table_lists_a_header_the_profile_declares(tmp_path):
+    run = make_run(tmp_path)
+    profile = yaml.safe_load((run / "profile.used.yaml").read_text())
+    for ingress in profile["ingresses"]:
+        if ingress["id"] == "gw":
+            ingress["version_headers"] = ["x-kong-version", "x-kong-build"]
+    (run / "profile.used.yaml").write_text(yaml.safe_dump(profile))
+    exchange = json.loads((run / "exchanges.jsonl").read_text())
+    exchange["response_headers"] = {"x-kong-version": "3.9.1"}
+    (run / "exchanges.jsonl").write_text(json.dumps(exchange) + "\n")
+    rows = _rows(dashboard.write_best_effort(run), "gw")
+    assert rows["x-kong-version"]["declared"] is True
+    assert rows["x-kong-version"]["seen"] == {"x-kong-version": {"3.9.1": 1}}
+    assert rows["x-kong-build"]["seen"] == {}
+
+
+def test_a_declared_header_the_table_lists_is_one_row_marked_declared(tmp_path):
+    run = make_run(tmp_path)
+    profile = yaml.safe_load((run / "profile.used.yaml").read_text())
+    for ingress in profile["ingresses"]:
+        if ingress["id"] == "gw":
+            ingress["version_headers"] = ["server"]
+    (run / "profile.used.yaml").write_text(yaml.safe_dump(profile))
+    exchange = json.loads((run / "exchanges.jsonl").read_text())
+    exchange["response_headers"] = {"server": "kong/3.4.0"}
+    (run / "exchanges.jsonl").write_text(json.dumps(exchange) + "\n")
+    [entry] = [
+        r for r in payload(dashboard.write_best_effort(run))["stack"] if r["ingress"] == "gw"
+    ]
+    servers = [row for row in entry["rows"] if row["row"] == "server"]
+    assert len(servers) == 1
+    assert servers[0]["declared"] is True
+    assert servers[0]["seen"] == {"server": {"kong/3.4.0": 1}}

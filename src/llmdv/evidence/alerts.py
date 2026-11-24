@@ -24,11 +24,11 @@ not a comparison was made, so a pager can tell it from a new break on the first 
 `points_at` is read off the layer graph the run recorded in outcome.json, with the pairing rule
 the run summary's attribution ladder uses (`profile/topology.py`): from the failing layer, step
 to a failing layer among the nearest layers behind it that reported, until all of those passed
-or there is none. It is a hypothesis; `basis` says what it rests on. A run recorded before
-outcome.json carried the graph is read by kind depth, as it was then. So is a run whose recorded
-graph misses an ingress that reported. Runs recorded before kinds became positions (#91, during
-incubation) name products (`vllm`, `litellm`); those are not read as positions, so their layers
-are left unplaced.
+or there is none. It is a hypothesis; `basis` says what it rests on. A run that recorded no
+graph, or one whose graph misses an ingress that reported, gets a graph derived from the
+positions its results recorded, as a profile without declared edges does; one rule reads every
+run. Runs recorded before kinds became positions (#91, during incubation) name products
+(`vllm`, `litellm`); those are not read as positions, so their layers are left unplaced.
 
 `publication` and `job_exit_code` are only set on the local copy, which `llmdv job` also prints as
 the last line of its output. Like `outcome.json`, the published copy cannot know how its own
@@ -80,8 +80,10 @@ def build(run_dir: Path) -> dict[str, Any] | None:
     for record in records:
         ingress, case, variant = key(record)
         columns.setdefault((case, variant), {})[ingress] = record
-    if topology and not topology.covers(name for column in columns.values() for name in column):
-        topology = None
+    if topology is None or not topology.covers(
+        name for column in columns.values() for name in column
+    ):
+        topology = _derived(records)
 
     results = []
     for record in records:
@@ -143,11 +145,11 @@ def attribute(
     `column` holds the same case's decided results by ingress. The walk starts at the failing
     layer and steps to the first failing layer among the nearest layers behind it that reported
     (`Topology.nearest`); it stops where all of them passed, or where there are none. Peers are
-    never compared. Without a `topology` (a run recorded before outcome.json carried one, or
-    one whose graph misses a layer that reported) it reads kind depth instead.
+    never compared. Without a `topology`, the graph is derived from the positions the results
+    recorded, by the same rule a profile without declared edges uses.
     """
     if topology is None:
-        return _attribute_by_depth(record, column)
+        topology = _derived(column.values())
     here = record.get("ingress") or "-"
     culprit = record
     while True:
@@ -158,28 +160,6 @@ def attribute(
         if not failing:
             return _innermost(culprit, here)
         culprit = column[failing[0]]
-
-
-def _attribute_by_depth(record: dict, column: dict[str, dict]) -> tuple[dict, str]:
-    """`attribute` for a run with no recorded graph: the rule such runs were read with.
-
-    Only layers strictly inside this one count, nearest first, as such runs were read.
-    """
-    here = record.get("ingress") or "-"
-    mine = _depth(record)
-
-    def deeper(other: dict) -> bool:
-        theirs = _depth(other)
-        return mine is not None and theirs is not None and theirs > mine
-
-    inner = sorted(filter(deeper, column.values()), key=_depth)
-    culprit = record
-    for other in inner:
-        if other["outcome"] in _BAD:
-            culprit = other
-            continue
-        return culprit, f"fails at {culprit.get('ingress')}, passes at {other.get('ingress')}"
-    return _innermost(culprit, here)
 
 
 def _innermost(culprit: dict, here: str) -> tuple[dict, str]:
@@ -215,11 +195,23 @@ def _comparison(comparison: dict | None, made: bool) -> dict[str, Any]:
     }
 
 
-def _depth(record: dict) -> int | None:
-    try:
-        return depth(record.get("ingress_kind") or "")
-    except (KeyError, ValueError):
-        return None
+def _derived(records) -> Topology:
+    """The graph a run's results imply, for a run that recorded none (or one that misses a
+    layer that reported): each ingress at the position its results recorded, derived as a
+    profile without declared edges is. An ingress with no readable position fronts nothing."""
+    layers: dict[str, int] = {}
+    for record in records:
+        name = record.get("ingress")
+        if not name or name in layers:
+            continue
+        try:
+            layers[str(name)] = depth(record.get("ingress_kind") or "")
+        except (KeyError, ValueError):
+            layers[str(name)] = -1
+    known = [(name, at) for name, at in layers.items() if at >= 0]
+    derived = Topology.derive(known)
+    unplaced = {name: () for name, at in layers.items() if at < 0}
+    return Topology(order=derived.order + tuple(unplaced), fronts={**derived.fronts, **unplaced})
 
 
 def _read_json(path: Path) -> dict | None:
