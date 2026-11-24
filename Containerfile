@@ -29,7 +29,7 @@ RUN case "$(uname -m)" in \
  && test "$(/usr/local/bin/claude --version)" = "${CLAUDE_CODE_VERSION} (Claude Code)"
 
 COPY requirements.lock /tmp/llmdv/requirements.lock
-COPY pyproject.toml /tmp/llmdv/pyproject.toml
+COPY pyproject.toml README.md LICENSE /tmp/llmdv/
 COPY src /tmp/llmdv/src
 # /work is group-0 writable, so OpenShift's arbitrary UID can write run directories.
 RUN pip install --no-cache-dir --require-hashes -r /tmp/llmdv/requirements.lock \
