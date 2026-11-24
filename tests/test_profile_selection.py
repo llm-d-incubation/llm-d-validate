@@ -250,3 +250,10 @@ def test_job_passes_all_through_to_verify(tmp_path, monkeypatch):
     assert job_cmd._verify(namespace, tmp_path, unknown) == 0
     (command,) = started
     assert command[command.index("verify") :].count("--all") == 1
+
+
+def test_a_selection_naming_the_renamed_case_names_its_replacement(tmp_path):
+    """As a known_failures entry does: otherwise it fails later as a glob matching nothing."""
+    profile = _selected(tmp_path, "http://127.0.0.1:9", "field_options.vllm_observable")
+    with pytest.raises(loader.ProfileError, match="use 'field_options.extension_observable'"):
+        loader.load(profile)

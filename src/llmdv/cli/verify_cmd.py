@@ -909,7 +909,10 @@ def _map_pytest_exit(code: int, interrupted: bool = False) -> int:
         log.error("pytest refused the run; the error above says why")
         return USAGE
     if code == 5:
-        log.warning("no tests were collected; check --ingress/--client/--surface and -k/-m")
+        log.warning(
+            "no tests were collected; check --ingress/--client/--surface, -k/-m and the "
+            "profile's selection (--all runs every case)"
+        )
         return USAGE
     return INTERNAL
 

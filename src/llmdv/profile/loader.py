@@ -644,6 +644,7 @@ def _selection(raw: Any) -> tuple[str, ...]:
         )
     for index, glob in enumerate(globs):
         parse.string(glob, f"selection[{index}]", non_empty=True)
+    _refuse_renamed_cases(globs, "selection")
     return globs
 
 

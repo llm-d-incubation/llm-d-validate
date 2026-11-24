@@ -156,7 +156,7 @@ A failure the team has filed and traced to a fix that has not reached the fleet 
 The case still fails and the run still exits `1`; the label only tells the reader it is known.
 An entry takes `check`, `cases`, `issue`, `fix` (e.g. `"upstream issue: <ref> (state) | fix PR: <ref>"`),
 optionally `ingress` (one id or a list) and `until` (quoted version strings); an entry that matches no
-failure is reported as unmatched, which says the fix landed.
+failure although a case it covers ran is reported as unmatched, which says the fix may have landed.
 A decision that a behaviour is intended is not a known failure: record it as `TRIAGED <date>` in the
 comment beside the line and, if the declaration changes, cite the decision.
 

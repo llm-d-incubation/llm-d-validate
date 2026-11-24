@@ -172,8 +172,22 @@ def test_at_or_past_compares_dotted_versions_and_otherwise_equality(observed, wa
 
 def test_unmatched_entries_are_the_ones_that_labelled_nothing():
     entries = [ENTRY, KnownFailure(check="http_status", issue="#2", cases=("tools.*",))]
-    records = [{"known_failure": {"status": "known", "issue": "#1", "check": "finish_reason"}}]
+    records = [
+        {"known_failure": {"status": "known", "issue": "#1", "check": "finish_reason"}},
+        {"case_id": "tools.forced_call", "ingress": "g", "outcome": "pass"},
+    ]
     assert unmatched(entries, records) == [{"check": "http_status", "issue": "#2"}]
+
+
+@pytest.mark.parametrize("outcome", [None, "skip"])
+def test_an_entry_none_of_whose_cases_ran_is_not_unmatched(outcome):
+    """A selection or a `-k` left its cases out, or they skipped: the run says nothing about
+    the entry, so it is not offered for pruning."""
+    entries = [KnownFailure(check="http_status", issue="#2", cases=("tools.*",))]
+    records = [{"case_id": "openai_chat.basic", "ingress": "g", "outcome": "pass"}]
+    if outcome:
+        records.append({"case_id": "tools.forced_call", "ingress": "g", "outcome": outcome})
+    assert unmatched(entries, records) == []
 
 
 # ----------------------------------------------------------------- the profile

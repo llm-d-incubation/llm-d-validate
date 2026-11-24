@@ -549,9 +549,10 @@ What a run reports:
   such as a 404 from a route the gateway answers itself, or a stream (its recorded body is not
   an object, so `system_fingerprint` is never read from one), cannot be judged and the failure
   stays `known`. Name a signal the failing response carries.
-- A pass is never labelled. An entry that labelled no failure in the run is listed in the
-  banner, `summary.md` and `outcome.json` (`verification.known.unmatched`): either the fix
-  landed and the entry should go, or the selection left its cases out. `llmdv compare` reports
+- A pass is never labelled. An entry that labelled no failure although a case it covers ran is
+  listed in the banner, `summary.md` and `outcome.json` (`verification.known.unmatched`): the fix
+  may have landed and the entry should go. An entry none of whose cases ran (the selection or a
+  `-k` left them out, or they skipped) is not listed, because the run says nothing about it. `llmdv compare` reports
   a fix landing when a case the previous run labelled passes now, and never calls a regression
   known. See [docs/compare.md](../docs/compare.md).
 - `verdict.txt` in a failure bundle, `alerts.json` and the dashboard's failure groups carry the
