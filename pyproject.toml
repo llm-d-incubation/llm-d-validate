@@ -6,7 +6,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "llm-d-validate"
 dynamic = ["version"]  # src/llmdv/__init__.py's __version__, the one place it is written
-description = "Full-stack validation for deployed llm-d model serving stacks: real requests through the gateway, the router and the engine, with reproducible evidence behind every verdict"
+description = "Roll out llm-d with confidence: contract and regression testing for deployed llm-d model serving stacks"
 readme = "README.md"
 requires-python = ">=3.10"
 license = "Apache-2.0"

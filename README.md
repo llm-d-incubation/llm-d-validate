@@ -1,7 +1,7 @@
 <h1 align="center">llm-d-validate</h1>
 
 <p align="center">
-  <b>Full-stack validation for deployed <a href="https://github.com/llm-d/llm-d">llm-d</a> model serving stacks.<br>Real requests through the gateway, the router and the engine, with reproducible evidence behind every verdict.</b>
+  <b>Roll out <a href="https://github.com/llm-d/llm-d">llm-d</a> with confidence.</b><br>Contract and regression testing for deployed llm-d model serving stacks: know that the gateway, the router, and the engine still behave as their APIs define.
 </p>
 
 <p align="center">
