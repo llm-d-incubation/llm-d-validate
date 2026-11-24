@@ -32,6 +32,7 @@ Conventions:
 | `fleet_policy` | `dedicated` \| `shared` | `dedicated` | `shared` means other people depend on this fleet: cases marked `disruptive` skip as `excluded_by_policy`. Cheap well-formed refusals (a bad token limit, an unknown path, a bad credential) still run. Declared, never inferred. |
 | `fleet` | mapping | none | Configuration and metrics rules read from the cluster. See [FLEET.md](FLEET.md). |
 | `known_failures` | list | none | Failures already filed and traced to a pending fix. Labels, never excuses. See [known_failures](#known_failures). |
+| `selection` | list of string | every case | Case-id globs: `verify`, `plan` and `job` run only the cases one matches, and `--all` runs everything. See [selection](#selection). |
 
 ## extends
 
@@ -558,6 +559,25 @@ What a run reports:
 
 Editing this block, a comment, or the path of a client `executable` does not change the profile digest. Only declarations do, so a
 comparison window is not dropped each time a finding is filed.
+
+## selection
+
+The cases a profile runs, when it should not run them all: a guide's lane that only needs the cases exercising what the guide changes, say, while another lane runs the full suite against the same engine and model.
+
+```yaml
+selection:
+  - contract.*                                 # keep the contract suite, or a stale profile goes unnoticed
+  - discovery.*
+  - "openai_chat.request_field[logit_bias]"    # one variant of one case
+```
+
+- Each entry is a glob over the case id or `id[variant]`, matched exactly as [`known_failures[].cases`](#known_failures) are: `*` and `?` are wild and brackets are literal. A case runs when any glob matches it.
+- `llmdv verify`, `llmdv plan` and `llmdv job` apply it; `--all` sets it aside and runs every case. `--ingress`, `--client`, `--surface`, `-k` and `-m` still narrow what it leaves.
+- A case it leaves out is deselected, not skipped: it appears in no `results.jsonl` record and in no skip class. `llmdv plan` reports how many were left out (`selection.profile.left_out` in `--json`).
+- It applies to every suite, the contract suite included, so a selection that should still check the profile's own declarations names `contract.*`. An item without a case id cannot be named short of `*`, so a selection leaves it out; every case under `suites/` has one.
+- A glob that matches no collected case is an invalid selection (exit 2), and the error names it, so a typo cannot quietly select nothing. Globs are checked before `-k` and `-m` narrow, but after `--ingress`, which decides which ingresses are collected at all.
+- An empty list is an error. In a child profile, `selection: null` clears an inherited selection.
+- `outcome.json` records it under `selection`: the globs (`cases`), whether `--all` was given (`all`), and whether the run left cases out (`in_force`). The selection is a declaration, so changing it changes the profile digest, and `llmdv compare` reports the profile changed. See [docs/compare.md](../docs/compare.md).
 
 ## fleet
 

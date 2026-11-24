@@ -1047,6 +1047,9 @@ class Profile:
     fleet: FleetChecks = field(default_factory=FleetChecks)
     # Failures already filed and traced to a pending fix. Labels, never excuses.
     known_failures: tuple[KnownFailure, ...] = ()
+    # Case-id globs, matched as `known_failures[].cases` are. Empty runs every case; `--all`
+    # ignores it. What it leaves out is deselected, never skipped.
+    selection: tuple[str, ...] = ()
 
     def ingress(self, ingress_id: str) -> Ingress:
         for item in self.ingresses:

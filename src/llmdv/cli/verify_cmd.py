@@ -179,6 +179,12 @@ def add_selection_arguments(parser: argparse.ArgumentParser) -> None:
     )
     parser.add_argument("-k", dest="keyword", default=None, help="pytest keyword expression")
     parser.add_argument("-m", dest="marker", default=None, help="pytest marker expression")
+    parser.add_argument(
+        "--all",
+        action="store_true",
+        help="ignore the profile's `selection` and run every case; the selectors above still "
+        "narrow",
+    )
 
 
 @dataclass
@@ -291,6 +297,11 @@ def _verify(args: argparse.Namespace, run: _Run) -> int:
         log.error("%s", exc)
         return USAGE
     run.outcome.topology = profile.topology().as_record()
+    run.outcome.selection = {
+        "cases": list(profile.selection),
+        "all": args.all,
+        "in_force": bool(profile.selection) and not args.all,
+    }
     run.outcome.write(run_dir)
 
     diagnostics = loader.validate(profile)
@@ -867,7 +878,7 @@ def _map_pytest_exit(code: int, interrupted: bool = False) -> int:
         log.error("pytest hit an internal error -- this is a llmdv defect, not a fleet result")
         return INTERNAL
     if code == 4:
-        log.error("pytest usage error in the arguments llmdv built")
+        log.error("pytest refused the run; the error above says why")
         return USAGE
     if code == 5:
         log.warning("no tests were collected; check --ingress/--client/--surface and -k/-m")
@@ -935,6 +946,8 @@ def selection_argv(args: argparse.Namespace) -> list[str]:
         argv += ["--llmdv-client", client_id]
     for surface in args.surface:
         argv += ["--llmdv-surface", surface]
+    if getattr(args, "all", False):
+        argv += ["--llmdv-all"]
     if args.keyword:
         argv += ["-k", args.keyword]
     if args.marker:

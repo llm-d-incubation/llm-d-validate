@@ -43,6 +43,10 @@ class Outcome:
     # Which ingress fronts which (profile/topology.py), so the alert feed can attribute a
     # failure without the profile. None until the profile has loaded.
     topology: dict[str, Any] | None = None
+    # The profile's `selection` globs and whether `--all` set them aside; `in_force` says the
+    # run left cases out, so a reader or `llmdv compare` can tell it from a full one. None until
+    # the profile has loaded.
+    selection: dict[str, Any] | None = None
     exit_code: int | None = None
     exit_class: str | None = None
     counts: dict[str, int] = field(default_factory=dict)
@@ -215,7 +219,7 @@ def _load(run_dir: Path) -> Any:
 
 
 # The parts of an outcome every reader walks into, and the JSON type each must have.
-_MAPPINGS = ("profile", "labels", "verification", "publication")
+_MAPPINGS = ("profile", "labels", "selection", "verification", "publication")
 _VERIFICATION = {"counts": dict, "skips": dict, "failures": list}
 
 

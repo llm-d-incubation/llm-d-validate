@@ -60,6 +60,14 @@ parsed declarations, not the file: comments and the `known_failures` block do no
 recorded before that rule carry a digest of the file bytes, so the first run after it reports
 the profile as changed once, with nothing listed under what changed.
 
+A run under a profile's [`selection`](../profiles/REFERENCE.md#selection) holds only the cases
+it selected. The ones it left out are deselected, not skipped, so they have no record at all:
+against a full run they are listed under **Suite changed** as vanished, never as *Stopped
+running* or as a regression. The selection is a declaration, so a selected run and a full one
+(or two runs under different selections) differ in digest and the report says **the profile
+changed**; a run with `--all` keeps the digest but holds every case. `outcome.json` records
+which it was under `selection`: the globs, whether `--all` was given, and `in_force`.
+
 Every run records in `outcome.json` what its traffic said about each ingress, read the same way
 at every layer from one table (`src/llmdv/ingress/signals.py`) plus the `version_headers` the
 profile declares: the engine's `system_fingerprint`, `x-litellm-version`, `server`, the router's

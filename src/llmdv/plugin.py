@@ -57,6 +57,7 @@ from .profile.schema import (
     Model,
     Profile,
     SkipClass,
+    matches_case,
 )
 from .results.record import ResultRecord, ResultsWriter, new_run_id
 from .surfaces.base import SURFACE_FEATURES, SURFACE_PATHS, SurfaceKind
@@ -200,6 +201,12 @@ def pytest_addoption(parser: pytest.Parser) -> None:
         action="append",
         default=[],
         help="restrict to these surfaces (repeatable; a union)",
+    )
+    group.addoption(
+        "--llmdv-all",
+        action="store_true",
+        default=False,
+        help="ignore the profile's selection and run every case",
     )
     group.addoption(
         "--llmdv-run-dir",
@@ -612,7 +619,8 @@ def _check_sample_rules(profile: Profile, items: list[pytest.Item]) -> None:
 
 
 def pytest_collection_modifyitems(config: pytest.Config, items: list[pytest.Item]) -> None:
-    """Apply --llmdv-client and --llmdv-surface as intersecting filters.
+    """Apply the profile's selection, then --llmdv-client and --llmdv-surface, as intersecting
+    filters.
 
     Selectors narrow; they never widen. A case with no surface marker is infrastructure (the
     contract suite, for instance) and is never filtered out by a surface selector.
@@ -624,6 +632,7 @@ def pytest_collection_modifyitems(config: pytest.Config, items: list[pytest.Item
     if profile is None:
         return
     _check_sample_rules(profile, items)
+    _apply_selection(config, profile, items)
 
     wanted: set[str] = set()
     for client_id in config.getoption("--llmdv-client") or []:
@@ -655,6 +664,44 @@ def pytest_collection_modifyitems(config: pytest.Config, items: list[pytest.Item
     items.sort(key=lambda item: _phase_sort_key(item, order))
 
 
+def _apply_selection(config: pytest.Config, profile: Profile, items: list[pytest.Item]) -> None:
+    """Deselect every case the profile's `selection` names no glob for, unless --llmdv-all.
+
+    Deselected rather than skipped: a case left out appears in no result and no skip class, so
+    the skip classes keep meaning what the fleet lacks. Runs before `-k` and `-m`, which pytest
+    applies in its own `modifyitems`, so a glob is checked against every collected case and one
+    naming none is a usage error rather than a quietly empty run. An item without a case_id has
+    no name a glob could match short of `*`, so a selection leaves it out like any other case;
+    every case under `suites/` carries one, the contract suite's included.
+    """
+    config._llmdv_left_out = 0  # type: ignore[attr-defined]
+    if not profile.selection or config.getoption("--llmdv-all"):
+        return
+    names = [(_case_id(item), _variant(item)) for item in items]
+    unmatched = [
+        glob
+        for glob in profile.selection
+        if not any(matches_case((glob,), case_id, variant) for case_id, variant in names)
+    ]
+    if unmatched:
+        raise pytest.UsageError(
+            f"selection: {', '.join(map(repr, unmatched))} matches no case collected for "
+            f"profile {profile.name!r}; `llmdv plan --all` lists the case ids"
+        )
+    kept, deselected = [], []
+    for item, (case_id, variant) in zip(items, names, strict=True):
+        (kept if matches_case(profile.selection, case_id, variant) else deselected).append(item)
+    if deselected:
+        config.hook.pytest_deselected(items=deselected)
+        items[:] = kept
+    config._llmdv_left_out = len(deselected)  # type: ignore[attr-defined]
+
+
+def _case_id(item: pytest.Item) -> str | None:
+    marker = item.get_closest_marker("case_id")
+    return marker.args[0] if marker and marker.args else None
+
+
 # ------------------------------------------------------------------ fixtures
 
 
@@ -675,6 +722,9 @@ def pytest_collection_finish(session: pytest.Session) -> None:
         sizes[phase] = sizes.get(phase, 0) + 1
     session.config._llmdv_phase_sizes = sizes  # type: ignore[attr-defined]
     session.config._llmdv_phase_seen = None  # type: ignore[attr-defined]
+    left_out = getattr(session.config, "_llmdv_left_out", 0)
+    if left_out and not session.config.option.collectonly:
+        log.info("%d case(s) left out by the profile's selection (--all runs them)", left_out)
     if not session.items:
         log.warning("no cases collected -- check --ingress/--client/--surface and -k/-m")
 

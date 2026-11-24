@@ -519,6 +519,7 @@ def _build(raw: dict[str, Any], path: Path, clients_dir: Path) -> Profile:
                 ),
                 fleet=lambda: parse_fleet(raw.get("fleet")),
                 known_failures=lambda: _known_failures(raw.get("known_failures")),
+                selection=lambda: _selection(raw.get("selection")),
             ),
             source_path=path,
         )
@@ -630,6 +631,20 @@ def _refuse_renamed_cases(cases: tuple[str, ...], where: str) -> None:
                 raise ProfileError(
                     f"{where}[{index}]: {pattern!r} names {old!r}, which was renamed; use {new!r}"
                 )
+
+
+def _selection(raw: Any) -> tuple[str, ...]:
+    if raw is None:
+        return ()
+    globs = parse.strings(raw, "selection")
+    if not globs:
+        raise ProfileError(
+            "selection: an empty list selects no case; leave the key out, or set it to null to "
+            "clear an inherited one"
+        )
+    for index, glob in enumerate(globs):
+        parse.string(glob, f"selection[{index}]", non_empty=True)
+    return globs
 
 
 def _block(value: Any, where: str) -> dict[str, Any]:
