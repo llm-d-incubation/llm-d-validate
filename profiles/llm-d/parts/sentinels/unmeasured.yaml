@@ -6,7 +6,7 @@
 #
 # INTENT: placeholders, as .agents/skills/writing-an-infra-profile/SKILL.md step 6 describes.
 # Their real values depend on one exact stack (template, tokenizer, engine build, parsers), so
-# they cannot be shared. The first run with --evidence all fails each pin with the observed
+# they cannot be shared. The first run with --evidence all --all fails each pin with the observed
 # count and records each contract part's exchange; the combination then sets its own
 # `prompt_pins` and `contract_baseline` to those values, citing the build, and they override
 # these.

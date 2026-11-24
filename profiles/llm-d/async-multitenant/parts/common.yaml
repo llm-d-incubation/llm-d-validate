@@ -7,8 +7,8 @@
 # No `name` here: each combination names itself, so each run says which one it was.
 
 #
-# What these profiles cover: only the guide's llm-d router, the `llm-d-router-epp` Service (helm
-# release POOL_NAME = llm-d-router, MT/guide.yaml). The guide also deploys Redis, llm-d-async
+# What these profiles cover: only the guide's llm-d router, the router release's `<release>-epp` Service
+# (`<release>` is POOL_NAME in MT/guide.yaml). The guide also deploys Redis, llm-d-async
 # (chart v1.0.0, Redis sorted-set queues, quota-only values) and the router coordinator
 # (llm-d-coordinator:8080), which none of these profiles reach.
 #
@@ -37,7 +37,7 @@
 # where each one lands. Router claims it shares with optimized-baseline (surfaces, streaming
 # pass-through, the EPP's error envelopes, header aliases) land as
 # ../../optimized-baseline/parts/common.yaml maps them.
-#   1   the router serves completions directly (the shared e2e smoke loop at llm-d-router-epp)
+#   1   the router serves completions directly (the shared e2e smoke loop at <release>-epp)
 #       -> openai_completions.*, openai_chat.*
 #   2   requests are placed in a band by x-llm-d-inference-objective and kept fair across
 #       tenants by x-llm-d-inference-fairness-id -> headers declared `consumed` in

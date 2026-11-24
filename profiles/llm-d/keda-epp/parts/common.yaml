@@ -9,15 +9,15 @@
 #
 # The guide autoscales optimized-baseline's model server with a KEDA ScaledObject on an EPP
 # metric. Its lanes deploy the router and model server themselves (FROM values: S/nightly-deploy-*):
-#   gke    helm release keda-epp-gke (Service keda-epp-gke-epp): R/router/base.values.yaml,
+#   gke    helm release <release>-gke (Service <release>-gke-epp): R/router/base.values.yaml,
 #          OB/router/optimized-baseline.values.yaml, R/router/features/monitoring-gke.values.yaml,
 #          K/optimized-baseline/router.values.yaml; model server OB/modelserver/gpu/vllm/gke;
 #          ScaledObject K/optimized-baseline/overlays/k8s/queue (flow-control queue size and
 #          running requests), against Google Managed Prometheus
-#   amd    helm release keda-epp-rocm (Service keda-epp-rocm-epp): the same router values with
+#   amd    helm release <release>-rocm (Service <release>-rocm-epp): the same router values with
 #          R/router/features/monitoring.values.yaml; model server OB/modelserver/amd/vllm/base;
 #          ScaledObject overlays/k8s/queue
-#   ibm    helm release keda-epp-inflight (Service keda-epp-inflight-epp): R/router/base,
+#   ibm    helm release <release>-inflight (Service <release>-inflight-epp): R/router/base,
 #          OB/router/optimized-baseline.values.yaml and monitoring.values.yaml, NOT
 #          K/optimized-baseline/router.values.yaml, so no flow control; model server
 #          OB/modelserver/gpu/vllm/base; ScaledObject overlays/ocp/inflight

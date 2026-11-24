@@ -3,13 +3,13 @@
 # after the engine part. Never extends anything.
 #
 # Used by (overlays as ACCELERATOR_TYPE/MODEL_SERVER/INFRA_PROVIDER, at llm-d 9ca8ff0):
-#   amd/atom/{base,amd-ci}      atom-dev v0.1.7-rc0
-#   gpu/trtllm/{base,gke}       trtllm-serve 1.3.0rc29
-# FROM values: guides/optimized-baseline/modelserver/{amd/atom,gpu/trtllm}/base/ pass no parser
-# flag and no window.
+#   amd/atom/amd-ci             atom-dev v0.1.7-rc0; optimized-baseline/
+#                               atom-qwen3-32b-ctxunknown-inline-standalone.yaml
+# FROM values: guides/optimized-baseline/modelserver/amd/atom/base/ passes no parser flag and no
+# window.
 #
 # The same shape as qwen3-32b-inline.yaml, except the window: vLLM and SGLang take the model's own
-# window by default, but neither Atom's nor TensorRT-LLM's default is established here, so
+# window by default, but Atom's default is not established here, so
 # max_model_len is left unset and the context-overflow and long-context cases skip as undeclared.
 # Set it from the first run (an over-limit 4xx names the window).
 #
@@ -22,7 +22,7 @@
 #   effort_rendering    no source states an effort marker in the chat template
 
 model:
-  # FROM values: --model Qwen/Qwen3-32B (Atom) and the first argument of `trtllm-serve serve`.
+  # FROM values: --model Qwen/Qwen3-32B (Atom).
   public_id: Qwen/Qwen3-32B
   aliases: []
   # Unknown: no flag sets a window and the engines' defaults are not established here.

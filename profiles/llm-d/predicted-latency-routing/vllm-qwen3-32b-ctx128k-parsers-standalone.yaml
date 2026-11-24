@@ -49,7 +49,7 @@ model:
   # client sees; the names belong to the engine, so they are stated here.
   reasoning:
     parser: qwen3
-    # MEASURED on another deployment (vLLM 0.32 behind an llm-d router): the field is
+    # Inferred from another deployment (vLLM 0.32 behind an llm-d router), where the field is
     # `reasoning`, and `reasoning_content` is absent. Not yet observed on this guide's vLLM
     # v0.31.0; the first run settles it.
     field: reasoning

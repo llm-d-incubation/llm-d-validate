@@ -3,14 +3,14 @@
 # it after the engine part. Never extends anything.
 #
 # Used by (overlays as ACCELERATOR_TYPE/MODEL_SERVER/INFRA_PROVIDER, at llm-d 9ca8ff0):
-#   tpu/v6/vllm/{base,gke}            vllm-torchtpu --max-model-len=16384 --reasoning-parser=qwen3
-#                                     --tool-call-parser=hermes --enable-auto-tool-choice
-#   tpu/{v5p,v6,v7}/sglang/{base,gke} sglang --context-length=16384 --reasoning-parser=qwen3
-#                                     --tool-call-parser=qwen
-# FROM values: guides/optimized-baseline/modelserver/tpu/*/{vllm,sglang}/base/patch-*.yaml.
+#   tpu/v5p/sglang (no provider: base) sglang --context-length=16384 --reasoning-parser=qwen3
+#                                     --tool-call-parser=qwen; optimized-baseline/
+#                                     sglang-qwen3-32b-ctx16k-parsers-standalone.yaml
+# FROM values: guides/optimized-baseline/modelserver/tpu/v5p/sglang/base/patch-sglang.yaml.
 # Also used by tiered-prefix-cache tpu/v5p/sglang/native/cpu/base (sglang v0.1.0-tpu, the same
 # window and parsers, HiCache). FROM values: guides/tiered-prefix-cache/modelserver/tpu/v5p/
-# sglang/native/cpu/base/patch-decode.yaml.
+# sglang/native/cpu/base/patch-decode.yaml; tiered-prefix-cache/
+# sglang-qwen3-32b-ctx16k-parsers-standalone.yaml.
 #
 # The same shape as qwen3-32b-parsers.yaml at a smaller window. The parser NAMES are the engine's
 # flag values, so each combination file states them.
@@ -22,8 +22,7 @@ model:
   # FROM values: the first argument of `vllm serve` and SGLang's --model-path.
   public_id: Qwen/Qwen3-32B
   aliases: []
-  # FROM values: --max-model-len=16384 (vLLM, tpu/v6/vllm/base/patch-vllm.yaml) and
-  # --context-length=16384 (SGLang, tpu/*/sglang/base/patch-sglang.yaml).
+  # FROM values: --context-length=16384 (SGLang, tpu/v5p/sglang/base/patch-sglang.yaml).
   max_model_len: 16384
   reasoning:
     # A reasoning parser moves the <think> block out of `content` into its own field. The

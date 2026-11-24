@@ -4,8 +4,7 @@
 #
 # Used by (overlays as ACCELERATOR_TYPE/MODEL_SERVER/INFRA_PROVIDER, at llm-d 9ca8ff0):
 #   xpu/vllm/base               an Intel XPU vLLM build; --dtype=float16 --disable-sliding-window
-#   xpu/sglang/base             an Intel XPU SGLang build; --dtype=float16
-# FROM values: guides/optimized-baseline/modelserver/xpu/{vllm,sglang}/base/.
+# FROM values: guides/optimized-baseline/modelserver/xpu/vllm/base/.
 #   fast-model-actuation platform/{gke,ocp}
 #                               vLLM run by the FMA launcher image v0.8.0 (the vLLM version is
 #                               not pinned anywhere in the guide); --model Qwen/Qwen3-0.6B
@@ -25,7 +24,7 @@
 #   effort_rendering    no source states an effort marker in the chat template
 
 model:
-  # FROM values: the first argument of `vllm serve` and SGLang's --model-path.
+  # FROM values: the first argument of `vllm serve`.
   public_id: Qwen/Qwen3-0.6B
   aliases: []
   # FROM values: no overlay here sets a window. DERIVED: 40960 is max_position_embeddings in the

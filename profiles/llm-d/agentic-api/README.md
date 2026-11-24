@@ -2,7 +2,7 @@
 
 Profiles for llm-d's [agentic-api guide](https://github.com/llm-d/llm-d/tree/main/guides/agentic-api) at llm-d `9ca8ff0`. The guide puts vLLM Agentic API (`vllm/agentic-api:v0.9.0`, Service `agentic-api` on port 9000), backed by PostgreSQL, in front of an llm-d router and optimized-baseline's vLLM model server. Every profile here is WRITTEN, NOT RUN.
 
-**These profiles cover only the router.** They test the guide's llm-d router (EPP), in standalone mode, through `../parts/topology/standalone.yaml`. The helm release is `agentic-api`, so the Service is `agentic-api-epp` on port 80 (the lane's `gateway_host`). Its router config is optimized-baseline's, unchanged, so the router behaves as optimized-baseline's does.
+**These profiles cover only the router.** They test the guide's llm-d router (EPP), in standalone mode, through `../parts/topology/standalone.yaml`. The helm release is `agentic-api`, so the Service is `<GUIDE_NAME>-epp` on port 80 (the lane's `gateway_host`). Its router config is optimized-baseline's, unchanged, so the router behaves as optimized-baseline's does.
 
 ## Lanes
 
@@ -13,7 +13,7 @@ Profiles for llm-d's [agentic-api guide](https://github.com/llm-d/llm-d/tree/mai
 The lane's deploy script is `guides/agentic-api/scripts/nightly-deploy-gke.sh` (one model-server replica), and its validator is `.github/scripts/e2e/e2e-validate-agentic-api.sh`, which runs the guide's `verify.py` against agentic-api.
 
 ```sh
-export LLMDV_EPP_URL=http://agentic-api-epp.<namespace>.svc.cluster.local
+export LLMDV_EPP_URL=http://<GUIDE_NAME>-epp.<namespace>.svc.cluster.local
 llmdv verify --profile profiles/llm-d/agentic-api/vllm-qwen3-32b-parsers-standalone.yaml \
   --identity accelerator=gpu --identity provider=gke
 ```

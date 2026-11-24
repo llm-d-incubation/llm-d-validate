@@ -2,7 +2,7 @@
 
 Profiles for llm-d's [multitenant async-processing guide](https://github.com/llm-d/llm-d/tree/main/guides/batch-serving/asynchronous-processing/multitenant) (`guide.yaml` name `async-multitenant`) at llm-d `9ca8ff0`: llm-d-async dispatching queued work from Redis through an llm-d router with flow control and six priority bands, beside realtime traffic, with the router coordinator as an HTTP front door. Every profile here is WRITTEN, NOT RUN.
 
-**These profiles cover only the router.** They test the guide's llm-d router (EPP), in standalone mode, through `../parts/topology/standalone.yaml`. The helm release is `llm-d-router`, so the Service is `llm-d-router-epp` on port 80 (the lanes' `gateway_host`).
+**These profiles cover only the router.** They test the guide's llm-d router (EPP), in standalone mode, through `../parts/topology/standalone.yaml`. The Service is the router release's `<release>-epp` on port 80, where `<release>` is the guide's `POOL_NAME` (the lanes' `gateway_host`).
 
 ## Lanes
 
@@ -14,7 +14,7 @@ Both lanes run `guides/batch-serving/asynchronous-processing/multitenant/scripts
 | `async-multitenant-holdback-gke-acc-gpu-vllm-x` | `values/router/flow-control-holdback.yaml` | `vllm-qwen3-32b-parsers-standalone` | `--identity accelerator=gpu --identity provider=gke --identity flavor=holdback` |
 
 ```sh
-export LLMDV_EPP_URL=http://llm-d-router-epp.<namespace>.svc.cluster.local
+export LLMDV_EPP_URL=http://<release>-epp.<namespace>.svc.cluster.local
 llmdv verify --profile profiles/llm-d/async-multitenant/vllm-qwen3-32b-parsers-standalone.yaml \
   --identity accelerator=gpu --identity provider=gke --identity flavor=evictable
 ```
@@ -30,5 +30,5 @@ llmdv verify --profile profiles/llm-d/async-multitenant/vllm-qwen3-32b-parsers-s
 ## Upstream notes
 
 - `guide.yaml` has no `support:` table, so no configuration is marked `validated`; these profiles follow the two lanes.
-- The holdback lane passes `guide_name: async-multitenant-holdback` to the reusable workflow, a name no `guide.yaml` declares; the router's own release stays `llm-d-router`.
+- The holdback lane passes `guide_name: async-multitenant-holdback` to the reusable workflow, a name no `guide.yaml` declares; the router's own release is the same as the other lane's.
 - `guide.yaml`'s `GPUS=1` option (`modelserver/gpu/vllm/single-gpu`, Qwen/Qwen3-8B) and the Pub/Sub queue backend are `skip_in: [ci]`; no lane runs them, so no profile covers them.

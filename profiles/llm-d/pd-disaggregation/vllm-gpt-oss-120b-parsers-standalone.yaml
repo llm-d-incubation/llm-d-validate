@@ -46,8 +46,8 @@ model:
   # a client sees; the names belong to the engine, so they are stated here.
   reasoning:
     parser: openai_gptoss
-    # MEASURED on another deployment (vLLM 0.32 behind an llm-d router, a different model): the
-    # field is `reasoning`, and `reasoning_content` is absent. Not yet observed on this guide's
+    # Inferred from another deployment (vLLM 0.32 behind an llm-d router, a different model),
+    # where the field is `reasoning`, and `reasoning_content` is absent. Not yet observed on this guide's
     # vLLM v0.31.0 with gpt-oss; the first run settles it.
     field: reasoning
   tools:

@@ -7,7 +7,7 @@
 
 #
 # The router, as this guide configures it (FROM values: G/router/flow-control.values.yaml, layered
-# on R/router/base.values.yaml; helm release `flow-control`, so the Service is flow-control-epp):
+# on R/router/base.values.yaml; helm release `flow-control`, so the Service is <GUIDE_NAME>-epp):
 #   feature gate      flowControl
 #   scheduling        profile `default` = queue-scorer 2, kv-cache-utilization-scorer 2,
 #                     prefix-cache-scorer 3 (not optimized-baseline's prefix-cache-affinity-filter
