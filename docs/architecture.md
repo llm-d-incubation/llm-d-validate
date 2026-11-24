@@ -100,7 +100,7 @@ decide independently when their routes answer.
 
 Each run records one fixed identity in `outcome.json`, `alerts.json` and `comparison.json`.
 Guide, model, engine and gateway come from the profile (`engine` and `gateway` are top-level
-fields naming the products); accelerator, provider, `llm_d_ref` and trigger come from `--identity`; llmdv records
+fields naming the products); accelerator, provider, `llm_d_ref`, trigger and flavor come from `--identity`; llmdv records
 its version and the profile digest. Automatic comparisons require matching configuration
 dimensions, so different overlays cannot become one another's baselines. An unreadable archived
 identity is an archive/environment error, not a legacy run.

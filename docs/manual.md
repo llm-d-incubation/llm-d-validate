@@ -344,9 +344,11 @@ agent-written analysis on the page, use the
 changed their answer. See [docs/compare.md](compare.md).
 
 Use repeated `--identity key=value` options on `verify` or `job` for lane dimensions
-`accelerator`, `provider`, `llm_d_ref` and `trigger`, or for profile assertions `guide`, `engine`,
-`gateway` and `model`; a mismatch exits 2. Trigger defaults to `manual`. Baselines are
-chosen only from runs with matching configuration identity. `--label` cannot use identity keys.
+`accelerator`, `provider`, `llm_d_ref`, `trigger` and `flavor`, or for profile assertions `guide`,
+`engine`, `gateway` and `model`; a mismatch or an empty value exits 2. Trigger defaults to
+`manual`. `flavor` names whatever else tells apart lanes that share a profile, such as
+`--identity flavor=lmcache-cpu`; a run that passes none records no flavor. Baselines are chosen only from runs
+with matching configuration identity, flavor included. `--label` cannot use identity keys.
 
 ## Running unattended
 

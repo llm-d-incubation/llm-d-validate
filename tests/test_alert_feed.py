@@ -292,7 +292,7 @@ def test_compare_records_why_it_made_no_comparison(tmp_path):
 
     assert record["made"] is False
     assert record["identity"] == {}
-    assert "no earlier nightly run" in record["reason"]
+    assert "the archive holds no earlier run of this profile" in record["reason"]
 
 
 # ------------------------------------------------------------------- llmdv job, end to end

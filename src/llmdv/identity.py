@@ -18,6 +18,7 @@ DIMENSIONS = (
     "llmdv_version",
     "profile_digest",
     "trigger",
+    "flavor",
 )
 CONFIGURATION_DIMENSIONS = (
     "guide",
@@ -27,8 +28,11 @@ CONFIGURATION_DIMENSIONS = (
     "gateway",
     "model",
     "trigger",
+    "flavor",
 )
-LANE_DIMENSIONS = ("accelerator", "provider", "llm_d_ref", "trigger")
+# `flavor` names whatever else tells lanes that share a profile apart (two cache offload
+# backends, say), so their runs never become one another's baselines.
+LANE_DIMENSIONS = ("accelerator", "provider", "llm_d_ref", "trigger", "flavor")
 ASSERTION_DIMENSIONS = ("guide", "engine", "gateway", "model")
 _ALIASES = {"llm-d-ref": "llm_d_ref", "llm-d_ref": "llm_d_ref"}
 RESERVED_LABELS = frozenset(DIMENSIONS) | {
@@ -53,12 +57,20 @@ def parse(values: list[str] | None) -> dict[str, str]:
     for item in values or []:
         key, sep, value = item.partition("=")
         key = _ALIASES.get(key, key)
-        if not sep or key not in (*LANE_DIMENSIONS, *ASSERTION_DIMENSIONS) or not value:
+        if sep and key in (*LANE_DIMENSIONS, *ASSERTION_DIMENSIONS) and not value.strip():
+            raise IdentityError(f"--identity {key}: needs a value; got {item!r}")
+        if not sep or key not in (*LANE_DIMENSIONS, *ASSERTION_DIMENSIONS):
             raise IdentityError(
                 "--identity must be one of key=value for "
                 f"{', '.join((*LANE_DIMENSIONS, *ASSERTION_DIMENSIONS))}; "
                 f"got {item!r}"
             )
+        # A stray space from shell quoting or YAML would make a lane of its own, which matches
+        # no earlier run: its regressions would never be compared.
+        if value != value.strip():
+            raise IdentityError(f"--identity {key}: {value!r} has leading or trailing whitespace")
+        # A later value replaces an earlier one, so a caller can override the runner's default
+        # (`llmdv job` passes its own `--identity` before the caller's).
         result[key] = value
     result.setdefault("trigger", "manual")
     return result
@@ -79,6 +91,7 @@ def build(
         "llmdv_version": __version__,
         "profile_digest": profile_digest,
         "trigger": lane.get("trigger", "manual"),
+        "flavor": lane.get("flavor"),
     }
     return values
 
