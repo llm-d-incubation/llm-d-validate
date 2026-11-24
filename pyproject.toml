@@ -1,12 +1,37 @@
 [build-system]
-requires = ["setuptools>=68"]
+# 77 for the SPDX `license` expression and `license-files` (PEP 639).
+requires = ["setuptools>=77"]
 build-backend = "setuptools.build_meta"
 
 [project]
 name = "llm-d-validate"
-version = "0.1.0"
-description = "Functional validation for deployed model serving stacks"
+dynamic = ["version"]  # src/llmdv/__init__.py's __version__, the one place it is written
+description = "Functional validation for deployed llm-d model serving stacks: the gateway, the router and the engine"
+readme = "README.md"
 requires-python = ">=3.10"
+license = "Apache-2.0"
+license-files = ["LICENSE"]
+authors = [{ name = "The llm-d Authors" }]
+keywords = ["llm-d", "llm", "inference", "validation", "testing"]
+# Python versions: only those CI's offline-tests matrix runs.
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Environment :: Console",
+    "Framework :: Pytest",
+    "Intended Audience :: Developers",
+    "Intended Audience :: System Administrators",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3 :: Only",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
+    "Programming Language :: Python :: 3.15",
+    "Topic :: Software Development :: Testing",
+    "Topic :: System :: Monitoring",
+]
 dependencies = [
     "pytest>=8",
     "pyyaml>=6",
@@ -33,11 +58,21 @@ ibm-cos = ["ibm-cos-sdk>=2.16.2"]
 # `llmdv verify` blocks it, so live verification stays serial wherever it is installed.
 dev = ["ruff==0.16.9", "pre-commit>=4.1", "pytest-xdist>=3.6"]
 
+[project.urls]
+Homepage = "https://llm-d.ai"
+Documentation = "https://github.com/llm-d-incubation/llm-d-validate/blob/main/docs/manual.md"
+Repository = "https://github.com/llm-d-incubation/llm-d-validate"
+Issues = "https://github.com/llm-d-incubation/llm-d-validate/issues"
+Releases = "https://github.com/llm-d-incubation/llm-d-validate/releases"
+
 [project.scripts]
 llmdv = "llmdv.cli.main:main"
 
 [project.entry-points.pytest11]
 llmdv = "llmdv.plugin"
+
+[tool.setuptools.dynamic]
+version = { attr = "llmdv.__version__" }
 
 [tool.setuptools.packages.find]
 where = ["src"]

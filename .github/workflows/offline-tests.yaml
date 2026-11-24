@@ -85,8 +85,9 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        # 3.10 is the floor in pyproject.toml; 3.11 is what the runner image ships.
-        python: ["3.10", "3.11"]
+        # 3.10 is the floor in pyproject.toml, 3.11 is what the runner image ships, and the rest are
+        # every newer release, matching the Python classifiers pyproject.toml publishes.
+        python: ["3.10", "3.11", "3.12", "3.13", "3.14", "3.15"]
     name: test (python ${{ matrix.python }})
     steps:
       # A sparse checkout leaves files marked skip-worktree in this runner's reused workspace, and
