@@ -15,7 +15,9 @@
 #                                     `nvidia` RuntimeClass)
 # Both apply the same InferenceServerConfig (`--model Qwen/Qwen3-0.6B --enable-sleep-mode
 # --gpu-memory-utilization 0.9`) to the same launcher and requester images (v0.8.0), so they look
-# the same to a client. The vLLM version is the launcher image's; the guide does not pin it.
+# the same to a client. The guide does not pin a vLLM version; the launcher image v0.8.0 is built
+# on vllm-openai:v0.26.0 (FROM docs: llm-d-fast-model-actuation@v0.8.0:
+# dockerfiles/Dockerfile.launcher.benchmark:1).
 # Not covered: fast-model-actuation-keda (its own guide.yaml, deferred); see README.md.
 #
 # How a lane runs it, after deploying the guide in standalone mode (guide.yaml deploy.standalone
@@ -37,3 +39,13 @@ extends:
   - parts/common.yaml
 
 name: fast-model-actuation-vllm-qwen3-0.6b-inline-standalone
+
+ingresses:
+  # Overrides ../parts/topology/standalone.yaml on purpose: the launcher's vLLM v0.26.0 serves
+  # /v1/chat/completions/render and /v1/completions/render with no flag, and has no Messages or
+  # Responses render route (FROM docs: llm-d-fast-model-actuation@v0.8.0:
+  # dockerfiles/Dockerfile.launcher.benchmark:1 for the version; the --enable-scale-out gate came
+  # with vLLM v0.30, vllm@v0.31.0:vllm/entrypoints/scale_out/factories.py). The EPP forwards both
+  # paths to a replica. Declared here because surfaces are keyed by ingress id.
+  - id: epp
+    surfaces: [chat_completions, completions, messages, responses, chat_render, completions_render]

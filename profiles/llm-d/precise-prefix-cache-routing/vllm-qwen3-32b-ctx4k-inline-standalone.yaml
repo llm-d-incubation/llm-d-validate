@@ -14,10 +14,11 @@
 #
 # vllm-tpu v0.31.0 with --max-model-len=4096, --block-size=64 and --kv-events-config, and
 # WITHOUT --enable-scale-out (FROM values: modelserver/tpu/v5p/vllm/base/patch-vllm.yaml).
-# The guide's README says the TPU overlays run vLLM 0.29, which serves the render routes
-# without the flag; the rendered image is v0.31.0. If that build needs the flag, every
-# router render call answers 404 and the router routes without cache information while
-# client requests still answer 200 (README.md, "Upstream notes").
+# vLLM v0.30 and later register the render routes only with that flag (FROM docs:
+# vllm@v0.31.0:vllm/entrypoints/scale_out/factories.py), so every router render call answers
+# 404 and the router routes without cache information while client requests still answer 200
+# (README.md, "Upstream notes"). No render surface is declared here, unlike the other lanes'
+# combinations.
 #
 # How a lane runs it, after deploying the guide in standalone mode (guide.yaml deploy.standalone)
 # with one of the overlays above (GUIDE_NAME=precise-prefix-cache-routing):
