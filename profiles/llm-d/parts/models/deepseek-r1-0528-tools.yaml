@@ -1,0 +1,65 @@
+# Part: deepseek-ai/DeepSeek-R1-0528 at the model's own 163840-token window, served WITH a
+# tool-call parser and automatic tool choice but WITHOUT a reasoning parser: the reasoning arrives
+# inline as a <think> block in `content`, and tool calls are parsed. Not a profile on its own; a
+# combination file lists it after the engine part. Never extends anything.
+#
+# Used by (overlays as ACCELERATOR_TYPE/MODEL_SERVER/INFRA_PROVIDER, at llm-d 9ca8ff0):
+#   wide-ep gpu/vllm/{base,gke,coreweave,ocp}   vllm-openai v0.31.0, prefill and decode alike:
+#                               --enable-auto-tool-choice --tool-call-parser deepseek_v3
+#                               --chat-template /vllm-workspace/examples/tool_chat_template_deepseekr1.jinja
+#                               and no --reasoning-parser
+# FROM values: guides/wide-ep/modelserver/gpu/vllm/base/disaggregatedset.yaml, rendered through
+# each provider overlay with kubectl kustomize. The overlay's own comment says why there is no
+# reasoning parser: vLLM lists the deepseek_r1 reasoning parser as not supporting tool calling,
+# and the model's bundled template never renders `tools`, hence vLLM's own R1 template.
+#
+# The tool parser NAME is the engine's own flag value, so the combination file states it; this
+# part states the shape a client sees.
+#
+# Excluded, and why:
+#   reasoning_tokens    without a reasoning parser the engine cannot count reasoning apart from
+#                       the answer
+#   answer_max_tokens   opt-in, and no source states the budget R1 needs for a one-word answer
+#                       with thinking on; set it from the first run's recorded usage
+#   effort_rendering    vLLM's tool_chat_template_deepseekr1.jinja renders no effort marker
+
+model:
+  # FROM values: the first argument of `vllm serve`. The ocp overlay loads from a local path but
+  # keeps this id with --served-model-name (modelserver/gpu/vllm/ocp/kustomization.yaml).
+  public_id: deepseek-ai/DeepSeek-R1-0528
+  aliases: []
+  # FROM values: no overlay sets --max-model-len, so the engine uses the model's own window.
+  # DERIVED: 163840 is max_position_embeddings in the model's config.json (YaRN, factor 40 over
+  # 4096 original positions), not a guide value. The first run's GET /v1/models (vLLM's
+  # max_model_len) confirms it.
+  max_model_len: 163840
+  reasoning:
+    # FROM values: no --reasoning-parser on either role, on purpose (see the header).
+    parser: null
+    field: null
+    # INTENT: without a parser, the reasoning reaches the client as a literal <think> block in
+    # `content`. vLLM's R1 tool template appends only the assistant marker, not an opening
+    # <think>, so the model writes the opening tag itself (FROM docs: vLLM's
+    # examples/tool_chat_template_deepseekr1.jinja; not observed on this deployment).
+    inline_tag: think
+    # INTENT: R1 thinks on every turn; its template has no switch to turn thinking off.
+    default_on: true
+  tools:
+    # FROM values: --enable-auto-tool-choice.
+    auto_choice: true
+    # INTENT: DeepSeek writes each set of calls between its tool-call sentinel tokens, which the
+    # deepseek_v3 parser consumes; one left in the answer text is a call the parser missed.
+    markup: ["<｜tool▁calls▁begin｜>"]
+
+capabilities:
+  # INTENT: every effort each API defines; the API defines what an effort asks for, whatever shape
+  # the reasoning arrives in. `none` is the quiet one. R1's template has no effort or off switch,
+  # so `none` and the effort order are expected to fail until the team triages them (Rule 1).
+  chat_reasoning_efforts: [minimal, low, medium, high, xhigh, max]
+  chat_quiet_efforts: [none]
+  responses_reasoning_efforts: [none, minimal, low, medium, high, xhigh, max]
+  messages_thinking: [enabled, adaptive, disabled]
+  messages_efforts: [low, medium, high, xhigh, max]
+  # INTENT: declared accepted on a text-only model; expected to fail until the team marks it
+  # (Rule 1, red flags).
+  vision: [chat_completions, messages, responses]

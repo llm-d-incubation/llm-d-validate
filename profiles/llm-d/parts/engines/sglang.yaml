@@ -6,6 +6,8 @@
 # sglang v0.1.0-tpu, an Intel XPU build and a vendor build for DeepSeek-V4. The NVIDIA GPU overlay
 # also runs SGLang's Rust HTTP frontend (SGLANG_RUST_SERVER=1, guides/optimized-baseline/README.md,
 # "Tuning"); its combination file says so, since that is an overlay fact, not an engine-wide one.
+# The other guides' SGLang lanes run sglang v0.5.22 (pd-disaggregation with gpt-oss-120b,
+# pod-snapshot, tiered-prefix-cache on GPU) and sglang v0.1.0-tpu (tiered-prefix-cache on TPU).
 #
 # DECLARES NOTHING YET, on purpose. Everything engine-independent comes from parts/base.yaml; what is
 # left is SGLang's own request extensions, and llmdv's extension vocabularies (`extension_options` and

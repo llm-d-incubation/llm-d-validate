@@ -1,0 +1,45 @@
+# The multimodal-serving guide in standalone mode (the client reaches the EPP's own listener):
+# vLLM serving Qwen/Qwen3-VL-32B-Instruct, which reads images, with no parsers: no reasoning, no
+# tool calls.
+#
+# STATUS: WRITTEN, NOT RUN. llm-d 9ca8ff0. Composed from the guide's shipped config and the API
+# references. Only the router layer has been measured (on kind, with a simulator engine; see
+# ../parts/topology/standalone.yaml).
+#
+# CI lanes that deploy this configuration (llm-d's nightly-e2e-multimodal-serving-<lane>
+# workflows; each runs in standalone mode, gateway_class epponly):
+#   aggregation-gke-acc-gpu-vllm-x      TOPOLOGY=aggregation, gpu/vllm/gke
+#                                       (aggregation/modelserver/gpu/vllm/gke): 8 replicas, TP=2
+#   aggregation-gke-acc-tpu-vllm-x      TOPOLOGY=aggregation, tpu/v7/vllm with infra_provider
+#                                       `qwen3-vl` (aggregation/modelserver/tpu/v7/vllm/qwen3-vl,
+#                                       which tpu/v7/vllm/gke wraps; the two render the same):
+#                                       8 replicas, TP=4
+#   e-disaggregation-gke-acc-gpu-vllm-x TOPOLOGY=e-pd, gpu/vllm/e-pd/gke
+#                                       (e-disaggregation/modelserver/gpu/vllm/e-pd/gke): 2 encode
+#                                       pods and 8 decode pods, each TP=2; the decode pods serve
+#                                       behind the routing sidecar
+# All three run vLLM v0.31.0 (CUDA and TPU builds) with the same model id, no window flag and no
+# parser, so they look the same to a client. The E/PD routing sidecar sits in the client's path
+# on the decode pods; its own error envelopes have not been measured.
+#
+# How a lane runs it, after deploying the guide in standalone mode (guide.yaml deploy.standalone)
+# with one of the overlays above:
+#   export LLMDV_EPP_URL=http://<GUIDE_NAME>-epp.<namespace>.svc.cluster.local
+#   # or from outside the cluster:
+#   #   kubectl port-forward -n <namespace> svc/<GUIDE_NAME>-epp 18080:80 &
+#   #   export LLMDV_EPP_URL=http://localhost:18080
+#   llmdv profile validate profiles/llm-d/multimodal-serving/vllm-qwen3-vl-32b-instruct-inline-standalone.yaml
+#   llmdv verify --profile profiles/llm-d/multimodal-serving/vllm-qwen3-vl-32b-instruct-inline-standalone.yaml \
+#     --identity accelerator=<ACCELERATOR_TYPE> --identity provider=<INFRA_PROVIDER> \
+#     --identity flavor=<aggregation|e-pd>
+# The exact flags per lane are in README.md beside this file.
+
+extends:
+  - ../parts/base.yaml
+  - ../parts/topology/standalone.yaml
+  - ../parts/engines/vllm.yaml
+  - ../parts/models/qwen3-vl-32b-instruct-inline.yaml
+  - ../parts/sentinels/unmeasured.yaml
+  - parts/common.yaml
+
+name: multimodal-serving-vllm-qwen3-vl-32b-instruct-inline-standalone

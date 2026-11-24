@@ -1,0 +1,71 @@
+# Part: deepseek-ai/DeepSeek-V3 at a 36864-token window, served WITHOUT reasoning or tool-call
+# parsers. DeepSeek-V3 is not a reasoning model: it writes no <think> block, so there is no
+# reasoning to parse or to find inline, and no tool call is parsed. Not a profile on its own; a
+# combination file lists it after the engine part. Never extends anything.
+#
+# Used by (overlays as ACCELERATOR_TYPE/MODEL_SERVER/INFRA_PROVIDER, at llm-d 9ca8ff0):
+#   wide-ep amd/vllm/{base,amd-ci}   vllm-openai-rocm v0.32.0-rc.2 (llm-d's ROCm build), prefill
+#                               and decode alike: --max-model-len 36864
+#                               --no-enable-prefix-caching --api-server-count 8 --block-size 16
+# FROM values: guides/wide-ep/modelserver/amd/vllm/base/disaggregatedset.yaml, rendered through
+# amd-ci with kubectl kustomize (amd-ci changes no client-visible argument). No
+# --reasoning-parser, --tool-call-parser, --enable-auto-tool-choice or --chat-template.
+#
+# Reasoning, and how Rule 1 and Rule 3 apply to a model that does not reason. The reasoning SHAPE
+# is an existence fact of the model, like its window: this one has none, so every reasoning key
+# below is null or false and the cases that need reasoning (`needs("reasoning")`) skip as
+# undeclared. The effort and thinking VOCABULARIES are split by what their cases check:
+#   declared   where the case checks API behaviour any correct stack shows whether or not the
+#              model reasons: the request is accepted, Responses echoes `reasoning.effort`,
+#              `none` and Messages `disabled` answer with no reasoning, `adaptive` returns
+#              well-formed blocks (thinking optional), Messages effort changes output size (the
+#              Anthropic API defines effort over the whole response, not only thinking)
+#   left out   where the case checks that the model produces reasoning, which this model does
+#              not do: Chat reasoning efforts (each requires reasoning text), Messages `enabled`
+#              (requires a leading thinking block), reasoning_tokens (needs a reasoning parser)
+#
+# Excluded, and why:
+#   model.tools               no tool parser
+#   chat_reasoning_efforts    see above: each case requires reasoning text
+#   messages_thinking enabled see above: requires a thinking block
+#   reasoning_tokens          no reasoning, and no parser to count it
+#   answer_max_tokens         opt-in, and no source states the budget; set it from the first
+#                             run's recorded usage
+#   effort_rendering          no source states an effort marker in DeepSeek-V3's chat template
+
+model:
+  # FROM values: the first argument of `vllm serve`.
+  public_id: deepseek-ai/DeepSeek-V3
+  aliases: []
+  # FROM values: --max-model-len 36864 on prefill and decode.
+  max_model_len: 36864
+  reasoning:
+    # FROM values: no --reasoning-parser.
+    parser: null
+    field: null
+    # INTENT: DeepSeek-V3 is not a reasoning model and writes no <think> block, so there is no
+    # inline tag either. A <think> in its answer fails the answer-only checks, which is right.
+    inline_tag: null
+    default_on: false
+  tools:
+    # FROM values: no --tool-call-parser and no --enable-auto-tool-choice, so the tool cases skip
+    # as undeclared: the parser they need does not exist here.
+    parser: null
+    auto_choice: false
+
+capabilities:
+  # INTENT: `none` asks for no reasoning, which a model that does not reason answers by
+  # construction.
+  chat_quiet_efforts: [none]
+  # INTENT: every Responses effort; the case checks the effort is echoed, and that `none` returns
+  # no reasoning, neither of which needs a reasoning model.
+  responses_reasoning_efforts: [none, minimal, low, medium, high, xhigh, max]
+  # INTENT: `adaptive` lets the model decide (no thinking is a valid answer) and `disabled` asks
+  # for none. `enabled` is left out (see the header).
+  messages_thinking: [adaptive, disabled]
+  # INTENT: every Messages effort. anthropic_messages.effort_effect expects high effort to produce
+  # more output than low; whether this template and engine act on effort is for the run to show.
+  messages_efforts: [low, medium, high, xhigh, max]
+  # INTENT: declared accepted on a text-only model; expected to fail until the team marks it
+  # (Rule 1, red flags).
+  vision: [chat_completions, messages, responses]

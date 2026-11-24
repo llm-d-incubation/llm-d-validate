@@ -1,0 +1,96 @@
+# Part: what every pod-snapshot profile shares. Not a profile on its own; a combination file
+# beside this folder lists it last in `extends`. Never extends anything.
+#
+# G = guides/pod-snapshot, R = guides/recipes, at llm-d 9ca8ff0.
+#
+# No `name` here: the combination file names itself.
+#
+# The router, as this guide configures it (FROM values): G/router/pod-snapshot.values.yaml:
+# approx-prefix-cache-producer and inflight-load-producer; profile `default` =
+# prefix-cache-affinity-filter, then token-load-scorer; all plugin defaults, on top of
+# R/router/base.values.yaml. That is optimized-baseline's vLLM router configuration, so the shared
+# router claims mapped in ../../optimized-baseline/parts/common.yaml hold here unchanged. No
+# configuration names an SLO admission plugin, so the topology part's SLO-header declarations
+# stand.
+#
+# Block sizes: neither overlay sets one and the router values do not override the prefix
+# producer's, so the engine default applies. None is declared, because cache_reuse is not
+# declared (below).
+#
+# How the lanes deploy it (FROM values: G/scripts/nightly-deploy-gke.sh, read, not run): the
+# router in standalone mode, the PodSnapshotStorageConfig and PodSnapshotPolicy, then one replica
+# that cold starts and is checkpointed (Pod 1), then a scale to two, whose second replica is
+# restored from the snapshot (Pod 2). Both replicas run under gVisor, one GPU each. A lane runs
+# llmdv once both are Ready, so its requests reach a cold-started and a restored replica alike.
+#
+# The guide's claims (G/README.md, G/guide.yaml) and where each one lands:
+#   1   Pod 1 cold starts, releases GPU memory (vLLM engine.sleep(level=1); SGLang
+#       /release_memory_occupation), and a PodSnapshot reaches Ready (verify.tests.snapshot)
+#       -> NOT COVERED: cluster state (PodSnapshot objects, pod conditions, logs), which a
+#          committed profile does not read, and llmdv never scales or restarts anything
+#   2   Pod 2 is restored from the snapshot rather than cold started, and wakes its GPU memory
+#       (verify.tests.restore; check_thresholds.py)
+#       -> NOT COVERED: cluster state, as 1
+#   3   startup and restore latency stay under per-phase thresholds (G/scripts/check_thresholds.py,
+#       G/benchmark-results/)
+#       -> NOT COVERED: timing; a benchmark, not llmdv
+#   4   the restored pod serves inference: /v1/completions answers (verify.tests.request)
+#       -> openai_completions.* and every other surface case; with two Ready replicas behind the
+#          router, the run's requests reach both. llmdv cannot tell which replica answered
+#   5   single GPU per pod, TP=1 (README "Single-GPU Scope")
+#       -> fleet.config rules, which need cluster access
+#   6   SGLang answers /health with 503 until the snapshot and wake-up finish (README)
+#       -> NOT COVERED: startup behaviour; llmdv runs against a Ready stack
+#   7   kubectl port-forward to a gVisor pod fails; forward the router Service instead (README)
+#       -> the run block in each combination forwards the `<GUIDE_NAME>-epp` Service
+#   8   gateway mode (guide.yaml deploy.gateway)
+#       -> NOT COVERED: no lane runs it (the workflows pass gateway_host `<GUIDE_NAME>-epp`)
+
+guide: pod-snapshot
+
+capabilities:
+  # Not declared, on purpose. The cache suite reads cached_tokens from each response, and neither
+  # overlay asks its engine to report it: G/modelserver/gpu/vllm/gke passes no
+  # --enable-prompt-tokens-details and G/modelserver/gpu/sglang/gke no --enable-cache-report
+  # (FROM values, rendered). With no cached_tokens, `affinity: routed` would fail on a correct
+  # stack for want of the field, not for want of affinity.
+  cache_reuse: null
+
+# The cases this guide's lanes run by default (`llmdv verify --all` runs everything). They test
+# what a lane's own deployment can get wrong: the router path, the overlay's parsers and window,
+# and what this guide changes. Engine and model conformance, the rest of the suite, depends only
+# on the engine build, model and flags, which many lanes share; it runs with `--all` once per
+# configuration (profiles/llm-d/README.md, "Which lane runs everything").
+selection:
+  # Every lane: the router serves each API a client uses, and refuses what it should.
+  - contract.*
+  - discovery.models_lists_declared_model
+  - discovery.unknown_model_no_fallback
+  - discovery.models_parses_with_openai_sdk
+  - openai_chat.basic_non_streaming
+  - openai_chat.streaming_sse
+  - openai_chat.stop_reason
+  - openai_completions.basic_non_streaming
+  - openai_completions.streaming_matches_json
+  - openai_completions.stop_reason
+  - anthropic_messages.basic_non_streaming
+  - anthropic_messages.streaming_sse
+  - openai_responses.basic_non_streaming
+  - openai_responses.streaming_sse
+  - streaming.sse_framing
+  - unhappy.unknown_path
+  - unhappy.malformed_json
+  - unhappy.missing_model
+  - unhappy.wrong_method
+  - unhappy.error_envelope_fields
+  - transport.connection
+  - transport.health_status
+  # Every lane: the overlay's parser flags take effect (skips where the model part has none).
+  - openai_chat.configured_reasoning
+  - tools.auto_call
+  - tools.auto_stream
+  # Every lane: the overlay's context window is the one declared.
+  - long_context.*
+  - unhappy.context_overflow
+  - unhappy.token_limit_over_context
+  # This guide adds nothing: snapshot and restore are cluster state, not client behaviour; the client sees the 8k window.

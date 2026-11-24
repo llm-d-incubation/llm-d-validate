@@ -1,0 +1,61 @@
+# Part: openai/gpt-oss-120b at the model's own 131072-token window, served WITH a reasoning parser
+# and a tool-call parser with automatic tool choice. Not a profile on its own; a combination file
+# lists it after the engine part. Never extends anything.
+#
+# Used by (overlays as ACCELERATOR_TYPE/MODEL_SERVER/INFRA_PROVIDER, at llm-d 9ca8ff0):
+#   pd-disaggregation gpu/vllm/{gke/base,coreweave,ocp}   vllm-openai v0.31.0
+#   pd-disaggregation amd/vllm/nixl/amd-ci                vllm-openai-rocm v0.31.0
+#   each with --reasoning-parser=openai_gptoss --tool-call-parser=openai --enable-auto-tool-choice,
+#   on the prefill and the decode role alike
+# FROM values: guides/pd-disaggregation/modelserver/{gpu,amd}/vllm/, rendered with
+# `kubectl kustomize`.
+#
+# gpt-oss writes the harmony format: its reasoning goes to an `analysis` channel and its answer to
+# a `final` channel, separated by special tokens rather than a <think> tag. The reasoning parser
+# moves the analysis channel into its own field. The parser NAMES are the engine's own flag
+# values, so each combination file states them; this part states the shape a client sees.
+#
+# Excluded, and why:
+#   answer_max_tokens   opt-in, and no source states the budget gpt-oss needs for a one-word
+#                       answer at its default effort; set it from the first run's recorded usage
+#   effort_rendering    gpt-oss's chat template is expected to render the requested effort in its
+#                       system message (a `Reasoning: <effort>` line), but no file at llm-d
+#                       9ca8ff0 states it and no run has read it back; declare it from the first
+#                       run's prompt_logprobs
+
+model:
+  # FROM values: the first argument of `vllm serve` on both roles. The ocp overlay adds a
+  # preprocess container but keeps this id as the served name.
+  public_id: openai/gpt-oss-120b
+  aliases: []
+  # FROM values: no overlay listed above sets --max-model-len, so the engine uses the model's own.
+  # DERIVED: 131072 is max_position_embeddings in the model's config.json, not a guide value. The
+  # first run's GET /v1/models (vLLM's max_model_len) confirms it.
+  max_model_len: 131072
+  reasoning:
+    # The field's name is the engine's, so each combination states it beside the parser names.
+    # INTENT: gpt-oss always reasons in its analysis channel; its efforts change how much, not
+    # whether.
+    default_on: true
+  tools:
+    # FROM values: --enable-auto-tool-choice.
+    auto_choice: true
+    # INTENT: a harmony tool call addresses its recipient as `to=functions.<name>`; that text left
+    # in the answer is a call the parser missed. The channel delimiters around it are special
+    # tokens, which a correct server does not detokenize into the answer, so they are not listed.
+    markup: ["to=functions."]
+
+capabilities:
+  # INTENT: every effort each API defines. `none` is the quiet one: the OpenAI API defines it as no
+  # reasoning. gpt-oss itself documents low, medium and high; whether the others are refused,
+  # mapped or honoured is for the effort cases to measure.
+  chat_reasoning_efforts: [minimal, low, medium, high, xhigh, max]
+  chat_quiet_efforts: [none]
+  responses_reasoning_efforts: [none, minimal, low, medium, high, xhigh, max]
+  messages_thinking: [enabled, adaptive, disabled]
+  messages_efforts: [low, medium, high, xhigh, max]
+  # INTENT: a reasoning parser lets the engine count reasoning tokens apart from the answer.
+  reasoning_tokens: [chat_completions, responses]
+  # INTENT: the model reads images on every surface. gpt-oss-120b is text-only, so these are
+  # expected to fail until the team marks them (Rule 1, red flags: declare accepted, say so).
+  vision: [chat_completions, messages, responses]

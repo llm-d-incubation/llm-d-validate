@@ -1,0 +1,40 @@
+# The precise-prefix-cache-routing guide in standalone mode (the client reaches the EPP's own
+# listener):
+# vLLM on TPU v5p serving Qwen/Qwen3-32B at a 4096-token window with no parsers.
+#
+# STATUS: WRITTEN, NOT RUN. llm-d 9ca8ff0.
+#
+# CI lane that deploys this configuration (llm-d's nightly-e2e-precise-prefix-cache-routing-<lane>
+# workflow; it runs in standalone mode, gateway_class epponly):
+#   gke-acc-tpu-vllm-x                tpu/v5p/vllm (the lane sets no provider, so it applies that
+#                                     folder's own kustomization, which includes `base`;
+#                                     `gke` renders the same engine arguments)
+# Identity flags per lane:
+#   gke-acc-tpu-vllm-x                --identity accelerator=tpu/v5p --identity provider=base
+#
+# vllm-tpu v0.31.0 with --max-model-len=4096, --block-size=64 and --kv-events-config, and
+# WITHOUT --enable-scale-out (FROM values: modelserver/tpu/v5p/vllm/base/patch-vllm.yaml).
+# The guide's README says the TPU overlays run vLLM 0.29, which serves the render routes
+# without the flag; the rendered image is v0.31.0. If that build needs the flag, every
+# router render call answers 404 and the router routes without cache information while
+# client requests still answer 200 (README.md, "Upstream notes").
+#
+# How a lane runs it, after deploying the guide in standalone mode (guide.yaml deploy.standalone)
+# with one of the overlays above (GUIDE_NAME=precise-prefix-cache-routing):
+#   export LLMDV_EPP_URL=http://<GUIDE_NAME>-epp.<namespace>.svc.cluster.local
+#   # or from outside the cluster:
+#   #   kubectl port-forward -n <namespace> svc/<GUIDE_NAME>-epp 18080:80 &
+#   #   export LLMDV_EPP_URL=http://localhost:18080
+#   llmdv profile validate profiles/llm-d/precise-prefix-cache-routing/vllm-qwen3-32b-ctx4k-inline-standalone.yaml
+#   llmdv verify --profile profiles/llm-d/precise-prefix-cache-routing/vllm-qwen3-32b-ctx4k-inline-standalone.yaml \
+#     <the lane's identity flags above>
+
+extends:
+  - ../parts/base.yaml
+  - ../parts/topology/standalone.yaml
+  - ../parts/engines/vllm.yaml
+  - ../parts/models/qwen3-32b-ctx4k-inline.yaml
+  - ../parts/sentinels/unmeasured.yaml
+  - parts/common.yaml
+
+name: precise-prefix-cache-routing-vllm-qwen3-32b-ctx4k-inline-standalone

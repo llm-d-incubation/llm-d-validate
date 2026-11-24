@@ -1,0 +1,37 @@
+# The pd-disaggregation guide in standalone mode (the client reaches the EPP's own listener):
+# SGLang serving openai/gpt-oss-120b with no parsers: the harmony analysis text reaches
+# the client in `content`, untagged, and no tool call is parsed.
+#
+# STATUS: WRITTEN, NOT RUN. llm-d 9ca8ff0. Composed from the guide's shipped config and the API
+# references. Only the router layer has been measured (on kind, with a simulator engine and
+# optimized-baseline's router values; see ../parts/topology/standalone.yaml).
+#
+# Prefill and decode run the same model id, window and parser flags (FROM values: both roles of
+# each overlay below); the decode pod's routing sidecar returns one response per request.
+#
+# CI lane that deploys this configuration (llm-d's nightly-e2e-pd-disaggregation-<lane>
+# workflow; it runs in standalone mode, gateway_class epponly):
+#   gke-acc-gpu-sglang-x              gpu/sglang/gke           sglang v0.5.22
+# The decode routing sidecar runs with --kv-connector=sglang. What a client sees of the reasoning,
+# and why no inline tag is declared, is in ../parts/models/gpt-oss-120b-inline.yaml.
+#
+# How a lane runs it, after deploying the guide in standalone mode (guide.yaml deploy.standalone)
+# with one of the overlays above:
+#   export LLMDV_EPP_URL=http://<GUIDE_NAME>-epp.<namespace>.svc.cluster.local
+#   # or from outside the cluster:
+#   #   kubectl port-forward -n <namespace> svc/<GUIDE_NAME>-epp 18080:80 &
+#   #   export LLMDV_EPP_URL=http://localhost:18080
+#   llmdv profile validate profiles/llm-d/pd-disaggregation/sglang-gpt-oss-120b-inline-standalone.yaml
+#   llmdv verify --profile profiles/llm-d/pd-disaggregation/sglang-gpt-oss-120b-inline-standalone.yaml \
+#     --identity accelerator=<ACCELERATOR_TYPE> --identity provider=<INFRA_PROVIDER>
+# with the values each lane above lists (README.md beside this file).
+
+extends:
+  - ../parts/base.yaml
+  - ../parts/topology/standalone.yaml
+  - ../parts/engines/sglang.yaml
+  - ../parts/models/gpt-oss-120b-inline.yaml
+  - ../parts/sentinels/unmeasured.yaml
+  - parts/common.yaml
+
+name: pd-disaggregation-sglang-gpt-oss-120b-inline-standalone

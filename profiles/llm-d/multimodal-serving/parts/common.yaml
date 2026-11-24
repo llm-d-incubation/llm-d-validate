@@ -1,0 +1,117 @@
+# Part: what every multimodal-serving profile shares. Not a profile on its own; a combination file
+# beside this folder lists it last in `extends`. Never extends anything.
+#
+# G = guides/multimodal-serving, R = guides/recipes, at llm-d 9ca8ff0.
+#
+# No `name` here: the combination file names itself.
+#
+# The router, as this guide configures it (FROM values):
+#   aggregation   G/aggregation/router/aggregation.values.yaml: token-producer (images and video
+#                 estimated from their resolution, factor 1024 for Qwen3-VL),
+#                 approx-prefix-cache-producer, inflight-load-producer; profile `default` =
+#                 prefix-cache-affinity-filter (peakPrefillThroughput 15751, affinityThreshold 0.6,
+#                 maxTTFTPenaltyMs 36000), then token-load-scorer
+#   e-pd          G/e-disaggregation/router/vllm/e-pd-disaggregation.values.yaml: the same
+#                 producers and filter, plus always-disagg-multimodal-decider and
+#                 disagg-profile-handler; profile `encode` (encode-filter, queue-scorer) runs only
+#                 for a request with media, profile `decode` (decode-filter,
+#                 prefix-cache-affinity-filter, token-load-scorer) for every request
+#   shared        R/router/base.values.yaml, as for optimized-baseline
+# The shared router claims (EPP HTTP APIs, header handling, FailOpen, standalone endpoint) are
+# mapped in ../../optimized-baseline/parts/common.yaml; they hold here unchanged. No
+# configuration names an SLO admission plugin, so the topology part's SLO-header declarations
+# stand.
+#
+# Block sizes: no overlay sets --block-size and no router value overrides the prefix producer's,
+# so the engine default applies. None is declared, because cache_reuse is not declared (below).
+#
+# The guide's claims (G/README.md, G/guide.yaml, G/aggregation/README.md,
+# G/e-disaggregation/README.md) and where each one lands:
+#   1   an image in a Chat request is answered (guide.yaml verify.tests.request: an inline base64
+#       PNG in an `image_url` part, "What color is this image?")
+#       -> the vision cases on chat_completions (model part: vision), which draw a fresh image
+#          and require the answer to describe it; also declared on messages and responses
+#   2   text-only requests are served too (verify.tests.mm_requests, last request)
+#       -> every text case
+#   3   the same prompt and image twice land on one pod, whose vllm:prefix_cache_hits_total and
+#       vllm:mm_cache_hits_total grow with the second request (verify.tests.mm_requests and
+#       pod_metrics; README "Verify multimodal routing")
+#       -> NOT COVERED: needs routing.prefix_affinity with per-pod counter deltas (#27), and
+#          cluster access to read the counters, which a committed profile does not carry
+#   4   in E/PD, the encode pods count the image requests and not the text-only one; the decode
+#       pods count all three (README "Verify multimodal routing")
+#       -> NOT COVERED: per-pod counters, same reasons as 3
+#   5   the encoder output reaches the decode pod over the EC connector (e-disaggregation README
+#       "Confirm the EC Transfer"; a DEBUG log line)
+#       -> NOT COVERED: needs a log level change, which llmdv never makes, and pod logs. A
+#          consumer that receives no encoder output encodes locally, so a client cannot tell
+#   6   llm_d_epp_prefix_indexer_hit_ratio and llm_d_epp_disagg_decision_total on the EPP
+#       when MONITORING=true (verify.tests.router_metrics)
+#       -> NOT COVERED: fleet.metrics, which needs cluster access
+#   7   token estimation per image and video; an image given by URL is priced at
+#       defaultResolution because the router does not fetch it (README "Token estimation")
+#       -> NOT COVERED: a router-internal estimate with no client-observable effect. The
+#          Messages image_url source would need image_url_fixture, which no lane hosts
+#   8   video metadata headers x-llm-d-video-fps, -duration-seconds and -resolution (README
+#       "Token estimation")
+#       -> NOT COVERED: llmdv has no video input case, and the headers are not declared in the
+#          topology part
+#   9   one model, Qwen/Qwen3-VL-32B-Instruct, on every validated overlay
+#       -> discovery.models_lists_declared_model, discovery.unknown_model_no_fallback
+#   10  the window, parsers and Instruct (non-thinking) behaviour of the model
+#       -> long_context.*, unhappy.context_overflow, the reasoning and tool cases (model part)
+
+guide: multimodal-serving
+
+capabilities:
+  # Not declared, on purpose. The cache suite reads cached_tokens from each response, and no
+  # overlay of this guide asks vLLM to report it: none passes --enable-prompt-tokens-details in
+  # any role (FROM values: G/aggregation/modelserver/ and G/e-disaggregation/modelserver/gpu/,
+  # rendered). With no cached_tokens, `affinity: routed` would fail on a correct stack for want of
+  # the field, not for want of affinity. The guide's own affinity claim (3 above) needs
+  # routing.prefix_affinity.
+  cache_reuse: null
+
+# The cases this guide's lanes run by default (`llmdv verify --all` runs everything). They test
+# what a lane's own deployment can get wrong: the router path, the overlay's parsers and window,
+# and what this guide changes. Engine and model conformance, the rest of the suite, depends only
+# on the engine build, model and flags, which many lanes share; it runs with `--all` once per
+# configuration (profiles/llm-d/README.md, "Which lane runs everything").
+selection:
+  # Every lane: the router serves each API a client uses, and refuses what it should.
+  - contract.*
+  - discovery.models_lists_declared_model
+  - discovery.unknown_model_no_fallback
+  - discovery.models_parses_with_openai_sdk
+  - openai_chat.basic_non_streaming
+  - openai_chat.streaming_sse
+  - openai_chat.stop_reason
+  - openai_completions.basic_non_streaming
+  - openai_completions.streaming_matches_json
+  - openai_completions.stop_reason
+  - anthropic_messages.basic_non_streaming
+  - anthropic_messages.streaming_sse
+  - openai_responses.basic_non_streaming
+  - openai_responses.streaming_sse
+  - streaming.sse_framing
+  - unhappy.unknown_path
+  - unhappy.malformed_json
+  - unhappy.missing_model
+  - unhappy.wrong_method
+  - unhappy.error_envelope_fields
+  - transport.connection
+  - transport.health_status
+  # Every lane: the overlay's parser flags take effect (skips where the model part has none).
+  - openai_chat.configured_reasoning
+  - tools.auto_call
+  - tools.auto_stream
+  # Every lane: the overlay's context window is the one declared.
+  - long_context.*
+  - unhappy.context_overflow
+  - unhappy.token_limit_over_context
+  # This guide: the guide serves images; on the e-pd lane media requests pass an encode step and the
+  # routing sidecar.
+  - images.*
+  - unhappy.image_input
+  - unhappy.invalid_image
+  - streaming.*

@@ -1,0 +1,38 @@
+# The pd-disaggregation guide in standalone mode (the client reaches the EPP's own listener):
+# vLLM serving Qwen/Qwen3-32B with no parsers: inline <think>, no tool calls (an llm-d
+# ROCm vLLM build, over the MoRI-IO connector).
+#
+# STATUS: WRITTEN, NOT RUN. llm-d 9ca8ff0. Composed from the guide's shipped config and the API
+# references. Only the router layer has been measured (on kind, with a simulator engine and
+# optimized-baseline's router values; see ../parts/topology/standalone.yaml).
+#
+# Prefill and decode run the same model id, window and parser flags (FROM values: both roles of
+# each overlay below); the decode pod's routing sidecar returns one response per request.
+#
+# CI lane that deploys this configuration (llm-d's nightly-e2e-pd-disaggregation-<lane>
+# workflow; it runs in standalone mode, gateway_class epponly):
+#   amd-ci-acc-rocm-vllm-moriio       amd/vllm/moriio/amd-ci-1p1d-tp8
+#                                     ghcr.io/llm-d/vllm-openai-rocm v0.32.0-rc.2, TP=8 per role
+# guide.yaml advertises openai/gpt-oss-120b for the amd accelerator; this overlay serves
+# Qwen/Qwen3-32B (guide.yaml's MODEL comment says so), with no parser flags.
+#
+# How a lane runs it, after deploying the guide in standalone mode (guide.yaml deploy.standalone)
+# with one of the overlays above:
+#   export LLMDV_EPP_URL=http://<GUIDE_NAME>-epp.<namespace>.svc.cluster.local
+#   # or from outside the cluster:
+#   #   kubectl port-forward -n <namespace> svc/<GUIDE_NAME>-epp 18080:80 &
+#   #   export LLMDV_EPP_URL=http://localhost:18080
+#   llmdv profile validate profiles/llm-d/pd-disaggregation/vllm-qwen3-32b-inline-standalone.yaml
+#   llmdv verify --profile profiles/llm-d/pd-disaggregation/vllm-qwen3-32b-inline-standalone.yaml \
+#     --identity accelerator=<ACCELERATOR_TYPE> --identity provider=<INFRA_PROVIDER>
+# with the values each lane above lists (README.md beside this file).
+
+extends:
+  - ../parts/base.yaml
+  - ../parts/topology/standalone.yaml
+  - ../parts/engines/vllm.yaml
+  - ../parts/models/qwen3-32b-inline.yaml
+  - ../parts/sentinels/unmeasured.yaml
+  - parts/common.yaml
+
+name: pd-disaggregation-vllm-qwen3-32b-inline-standalone

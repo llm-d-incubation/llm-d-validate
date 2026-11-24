@@ -1,0 +1,37 @@
+# The predicted-latency-routing guide in standalone mode (the client reaches the EPP's own
+# listener):
+# vLLM serving Qwen/Qwen3-0.6B with no parsers (an Intel XPU vLLM build).
+#
+# STATUS: WRITTEN, NOT RUN. llm-d 9ca8ff0.
+#
+# CI lane that deploys this configuration (llm-d's nightly-e2e-predicted-latency-routing-<lane>
+# workflow; it runs in standalone mode, gateway_class epponly):
+#   intel-acc-xpu-vllm-x              xpu/vllm (the lane sets no provider, so it applies that
+#                                     folder's own kustomization, which includes `base`,
+#                                     itself optimized-baseline's xpu/vllm overlay)
+# Identity flags per lane:
+#   intel-acc-xpu-vllm-x              --identity accelerator=xpu --identity provider=base
+#
+# llm-d-xpu v1.0.0, unchanged from optimized-baseline: single-XPU pods have no room for the
+# long-context Qwen3-32B configuration (FROM values: modelserver/xpu/vllm/base/
+# kustomization.yaml).
+#
+# How a lane runs it, after deploying the guide in standalone mode (guide.yaml deploy.standalone)
+# with one of the overlays above (GUIDE_NAME=predicted-latency-routing):
+#   export LLMDV_EPP_URL=http://<GUIDE_NAME>-epp.<namespace>.svc.cluster.local
+#   # or from outside the cluster:
+#   #   kubectl port-forward -n <namespace> svc/<GUIDE_NAME>-epp 18080:80 &
+#   #   export LLMDV_EPP_URL=http://localhost:18080
+#   llmdv profile validate profiles/llm-d/predicted-latency-routing/vllm-qwen3-0.6b-inline-standalone.yaml
+#   llmdv verify --profile profiles/llm-d/predicted-latency-routing/vllm-qwen3-0.6b-inline-standalone.yaml \
+#     <the lane's identity flags above>
+
+extends:
+  - ../parts/base.yaml
+  - ../parts/topology/standalone.yaml
+  - ../parts/engines/vllm.yaml
+  - ../parts/models/qwen3-0.6b-inline.yaml
+  - ../parts/sentinels/unmeasured.yaml
+  - parts/common.yaml
+
+name: predicted-latency-routing-vllm-qwen3-0.6b-inline-standalone

@@ -1,0 +1,49 @@
+# The async-multitenant guide's llm-d router in standalone mode (the client reaches the EPP's own
+# listener, with flow control on; not the coordinator): vLLM serving Qwen/Qwen3-32B with the
+# qwen3 reasoning parser and the hermes tool parser.
+#
+# STATUS: WRITTEN, NOT RUN. llm-d 9ca8ff0. Composed from the guide's shipped config and the API
+# references. Only the router layer has been measured, and that with optimized-baseline's router
+# config, without flow control (on kind, with a simulator engine; see
+# ../parts/topology/standalone.yaml).
+#
+# CI lanes that deploy this configuration (llm-d's nightly-e2e-<lane> workflows; standalone mode,
+# through reusable-nightly-e2e-gke with a custom_deploy_script):
+#   async-multitenant-gke-acc-gpu-vllm-x            AMT_FLOW_CONTROL=evictable
+#   async-multitenant-holdback-gke-acc-gpu-vllm-x   AMT_FLOW_CONTROL=holdback
+# Both run guides/batch-serving/asynchronous-processing/multitenant/scripts/nightly-deploy-gke.sh,
+# which renders that guide's modelserver/gpu/vllm/gke (optimized-baseline's
+# modelserver/gpu/vllm/gke relabelled for the guide, one replica). They differ only in the router
+# values.
+#
+# How a lane runs it, after the deploy script:
+#   export LLMDV_EPP_URL=http://llm-d-router-epp.<namespace>.svc.cluster.local
+#   # or from outside the cluster:
+#   #   kubectl port-forward -n <namespace> svc/llm-d-router-epp 18080:80 &
+#   #   export LLMDV_EPP_URL=http://localhost:18080
+#   llmdv profile validate profiles/llm-d/async-multitenant/vllm-qwen3-32b-parsers-standalone.yaml
+#   llmdv verify --profile profiles/llm-d/async-multitenant/vllm-qwen3-32b-parsers-standalone.yaml \
+#     --identity accelerator=gpu --identity provider=gke --identity flavor=<evictable|holdback>
+
+extends:
+  - ../parts/base.yaml
+  - ../parts/topology/standalone.yaml
+  - ../parts/engines/vllm.yaml
+  - ../parts/models/qwen3-32b-parsers.yaml
+  - ../parts/sentinels/unmeasured-with-tools.yaml
+  - parts/common.yaml
+
+name: async-multitenant-vllm-qwen3-32b-parsers-standalone
+
+model:
+  # FROM values: the overlay's own flag values (--reasoning-parser=qwen3,
+  # --tool-call-parser=hermes). The model part declares the shape a client sees; the names
+  # belong to the engine, so they are stated here.
+  reasoning:
+    parser: qwen3
+    # MEASURED on another deployment (vLLM 0.32 behind an llm-d router): the field is
+    # `reasoning`, and `reasoning_content` is absent. Not yet observed on this guide's vLLM
+    # v0.31.0; the first run settles it.
+    field: reasoning
+  tools:
+    parser: hermes

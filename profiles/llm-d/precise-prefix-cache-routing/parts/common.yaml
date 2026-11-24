@@ -1,0 +1,128 @@
+# Part: what every precise-prefix-cache-routing profile shares. Not a profile on its own; a
+# combination file beside this folder lists it last in `extends`. Never extends anything.
+#
+# G = guides/precise-prefix-cache-routing, R = guides/recipes, at llm-d 9ca8ff0.
+#
+# No `name` here: each combination names itself.
+#
+# The router, as this guide configures it (FROM values: G/router/
+# precise-prefix-cache-routing.values.yaml, every lane runs vLLM):
+#   token-producer                 tokenizes every prompt before routing by calling vLLM's
+#                                  /v1/*/render on the pool's own Ready endpoints, round-robin,
+#                                  one retry on another endpoint; modelName Qwen/Qwen3-32B;
+#                                  messagesRenderMode and responsesRenderMode `auto` (native render
+#                                  when the engine serves it, else a deprecated chat-render fallback)
+#   endpoint-notification-source, precise-prefix-cache-producer
+#                                  a KV-block index fed by each engine's ZMQ KV events (ports 5556,
+#                                  replay 5559), 64-token blocks, speculative indexing
+#   inflight-load-producer, prefix-cache-affinity-filter (peakPrefillThroughput 15926), then
+#                                  token-load-scorer in the `default` profile
+#   one EPP replica (the token-load accounting and the index are per process); R/router/
+#   base.values.yaml for the rest, as in optimized-baseline
+# No configuration names an SLO admission plugin, so the topology part's `ignored` SLO headers
+# stand.
+#
+# Engine settings every lane shares (FROM values: G/modelserver/): --block-size=64 and
+# --kv-events-config, no KV connector; --enable-scale-out, which serves vLLM's render routes on
+# the inference port, on every lane except tpu/v5p (see README.md, "Upstream notes").
+# The router's 64-token blocks match the engines' --block-size=64. Not declared as
+# cache_reuse.block_size, because cache_reuse is not declared (below).
+#
+# Render surfaces are NOT declared, on purpose. Whether an engine serves its render routes is an
+# existence fact, and no run has measured it on these engines (see ../../parts/topology/
+# standalone.yaml). This guide's engines are expected to serve them, since the router depends on
+# them; the router forwards every path, so on the first run contract.undeclared_surfaces_absent
+# names each render route that answers through the EPP, and they are declared then, in the
+# combinations, with the change sentinels (render_pins) that go with them.
+#
+# Router claims this guide shares with optimized-baseline (error envelopes, header handling,
+# streaming pass-through, the EPP's HTTP APIs, FailOpen, gateway mode): see
+# ../../optimized-baseline/parts/common.yaml, claims 8 to 28; they land on the same cases here.
+#
+# The guide's own claims (G/README.md and G/guide.yaml verify.tests) and where each one lands:
+#   render         every model-server pod answers /v1/completions/render with token_ids for MODEL,
+#                  called on the pod, not through the router
+#                  -> NOT COVERED: needs a per-pod engine ingress, and a committed profile names no
+#                     pod. Through the router the render routes reach some replica, which the
+#                     render suite checks once the surfaces are declared (above)
+#   request        /v1/completions through the EPP answers -> openai_completions.*
+#   messages       /v1/messages through the EPP, which the router renders through
+#                  /v1/messages/render -> anthropic_messages.*
+#   responses      /v1/responses through the EPP (a preview; rendered natively, or by the legacy
+#                  fallback where the engine has no /v1/responses/render) -> openai_responses.*
+#   chat           /v1/chat/completions, rendered through /v1/chat/completions/render
+#                  (G/README.md "Supported APIs") -> openai_chat.*
+#   router_render  the router renders a request itself: one more successful
+#                  llm_d_epp_token_producer_render_duration_seconds_count{result="success"} and no
+#                  new llm_d_epp_token_producer_render_failures_total across one request
+#                  -> NOT COVERED: reads the EPP's /metrics on port 9090 with a service-account
+#                     token, which needs cluster access a committed profile does not carry
+#                     (fleet.metrics, from a lane's own local file). Without it, a router whose
+#                     renders all fail still answers 200 (G/README.md, "Verify that the router
+#                     renders"), so every case here can pass while precise routing is off
+#   shared_prefix  ten requests sharing a ~2k-token prefix, 3 s apart, past the 2 s speculative-index
+#                  TTL, each answers -> openai_completions.* for the answers; staying on one pod
+#                  -> NOT COVERED: routing.prefix_affinity (#27), as in optimized-baseline claim 3
+#   pod_metrics    per-pod vllm:prefix_cache_{hits,queries}_total and vllm:request_success_total
+#                  through the API-server proxy -> NOT COVERED, as optimized-baseline claim 11
+#   model          each accelerator serves the one model of the support table
+#                  -> discovery.models_lists_declared_model, discovery.unknown_model_no_fallback
+#   KV events      engines publish KV events and the index tracks them (G/README.md, "How It
+#                  Works") -> NOT COVERED: not client-observable
+
+guide: precise-prefix-cache-routing
+
+capabilities:
+  # Not declared, on purpose. The cache suite reads cached_tokens from each response, and no
+  # overlay of this guide asks an engine to report it: none passes vLLM's
+  # --enable-prompt-tokens-details (FROM values: G/modelserver/). With no cached_tokens,
+  # `affinity: routed` would fail on a correct stack for want of the field, not for want of
+  # affinity. The guide's own affinity claim (shared_prefix above) needs routing.prefix_affinity.
+  cache_reuse: null
+
+# The cases this guide's lanes run by default (`llmdv verify --all` runs everything). They test
+# what a lane's own deployment can get wrong: the router path, the overlay's parsers and window,
+# and what this guide changes. Engine and model conformance, the rest of the suite, depends only
+# on the engine build, model and flags, which many lanes share; it runs with `--all` once per
+# configuration (profiles/llm-d/README.md, "Which lane runs everything").
+selection:
+  # Every lane: the router serves each API a client uses, and refuses what it should.
+  - contract.*
+  - discovery.models_lists_declared_model
+  - discovery.unknown_model_no_fallback
+  - discovery.models_parses_with_openai_sdk
+  - openai_chat.basic_non_streaming
+  - openai_chat.streaming_sse
+  - openai_chat.stop_reason
+  - openai_completions.basic_non_streaming
+  - openai_completions.streaming_matches_json
+  - openai_completions.stop_reason
+  - anthropic_messages.basic_non_streaming
+  - anthropic_messages.streaming_sse
+  - openai_responses.basic_non_streaming
+  - openai_responses.streaming_sse
+  - streaming.sse_framing
+  - unhappy.unknown_path
+  - unhappy.malformed_json
+  - unhappy.missing_model
+  - unhappy.wrong_method
+  - unhappy.error_envelope_fields
+  - transport.connection
+  - transport.health_status
+  # Every lane: the overlay's parser flags take effect (skips where the model part has none).
+  - openai_chat.configured_reasoning
+  - tools.auto_call
+  - tools.auto_stream
+  # Every lane: the overlay's context window is the one declared.
+  - long_context.*
+  - unhappy.context_overflow
+  - unhappy.token_limit_over_context
+  # This guide: the router renders every prompt (token producer, Messages and Responses render
+  # modes): token counts and render must agree with the engine.
+  - anthropic_messages.count_tokens
+  - anthropic_messages.token_count_matches_usage
+  - anthropic_messages.stream_matches_message
+  - openai_responses.input_tokens
+  - render.*
+  - evolution.prompt_pin
+  - evolution.prompt_pin_tools

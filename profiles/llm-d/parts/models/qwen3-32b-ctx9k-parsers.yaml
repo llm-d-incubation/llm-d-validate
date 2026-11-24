@@ -1,0 +1,49 @@
+# Part: Qwen/Qwen3-32B capped at a 9216-token window, served WITH a reasoning parser and a
+# tool-call parser with automatic tool choice. Not a profile on its own; a combination file lists
+# it after the engine part. Never extends anything.
+#
+# Used by (overlays as ACCELERATOR_TYPE/MODEL_SERVER/INFRA_PROVIDER, at llm-d 9ca8ff0):
+#   pd-disaggregation tpu/v5p/vllm/{base,gke}   vllm-tpu v0.31.0 --max-model-len=9216
+#                                               --reasoning-parser=qwen3 --tool-call-parser=hermes
+#                                               --enable-auto-tool-choice, on the prefill and the
+#                                               decode role alike
+# FROM values: guides/pd-disaggregation/modelserver/tpu/v5p/vllm/, rendered with
+# `kubectl kustomize` (the folder's own kustomization and `gke` render the same engine arguments).
+#
+# The same shape as qwen3-32b-parsers.yaml at a smaller window. The parser NAMES are the engine's
+# flag values, so each combination file states them.
+#
+# Excluded, and why:
+#   answer_max_tokens, effort_rendering   as in qwen3-32b-parsers.yaml
+
+model:
+  # FROM values: the first argument of `vllm serve` on both roles.
+  public_id: Qwen/Qwen3-32B
+  aliases: []
+  # FROM values: --max-model-len=9216 on both roles.
+  max_model_len: 9216
+  reasoning:
+    # A reasoning parser moves the <think> block out of `content` into its own field. The
+    # field's name is the engine's, so each combination states it beside the parser names.
+    # INTENT: Qwen3 thinks unless asked not to (its template's enable_thinking defaults to
+    # true).
+    default_on: true
+  tools:
+    # FROM values: --enable-auto-tool-choice.
+    auto_choice: true
+    # INTENT: Qwen3 wraps each call in <tool_call> tags; a tag left in the answer text is a call
+    # the parser missed.
+    markup: ["<tool_call>"]
+
+capabilities:
+  # INTENT: every effort each API defines; see qwen3-32b-parsers.yaml.
+  chat_reasoning_efforts: [minimal, low, medium, high, xhigh, max]
+  chat_quiet_efforts: [none]
+  responses_reasoning_efforts: [none, minimal, low, medium, high, xhigh, max]
+  messages_thinking: [enabled, adaptive, disabled]
+  messages_efforts: [low, medium, high, xhigh, max]
+  # INTENT: a reasoning parser lets the engine count reasoning tokens apart from the answer.
+  reasoning_tokens: [chat_completions, responses]
+  # INTENT: declared accepted on a text-only model; expected to fail until the team marks it
+  # (Rule 1, red flags).
+  vision: [chat_completions, messages, responses]

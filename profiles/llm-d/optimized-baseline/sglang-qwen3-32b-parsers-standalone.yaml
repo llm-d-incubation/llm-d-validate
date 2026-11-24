@@ -2,7 +2,7 @@
 # SGLang serving Qwen/Qwen3-32B with the qwen3 reasoning parser and the qwen tool parser.
 #
 # STATUS: WRITTEN, NOT RUN against this engine. Composed from the guide's shipped config at
-# llm-d 565373b and the API references. Only the router layer has been measured (on kind,
+# llm-d 9ca8ff0 and the API references. Only the router layer has been measured (on kind,
 # with a simulator engine; see ../parts/topology/standalone.yaml).
 #
 # CI lane that deploys this configuration (llm-d's nightly-e2e-optimized-baseline-<lane>
@@ -29,6 +29,7 @@ extends:
   - ../parts/topology/standalone.yaml
   - ../parts/engines/sglang.yaml
   - ../parts/models/qwen3-32b-parsers.yaml
+  - ../parts/sentinels/unmeasured-with-tools.yaml
   - parts/common.yaml
 
 name: optimized-baseline-sglang-qwen3-32b-parsers-standalone
@@ -43,42 +44,3 @@ model:
     field: reasoning_content
   tools:
     parser: qwen
-
-capabilities:
-  # Change sentinels. Their values depend on this exact stack (template, tokenizer, engine
-  # build and parsers), so they live here and not in a part. INTENT: placeholders, as
-  # .agents/skills/writing-an-infra-profile/SKILL.md step 6 describes. The first run with
-  # --evidence all fails each pin with the observed count and records each contract
-  # part's exchange; replace these with those values and cite the build.
-  prompt_pins:
-    chat_completions: {conversation: 1, tools: 1}
-    completions: {conversation: 1}
-    messages: {conversation: 1, tools: 1}
-    responses: {conversation: 1, tools: 1}
-  contract_baseline:
-    chat_completions:
-      response: {llmdv_seed: [absent]}
-      stream: {llmdv_seed: [absent]}
-      error: {llmdv_seed: [absent]}
-      invalid: {llmdv_seed: [absent]}
-      tool_response: {llmdv_seed: [absent]}
-      tool_stream: {llmdv_seed: [absent]}
-    completions:
-      response: {llmdv_seed: [absent]}
-      stream: {llmdv_seed: [absent]}
-      error: {llmdv_seed: [absent]}
-      invalid: {llmdv_seed: [absent]}
-    messages:
-      response: {llmdv_seed: [absent]}
-      stream: {llmdv_seed: [absent]}
-      error: {llmdv_seed: [absent]}
-      invalid: {llmdv_seed: [absent]}
-      tool_response: {llmdv_seed: [absent]}
-      tool_stream: {llmdv_seed: [absent]}
-    responses:
-      response: {llmdv_seed: [absent]}
-      stream: {llmdv_seed: [absent]}
-      error: {llmdv_seed: [absent]}
-      invalid: {llmdv_seed: [absent]}
-      tool_response: {llmdv_seed: [absent]}
-      tool_stream: {llmdv_seed: [absent]}

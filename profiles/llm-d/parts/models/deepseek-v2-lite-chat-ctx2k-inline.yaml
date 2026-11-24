@@ -1,0 +1,85 @@
+# Part: deepseek-ai/DeepSeek-V2-Lite-Chat at a 2048-token window, served WITHOUT reasoning or
+# tool-call parsers. DeepSeek-V2-Lite-Chat is not a reasoning model: it writes no <think> block,
+# and no tool call is parsed. Not a profile on its own; a combination file lists it after the
+# engine part. Never extends anything.
+#
+# Used by (overlays as ACCELERATOR_TYPE/MODEL_SERVER/INFRA_PROVIDER, at llm-d 9ca8ff0):
+#   wide-ep xpu/vllm/xpu-ci     llm-d-xpu v1.0.0 (an Intel XPU vLLM build), aggregated
+#                               LeaderWorkerSet, TP2 with expert parallelism, no P/D and no
+#                               routing sidecar: --max-model-len ${MAX_MODEL_LEN} (2048)
+#                               --trust-remote-code --dtype bfloat16 --block-size 64
+# FROM values: guides/wide-ep/modelserver/xpu/vllm/xpu-ci/ (patch-xpu-ci-lws.yaml over
+# ../base/lws.yaml), rendered with kubectl kustomize. No --reasoning-parser, --tool-call-parser,
+# --enable-auto-tool-choice or --chat-template. The xpu `base` overlay serves Qwen/Qwen3-235B-A22B
+# instead, and no lane deploys it.
+#
+# Reasoning: as in deepseek-v3-ctx36k-inline.yaml, whose header explains the split. The
+# reasoning shape is an existence fact (none here); the effort and thinking vocabularies are
+# declared where their cases check API behaviour and left out where they check that the model
+# reasons.
+#
+# The 2048-token window is small. These cases, read from src/llmdv at this commit, send a budget
+# the window cannot hold, so vLLM refuses them for exceeding the context (or, on a build that
+# clamps the budget, serves them shorter). They stay declared: they are what a client sends, and
+# the failures are the team's to triage (Rule 4), not this part's to pre-excuse:
+#   anthropic_messages.thinking_mode, thinking_mode_streaming, reasoning_effort,
+#   reasoning_effort_streaming, thinking_retained   MessagesSurface.thinking_body's default
+#                 max_tokens is 2048, so any prompt overflows; thinking_mode's enabled-2048-4000
+#                 variant asks 4000 (it skips here: `enabled` is not declared)
+#   anthropic_messages.error_types (the thinking triggers)   refused either way, but the refusal
+#                 may name the window rather than the malformed thinking field
+#   scenarios.structured_client (triage shape)   max_tokens 3000 (TRIAGE_BUDGET)
+#   messages_features.max_tokens_large           max_tokens 64000; overflows every window in
+#                 these profiles, not only this one
+# Close to the limit but expected to fit: scenarios.structured_client (judge shape) fills half the
+# window with ~1024 words of background, plus a 16-token verdict. Window-relative cases
+# (long_context.*, unhappy.context_overflow, streaming timing, the Messages effort_effect budget
+# of max(1024, window/4)) scale to 2048. The cache sessions refuse a window under 4096 as
+# undeclared, but cache_reuse is not declared in this guide anyway. The tool, client-session and
+# agent cases with large budgets (AGENT_BUDGET 2048, Claude Code's 8192 output) need a tool
+# parser and skip.
+#
+# Excluded, and why:
+#   model.tools               no tool parser
+#   chat_reasoning_efforts    each case requires reasoning text, which this model does not write
+#   messages_thinking enabled requires a thinking block
+#   reasoning_tokens          no reasoning, and no parser to count it
+#   answer_max_tokens         opt-in, and no source states the budget; set it from the first
+#                             run's recorded usage
+#   effort_rendering          no source states an effort marker in the model's chat template
+
+model:
+  # FROM values: the first argument of `vllm serve` in the xpu-ci overlay.
+  public_id: deepseek-ai/DeepSeek-V2-Lite-Chat
+  aliases: []
+  # FROM values: --max-model-len ${MAX_MODEL_LEN}, and MAX_MODEL_LEN is "2048" in the container
+  # env (set in ../base/lws.yaml, kept by xpu-ci). The model's own config allows far more; the
+  # overlay caps it.
+  max_model_len: 2048
+  reasoning:
+    # FROM values: no --reasoning-parser.
+    parser: null
+    field: null
+    # INTENT: not a reasoning model, so no inline tag either.
+    inline_tag: null
+    default_on: false
+  tools:
+    # FROM values: no --tool-call-parser and no --enable-auto-tool-choice, so the tool cases skip
+    # as undeclared.
+    parser: null
+    auto_choice: false
+
+capabilities:
+  # INTENT: `none` asks for no reasoning, which a model that does not reason answers by
+  # construction.
+  chat_quiet_efforts: [none]
+  # INTENT: every Responses effort; the case checks the effort is echoed and that `none` returns
+  # no reasoning.
+  responses_reasoning_efforts: [none, minimal, low, medium, high, xhigh, max]
+  # INTENT: `adaptive` (no thinking is a valid answer) and `disabled`; `enabled` is left out.
+  messages_thinking: [adaptive, disabled]
+  # INTENT: every Messages effort; effort_effect is for the run to show.
+  messages_efforts: [low, medium, high, xhigh, max]
+  # INTENT: declared accepted on a text-only model; expected to fail until the team marks it
+  # (Rule 1, red flags).
+  vision: [chat_completions, messages, responses]

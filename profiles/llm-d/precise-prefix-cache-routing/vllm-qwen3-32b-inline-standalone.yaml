@@ -1,0 +1,35 @@
+# The precise-prefix-cache-routing guide in standalone mode (the client reaches the EPP's own
+# listener):
+# vLLM serving Qwen/Qwen3-32B with no parsers: inline <think>, no tool calls (ROCm build).
+#
+# STATUS: WRITTEN, NOT RUN. llm-d 9ca8ff0.
+#
+# CI lane that deploys this configuration (llm-d's nightly-e2e-precise-prefix-cache-routing-<lane>
+# workflow; it runs in standalone mode, gateway_class epponly):
+#   amd-ci-acc-rocm-vllm-x            amd/vllm (the lane sets no provider, so it applies that
+#                                     folder's own kustomization, which includes `base`)
+# Identity flags per lane:
+#   amd-ci-acc-rocm-vllm-x            --identity accelerator=amd --identity provider=base
+#
+# vllm-openai-rocm v0.31.0 with --enable-scale-out, --block-size=64 and --kv-events-config
+# (FROM values: modelserver/amd/vllm/base/patch-vllm.yaml).
+#
+# How a lane runs it, after deploying the guide in standalone mode (guide.yaml deploy.standalone)
+# with one of the overlays above (GUIDE_NAME=precise-prefix-cache-routing):
+#   export LLMDV_EPP_URL=http://<GUIDE_NAME>-epp.<namespace>.svc.cluster.local
+#   # or from outside the cluster:
+#   #   kubectl port-forward -n <namespace> svc/<GUIDE_NAME>-epp 18080:80 &
+#   #   export LLMDV_EPP_URL=http://localhost:18080
+#   llmdv profile validate profiles/llm-d/precise-prefix-cache-routing/vllm-qwen3-32b-inline-standalone.yaml
+#   llmdv verify --profile profiles/llm-d/precise-prefix-cache-routing/vllm-qwen3-32b-inline-standalone.yaml \
+#     <the lane's identity flags above>
+
+extends:
+  - ../parts/base.yaml
+  - ../parts/topology/standalone.yaml
+  - ../parts/engines/vllm.yaml
+  - ../parts/models/qwen3-32b-inline.yaml
+  - ../parts/sentinels/unmeasured.yaml
+  - parts/common.yaml
+
+name: precise-prefix-cache-routing-vllm-qwen3-32b-inline-standalone

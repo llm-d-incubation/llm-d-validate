@@ -1,0 +1,48 @@
+# The tiered-prefix-cache guide in standalone mode (the client reaches the EPP's own
+# listener):
+# SGLang serving Qwen/Qwen3-32B with the qwen3 reasoning parser and the qwen tool parser,
+# offloading KV cache to CPU RAM through HiCache.
+#
+# STATUS: WRITTEN, NOT RUN. llm-d 9ca8ff0.
+#
+# CI lane that deploys this configuration (llm-d's nightly-e2e-tiered-prefix-cache-<lane>
+# workflow; it runs in standalone mode, gateway_class epponly):
+#   gke-cpu-gpu-sglang-native         gpu/sglang/native/cpu/gke
+# (overlay as ACCELERATOR_TYPE/MODEL_SERVER/CONNECTOR/VARIANT/INFRA_PROVIDER)
+# Identity flags per lane:
+#   gke-cpu-gpu-sglang-native         --identity accelerator=gpu --identity provider=gke
+#
+# sglang v0.5.22 with --enable-hierarchical-cache and --page-size=64; unlike
+# optimized-baseline's NVIDIA SGLang overlay it does not set SGLANG_RUST_SERVER (FROM values:
+# modelserver/gpu/sglang/native/cpu/base/patch-sglang.yaml).
+#
+# How a lane runs it, after deploying the guide in standalone mode (guide.yaml deploy.standalone)
+# with one of the overlays above (GUIDE_NAME=tiered-prefix-cache):
+#   export LLMDV_EPP_URL=http://<GUIDE_NAME>-epp.<namespace>.svc.cluster.local
+#   # or from outside the cluster:
+#   #   kubectl port-forward -n <namespace> svc/<GUIDE_NAME>-epp 18080:80 &
+#   #   export LLMDV_EPP_URL=http://localhost:18080
+#   llmdv profile validate profiles/llm-d/tiered-prefix-cache/sglang-qwen3-32b-parsers-standalone.yaml
+#   llmdv verify --profile profiles/llm-d/tiered-prefix-cache/sglang-qwen3-32b-parsers-standalone.yaml \
+#     <the lane's identity flags above>
+
+extends:
+  - ../parts/base.yaml
+  - ../parts/topology/standalone.yaml
+  - ../parts/engines/sglang.yaml
+  - ../parts/models/qwen3-32b-parsers.yaml
+  - ../parts/sentinels/unmeasured-with-tools.yaml
+  - parts/common.yaml
+
+name: tiered-prefix-cache-sglang-qwen3-32b-parsers-standalone
+
+model:
+  # FROM values: the overlays' own flag values. The model part declares the shape a
+  # client sees; the names belong to the engine, so they are stated here.
+  reasoning:
+    parser: qwen3
+    # Inferred: SGLang's OpenAI server names the field reasoning_content. Not yet observed on
+    # this guide's SGLang build; the first run settles it.
+    field: reasoning_content
+  tools:
+    parser: qwen

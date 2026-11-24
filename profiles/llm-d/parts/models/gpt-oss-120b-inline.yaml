@@ -1,0 +1,70 @@
+# Part: openai/gpt-oss-120b at the model's own 131072-token window, served WITHOUT reasoning or
+# tool-call parsers. Not a profile on its own; a combination file lists it after the engine part.
+# Never extends anything.
+#
+# Used by (overlays as ACCELERATOR_TYPE/MODEL_SERVER/INFRA_PROVIDER, at llm-d 9ca8ff0):
+#   pd-disaggregation gpu/sglang/gke   sglang v0.5.22, no --reasoning-parser, no
+#                                      --tool-call-parser, on the prefill and the decode role alike
+# FROM values: guides/pd-disaggregation/modelserver/gpu/sglang/, rendered with
+# `kubectl kustomize`.
+#
+# What "inline" means for this model, and why no inline tag is declared. gpt-oss writes the harmony
+# format: reasoning in an `analysis` channel, the answer in a `final` channel, separated by special
+# tokens (<|channel|>, <|message|>, <|end|>), not by a <think> tag. With no reasoning parser,
+# nothing separates the two, so a correct server returns both in `content`, and no reasoning field.
+# What exactly reaches `content` is NOT established here:
+#   - if the server drops special tokens when detokenizing (the usual default), the channel names
+#     run into the text (`analysis...assistantfinal...`);
+#   - if it keeps them, the harmony delimiters appear literally;
+#   - if this SGLang build handles harmony natively for gpt-oss without a parser, the reasoning may
+#     arrive separated after all.
+# None of these is a <think> or <thinking> block, the only inline carriers llmdv recognises, so
+# declaring `inline_tag` would assert a shape no correct stack produces. The part declares no
+# reasoning mode: the reasoning-shape and effort-order cases skip as undeclared, and the cases that
+# require the answer alone in `content` see the analysis text there and fail. That failure is the
+# finding (raw harmony reaches the client), left for the team (Rule 4). If the first run shows a
+# separated field, this part is wrong, not the stack: say so then.
+#
+# Excluded, and why:
+#   model.tools         no tool parser
+#   reasoning_tokens    without a reasoning parser the engine cannot count reasoning apart from
+#                       the answer
+#   answer_max_tokens   opt-in, and no source states the budget this model needs for a one-word
+#                       answer; set it from the first run's recorded usage
+#   effort_rendering    as in gpt-oss-120b-parsers.yaml: no source at llm-d 9ca8ff0 states the
+#                       template's effort marker
+
+model:
+  # FROM values: --model-path=openai/gpt-oss-120b on both roles.
+  public_id: openai/gpt-oss-120b
+  aliases: []
+  # FROM values: no --context-length in the overlay, so the engine uses the model's own.
+  # DERIVED: 131072 is max_position_embeddings in the model's config.json, not a guide value. The
+  # first run's GET /v1/models confirms it.
+  max_model_len: 131072
+  reasoning:
+    # FROM values: no --reasoning-parser.
+    parser: null
+    field: null
+    # INTENT: no tag; see the header. The harmony analysis text arrives untagged in `content`.
+    inline_tag: null
+    # INTENT: gpt-oss always reasons in its analysis channel. Declared so the smoke budgets leave
+    # room for that text ahead of the answer.
+    default_on: true
+  tools:
+    # FROM values: no --tool-call-parser, so the tool cases skip as undeclared: the parser they
+    # need does not exist here.
+    parser: null
+    auto_choice: false
+
+capabilities:
+  # INTENT: every effort each API defines. The API defines what an effort asks for, whatever shape
+  # the reasoning arrives in. `none` is the quiet one.
+  chat_reasoning_efforts: [minimal, low, medium, high, xhigh, max]
+  chat_quiet_efforts: [none]
+  responses_reasoning_efforts: [none, minimal, low, medium, high, xhigh, max]
+  messages_thinking: [enabled, adaptive, disabled]
+  messages_efforts: [low, medium, high, xhigh, max]
+  # INTENT: declared accepted on a text-only model; expected to fail until the team marks it
+  # (Rule 1, red flags).
+  vision: [chat_completions, messages, responses]

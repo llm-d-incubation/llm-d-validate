@@ -1,0 +1,43 @@
+# The wide-ep guide in standalone mode (the client reaches the EPP's own listener): vLLM serving
+# deepseek-ai/DeepSeek-R1-0528, P/D disaggregated across wide DP/EP groups, with the deepseek_v3
+# tool parser and no reasoning parser: inline <think> reasoning, parsed tool calls.
+#
+# STATUS: WRITTEN, NOT RUN. llm-d 9ca8ff0. Composed from the guide's shipped config and the API
+# references. Only the router layer has been measured (on kind, with a simulator engine; see
+# ../parts/topology/standalone.yaml).
+#
+# CI lanes that deploy this configuration (llm-d's nightly-e2e-wide-ep-<lane> workflows; each
+# runs in standalone mode, gateway_class epponly):
+#   gke-acc-gpu-vllm-x                gpu/vllm/gke
+#   cks-acc-gpu-vllm-x                gpu/vllm/coreweave
+#   ibm-acc-gpu-vllm-x                gpu/vllm/ocp (serves from a local path under the same model
+#                                     id; `ocp` is not among guide.yaml's gpu providers)
+# The provider overlays change only node, RDMA and cache settings; the vLLM arguments of both
+# roles render identically, so they look the same to a client. Same to a client, but run by no
+# lane: gpu/vllm/base.
+#
+# How a lane runs it, after deploying the guide in standalone mode (guide.yaml deploy.standalone)
+# with one of the overlays above:
+#   export LLMDV_EPP_URL=http://<GUIDE_NAME>-epp.<namespace>.svc.cluster.local
+#   # or from outside the cluster:
+#   #   kubectl port-forward -n <namespace> svc/<GUIDE_NAME>-epp 18080:80 &
+#   #   export LLMDV_EPP_URL=http://localhost:18080
+#   llmdv profile validate profiles/llm-d/wide-ep/vllm-deepseek-r1-0528-tools-standalone.yaml
+#   llmdv verify --profile profiles/llm-d/wide-ep/vllm-deepseek-r1-0528-tools-standalone.yaml \
+#     --identity accelerator=gpu --identity provider=<gke|coreweave|ocp>
+
+extends:
+  - ../parts/base.yaml
+  - ../parts/topology/standalone.yaml
+  - ../parts/engines/vllm.yaml
+  - ../parts/models/deepseek-r1-0528-tools.yaml
+  - ../parts/sentinels/unmeasured-with-tools.yaml
+  - parts/common.yaml
+
+name: wide-ep-vllm-deepseek-r1-0528-tools-standalone
+
+model:
+  # FROM values: the overlays' own flag value, the same on prefill and decode. There is no
+  # reasoning parser, so the model part's null reasoning parser and field stand.
+  tools:
+    parser: deepseek_v3

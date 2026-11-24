@@ -2,12 +2,25 @@
 # parsers: reasoning arrives inline as a <think> block, and no tool call is parsed. Not a profile
 # on its own; a combination file lists it after the engine part. Never extends anything.
 #
-# Used by (overlays as ACCELERATOR_TYPE/MODEL_SERVER/INFRA_PROVIDER, at llm-d 565373b):
+# Used by (overlays as ACCELERATOR_TYPE/MODEL_SERVER/INFRA_PROVIDER, at llm-d 9ca8ff0):
 #   amd/vllm/{base,amd-ci}      vllm-openai-rocm v0.31.0
 #   tpu/v5p/vllm/{base,gke}     vllm-tpu v0.31.0
 #   amd/sglang/{base,amd-ci}    sglang v0.5.22 (ROCm build)
 # FROM values: guides/optimized-baseline/modelserver/{amd,tpu/v5p}/*/base/patch-*.yaml pass no
 # parser flag and no window.
+#   pd-disaggregation amd/vllm/moriio/amd-ci-1p1d-tp8
+#                               vllm-openai-rocm v0.32.0-rc.2 (an llm-d build), on the prefill
+#                               and the decode role alike
+# FROM values: guides/pd-disaggregation/modelserver/amd/vllm/moriio/, rendered with
+# `kubectl kustomize`: no parser flag and no window.
+# The same overlay, deployed by other guides' lanes:
+#   flow-control       optimized-baseline amd/vllm/base, relabelled
+#   keda-epp           optimized-baseline amd/vllm/base
+# Also used by precise-prefix-cache-routing amd/vllm/base (vllm-openai-rocm v0.31.0), and
+# tiered-prefix-cache amd/vllm/{lmcache-connector,native}/{cpu,fs}/amd-ci (vllm-openai-rocm
+# v0.31.0), tpu/v5p/vllm/native/cpu/base (vllm-tpu v0.31.0) and xpu/vllm/native/cpu/base
+# (llm-d-xpu v1.0.0). FROM values: guides/{precise-prefix-cache-routing,tiered-prefix-cache}/
+# modelserver/ pass no parser flag and no window.
 #
 # Excluded, and why:
 #   model.tools         no tool parser

@@ -1,0 +1,102 @@
+# Part: what every predicted-latency-routing profile shares. Not a profile on its own; a
+# combination file beside this folder lists it last in `extends`. Never extends anything.
+#
+# G = guides/predicted-latency-routing, R = guides/recipes, at llm-d 9ca8ff0.
+#
+# No `name` here: each combination names itself.
+#
+# The router, as every CI lane configures it (FROM values: G/router/predicted-latency.values.yaml;
+# guide.yaml deploy.router_values `routing`, SLO_AWARE=false):
+#   router.latencyPredictor.enabled   the training and prediction servers run as sidecars in the
+#                                  EPP pod (ports 8000 and 8001, guide.yaml verify.tests.predictor);
+#                                  they are not on the client's path and no Service exposes them
+#   approx-prefix-cache-producer   maxPrefixTokensToMatch 262144
+#   predicted-latency-producer     default streamingMode false: trains on end-to-end latency, for
+#                                  streaming and non-streaming clients alike
+#   prefix-cache-affinity-filter `loose-affinity-filter` (affinityThreshold 0.8, ttftSource
+#                                  latencyPredictor, maxTTFTPenaltyMs 5000), latency-scorer,
+#                                  weighted-random-picker in the `default` profile
+#   modelServers.matchLabels       llm-d.ai/guide=optimized-baseline: the overlays reuse
+#                                  optimized-baseline's model servers (README.md, "Upstream notes")
+#   R/router/base.values.yaml for the rest, as in optimized-baseline
+# No admission plugin is configured, so the SLO headers have no effect and the topology part's
+# `ignored` declarations stand. The SLO-aware values (G/router/predicted-latency-slo.values.yaml)
+# are skip_in: [ci] in guide.yaml, so no lane deploys them and no profile here covers them.
+#
+# Block sizes: no overlay sets one; the engines use their default and the router's prefix
+# producer auto-tunes from what they publish. Not declared, because cache_reuse is not.
+#
+# Router claims this guide shares with optimized-baseline (error envelopes, header handling,
+# streaming pass-through, the EPP's HTTP APIs, FailOpen, gateway mode): see
+# ../../optimized-baseline/parts/common.yaml, claims 8 to 28; they land on the same cases here.
+#
+# The guide's own claims (G/README.md and G/guide.yaml verify.tests) and where each one lands:
+#   request        /v1/completions through the EPP answers -> openai_completions.*
+#   traffic        200 completions, ten at a time, max_tokens 16 to 128, all answered (they are
+#                  the predictor's training samples) -> openai_completions.* for single answers;
+#                  the burst itself -> NOT COVERED: needs load mode (#23)
+#   predictor      training_samples_count{model="ttft"|"tpot"} on the EPP pod's port 8000 and
+#                  /status on 8001 -> NOT COVERED: sidecar ports reached through the API-server
+#                  pod proxy, which needs cluster access a committed profile does not carry
+#   router_metrics llm_d_epp_request_(predicted_)?(ttft|tpot)_seconds_count on the EPP's /metrics,
+#                  only with MONITORING=true, which no lane sets -> NOT COVERED (fleet.metrics)
+#   routing        lower latency than load-only scoring, the affinity filter's TTFT penalty
+#                  -> a benchmark, not llmdv
+#   SLO headers    without the SLO values they change nothing -> declared `ignored` in the
+#                  topology part; with them (slo_request, SLO-aware scheduling) -> NOT COVERED,
+#                  no lane deploys them
+#   context        the NVIDIA and AMD overlays serve a RoPE-scaled 131072-token window
+#                  -> long_context.*, unhappy.context_overflow via model.max_model_len
+#   model          each accelerator serves the one model of the support table
+#                  -> discovery.models_lists_declared_model, discovery.unknown_model_no_fallback
+
+guide: predicted-latency-routing
+
+capabilities:
+  # Not declared, on purpose. The cache suite reads cached_tokens from each response, and no
+  # overlay of this guide asks an engine to report it: none passes vLLM's
+  # --enable-prompt-tokens-details (FROM values: G/modelserver/ and the optimized-baseline
+  # overlays they reuse). With no cached_tokens, `affinity: routed` would fail on a correct stack
+  # for want of the field, not for want of affinity.
+  cache_reuse: null
+
+# The cases this guide's lanes run by default (`llmdv verify --all` runs everything). They test
+# what a lane's own deployment can get wrong: the router path, the overlay's parsers and window,
+# and what this guide changes. Engine and model conformance, the rest of the suite, depends only
+# on the engine build, model and flags, which many lanes share; it runs with `--all` once per
+# configuration (profiles/llm-d/README.md, "Which lane runs everything").
+selection:
+  # Every lane: the router serves each API a client uses, and refuses what it should.
+  - contract.*
+  - discovery.models_lists_declared_model
+  - discovery.unknown_model_no_fallback
+  - discovery.models_parses_with_openai_sdk
+  - openai_chat.basic_non_streaming
+  - openai_chat.streaming_sse
+  - openai_chat.stop_reason
+  - openai_completions.basic_non_streaming
+  - openai_completions.streaming_matches_json
+  - openai_completions.stop_reason
+  - anthropic_messages.basic_non_streaming
+  - anthropic_messages.streaming_sse
+  - openai_responses.basic_non_streaming
+  - openai_responses.streaming_sse
+  - streaming.sse_framing
+  - unhappy.unknown_path
+  - unhappy.malformed_json
+  - unhappy.missing_model
+  - unhappy.wrong_method
+  - unhappy.error_envelope_fields
+  - transport.connection
+  - transport.health_status
+  # Every lane: the overlay's parser flags take effect (skips where the model part has none).
+  - openai_chat.configured_reasoning
+  - tools.auto_call
+  - tools.auto_stream
+  # Every lane: the overlay's context window is the one declared.
+  - long_context.*
+  - unhappy.context_overflow
+  - unhappy.token_limit_over_context
+  # This guide: the guide serves streaming and non-streaming clients alike, at a 128k window on GPU
+  # and AMD.
+  - streaming.*
