@@ -1,8 +1,11 @@
 <h1 align="center">llm-d-validate</h1>
 
 <p align="center">
-  <b>Roll out <a href="https://github.com/llm-d/llm-d">llm-d</a> with confidence.</b><br>Contract and regression testing for deployed llm-d model serving stacks: know that the gateway, the router, and the engine still behave as their APIs define.
+  <b>Roll out <a href="https://github.com/llm-d/llm-d">llm-d</a> with confidence.</b>
 </p>
+
+Contract and regression testing for deployed llm-d model serving stacks: know that the gateway,
+the router, and the engine still behave as their APIs define.
 
 <p align="center">
   <a href="https://github.com/llm-d-incubation/llm-d-validate/actions/workflows/offline-tests.yaml?query=branch%3Amain"><img alt="offline tests" src="https://github.com/llm-d-incubation/llm-d-validate/actions/workflows/offline-tests.yaml/badge.svg?branch=main"></a>
