@@ -20,7 +20,7 @@ from typing import Any
 
 import yaml
 
-from ..ingress import version_signals
+from ..ingress import signals, version_signals
 
 MAX_VALUES = 5
 MAX_LEN = 80
@@ -76,8 +76,14 @@ def version_headers_in(profile_text: str | None) -> dict[str, tuple[str, ...]]:
         if isinstance(ingress, dict) and ingress.get("id") and ingress.get("version_headers"):
             names = ingress["version_headers"]
             if isinstance(names, list):
-                # Normalised as the loader does, so this reader and the run agree.
-                cleaned = tuple(str(name).strip().lower() for name in names if str(name).strip())
+                # Normalised and filtered as the loader does, so this reader and the run agree,
+                # and an archived profile that declared a per-request header (before the loader
+                # refused one) does not read as a rollout on every run.
+                cleaned = tuple(
+                    str(name).strip().lower()
+                    for name in names
+                    if str(name).strip() and signals.undeclarable(str(name)) is None
+                )
                 if cleaned:
                     out[str(ingress["id"])] = cleaned
     return out

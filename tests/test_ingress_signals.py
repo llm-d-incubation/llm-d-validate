@@ -255,6 +255,37 @@ def test_no_header_a_backend_row_matches_can_be_declared(tmp_path, header):
         loader.load(_declaring(tmp_path, header))
 
 
+@pytest.mark.parametrize(
+    "header, problem",
+    [
+        ("x-request-id", "changes from one request to the next"),
+        ("X-Request-Id", "changes from one request to the next"),
+        ("x-llm-d-request-id", "changes from one request to the next"),
+        ("retry-after", "changes from one request to the next"),
+        ("x-ratelimit-remaining-requests", "changes from one request to the next"),
+        ("anthropic-ratelimit-requests-remaining", "changes from one request to the next"),
+        ("date", "changes from one request to the next"),
+        ("traceparent", "changes from one request to the next"),
+        ("x-llmdv-run-id", "changes from one request to the next"),
+        ("set-cookie", "carries a credential or a session"),
+        ("authorization", "carries a credential or a session"),
+        ("x-forwarded-for", "may name a host"),
+        ("forwarded", "may name a host"),
+        ("via", "may name a host"),
+    ],
+)
+def test_a_header_that_is_never_a_build_cannot_be_declared(tmp_path, header, problem):
+    """A declared header is published and compared as a build: a per-request value would read
+    as a rollout on every run, and a cookie or a forwarded address would be published."""
+    with pytest.raises(ProfileError, match=problem):
+        loader.load(_declaring(tmp_path, header))
+
+
+@pytest.mark.parametrize("header", ["server", "x-kong-version", "x-gateway-build"])
+def test_a_build_header_can_still_be_declared(tmp_path, header):
+    assert loader.load(_declaring(tmp_path, header)).ingress("edge").version_headers == (header,)
+
+
 def test_a_destination_variant_is_never_published_undeclared():
     """The GIE protocol's served variant names the endpoint as its parent does."""
     headers = {"x-gateway-destination-endpoint-served": "10.0.0.5:8000"}

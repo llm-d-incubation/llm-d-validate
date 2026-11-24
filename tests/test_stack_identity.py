@@ -315,3 +315,12 @@ def test_a_declared_server_header_is_compared_at_its_own_ingress_only():
     assert stack_changes(before, after, {"gw": ("server",)}) == [
         "gw: server kong/3.4.0 → kong/3.5.0"
     ]
+
+
+def test_an_archived_profile_declaring_a_per_request_header_reads_no_rollout():
+    """A profile.used.yaml written before the loader refused one: the reader drops it too."""
+    archived = "ingresses:\n  - id: gw\n    version_headers: [x-request-id, X-Kong-Version]\n"
+    declared = version_headers_in(archived)
+    assert declared == {"gw": ("x-kong-version",)}
+    stack = {"gw": {"x-request-id": {"a": 1, "b": 1}, "x-kong-version": {"3.9.1": 2}}}
+    assert mixed_builds(stack, declared) == []
