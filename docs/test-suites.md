@@ -26,12 +26,11 @@ multiplied them.
 | Status | Meaning |
 | --- | --- |
 | built | implemented, with offline regressions that prove it can fail |
-| built, blocked by the fleet | implemented, but needs a capability no committed profile declares |
 | not built | no case exists yet; the gap has an issue |
 
-Status describes llmdv and the profiles in this repository, not one night's run. A fleet that
-serves a blocked capability runs those cases once its profile declares it;
-`llmdv profile show <profile.yaml> --matrix` shows what runs and what skips for that profile.
+Status describes llmdv and the profiles in this repository, not one night's run. A suite's cases
+run once a profile declares what they need; `llmdv profile show <profile.yaml> --matrix` shows
+what runs and what skips for that profile.
 An offline regression pass says nothing about a live fleet: run the cases against it (see
 [getting-started.md](getting-started.md)).
 
