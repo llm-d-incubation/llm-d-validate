@@ -6,7 +6,7 @@ vLLM's Chat server takes options the OpenAI API does not define: assistant prefi
 logprobs, a restricted output vocabulary and banned words. `logit_bias` is an OpenAI field
 whose effect needs the same kind of check. A layer that accepts one of these and drops its
 effect answers 200, so each case asserts the effect. Each runs only where
-`capabilities.vllm_options` names the option.
+`capabilities.extension_options` names the option.
 """
 
 from __future__ import annotations

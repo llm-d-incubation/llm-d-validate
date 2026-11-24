@@ -164,6 +164,7 @@ TOOL_ERROR_CLASSES = ("invalid_tool_schema", "invalid_tool_choice")
 SURFACE_FEATURES = frozenset(
     {
         "cache_usage",
+        "extension_options",
         "image_input",
         "json_object",
         "reasoning_usage",
@@ -171,7 +172,6 @@ SURFACE_FEATURES = frozenset(
         "structured_output",
         "tool_loop",
         "tools",
-        "vllm_options",
     }
 )
 

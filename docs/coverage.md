@@ -29,14 +29,14 @@ the cases against it (see [docs/end-to-end.md](end-to-end.md)).
 | Anthropic Messages (`anthropic_messages`) | 37 | Messages, event order, thinking, streamed thinking and effort, count_tokens, content drops | `messages`; `messages_checks`, `messages_thinking`, `messages_efforts`, `count_tokens` | built |
 | Tool calling (`tools`) | 64 | Tool calls, streamed arguments, parallel calls, results, loops; no declared call markup in any answer on a tool surface | `model.tools.parser`, `model.tools.auto_choice`, `model.tools.markup` | built |
 | Streaming (`streaming`) | 13 | SSE framing, terminal events, `[DONE]` in the model's text, timing, disconnect then recover | streaming surfaces; `transport.stream_budget` | built |
-| Field options (`field_options`) | 8 | Structured output, JSON mode (with reasoning beside the answer where it is on by default), reasoning usage, observable vLLM options, the effort marker the template renders for each requested effort | `structured_output`, `json_object`, `model.reasoning`, `reasoning_tokens`, `vllm_options`, `effort_rendering` | built |
+| Field options (`field_options`) | 8 | Structured output, JSON mode (with reasoning beside the answer where it is on by default), reasoning usage, observable engine extension options, the effort marker the template renders for each requested effort | `structured_output`, `json_object`, `model.reasoning`, `reasoning_tokens`, `extension_options`, `effort_rendering` | built |
 | Image input (`images`) | 8 | An image is read, not only accepted: streamed, 2.4 MB, two in order, counted by `count_tokens`; an internal image URL is refused | `vision`; `count_tokens`, `error_status.internal_image_url` | built |
 | Long context (`long_context`) | 3 | Requests near and past the context window | `model.max_model_len` | built |
 | Unhappy paths (`unhappy`) | 28 | Bad input, credentials and error envelopes get a clean 4xx | every surface; `error_status`, `unstructured_errors` | built |
 | Transport (`transport`) | 28 | HTTP handling, encodings, TLS, exposure, retry signals | `ingresses[].transport` | built |
 | Repository contract (`contract`) | 4 | Declared surfaces exist, undeclared absent; header dispositions | `surfaces`, `headers`, `header_probe` | built |
 | Render (`render`) | 3 | Rendered token ids are stable and prefix-preserving | `*_render` surfaces; `prefix_stability` | built, blocked by the fleet |
-| Prefix cache (`cache`) | 33 | Realised prefix reuse across turns, salts, tools, clients | `cache_reuse`; `vllm_options: [cache_salt]` | built |
+| Prefix cache (`cache`) | 33 | Realised prefix reuse across turns, salts, tools, clients | `cache_reuse`; `extension_options: [cache_salt]` | built |
 | Change sentinels (`evolution`) | 22 | Forward compat, byte fidelity, prompt and render pins, contract drift | `forward_compat`, `byte_fidelity`, `prompt_pins`, `render_pins`, `contract_baseline` | built (render pins blocked by the fleet) |
 | Client scenarios (`scenarios`) | 6 | Client-shaped multi-request patterns: blank turns, cancel bursts, aliases | `scenario_checks`, `client_model_names`, `chat_quiet_efforts` | built |
 | Real clients (`real_clients`) | 9 | Pinned Claude Code sessions through the declared chain | `clients[].binaries`, `client_sessions`, `client_reuse` | built |

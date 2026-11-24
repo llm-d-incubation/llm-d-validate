@@ -555,6 +555,88 @@ def test_invalid_structured_output_declarations_fail_during_load(tmp_path, decla
         )
 
 
+def test_extension_options_load(tmp_path):
+    text = MINIMAL + "capabilities:\n  extension_options: [ignore_eos, min_tokens]\n"
+    profile = loader.load(write(tmp_path, text))
+    assert profile.capabilities.extension_options == ("ignore_eos", "min_tokens")
+    assert profile.capabilities.supports_option("ignore_eos")
+
+
+@pytest.mark.parametrize(
+    "text,where",
+    [
+        (MINIMAL + "capabilities:\n  vllm_options: [ignore_eos]\n", "capabilities"),
+        (
+            MINIMAL + "    capabilities:\n      vllm_options: [ignore_eos]\n",
+            r"ingresses\[0\]\(direct\)\.capabilities",
+        ),
+    ],
+    ids=["profile", "ingress"],
+)
+def test_old_vllm_options_key_names_its_replacement(tmp_path, text, where):
+    with pytest.raises(loader.ProfileError, match=rf"{where}\.extension_options") as caught:
+        loader.load(write(tmp_path, text))
+    assert "vllm_options: renamed" in str(caught.value)
+
+
+KNOWN = "known_failures:\n  - {{check: c, issue: '#1', cases: ['{}']}}\n"
+
+
+@pytest.mark.parametrize(
+    "case",
+    [
+        "field_options.vllm_observable",
+        "field_options.vllm_*",
+        "field_options.vllm_observable[chat]",
+    ],
+)
+def test_a_known_failure_naming_the_renamed_case_names_its_replacement(tmp_path, case):
+    """It would otherwise silently stop matching the case it was written for."""
+    with pytest.raises(loader.ProfileError, match="use 'field_options.extension_observable'"):
+        loader.load(write(tmp_path, MINIMAL + KNOWN.format(case)))
+
+
+@pytest.mark.parametrize("case", ["field_options.extension_observable", "field_options.*"])
+def test_a_known_failure_naming_the_new_case_or_both_loads(tmp_path, case):
+    profile = loader.load(write(tmp_path, MINIMAL + KNOWN.format(case)))
+    assert profile.known_failures[0].cases == (case,)
+
+
+@pytest.mark.parametrize(
+    "text,where",
+    [
+        (
+            MINIMAL + "capabilities:\n  vllm_options: [ignore_eos]\n  count_tokens: 'yes'\n",
+            "capabilities",
+        ),
+        (
+            MINIMAL + "    capabilities:\n      vllm_options: [ignore_eos]\n"
+            "      count_tokens: 'yes'\n",
+            "ingresses[0](direct).capabilities",
+        ),
+        (
+            MINIMAL + "    capabilities:\n      vllm_options: [ignore_eos]\n"
+            "      count_tokenz: true\n",
+            "ingresses[0](direct).capabilities",
+        ),
+    ],
+    ids=["profile", "ingress", "ingress-unknown-key"],
+)
+def test_old_vllm_options_key_is_reported_with_the_blocks_other_problems(tmp_path, text, where):
+    with pytest.raises(loader.ProfileError) as caught:
+        loader.load(write(tmp_path, text))
+    paths = [line.split(": ")[1] for line in str(caught.value).splitlines()]
+    other = "count_tokenz" if "count_tokenz" in text else "count_tokens"
+    assert paths == [f"{where}.vllm_options", f"{where}.{other}"], str(caught.value)
+
+
+def test_old_vllm_options_key_exits_2(tmp_path):
+    path = write(tmp_path, MINIMAL + "capabilities:\n  vllm_options: [ignore_eos]\n")
+    result = run_llmdv("profile", "validate", str(path))
+    assert result.returncode == 2, result.stderr
+    assert "capabilities.extension_options" in result.stderr
+
+
 # ---------------------------------------------------------------- vantage
 
 

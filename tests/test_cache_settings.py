@@ -161,7 +161,7 @@ KWARGS = "test_kwargs_effort_reuse"
 def run_kwargs(tmp_path, declaration, defect=None, options=("chat_template_kwargs",), **caps):
     from tests.test_cache_reuse import run_cache_case
 
-    capabilities = {"vllm_options": list(options), "chat_quiet_efforts": ["low"], **caps}
+    capabilities = {"extension_options": list(options), "chat_quiet_efforts": ["low"], **caps}
     return run_cache_case(tmp_path, "chat_completions", declaration, KWARGS, defect, **capabilities)
 
 

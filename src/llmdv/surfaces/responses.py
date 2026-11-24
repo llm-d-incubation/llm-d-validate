@@ -114,16 +114,16 @@ class Responses(OpenAIErrors, Surface):
     features = frozenset(
         {
             "cache_usage",
+            "extension_options",
             "image_input",
             "json_object",
             "reasoning_usage",
             "structured_output",
             "tool_loop",
             "tools",
-            "vllm_options",
         }
     )
-    observable_vllm_options = frozenset(("ignore_eos",))
+    observable_extension_options = frozenset(("ignore_eos",))
 
     stream_stop = TERMINAL_EVENTS | {"error"}
 

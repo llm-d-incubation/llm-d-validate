@@ -216,7 +216,7 @@ LIMITS = "test_chat_token_limit or test_chat_single_token or test_chat_stop_sequ
 COMPLETIONS_LIMITS = "test_completions_token_limit or test_completions_stop_sequence"
 # The fake model reasons by default, so the Chat stop cases need an effort that turns it off.
 QUIET = {"chat_quiet_efforts": ["none"]}
-STOPS = {"openai_contract": True, "vllm_options": ["include_stop_str_in_output"], **QUIET}
+STOPS = {"openai_contract": True, "extension_options": ["include_stop_str_in_output"], **QUIET}
 
 
 def test_limits_and_stops_pass_on_a_healthy_fleet(tmp_path):
@@ -238,7 +238,7 @@ def test_included_stop_skips_where_undeclared(tmp_path):
 
 
 CHAT_STOPS = "test_chat_stop_sequence or (test_chat_stop_reason)"
-REASONING_STOPS = {**STOPS, "vllm_options": ["include_stop_str_in_output", "stop_reason"]}
+REASONING_STOPS = {**STOPS, "extension_options": ["include_stop_str_in_output", "stop_reason"]}
 
 
 def test_chat_stops_turn_reasoning_off_on_a_reasoning_model(tmp_path):
@@ -503,14 +503,16 @@ ENGINE_OPTIONS = [
 
 
 def test_engine_options_pass_on_a_healthy_fleet(tmp_path):
-    caps = {"vllm_options": ENGINE_OPTIONS, "chat_options": ["logprobs"]}
+    caps = {"extension_options": ENGINE_OPTIONS, "chat_options": ["logprobs"]}
     code, results = run_contract(tmp_path, ENGINE, caps)
     assert len(results) == 10 and set(results.values()) == {"pass"}, results
     assert code == 0
 
 
 def test_engine_options_skip_where_undeclared(tmp_path):
-    code, results = run_contract(tmp_path, ENGINE, {"vllm_options": ["continue_final_message"]})
+    code, results = run_contract(
+        tmp_path, ENGINE, {"extension_options": ["continue_final_message"]}
+    )
     assert outcome(results, "continue_final_message[fake-plain]") == "pass"
     assert outcome(results, "continue_final_message[fake-echo]") == "skip"
     assert outcome(results, "test_chat_prompt_logprobs") == "skip"
@@ -539,7 +541,7 @@ def test_engine_options_skip_where_undeclared(tmp_path):
     ],
 )
 def test_engine_option_defects_fail(tmp_path, defect, failing):
-    caps = {"vllm_options": ENGINE_OPTIONS, "chat_options": ["logprobs"]}
+    caps = {"extension_options": ENGINE_OPTIONS, "chat_options": ["logprobs"]}
     code, results = run_contract(tmp_path, ENGINE, caps, openai_contract_defect=defect)
     for fragment in failing:
         assert outcome(results, fragment) == "fail", (fragment, results)
@@ -843,7 +845,7 @@ def test_number_fidelity_renders_the_schema(tmp_path, auto_choice, defect, passe
 
 
 THINKING = "test_chat_thinking_off or test_chat_reasoning_history"
-THINKING_CAPS = {"openai_contract": True, "vllm_options": ["enable_thinking"]}
+THINKING_CAPS = {"openai_contract": True, "extension_options": ["enable_thinking"]}
 
 
 def test_thinking_controls_pass_on_a_healthy_fleet(tmp_path):
@@ -1040,7 +1042,7 @@ def test_a_profile_sets_effort_order_samples_and_slack(tmp_path):
 PROMPT_OPTIONS = "test_completions_token_ids or test_completions_truncated_prompt"
 PROMPT_OPTION_CAPS = {
     "openai_contract": True,
-    "vllm_options": ["return_token_ids", "truncate_prompt_tokens"],
+    "extension_options": ["return_token_ids", "truncate_prompt_tokens"],
 }
 
 
@@ -1078,7 +1080,7 @@ def test_prompt_option_defects_fail(tmp_path, defect, failing):
 
 
 HIDDEN = "test_chat_reasoning_hidden"
-HIDDEN_CAPS = {"openai_contract": True, "vllm_options": ["include_reasoning"]}
+HIDDEN_CAPS = {"openai_contract": True, "extension_options": ["include_reasoning"]}
 
 
 def test_hidden_reasoning_passes_on_a_healthy_fleet(tmp_path):
@@ -1101,7 +1103,7 @@ def test_hidden_reasoning_defects_fail(tmp_path, defect):
 
 
 STOP_REASON = "stop_reason"
-STOP_REASON_CAPS = {"openai_contract": True, "vllm_options": ["stop_reason"], **QUIET}
+STOP_REASON_CAPS = {"openai_contract": True, "extension_options": ["stop_reason"], **QUIET}
 BOTH_SURFACES = ("chat_completions", "completions")
 
 

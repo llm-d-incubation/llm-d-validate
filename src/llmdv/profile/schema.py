@@ -904,7 +904,8 @@ class Capabilities:
     stateless_responses: bool = False
     structured_output: bool | tuple[str, ...] = False
     structured_output_streaming: bool | tuple[str, ...] = False
-    vllm_options: tuple[str, ...] = ()
+    # Request-body extension fields the fleet accepts, such as vLLM's `ignore_eos`.
+    extension_options: tuple[str, ...] = ()
     scenario_checks: tuple[str, ...] = ()
     # Model names clients send by default, such as a coding agent's sub-agent model. Each must be
     # served where it is one of the model's aliases and refused cleanly everywhere else.
@@ -924,7 +925,7 @@ class Capabilities:
     samples: dict[str, SampleRule] = field(default_factory=dict)
 
     def supports_option(self, name: str) -> bool:
-        return name in self.vllm_options
+        return name in self.extension_options
 
 
 CLAUDE_CODE_MIN_VERSION = (2, 1, 0)

@@ -1217,8 +1217,8 @@ class FakeFleet:
         accept_missing_auth: bool = False,
         ignore_api_version: bool = False,
         extra_response_headers: dict | None = None,
-        vllm_options: bool = False,
-        vllm_option_defect: str | None = None,
+        extension_options: bool = False,
+        extension_option_defect: str | None = None,
         health_status: int = 200,
         empty_chat_stream: bool = False,
         render: bool = False,
@@ -1358,8 +1358,8 @@ class FakeFleet:
         self.accept_missing_auth = accept_missing_auth
         self.ignore_api_version = ignore_api_version
         self.extra_response_headers = extra_response_headers or {}
-        self.vllm_options = vllm_options
-        self.vllm_option_defect = vllm_option_defect
+        self.extension_options = extension_options
+        self.extension_option_defect = extension_option_defect
         self.health_status = health_status
         self.empty_chat_stream = empty_chat_stream
 
@@ -2347,9 +2347,12 @@ class FakeFleet:
                         payload = fleet.count_tokens_response
                     return self._send(200, payload)
 
-                if fleet.vllm_options and path in ("/v1/chat/completions", "/v1/responses"):
+                if fleet.extension_options and path in ("/v1/chat/completions", "/v1/responses"):
                     return self._send(
-                        200, vllm_option_payload(body, path, fleet.model, fleet.vllm_option_defect)
+                        200,
+                        extension_option_payload(
+                            body, path, fleet.model, fleet.extension_option_defect
+                        ),
                     )
 
                 if (
@@ -3289,7 +3292,7 @@ def run_llmdv(
     )
 
 
-def vllm_option_payload(body, path, model, defect):
+def extension_option_payload(body, path, model, defect):
     prompt = body.get("input") if path == "/v1/responses" else body["messages"][0]["content"]
     inputs, output, finish = len(prompt.split()), 2, "stop"
     if defect != "ignored":

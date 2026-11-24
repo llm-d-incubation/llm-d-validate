@@ -285,7 +285,7 @@ def test_render_declarations_are_strict(tmp_path, override):
         load(path)
 
 
-SALT = {"vllm_options": ["cache_salt"]}
+SALT = {"extension_options": ["cache_salt"]}
 
 
 @pytest.mark.parametrize("surface", SURFACES)

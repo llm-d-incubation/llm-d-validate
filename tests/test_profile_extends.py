@@ -18,7 +18,7 @@ PARENT = {
     "schema": "llmdv.profile/1",
     "name": "shared",
     "model": {"public_id": "org/model", "reasoning": {"parser": "deepseek_r1"}},
-    "capabilities": {"count_tokens": True, "vllm_options": ["priority"]},
+    "capabilities": {"count_tokens": True, "extension_options": ["priority"]},
     "ingresses": [
         {
             "id": "gateway",
@@ -54,7 +54,7 @@ def test_a_child_is_merged_over_its_parent(tmp_path):
             "name": "local",
             "fleet_policy": "shared",
             "model": {"max_model_len": 4096},
-            "capabilities": {"vllm_options": [], "count_tokens": None},
+            "capabilities": {"extension_options": [], "count_tokens": None},
             "ingresses": [
                 {"id": "engine", "setup": {"proxy": "allow"}},
                 {"id": "extra", "kind": "engine", "base_url": "http://localhost:9000"},
@@ -70,7 +70,7 @@ def test_a_child_is_merged_over_its_parent(tmp_path):
     assert profile.model.public_id == "org/model"
     assert profile.model.reasoning.parser == "deepseek_r1"
     assert profile.model.max_model_len == 4096
-    assert profile.capabilities.vllm_options == ()
+    assert profile.capabilities.extension_options == ()
     assert profile.capabilities.count_tokens is False
     # Ingresses match by id; a new id is added at the end.
     assert profile.ingress_ids == ("gateway", "engine", "extra")

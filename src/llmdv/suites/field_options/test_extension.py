@@ -5,21 +5,21 @@ from __future__ import annotations
 import pytest
 
 from ...assertions import fail
-from ...assertions.vllm_options import assert_token_ids
+from ...assertions.extension_options import assert_token_ids
 from ...evidence import journal
 from ...surfaces.base import Completion
 from ..conftest import check_basic_completion
 
 
-@pytest.mark.surface_generic("vllm_options")
+@pytest.mark.surface_generic("extension_options")
 @pytest.mark.parametrize(
     "option", ["return_token_ids", "min_tokens", "ignore_eos", "truncate_prompt_tokens"]
 )
-@pytest.mark.case_id("field_options.vllm_observable")
-def test_vllm_observable_options(client, surface, model, ingress, option):
+@pytest.mark.case_id("field_options.extension_observable")
+def test_extension_observable_options(client, surface, model, ingress, option):
     if not ingress.capabilities.supports_option(option):
         pytest.skip(f"[undeclared] ingress {ingress.id!r} does not declare {option}")
-    if option not in surface.observable_vllm_options:
+    if option not in surface.observable_extension_options:
         pytest.skip(f"[not_implemented] {option} has no observable probe on {surface.name}")
 
     def generate(**options) -> Completion:

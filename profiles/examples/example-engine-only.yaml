@@ -74,7 +74,7 @@ capabilities:
   # Set for a multimodal model served with its vision path on; the image cases then run.
   vision: false
   # Engine-specific request options (see REFERENCE.md). Left empty until each is probed.
-  vllm_options: []
+  extension_options: []
 
 headers:
   x-request-id:

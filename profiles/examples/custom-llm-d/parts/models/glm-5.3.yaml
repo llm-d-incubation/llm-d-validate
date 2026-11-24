@@ -76,7 +76,7 @@ capabilities:
 
   # The template has no enable_thinking variable and always opens <think>: sending it changed
   # neither the prompt nor the output, so it is left out of base.yaml's list.
-  vllm_options: [ignore_eos, min_tokens, truncate_prompt_tokens, cache_salt, include_stop_str_in_output, continue_final_message, echo, continuous_usage_stats, structured_outputs, return_tokens_as_token_ids, prompt_logprobs, allowed_token_ids, bad_words, include_reasoning, stop_reason, chat_template_kwargs, return_token_ids, logit_bias]
+  extension_options: [ignore_eos, min_tokens, truncate_prompt_tokens, cache_salt, include_stop_str_in_output, continue_final_message, echo, continuous_usage_stats, structured_outputs, return_tokens_as_token_ids, prompt_logprobs, allowed_token_ids, bad_words, include_reasoning, stop_reason, chat_template_kwargs, return_token_ids, logit_bias]
 
   # Text-only, so image, audio, document and file input are declared `rejected`, which still
   # requires a clean 4xx in each API's error shape. This is a decision about the deployment,

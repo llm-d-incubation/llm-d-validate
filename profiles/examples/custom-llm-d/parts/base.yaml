@@ -295,7 +295,7 @@ capabilities:
   # INTENT: every vLLM request option, each enabling a Chat case judged by its effect.
   # MEASURED on one deployment: min_tokens was not honored by one model and logit_bias was
   # refused with 400 by the engine for another. Both fail until you triage them.
-  vllm_options: [ignore_eos, min_tokens, truncate_prompt_tokens, cache_salt, include_stop_str_in_output, continue_final_message, echo, continuous_usage_stats, structured_outputs, return_tokens_as_token_ids, prompt_logprobs, allowed_token_ids, bad_words, include_reasoning, stop_reason, chat_template_kwargs, return_token_ids, logit_bias, enable_thinking]
+  extension_options: [ignore_eos, min_tokens, truncate_prompt_tokens, cache_salt, include_stop_str_in_output, continue_final_message, echo, continuous_usage_stats, structured_outputs, return_tokens_as_token_ids, prompt_logprobs, allowed_token_ids, bad_words, include_reasoning, stop_reason, chat_template_kwargs, return_token_ids, logit_bias, enable_thinking]
 
   # INTENT: every scenario. inline_system and long_context need cache_reuse (router-llm-d.yaml);
   # long_context and parallel_subagents are disruptive, allowed by `dedicated`.
