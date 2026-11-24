@@ -1,11 +1,13 @@
-"""Print every effective setting that differs between two profiles at one ingress.
+"""Print every effective setting that differs between two profiles at one ingress, and in the
+profile-wide fields that ingress runs under.
 
     python compare_profiles.py <profile A> <profile B> <ingress id>
 
 Both profiles are loaded as llmdv loads them, with `extends` composed and per-ingress overrides
 applied, so a public profile plus its local overlay can be compared with the private profile it
 came from. Addresses, credentials, setup and the change sentinels (pins and baselines) are left
-out: they are expected to differ. Run it from the repository root with llmdv importable
+out, and so are the profile's name, its `environment` block (cluster detail) and where it was
+loaded from: they are expected to differ. Run it from the repository root with llmdv importable
 (`PYTHONPATH=src`), and with the variables the profiles name set to any value.
 """
 
@@ -19,6 +21,9 @@ import sys
 from llmdv.profile import loader
 
 LEFT_OUT = {"id", "base_url", "base_url_env", "auth", "setup", "logs"}
+# Profile-wide fields that are not compared here: the ingresses and headers are read per ingress
+# below, and the rest are expected to differ between a private profile and its public copy.
+PROFILE_LEFT_OUT = {"name", "ingresses", "headers", "environment", "source_path"}
 # Values only a run of one exact stack supplies; a published profile carries placeholders.
 SENTINELS = {"prompt_pins", "render_pins", "contract_baseline"}
 
@@ -55,7 +60,12 @@ def settings(path: str, ingress_id: str) -> dict:
     for header, by_ingress in plain(profile.headers).items():
         if isinstance(by_ingress, dict) and by_ingress.get(ingress_id) is not None:
             found[f"headers.{header}"] = by_ingress[ingress_id]
-    found["fleet_policy"] = plain(profile.fleet_policy)
+    for field in dataclasses.fields(profile):
+        if field.name not in PROFILE_LEFT_OUT:
+            found.update(
+                (f"profile.{key}", value)
+                for key, value in flat({field.name: plain(getattr(profile, field.name))})
+            )
     return found
 
 

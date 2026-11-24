@@ -57,6 +57,7 @@ Record: the gateway version, the engine build (`system_fingerprint`), and which 
 | You have | Profile |
 |---|---|
 | A committed profile for this model and layer (under `profiles/<system>/`) | use it |
+| A deployment of an llm-d guide | the guide's combination under `profiles/llm-d/<guide>/`; its `README.md` names the combination for each CI lane, the Service variable to export and the exact `--identity` flags. It runs the guide's `selection`; add `--all` for every case |
 | One for the model through another layer | copy it to `<system>/<model>.local.yaml` and change what differs: `kind`, `auth`, `model.public_id`, `health_path`, `rate_limited`, the surfaces |
 | A gateway and the router for the same model | a two-ingress `.local.yaml`: the gateway profile plus a `kind: router` ingress (below); llmdv then reports each layer as a column and attributes differences |
 | Nothing for this model | writing-an-infra-profile |
@@ -130,7 +131,7 @@ One live run per gateway at a time; never `-n`. From the repository root:
 
 ```sh
 llmdv verify --profile <profile> -m contract                 # about a minute: the declarations, live
-llmdv verify --profile <profile> --evidence all -k "<tests>"  # the cases you care about, if any
+llmdv verify --profile <profile> --evidence all -k "<tests>"  # the cases you care about, if any; add --all for a case outside the selection
 llmdv verify --profile <profile> --analyze                    # the full suite, 15-60 min; runs/<timestamp>/
 ```
 

@@ -25,7 +25,7 @@ Field reference: [`profiles/REFERENCE.md`](../../../profiles/REFERENCE.md). How 
 
    Declare only the layers you can reach. One ingress is a complete profile; a declared but unreachable layer fails preflight.
 
-2. **Put it at `profiles/<system>/<model>.yaml`.** A copy with real cluster detail is `profiles/<system>/<model>.local.yaml`, which is gitignored. A committed profile names its URL and key by variable (`base_url_env`, `auth.key_env`) and never stores either; a `.local.yaml` may write `base_url` inline, but declaring both is an error. An unset variable passes `llmdv profile validate` and fails preflight (exit 3). No namespace, cluster name, context, hostname, pod or Service name in a committed file. A committed profile gets a short note on how to run it next to it (`<model>.md`).
+2. **Put it at `profiles/<system>/<model>.yaml`.** A copy with real cluster detail is `profiles/<system>/<model>.local.yaml`, which is gitignored. A committed profile names its URL and key by variable (`base_url_env`, `auth.key_env`) and never stores either; a `.local.yaml` may write `base_url` inline, but declaring both is an error. An unset variable passes `llmdv profile validate` and fails preflight (exit 3). No namespace, cluster name, context, hostname, pod or Service name in a committed file. A committed profile gets a short note on how to run it beside it: a `README.md` in its folder, one per folder for a set of combinations, as each llm-d guide has.
 
 3. **Fill what exists by measuring it.** Model id and context length from the gateway's `GET /v1/models` (a gateway's ids are usually not the engine's). If you have cluster access, the `environment` block (`cluster`, `context`, `namespace`, `kubeconfig`, `metrics`; optional, and no gateway-only profile has one); check the kubeconfig holds the context, or `profile show --setup` prints `-l <selector>` instead of a pod. Selectors, never pod names, in `setup.requires`. The reasoning shape from one request: a populated reasoning field means declare `parser` and the `field` you saw (`reasoning` on recent vLLM; `reasoning_content` on older vLLM, on SGLang and through LiteLLM, which renames it); an inline `<think>` block means `parser: null`. Surfaces by sending a **shape-valid** body to each path at each layer (an empty `{}` answers 400 on an absent route).
 
@@ -58,7 +58,7 @@ Field reference: [`profiles/REFERENCE.md`](../../../profiles/REFERENCE.md). How 
    | `render_pins` | 64 zeros under each declared render surface and pin: `{chat_render: {conversation: "000…0", tools: "000…0"}}` |
    | `contract_baseline` part | `{llmdv_seed: [absent]}` |
 
-   Run `llmdv verify --profile <profile> --evidence all` against a known-good build. Each pin fails with the observed value in its `canonical_input_tokens` or `canonical_render_digest` check; each contract part passes with its exchange in `exchanges.jsonl`, which `llmdv.assertions.contract` (`shape`, `stream_shape`, `baseline`) turns into a baseline. Replace the placeholders.
+   Run `llmdv verify --profile <profile> --evidence all --all` against a known-good build (`--all`, because a profile's `selection` may leave the pin cases out). Each pin fails with the observed value in its `canonical_input_tokens` or `canonical_render_digest` check; each contract part passes with its exchange in `exchanges.jsonl`, which `llmdv.assertions.contract` (`shape`, `stream_shape`, `baseline`) turns into a baseline. Replace the placeholders.
 
    **Render.** The render cases run only on the `*_render` surfaces an ingress declares: `render.stability` and `render.unknown_model` on each, `render.synthetic_prefix` only with `prefix_stability`, and a render pin only under a declared render surface. `contract` checks surfaces both ways, so declare a render surface only where the stack is meant to serve it; otherwise leave it out with a comment saying so, and those cases skip as `undeclared`. The cache keys that depend on rendering (`render_equivalent`, `stripped_system_prefix`, `equivalent_settings`, `canonical_tool_keys`) are in [REFERENCE.md](../../../profiles/REFERENCE.md#cache_reuse).
 
@@ -91,7 +91,9 @@ Write a profile for each configuration that is both deployed by one of the guide
 
 1. List the guide's nightly workflows in llm-d. For each lane read its accelerator, engine, provider and gateway class.
 2. Render the overlay that lane applies, locally (`kubectl kustomize <path>`, never against a cluster). A lane that sets no provider applies the accelerator and engine folder's own kustomization. Read the model, context window, parsers and engine build, for each role (prefill and decode can differ).
-3. Group lanes that look the same to a client. Each group is one combination; its header names its lanes, and the directory's README maps every lane to its profile and lists what no lane runs.
+3. Group lanes that look the same to a client. Each group is one combination; its header names its lanes, and the directory's README maps every lane to its profile with the exact `--identity` flags that keep lanes sharing a combination apart, and lists what no lane runs.
+4. Give the guide's `parts/common.yaml` a `selection:` of the cases the guide's claims touch, keeping `contract.*` (see [REFERENCE.md](../../../profiles/REFERENCE.md#selection)), and check every glob with `llmdv plan --profile <combination>`. Rule 3 still holds for the configuration: one lane per configuration runs `--all`, recorded in `profiles/llm-d/README.md` under "Which lane runs everything", as does a lane whose engine build differs from the rest of its configuration.
+5. A layer the kinds cannot order (a routing sidecar between the router and the engines, two routers in series, a coordinator in front of the router) is placed with `fronts`; see [Declared layer edges](../../../profiles/REFERENCE.md#declared-layer-edges). An ingress may front only ingresses at its own position or deeper.
 
 ### Publishing a profile written against a private stack
 
@@ -135,11 +137,15 @@ Signals:
 - vLLM: `system_fingerprint: vllm-…` and `GET /version`. The fingerprint passes through every layer, so it identifies the engine behind an ingress, not the ingress.
 - Weak on their own: `server: uvicorn` (vLLM and LiteLLM both send it) and `x-went-into-resp-headers` (seen through engine and router). Record the signals you looked for and did not find. Hostnames, sibling profiles, config flags and docs are hypotheses, never confirmation.
 
+The full list of what each header, body field and marker reveals is the evidence table, `src/llmdv/ingress/signals.py`; a row marked `backend` (including `x-litellm-model-id` and `x-litellm-deployment`) may name a pod, host or Service and is never quoted. A product that names its build in a header the table does not know is declared per ingress with `version_headers` ([REFERENCE.md](../../../profiles/REFERENCE.md#ingresses)).
+
 ## Rule 3: everything eligible runs
 
 Declare every value llmdv's vocabularies define (in `profile/schema.py`, `profile/transport.py` and `surfaces/base.py` under `src/llmdv/`) for the target surfaces, even one an upstream API does not document. Honour schema constraints (surface names from `SURFACE_PATHS`; disjoint lists such as `chat_reasoning_efforts` and `chat_quiet_efforts`). "Not probed yet" is never a reason to leave something out: the run is the measurement.
 
 Leave a case out only when the thing it needs does not exist here (a 404 route, no cluster or metrics access, no instrument, no second ingress), or it executes model-written code on the operator's machine.
+
+A profile's `selection:` is not a way to leave a case out of a configuration: it narrows what one lane runs, and only when another lane runs the same configuration with `--all` (see [Profiles for an llm-d guide](#profiles-for-an-llm-d-guide)). A profile that is the only one for its configuration declares no selection.
 
 ## Rule 4: failures are left for the team
 
@@ -149,7 +155,7 @@ A failure the team has filed and traced to a fix that has not reached the fleet 
 `known_failures` ([REFERENCE.md](../../../profiles/REFERENCE.md#known_failures)), which names the check, the issue and the build the fix ships in.
 The case still fails and the run still exits `1`; the label only tells the reader it is known.
 An entry takes `check`, `cases`, `issue`, `fix` (e.g. `"upstream issue: <ref> (state) | fix PR: <ref>"`),
-optionally `ingress` (singular) and `until` (quoted version strings); an entry that matches no
+optionally `ingress` (one id or a list) and `until` (quoted version strings); an entry that matches no
 failure is reported as unmatched, which says the fix landed.
 A decision that a behaviour is intended is not a known failure: record it as `TRIAGED <date>` in the
 comment beside the line and, if the declaration changes, cite the decision.
