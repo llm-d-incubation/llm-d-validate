@@ -31,7 +31,8 @@ from typing import Any
 class Reveals(str, Enum):
     # Names a build or a layer's own signature; safe to publish in `outcome.json`.
     VERSION = "version"
-    # May name a pod, host or Service: recorded for attribution, never published.
+    # May name a pod, host or Service: recorded for attribution with the run's evidence, never
+    # in `outcome.json` and so never in a comparison, the alert feed or a notification.
     BACKEND = "backend"
     # Kept with the run's evidence, neither a build nor a backend.
     RECORDED = "recorded"
@@ -103,9 +104,6 @@ SIGNALS: tuple[Signal, ...] = (
 BACKEND_HEADERS = frozenset(
     signal.header for signal in SIGNALS if signal.reveals is Reveals.BACKEND and signal.header
 )
-# Every header an exact row knows. A profile's `version_headers` names only what the table does
-# not know: declaring a known header would change what that header means for one profile.
-KNOWN_HEADERS = frozenset(signal.header for signal in SIGNALS if signal.header)
 
 
 @dataclass(frozen=True)

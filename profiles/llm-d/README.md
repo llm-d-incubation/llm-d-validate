@@ -95,7 +95,7 @@ Every profile tests at the router (`<release>-epp`, standalone mode), the only l
 **Not covered, and why:**
 
 - **fast-model-actuation-keda** (2 lanes): the pool scales from zero, so the first request can wait up to 300 s and the pool returns to zero after about a minute idle; a profile cannot say "the first request may be slow" without loosening every latency check.
-- **Layers in front of or beside the router**: agentic-api's stateful Responses server, the async coordinator and its queues, and the prefill/decode routing sidecar. Each needs its own ingress, declared in front of the router with `fronts`, and measured behaviour.
+- **Layers in front of or beside the router**: agentic-api's stateful Responses server, the async coordinator and its queues, and the prefill/decode routing sidecar. Each needs its own ingress, placed in the layer graph with `fronts` (the sidecar behind the router, the others in front of or beside it), and measured behaviour.
 - **Claims that only hold under load or need cluster reads**: queueing, priority and fairness, eviction and shedding, scaling events, prefill/decode decisions, offload and cache counters, snapshot restore, prefix affinity (#23, #27).
 - **Guides no nightly lane runs**: coord-disaggregation, p2p-kv-cache-sharing, multi-model-routing, omni-serving, turn-priority-fairness, modelexpress-p2p, hyperconverged-cephfs, the per-model guides under `guides/models/`, and the other workload-autoscaling variants. Each is added when a lane runs it.
 
@@ -163,9 +163,9 @@ Lanes share a profile when the overlays they deploy give a client the same model
 
 - **Reasoning field name**: vLLM is declared as answering `reasoning` (seen on vLLM 0.32 elsewhere) and SGLang `reasoning_content` (inferred). Neither has been observed on this guide's builds.
 - **Prefix affinity** (`routing.prefix_affinity`, #27): the guide's central claim, that shared-prefix requests stay on one pod, needs a case family that reads per-pod counters. Kind showed it holding for sequential requests (ten of ten on one replica), but llmdv cannot check it yet. The cache suite cannot see it here either: no overlay asks the engine to report `cached_tokens`, so `cache_reuse` is left undeclared.
-- **Gateway role** (#24): llmdv has no role for a Gateway in front of the EPP yet, and no lane runs gateway mode.
+- **Gateway mode** (#24): no lane runs gateway mode, so no profile declares a `kind: gateway` ingress in front of the EPP.
 - **Surfaces**: the EPP also routes `/v1/embeddings` and `/inference/v1/generate` (both answered on kind), which llmdv has no surface for.
-- **Engine kinds**: no profile declares an engine ingress, because a committed profile names no pod and per-replica URLs are a lane's to provide. When an engine layer is added, `vllm` is the only engine kind and would misdescribe SGLang's and Atom's error envelopes, health paths and metric names.
+- **Engine kinds**: no profile declares an engine ingress, because a committed profile names no pod and per-replica URLs are a lane's to provide. When an engine layer is added it is `kind: engine`; SGLang's and Atom's error statuses, health paths and metric names are declared on that ingress, not implied by the kind.
 - **Non-vLLM extension vocabularies**: llmdv's extension vocabularies (`extension_options` and the extension entries of `chat_fields` and `completions_fields`) are vLLM's. `parts/engines/sglang.yaml` and `atom.yaml` declare none of them until a run shows which each engine serves.
 - **`ocp` provider**: the `ibm-acc-gpu-vllm-x` lane deploys `gpu/vllm/ocp`, but `ocp` is not among `guide.yaml`'s `INFRA_PROVIDER` values or the README's support table.
 - **Unknown context window**: the Atom overlay sets no window and no source states its default, so that profile's context cases skip as undeclared until someone states the value.

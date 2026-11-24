@@ -57,8 +57,8 @@ ingresses:
     # missing one is a preflight failure with the export command printed.
     auth: {type: bearer, key_env: LLMDV_GATEWAY_KEY}
     # MEASURE THIS. A health path that goes through authentication can only ever answer 401 to an
-    # unauthenticated probe, which preflight would read as unreachable. Prefer an auth-exempt path
-    # if the gateway has one.
+    # unauthenticated probe. Preflight counts any answer as reachable, so that proves only that the
+    # gateway is listening, not that it is healthy. Prefer an auth-exempt path if it has one.
     health_path: /health
     # MEASURE THIS by probing each path with a shape-valid body. A gateway's model_list bounds
     # what is reachable, so it commonly exposes fewer surfaces than the engine behind it serves.

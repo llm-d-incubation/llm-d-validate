@@ -84,8 +84,9 @@ def classify(
 
 def _landed(entry: KnownFailure, signals: list[Signal]) -> dict[str, str]:
     """The observed value of every awaited signal when all of them are at or past the entry's
-    values, else empty. Only responses from the entry's own ingresses count, so a gateway
-    header can never speak for the engine behind it."""
+    values, else empty. When the entry names `ingress`, only responses from those ingresses
+    count, so a gateway header can never speak for the engine behind it; an entry without one
+    is satisfied by a response from any layer."""
     if not entry.until:
         return {}
     seen: dict[str, str] = {}
