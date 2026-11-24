@@ -10,8 +10,8 @@ it at 1. A local port that still accepts is never the environment: a reset or a 
 response behind it is a crashing server, or a pod that died behind a live port-forward, which
 llmdv cannot tell apart, so both stay exit 1.
 
-`EXITS` is the one table of what each code means. The `--help` epilog, the manual's exit table
-and the dashboard all read it; a test keeps the manual in step.
+`EXITS` is the one table of what each code means. The `--help` epilog, the exit table in
+docs/cli.md and the dashboard all read it; a test keeps docs/cli.md in step.
 """
 
 OK = 0

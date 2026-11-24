@@ -7,7 +7,7 @@ match that dataclass's fields in both directions.
 
 Every dataclass reachable from `Profile` must be tied to a heading, so a new nested block fails
 here until it is documented. The `fleet` block is the exception: its rules are documented in
-FLEET.md and parsed in `profile/fleet.py`.
+REFERENCE.md's `## fleet` section and parsed in `profile/fleet.py`.
 """
 
 from __future__ import annotations

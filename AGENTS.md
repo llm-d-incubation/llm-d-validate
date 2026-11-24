@@ -6,7 +6,7 @@ What an agent or a new contributor needs before changing anything here.
 Before any live step, check what the person you are working for has (tools, access, where they
 keep credentials) with [.agents/ENVIRONMENT.md](.agents/ENVIRONMENT.md); the skills assume nothing
 about the machine. Start with [docs/architecture.md](docs/architecture.md) for the layout,
-[docs/manual.md](docs/manual.md) for every command,
+[docs/cli.md](docs/cli.md) for every command,
 [.agents/GROUND-TRUTH.md](.agents/GROUND-TRUTH.md) for behaviours of serving stacks that are
 measured rather than assumed, and [.agents/DECISIONS.md](.agents/DECISIONS.md) for why the design
 is the way it is. GROUND-TRUTH will save you from writing assertions that are confidently wrong.

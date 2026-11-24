@@ -16,7 +16,7 @@
 ## Checklist
 
 - [ ] Commits are signed off (`git commit -s`) per [DCO](https://github.com/llm-d/llm-d/blob/main/PR_SIGNOFF.md)
-- [ ] Code follows project [contributing guidelines](CONTRIBUTING.md)
+- [ ] Code follows project [contributing guidelines](https://github.com/llm-d-incubation/llm-d-validate/blob/main/CONTRIBUTING.md)
 - [ ] Tests pass locally (`python -m pytest tests/ -q`)
 - [ ] Linters pass (`ruff check src/ tests/ && ruff format --check src/ tests/`)
 - [ ] Documentation updated (if applicable)

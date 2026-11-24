@@ -1,6 +1,6 @@
 # Profile reference: `llmdv.profile/1`
 
-Every key a profile accepts, block by block. For how to write a profile, start with the [guide](README.md). For the `fleet` block, see [FLEET.md](FLEET.md).
+Every key a profile accepts, block by block. For how to write a profile, start with the [profile guide](README.md). The `fleet` block's rules are in [fleet](#fleet).
 
 Conventions:
 
@@ -30,7 +30,7 @@ Conventions:
 | `headers` | mapping | none | What each layer does to a header. See [headers](#headers). |
 | `clients` | list | none | Real consumers and the surfaces they need. See [clients](#clients). |
 | `fleet_policy` | `dedicated` \| `shared` | `dedicated` | `shared` means other people depend on this fleet: cases marked `disruptive` skip as `excluded_by_policy`. Cheap well-formed refusals (a bad token limit, an unknown path, a bad credential) still run. Declared, never inferred. |
-| `fleet` | mapping | none | Configuration and metrics rules read from the cluster. See [FLEET.md](FLEET.md). |
+| `fleet` | mapping | none | Configuration and metrics rules read from the cluster. See [fleet](#fleet). |
 | `known_failures` | list | none | Failures already filed and traced to a pending fix. Labels, never excuses. See [known_failures](#known_failures). |
 | `selection` | list of string | every case | Case-id globs: `verify`, `plan` and `job` run only the cases one matches, and `--all` runs everything. See [selection](#selection). |
 
@@ -66,7 +66,7 @@ Optional. Without it, llmdv works against bare URLs and never contacts a cluster
 | `context` | string | none | kubeconfig context. `--context` overrides it. |
 | `namespace` | string | none | Default namespace for lookups and log collection. |
 | `kubeconfig` | path | none | `~` is expanded. `--kubeconfig` overrides it. |
-| `metrics` | mapping | none | A read-only Prometheus-compatible API for the `fleet.metrics` rules. See [FLEET.md](FLEET.md#metrics). |
+| `metrics` | mapping | none | A read-only Prometheus-compatible API for the `fleet.metrics` rules. See [fleet metrics](#metrics). |
 
 ## model
 
@@ -180,7 +180,7 @@ Where this layer's own account of a request lives. Without `logs`, llmdv reads t
 | `target` | string | none | `pod/<name>` or `svc/<name>`; a Service resolves through its selector. |
 | `container` | string | all | Restrict to one container. |
 | `tail` | int | `2000` | Line cap per container for failure evidence. |
-| `forbid` | list of `{id, pattern}` | `[]` | Lines that must not appear during the run. See [FLEET.md](FLEET.md#logs). |
+| `forbid` | list of `{id, pattern}` | `[]` | Lines that must not appear during the run. See [fleet logs](#logs). |
 | `allow` | list of pattern | `[]` | Patterns that excuse a line a `forbid` entry matched. |
 
 ### ingresses[].transport
@@ -582,4 +582,83 @@ selection:
 
 ## fleet
 
-Rules read from the fleet's configuration, metrics and logs. See [FLEET.md](FLEET.md).
+Some failures show in a fleet's configuration, metrics or logs rather than on the wire: a setting that turns on full error stacks, two active routers, a router and engine disagreeing on block size. A profile that can read the cluster declares these as rules, each naming what it reads. Without rules, the `fleet` suite's cases skip as `undeclared`.
+
+Each rule has a unique `id` and a `check`, and becomes one variant of that check's case. On any rule, `when` names a capability that some ingress must declare for the rule to run, and `ingress` names the column its result appears in.
+
+### config
+
+Read with `kubectl get -o json`, in `environment.namespace` unless the rule names another. Finding no object fails; a forbidden or unreachable read skips as `requires_instrumentation`. A rule that names Secrets is refused.
+
+| Key | Applies to | Meaning |
+| --- | --- | --- |
+| `check` | all | `settings`, `values_agree`, `field_values`, `ready_endpoints` or `selector_exclusive`. |
+| `objects` | `settings`, `field_values`, `selector_exclusive` | `{kind, name}` or `{kind, selector}`, optional `namespace`. One resource kind. |
+| `view` | `settings`, sources | `containers` (default): each container's command line and `NAME=value` environment; Secret values are never read. `data`: a ConfigMap's data. |
+| `containers` | `settings`, sources | Container names to read. |
+| `require`, `forbid` | `settings` | Multiline regular expressions: each unit matches every `require` and no `forbid`. |
+| `sources` | `values_agree` | Each: `objects`, a `pattern` with one capture group, optional `view`, `containers`, `default`. The captured values must agree. |
+| `expect`, `expect_capability` | `values_agree` | A literal, or a capability path such as `cache_reuse.block_size`, they must also equal. |
+| `path` | `field_values` | Key list into each object, such as `[metadata, annotations, <name>]`. |
+| `equals`, `at_least_seconds` | `field_values` | Exactly one. The field may hold seconds or a Go-style duration such as `1h30m`. |
+| `service`, `count`, `namespace` | `ready_endpoints` | The Service must have exactly `count` ready endpoints. |
+| `selector_path` | `selector_exclusive` | Path to the named object's selector; no other object of its kind may select its pods. |
+
+```yaml
+fleet:
+  config:
+    - id: dev_mode_off
+      check: settings
+      objects: {kind: deployments, selector: app=engine}
+      containers: [server]
+      forbid: ['^DEV_MODE=(1|true)$']
+    - id: block_sizes_agree
+      check: values_agree
+      expect_capability: cache_reuse.block_size
+      sources:
+        - {objects: {kind: deployments, selector: app=engine}, pattern: '--block-size[ =](\d+)', default: "16"}
+        - {objects: {kind: configmaps, name: router-config}, view: data, pattern: 'blockSize:\s*(\d+)'}
+    - id: one_active_router
+      check: ready_endpoints
+      service: router
+      count: 1
+```
+
+The kubeconfig needs `get` and `list` on every kind read, plus `pods` for `selector_exclusive` and `endpointslices` or `endpoints` for `ready_endpoints`.
+
+### metrics
+
+The source is `environment.metrics`, a Prometheus-compatible API read only with `GET /api/v1/query`.
+
+| Key | Default | Meaning |
+| --- | --- | --- |
+| `url` | **required** | Base URL, such as a port-forward to the metrics API. |
+| `auth` | `{type: none}` | `{type: bearer, key_env: NAME}` sends the token from `$NAME`, redacted everywhere. |
+| `proxy` | `bypass` | `allow` lets the HTTP proxy variables apply. |
+| `timeout` | `15` | Seconds per query. |
+| `tls_verify` | `true` | Verify the source's certificate. |
+
+Preflight sends one query; an unanswered source or unset token is exit 3. During the run, an unreachable source or an answer with warnings skips as `requires_instrumentation`. A rejected query fails, and so does one returning no series unless `absent_is_zero: true`.
+
+| `check` | Keys | Holds when |
+| --- | --- | --- |
+| `bounds` | `query`, `min` and/or `max`, `absent_is_zero` | every series is within the bounds |
+| `agree` | `left`, `right`, `absolute_tolerance` or `relative_tolerance`, `relation` (`equal`, `at_least`) | each side returns one series, and they agree within tolerance, or left is at least right |
+| `spread` | `query`, optional `label`, `min_ratio`, `min_series` | the smallest value is at least `min_ratio` of the largest |
+| `header_label` | `ingress`, `headers`, `query`, `label`, `expect`, `timeout_s` (120), `interval_s` (5) | a request through `ingress` with `headers` is counted under `label` = `expect` |
+
+### logs
+
+A log source under `ingresses[].logs` with `forbid` entries gets one `logs.signatures` result. It runs last and scans the whole run window: every Running pod, and the previous instance of any container that restarted. `tail` does not cap the scan. Matching no pod or a failed read fails; a forbidden read skips as `requires_instrumentation`. A hit names the llmdv case whose request or response id is on the line.
+
+```yaml
+ingresses:
+  - id: engine
+    logs:
+      - selector: app=engine
+        container: server
+        forbid:
+          - {id: fatal, pattern: 'fatal error'}
+          - {id: validation_stack, pattern: 'Traceback \(most recent call last\)'}
+        allow: ['client disconnected']
+```

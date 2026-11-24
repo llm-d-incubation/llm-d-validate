@@ -118,5 +118,5 @@ Installed. Next:
   # offline, no cluster needed
   PYTHONPATH=src .venv/bin/python -m pytest tests/ -q
 
-Docs: README.md, docs/architecture.md, profiles/README.md, docs/coverage.md
+Docs: docs/getting-started.md, profiles/README.md (llm-d guides and your own stack), docs/cli.md
 NEXT

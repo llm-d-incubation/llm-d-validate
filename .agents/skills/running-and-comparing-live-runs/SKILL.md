@@ -5,7 +5,7 @@ description: Use when starting a live llmdv run against a real gateway (from a P
 
 # Running and comparing live runs
 
-Every path writes the same run directory, so reading and comparing work the same way afterwards. Human version: [docs/end-to-end.md](../../../docs/end-to-end.md). Cluster job and secrets: [deploy/README.md](../../../deploy/README.md). Comparison semantics: [docs/compare.md](../../../docs/compare.md).
+Every path writes the same run directory, so reading and comparing work the same way afterwards. Human version: [docs/getting-started.md](../../../docs/getting-started.md). Cluster job and secrets: [deploy/README.md](../../../deploy/README.md). Comparison semantics: [docs/compare.md](../../../docs/compare.md).
 
 ## Before any live run
 
@@ -95,4 +95,4 @@ Read the declaration-drift warning first: a changed profile can explain the whol
 
 ## Then
 
-Build and annotate the dashboard with reporting-a-run. Turn a failure group into an issue with filing-a-fleet-finding. Exit codes for every command: [docs/manual.md](../../../docs/manual.md#exit-codes).
+Build and annotate the dashboard with reporting-a-run. Turn a failure group into an issue with filing-a-fleet-finding. Exit codes for every command: [docs/cli.md](../../../docs/cli.md#exit-codes).

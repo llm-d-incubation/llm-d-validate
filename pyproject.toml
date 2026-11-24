@@ -60,7 +60,7 @@ dev = ["ruff==0.16.9", "pre-commit>=4.1", "pytest-xdist>=3.6"]
 
 [project.urls]
 Homepage = "https://llm-d.ai"
-Documentation = "https://github.com/llm-d-incubation/llm-d-validate/blob/main/docs/manual.md"
+Documentation = "https://github.com/llm-d-incubation/llm-d-validate/blob/main/docs/getting-started.md"
 Repository = "https://github.com/llm-d-incubation/llm-d-validate"
 Issues = "https://github.com/llm-d-incubation/llm-d-validate/issues"
 Releases = "https://github.com/llm-d-incubation/llm-d-validate/releases"

@@ -1,9 +1,9 @@
 # Design decisions
 
 The decisions that shape `llmdv`, and why each was made. They outlive any one layout or CLI, so
-read this before proposing to change one. The original design, with its full argument, is
-archived in [archive/llmdv-design-spec.md](archive/llmdv-design-spec.md); where the two disagree,
-the code and [../docs/architecture.md](../docs/architecture.md) win.
+read this before proposing to change one. The original design spec is in the repository's
+history; where it and this file disagree, the code and
+[../docs/architecture.md](../docs/architecture.md) win.
 
 ## What the infrastructure is like
 

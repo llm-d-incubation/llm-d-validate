@@ -102,6 +102,53 @@ Write a profile for each configuration a nightly lane deploys, as the rendered m
 4. Give the guide's `parts/common.yaml` a `selection:` of the cases the guide's claims touch, keeping `contract.*` (see [REFERENCE.md](../../../profiles/REFERENCE.md#selection)), and check every glob with `llmdv plan --profile <combination>`. Rule 3 still holds for the configuration: one lane per configuration runs `--all`, recorded in `profiles/llm-d/README.md` under "Which lane runs everything", as does a lane whose engine build differs from the rest of its configuration.
 5. A layer the kinds cannot order (a routing sidecar between the router and the engines, two routers in series, a coordinator in front of the router) is placed with `fronts`; see [Declared layer edges](../../../profiles/REFERENCE.md#declared-layer-edges). An ingress may front only ingresses at its own position or deeper.
 
+#### How profiles/llm-d is built
+
+**A sum, not a product.** A guide ships one router configuration, several engines, many model configurations and two topologies. One file per combination would repeat every fact in dozens of files, so each fact lives in one part and a combination lists the parts:
+
+```
+profiles/llm-d/
+  parts/                               shared by every guide; never run on their own
+    base.yaml                          what every guide's stack shares: API intent, engine-independent
+    topology/standalone.yaml           the EPP's own listener: the ingress, error statuses, header dispositions
+    engines/<engine>.yaml              an engine's own request extensions (vllm, sglang, atom)
+    models/<model-config>.yaml         model id, context window, reasoning and tool-call shape, vision
+    sentinels/unmeasured*.yaml         placeholder change sentinels until a run measures them
+  <guide>/                             one folder per guide, named as llm-d names it
+    parts/common.yaml                  what every profile of the guide shares: its claims, cache decisions, block sizes
+    <engine>-<model-config>-<topology>.yaml   a combination: what you run
+```
+
+A combination is `extends: [../parts/base.yaml, ../parts/topology/<t>.yaml, ../parts/engines/<e>.yaml, ../parts/models/<m>.yaml, ../parts/sentinels/<s>.yaml, parts/common.yaml]`, then its `name` and the parser names (the engine's own flag values, where the model part has parsers). The sentinel part is `unmeasured-with-tools.yaml` when the model has a tool-call parser, `unmeasured.yaml` otherwise. Once a run of that exact stack measures them, the combination sets its own `prompt_pins` and `contract_baseline`, which override the part.
+
+- **No key is set by two parts,** so the order of the list changes nothing. The one exception is the simulator: its model part overrides four `base.yaml` keys and its combination overrides the standalone surfaces, on purpose, and each says so in a comment. A run's `profile.used.yaml` names the file that set each key.
+- **`tests/test_example_profiles.py` checks every part** through the combinations that list it.
+- **Ingress-keyed facts live in the topology part.** llmdv keys surfaces, error statuses and header dispositions by ingress id, and the ids differ by topology (`epp`, `gateway`). So the SLO headers, which the guides leave without effect, are declared there, not in a guide's `parts/common.yaml`.
+- **Model parts are named by the configuration a client sees** (`qwen3-32b-ctx16k-parsers`), never by accelerator; their headers list the overlays that use them.
+
+**Which source owns which fact:**
+
+| Source | Owns |
+| --- | --- |
+| the guide's nightly lanes and the deploy scripts they call | which configurations get a profile |
+| the guide's `guide.yaml` and README | what the guide says exists and is supported, checked against the lanes and manifests (a disagreement goes under "Upstream notes"); how a client reaches the stack |
+| router values and model-server overlays | the deployed configuration: model id, window, parsers, router plugins, block sizes |
+| the APIs (OpenAI, Anthropic, the EPP reference) | behaviour: statuses, envelopes, fields, header handling |
+| a run | existence (surfaces served, the window an engine resolves) and the truth of every line above |
+
+**Provenance tags**, in the comment above every declaration:
+
+| Tag | Means |
+| --- | --- |
+| `FROM values: <path>` | read from the guide's shipped configuration at llm-d `9ca8ff0`, overlays rendered with `kubectl kustomize` |
+| `FROM docs: <path>` | read from the llm-d documentation at that commit, or from this repository's profile reference |
+| `INTENT` | how a correct stack behaves, as the API itself defines it |
+| `DERIVED` | computed from the model's own config, not stated by the guide (a default context window) |
+| `MEASURED 2026-11-16 on kind (real EPP, simulator engine)` | observed through a real endpoint picker in front of llm-d-inference-sim; a fact about the router layer only |
+| inferred | a reading of the config no source states outright; the comment says so |
+
+Behaviour lines change only after the team triages a failure, and the comment then cites the decision.
+
 ### Publishing a profile written against a private stack
 
 1. **Scrub the comments, keep the values.** Remove hostnames and URLs, namespaces, cluster and context names, pod and Service names, company, team and people's names, dates, ticket and issue references, run ids and internal model aliases. Rewrite a measurement as `MEASURED on one deployment`. A measured value is a fact of the stack: replacing it with a generic default makes a different profile.

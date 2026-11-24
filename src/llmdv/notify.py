@@ -20,7 +20,7 @@ MAX_WAIT = 30.0
 MAX_FAILURES_SHOWN = 10
 
 # The status word for each exit class. What the code means is said in the exit table's own
-# words (cli/exit_codes.py), so the notification cannot drift from the manual.
+# words (cli/exit_codes.py), so the notification cannot drift from docs/cli.md.
 STATUS = {
     "ok": "PASSED",
     "fleet": "FAILED",
