@@ -29,7 +29,8 @@ Publishing and pulling runs need the bucket variables exported ([`.agents/ENVIRO
 
 ```sh
 llmdv verify --profile <profile> -m contract
-llmdv verify --profile <profile> --analyze        # the full run; lands in runs/<timestamp>/
+llmdv verify --profile <profile> --analyze        # the profile's selection; lands in runs/<timestamp>/
+llmdv verify --profile <profile> --analyze --all  # every case, whatever the profile selects
 ```
 
 To publish it, add:
@@ -39,7 +40,7 @@ To publish it, add:
 --identity trigger=manual --label "actor=$USER"
 ```
 
-Use a `*.local.yaml` copy for machine-specific changes, and keep the machine awake. A multi-ingress profile runs every ingress; `--ingress <id>` (repeatable) restricts it, and `llmdv profile show <profile> --setup` prints any port-forwards it needs.
+A profile that declares `selection:` (every llm-d guide profile does) runs only the cases it names; `llmdv plan --profile <profile>` says how many it leaves out. One lane per configuration runs `--all` (`profiles/llm-d/README.md`, "Which lane runs everything"), as does a lane whose engine build changed. Use a `*.local.yaml` copy for machine-specific changes, and keep the machine awake. A multi-ingress profile runs every ingress; `--ingress <id>` (repeatable) restricts it, and `llmdv profile show <profile> --setup` prints any port-forwards it needs.
 
 **Unattended** (`llmdv job`, e.g. as a CronJob or a CI step):
 
@@ -47,7 +48,7 @@ Use a `*.local.yaml` copy for machine-specific changes, and keep the machine awa
 llmdv job --profile <profile> --remote-output "s3://$AWS_BUCKET/<prefix>" -- -m contract
 ```
 
-Arguments after `--` go to `llmdv verify`. Results go to `--remote-output`, or `LLMDV_RESULTS_URI` when it is not given; `outcome.json` in the job log says where.
+Flags the job does not know go to `llmdv verify` (`llmdv job --profile <profile> --all`); arguments after `--` reach pytest unparsed, so put verify's own flags such as `--all` or `--evidence all` before it. Results go to `--remote-output`, or `LLMDV_RESULTS_URI` when it is not given; `outcome.json` in the job log says where.
 
 **From a cluster job** (`deploy/trigger.sh`, needs the `llmdv-trigger` Role):
 
