@@ -136,7 +136,7 @@ python .github/scripts/live_summary.py runs/<run> --profile <name> --gateway <na
   bare skip.
 - **Assert what the API defines.** A case checks the behaviour the API specifies, not what one
   deployment happens to do today.
-- **Update [docs/coverage.md](docs/coverage.md)** with the suite's case count.
+- **Update [docs/test-suites.md](docs/test-suites.md)**: the suite's row says what it checks, what enables it, and its status.
 
 ## Adding a profile example
 

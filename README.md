@@ -1,7 +1,7 @@
 <h1 align="center">llm-d-validate</h1>
 
 <p align="center">
-  <b>Functional validation for deployed <a href="https://github.com/llm-d/llm-d">llm-d</a> model serving stacks: the gateway, the router and the engine.</b>
+  <b>End-to-end validation for deployed <a href="https://github.com/llm-d/llm-d">llm-d</a> serving stacks: every layer tested with real requests, every verdict backed by evidence.</b>
 </p>
 
 <p align="center">
@@ -14,7 +14,7 @@
   <a href="https://github.com/llm-d-incubation/llm-d-validate/blob/main/docs/getting-started.md">Getting started</a> ·
   <a href="https://github.com/llm-d-incubation/llm-d-validate/blob/main/profiles/README.md">Profiles</a> ·
   <a href="https://github.com/llm-d-incubation/llm-d-validate/blob/main/docs/cli.md">CLI reference</a> ·
-  <a href="https://github.com/llm-d-incubation/llm-d-validate/blob/main/docs/coverage.md">Coverage</a> ·
+  <a href="https://github.com/llm-d-incubation/llm-d-validate/blob/main/docs/test-suites.md">Test suites</a> ·
   <a href="https://github.com/llm-d-incubation/llm-d-validate/blob/main/CONTRIBUTING.md">Contributing</a>
 </p>
 
@@ -78,7 +78,7 @@ what to declare.
   compare, run unattended.
 - [Profiles](https://github.com/llm-d-incubation/llm-d-validate/blob/main/profiles/README.md) and the [field reference](https://github.com/llm-d-incubation/llm-d-validate/blob/main/profiles/REFERENCE.md).
 - [CLI reference](https://github.com/llm-d-incubation/llm-d-validate/blob/main/docs/cli.md): every command, selecting cases, exit codes, output files.
-- [Coverage](https://github.com/llm-d-incubation/llm-d-validate/blob/main/docs/coverage.md): what each suite checks and the profile key that enables it.
+- [Test suites](https://github.com/llm-d-incubation/llm-d-validate/blob/main/docs/test-suites.md): what each suite checks, the profile key that enables it, and how to run one.
 - [Architecture](https://github.com/llm-d-incubation/llm-d-validate/blob/main/docs/architecture.md): how the code is laid out.
 - [Contributing](https://github.com/llm-d-incubation/llm-d-validate/blob/main/CONTRIBUTING.md). Questions and ideas are welcome in the
   [llm-d Slack](https://llm-d.ai/slack) and in this repository's issues.

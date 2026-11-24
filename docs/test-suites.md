@@ -1,16 +1,28 @@
-# Functional test coverage
+# Test suites
 
-What each suite checks, the profile key that turns it on, and what is missing. Each row is one
-suite package under `src/llmdv/suites/`. The package name is also its pytest marker, so
-`llmdv verify --profile <profile> -m <suite>` runs one suite; a case whose `case_id` prefix names
-another suite carries that marker too. Case counts are not listed here because they drift:
-`llmdv plan --profile <profile>` lists every case a run would hold, after parametrized variants
-(surface, ingress, option) have multiplied them.
+The suites llmdv runs, what each one checks, the profile key that turns it on, and what is still
+missing. Each suite is a package under `src/llmdv/suites/`, and its name is also its pytest marker.
+
+## Run a suite
+
+```sh
+llmdv verify --profile <profile> -m openai_chat            # one suite
+llmdv verify --profile <profile> -m "tools or streaming"   # several
+llmdv verify --profile <profile> -k test_streaming_include_usage   # one case, by test name
+llmdv plan --profile <profile> -m openai_chat              # preview: what would run and skip, offline
+llmdv profile show <profile> --matrix                      # what this profile enables, per surface and ingress
+```
+
+A case whose `case_id` starts with another suite's name carries that suite's marker too. A profile
+with a `selection:` runs only the cases it names; add `--all` to run a suite past it.
+[cli.md](cli.md#selecting-what-runs) has every selector. Case counts are not listed here because
+they drift: `llmdv plan` prints them, after parametrized variants (surface, ingress, option) have
+multiplied them.
 
 | Status | Meaning |
 | --- | --- |
 | built | implemented, with offline regressions that prove it can fail |
-| built, blocked by the fleet | implemented, but needs a capability no committed profile declares, such as a render route |
+| built, blocked by the fleet | implemented, but needs a capability no committed profile declares |
 | not built | no case exists yet; the gap has an issue |
 
 Status describes llmdv and the profiles in this repository, not one night's run. A fleet that
@@ -19,14 +31,14 @@ serves a blocked capability runs those cases once its profile declares it;
 An offline regression pass says nothing about a live fleet: run the cases against it (see
 [getting-started.md](getting-started.md)).
 
-## Coverage
+## Suites
 
 | Suite (marker) | What it checks | Enabled by | Status |
 | --- | --- | --- | --- |
 | Discovery (`discovery`) | `/v1/models` lists the model; unknown models get no fallback; retrieval failures retain JSON, text or empty-body evidence | any surface; `model_retrieval`, `model_info` | built |
 | OpenAI Chat (`openai_chat`) | Basic, streaming, usage, reasoning, fields, choices, logprobs, answer budget | `chat_completions`; `chat_fields`, `chat_options`, `chat_reasoning_efforts`, `model.reasoning` | built |
 | OpenAI Completions (`openai_completions`) | Prompt-based completions, fields, limits, logprobs | `completions`; `completions_fields` | built |
-| OpenAI Responses (`openai_responses`) | Basic, streaming, tools, stored state, cancellation, options | `responses`; `responses_options`, `responses_features`, `stateful_responses` | built |
+| OpenAI Responses (`openai_responses`) | Basic, streaming, tools, options; stored responses and cancellation, or their clean refusal on a stateless stack | `responses`; `responses_options`, `responses_features`, `stateful_responses`, `background_responses` or `stateless_responses`, `responses_compact`, `responses_input_tokens` | built |
 | Anthropic Messages (`anthropic_messages`) | Messages, event order, thinking, streamed thinking and effort, count_tokens, content drops | `messages`; `messages_checks`, `messages_thinking`, `messages_efforts`, `count_tokens` | built |
 | Tool calling (`tools`) | Tool calls, streamed arguments, parallel calls, results, loops; no declared call markup in any answer on a tool surface | `model.tools.parser`, `model.tools.auto_choice`, `model.tools.markup` | built |
 | Streaming (`streaming`) | SSE framing, terminal events, `[DONE]` in the model's text, timing, disconnect then recover | streaming surfaces; `transport.stream_budget` | built |
@@ -36,9 +48,9 @@ An offline regression pass says nothing about a live fleet: run the cases agains
 | Unhappy paths (`unhappy`) | Bad input, credentials and error envelopes get a clean 4xx | every surface; `error_status`, `unstructured_errors` | built |
 | Transport (`transport`) | HTTP handling, encodings, TLS, exposure, retry signals | `ingresses[].transport` | built |
 | Repository contract (`contract`) | Declared surfaces exist, undeclared absent; header dispositions | `surfaces`, `headers`, `header_probe` | built |
-| Render (`render`) | Rendered token ids are stable and prefix-preserving | `*_render` surfaces; `prefix_stability` | built, blocked by the fleet |
+| Render (`render`) | Rendered token ids are stable and prefix-preserving | `*_render` surfaces; `prefix_stability` | built |
 | Prefix cache (`cache`) | Realised prefix reuse across turns, salts, tools, clients | `cache_reuse`; `extension_options: [cache_salt]` | built |
-| Change sentinels (`evolution`) | Forward compat, byte fidelity, prompt and render pins, contract drift | `forward_compat`, `byte_fidelity`, `prompt_pins`, `render_pins`, `contract_baseline` | built (render pins blocked by the fleet) |
+| Change sentinels (`evolution`) | Forward compat, byte fidelity, prompt and render pins, contract drift | `forward_compat`, `byte_fidelity`, `prompt_pins`, `render_pins`, `contract_baseline` | built |
 | Client scenarios (`scenarios`) | Client-shaped multi-request patterns: blank turns, cancel bursts, aliases | `scenario_checks`, `client_model_names`, `chat_quiet_efforts` | built |
 | Real clients (`real_clients`) | Pinned Claude Code sessions through the declared chain | `clients[].binaries`, `client_sessions`, `client_reuse` | built |
 | Fleet invariants (`fleet`) | Config reads, Prometheus bounds, forbidden log lines | `fleet.config`, `fleet.metrics`, `ingresses[].logs` | built |
@@ -58,7 +70,7 @@ as `undeclared` without sending a request.
 | `chat_template_kwargs` effects, cache metric fallback | none | Not built: needs a template fixture and a metric contract |
 | Other Responses request options | none | Partly built: metadata echo, output logprobs, reasoning effort and structured output exist |
 | Valid `output_config.effort` reaching the model | none | Partly built: invalid-value rejection, an output-size effect probe (`messages_checks: [effort_effect]`) and `field_options.messages_effort_rendered` exist; the last needs prompt logprobs on Messages, which the LiteLLM gateway does not return |
-| Render stability and synthetic prefix fixtures | none | Blocked by the fleet: needs a render route that answers 200 with `token_ids` |
+| Render pins measured on a real build | none | Not yet measured: precise-prefix-cache-routing declares render surfaces; its first run supplies the pins |
 | Sanitized production-shaped prefix fixtures, cross-ingress render parity | none | Not built |
 | HTTP/2 framing | none | Not built: needs the `h2` package |
 | 429, 5xx and errors after a stream opens | none | Needs load or fault injection |
@@ -84,5 +96,5 @@ Why some of these checks exist, and the measured behaviours behind them, are in
   `llmdv profile show <profile.yaml> --matrix`.
 - Every case `llmdv verify` would run, with per-suite counts and each skip's class:
   `llmdv plan --profile <profile> [-m <suite>]`. See
-  [Selecting cases](cli.md#selecting-what-runs).
+  [Selecting what runs](cli.md#selecting-what-runs).
 - Every profile key: [profiles/REFERENCE.md](../profiles/REFERENCE.md).

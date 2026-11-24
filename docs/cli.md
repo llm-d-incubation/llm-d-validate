@@ -65,7 +65,7 @@ but never widen it. The ingress id is the parametrisation id, so `-k router` kee
 `cache`, `contract`, `discovery`, `evolution`, `field_options`, `fleet`, `images`,
 `long_context`, `openai_chat`, `openai_completions`, `openai_responses`, `real_clients`,
 `render`, `scenarios`, `streaming`, `tools`, `transport`, `unhappy`
-([coverage.md](coverage.md#coverage)). A case whose `case_id` starts with another suite's name
+([test-suites.md](test-suites.md#suites)). A case whose `case_id` starts with another suite's name
 carries that marker too: `-m openai_chat` selects `openai_chat.disconnect_recovery`, which lives
 in `streaming/`. Cases also carry `disruptive`, `surface`, `surface_generic`, `case_id`, `needs`
 and `samples`. An unknown marker exits `2` and lists the real ones, rather than deselecting
@@ -293,5 +293,5 @@ holds a credential. For an agent-written analysis, use the
 - **Extending llmdv:** a new surface, case or client is additive, and a new gateway, router or
   engine product needs no code
   ([architecture.md](architecture.md#extending-llmdv)).
-- **Coverage:** [coverage.md](coverage.md).
+- **Test suites:** [test-suites.md](test-suites.md): what each suite checks and how to run one.
 - **llmdv's own tests:** no cluster needed; see [CONTRIBUTING.md](../CONTRIBUTING.md).

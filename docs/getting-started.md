@@ -66,6 +66,8 @@ A guide profile runs its `selection` by default: the router path, the overlay's 
 window, and what the guide changes. `--all` runs every case, including engine and model
 conformance. One lane per configuration needs it; the table in
 [profiles/llm-d/README.md](../profiles/llm-d/README.md#which-lane-runs-everything) names it.
+[test-suites.md](test-suites.md) lists every suite, what it checks, and how to run one on its own
+(`-m <suite>`).
 
 A run opens with a banner and ends with a summary:
 

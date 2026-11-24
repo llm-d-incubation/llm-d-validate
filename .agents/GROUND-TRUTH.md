@@ -232,7 +232,7 @@ declared context degrades selector resolution silently to an unresolved label. I
 
 ## Why some checks exist
 
-The reasoning behind checks listed in [docs/coverage.md](../docs/coverage.md).
+The reasoning behind checks listed in [docs/test-suites.md](../docs/test-suites.md).
 
 **A 200 must be well-formed, not just successful.** Some defects hide behind correct responses.
 A reasoning model given a small budget can spend it all thinking and stop at `length` with no

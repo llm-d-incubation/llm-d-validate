@@ -2,7 +2,7 @@
 
 How `llmdv` is laid out, what each part does, and the invariants that keep its results meaningful.
 For the profile format see [profiles/README.md](../profiles/README.md); for what is tested, see
-[coverage.md](coverage.md).
+[test-suites.md](test-suites.md).
 
 ## The core model
 
@@ -171,7 +171,7 @@ The one place modules are described. Paths are under `src/llmdv/`.
 | `output/` | The run directory and publication to `file://` or `s3://` (`ibm_cos.py` under `LLMDV_S3_AUTH=ibm-iam`); `MANIFEST.json` is written last. |
 | `results/` | `results.jsonl`; `read.py` is its one reader and refuses any schema but `llmdv.results/1`, which grows only by optional fields. |
 | `log/` | The logger tree: diagnostics to stderr, primary output to stdout, a redaction filter on every record. |
-| `suites/` | The functional tests, one package per suite and marker ([coverage.md](coverage.md)). |
+| `suites/` | The functional tests, one package per suite and marker ([test-suites.md](test-suites.md)). |
 | `plugin.py` | The pytest plugin: profile loading, ingress parametrisation, skip classes, evidence capture. Every fixture comes from here. |
 | `preflight.py`, `kube.py`, `identity.py`, `notify.py` | Environment checks before any case; the read-only kubectl/oc adapter; the run identity; the Slack message. |
 
