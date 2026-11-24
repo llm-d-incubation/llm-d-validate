@@ -8,7 +8,7 @@ Conventions:
 - Booleans and `model` values are parsed strictly: `"false"` is not `false`, `max_model_len: "8192"` is an error, and a numeric model id must be quoted.
 - A list in an enumerated field rejects unknown values. The capability vocabularies (efforts,
   thinking, checks, sessions, options, repeats, `byte_fidelity`) also reject repeats.
-- Unknown keys at the top level, in a per-ingress override, in `cache_reuse` and in `transport` are errors. The top-level keys are the table below and [`extends`](#extends); the error names the file and the closest known key.
+- Unknown keys at the top level, in the top-level `capabilities` block, in a per-ingress override, in `cache_reuse` and in `transport` are errors, and one load reports every one of them together with the block's other problems. The top-level keys are the table below and [`extends`](#extends); the error names the file and the closest known key.
 - A profile file is UTF-8 text.
 
 `tests/test_profile_reference.py` checks that every table below matches the schema in `src/llmdv/profile/schema.py`.
