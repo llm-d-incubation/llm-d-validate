@@ -53,7 +53,7 @@ which lane runs every case with `--all`.
 
 ### Add your gateway
 
-If a gateway sits in front of the router (Istio, kgateway, LiteLLM or your own), add it as a
+If a gateway sits in front of the router (Istio, agentgateway, LiteLLM or your own), add it as a
 second ingress. Write a short local file that extends the guide's combination:
 
 ```yaml
