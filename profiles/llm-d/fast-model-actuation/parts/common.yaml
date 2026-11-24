@@ -1,0 +1,103 @@
+# Part: what every fast-model-actuation profile shares. Not a profile on its own; a combination
+# file beside this folder lists it last in `extends`. Never extends anything.
+#
+# G = guides/fast-model-actuation, R = guides/recipes, at llm-d 9ca8ff0.
+#
+# No `name` here: the combination file names itself.
+#
+# The router, as this guide configures it (FROM values): G/router/fast-model-actuation.values.yaml:
+# profile `default` = queue-scorer (weight 1) and kv-cache-utilization-scorer (weight 1), no
+# prefix-cache plugin, on top of R/router/base.values.yaml. The InferencePool selects the FMA
+# requester pods (llm-d.ai/model qwen3-0.6b) on targetPort 8000. The shared router claims mapped
+# in ../../optimized-baseline/parts/common.yaml hold here, except prefix affinity, which this
+# guide does not configure. No configuration names an SLO admission plugin, so the topology
+# part's SLO-header declarations stand.
+#
+# The serving path (FROM values: G/modelserver/, G/requester/, G/platform/{gke,ocp}/, read and
+# rendered): the EPP routes to a requester pod's port 8000, where the requester image v0.8.0 runs
+# a TCP proxy (--proxy-port=8000) to the vLLM instance the FMA controllers bound to it. That vLLM
+# runs as a child of a launcher pod (launcher image v0.8.0) on one of the LauncherConfig's pool
+# ports, started with the InferenceServerConfig's options. The proxy is in every request's path.
+# As a TCP proxy it should pass vLLM's own responses through unchanged, but its behaviour on a
+# refused or dropped connection, and any error it answers itself, have not been measured.
+#
+# The modelserver/gpu/vllm/{base,gke,ocp} overlays are detection-only stubs for the benchmark
+# harness (a replicas: 0 Deployment that only names the model); the lanes stand the guide up with
+# `kubectl apply -k platform/<INFRA_PROVIDER>` (guide.yaml deploy.modelserver).
+#
+# The guide's claims (G/README.md, G/guide.yaml) and where each one lands:
+#   1   /v1/completions answers through the EPP (verify.tests.request)
+#       -> openai_completions.* and every other surface case
+#   2   scaling the requesters to zero puts the vLLM instances to sleep, and scaling back up
+#       wakes them (hot start) and serves again (verify.tests.sleep_wake, README "Demonstrate
+#       Sleep/Wake")
+#       -> NOT COVERED: llmdv never scales anything, and the sleeping label is cluster state
+#   3   hot start in seconds, warm start in tens of seconds (README "Overview")
+#       -> NOT COVERED: timing; a benchmark, not llmdv
+#   4   launcher, requester and controller lifecycle (binding, LRU eviction of sleeping
+#       instances, one launcher per GPU node)
+#       -> NOT COVERED: cluster state, which a committed profile does not read
+#   5   gateway mode and the GATEWAY_CLASS values other than epponly
+#       -> NOT COVERED: no lane runs them
+
+guide: fast-model-actuation
+
+capabilities:
+  # Not declared, on purpose. The cache suite reads cached_tokens from each response, and the
+  # InferenceServerConfig's options (`--model Qwen/Qwen3-0.6B --enable-sleep-mode
+  # --gpu-memory-utilization 0.9`, FROM values: G/modelserver/inferenceserverconfig.yaml) do not
+  # include --enable-prompt-tokens-details. The router has no prefix-cache plugin either, so
+  # `affinity: routed` has nothing to observe.
+  cache_reuse: null
+
+# The cases this guide's lanes run by default (`llmdv verify --all` runs everything). They test
+# what a lane's own deployment can get wrong: the router path, the overlay's parsers and window,
+# and what this guide changes. Engine and model conformance, the rest of the suite, depends only
+# on the engine build, model and flags, which many lanes share; it runs with `--all` once per
+# configuration (profiles/llm-d/README.md, "Which lane runs everything").
+selection:
+  # Every lane: the router serves each API a client uses, and refuses what it should.
+  - contract.*
+  - discovery.models_lists_declared_model
+  - discovery.unknown_model_no_fallback
+  - discovery.models_parses_with_openai_sdk
+  - openai_chat.basic_non_streaming
+  - openai_chat.streaming_sse
+  - openai_chat.stop_reason
+  - openai_completions.basic_non_streaming
+  - openai_completions.streaming_matches_json
+  - openai_completions.stop_reason
+  - anthropic_messages.basic_non_streaming
+  - anthropic_messages.streaming_sse
+  - openai_responses.basic_non_streaming
+  - openai_responses.streaming_sse
+  - streaming.sse_framing
+  - unhappy.unknown_path
+  - unhappy.malformed_json
+  - unhappy.missing_model
+  - unhappy.wrong_method
+  - unhappy.error_envelope_fields
+  - transport.connection
+  - transport.health_status
+  # Every lane: the overlay's parser flags take effect (skips where the model part has none).
+  - openai_chat.configured_reasoning
+  - tools.auto_call
+  - tools.auto_stream
+  # Every lane: the overlay's context window is the one declared.
+  - long_context.*
+  - unhappy.context_overflow
+  - unhappy.token_limit_over_context
+  # This guide: the router reaches vLLM through the requester's TCP proxy: the HTTP behaviours a
+  # proxy can change.
+  - transport.chunked_request
+  - transport.body_edge
+  - transport.long_header
+  - transport.header_name_case
+  - transport.bodiless_header
+  - transport.content_type
+  - transport.accept_event_stream
+  - transport.response_encoding
+  - transport.query_string
+  - transport.path_variant
+  - transport.expect_continue
+  - streaming.*

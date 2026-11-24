@@ -1,0 +1,110 @@
+# Part: what every tiered-prefix-cache profile shares. Not a profile on its own; a combination
+# file beside this folder lists it last in `extends`. Never extends anything.
+#
+# G = guides/tiered-prefix-cache, R = guides/recipes, at llm-d 9ca8ff0.
+#
+# No `name` here: each combination names itself.
+#
+# The overlay is modelserver/<ACCELERATOR_TYPE>/<MODEL_SERVER>/<CONNECTOR>/<VARIANT>/
+# <INFRA_PROVIDER>/ (FROM values: G/guide.yaml env.static and deploy.modelserver). CONNECTOR is
+# the offloading implementation (native, lmcache-connector) and VARIANT the tier (cpu = CPU RAM,
+# fs = CPU RAM plus a shared filesystem on a ReadWriteMany PVC). Neither changes the model, the
+# window or the parsers a client sees, so lanes that differ only in them share a combination and
+# are told apart with --identity flavor=<CONNECTOR short name>-<VARIANT> (README.md).
+#
+# The router, as every lane configures it (FROM values: G/router/single-host/
+# tiered-prefix-cache-cpu.values.yaml; no lane sets HOST_TYPE=multi-host):
+#   approx-prefix-cache-producer twice: `gpu-prefix-cache-producer` (auto-tuned, the HBM tier) and
+#                                  `cpu-prefix-cache-producer` (autoTune false,
+#                                  lruCapacityPerServer 19200 blocks of 64 tokens, sized for the
+#                                  GPU native overlay's 300 GiB CPU tier)
+#   queue-scorer, kv-cache-utilization-scorer, a prefix-cache-scorer per producer, and
+#                                  no-hit-lru-scorer in the `default` profile
+#   R/router/base.values.yaml for the rest, as in optimized-baseline
+# No configuration names an SLO admission plugin, so the topology part's `ignored` SLO headers
+# stand.
+#
+# Block sizes (FROM values: G/modelserver/): xpu vLLM --block-size 64; SGLang --page-size=64;
+# amd native fs offloads in 256-token blocks (kv_connector_extra_config.block_size); everything
+# else the engine default. The router's producers count 64-token blocks. Not declared as
+# cache_reuse.block_size, because cache_reuse is not declared (below).
+#
+# Router claims this guide shares with optimized-baseline (error envelopes, header handling,
+# streaming pass-through, the EPP's HTTP APIs, FailOpen, gateway mode): see
+# ../../optimized-baseline/parts/common.yaml, claims 8 to 28; they land on the same cases here.
+#
+# The guide's own claims (G/README.md and G/guide.yaml verify.tests) and where each one lands:
+#   model          the served model id equals MODEL (two sub-variants serve another model), read
+#                  from one pod's /v1/models -> discovery.models_lists_declared_model through the
+#                  EPP, with each combination's model part naming the id its overlay loads
+#   request        /v1/completions through the EPP answers -> openai_completions.*
+#   shared_prefix  ten requests sharing a ~2k-token prefix all answer -> openai_completions.* for
+#                  the answers; reuse from the offload tier -> NOT COVERED (below)
+#   offload_metrics  per-pod vllm:kv_offload_{store,load}_bytes_total,
+#                  vllm:external_prefix_cache_{hits,queries}_total, lmcache:local_cache_usage,
+#                  lmcache:retrieve_hit_rate; SGLang sglang:hicache_host_used_tokens,
+#                  evicted_tokens_total, load_back_tokens_total, cached_tokens_total
+#                  -> NOT COVERED: engine metrics through the API-server proxy need an engine layer
+#                     and cluster access a committed profile does not carry
+#   offload_gate   native connector on gpu, amd, xpu: vllm:kv_offload_store_bytes_total summed over
+#                  pods is above zero -> NOT COVERED, same reason
+#   shared_tier    native fs: a prefix primed on one pod is a hit on another, which loads it from
+#                  the shared filesystem -> NOT COVERED: calls each pod directly (per-pod engine
+#                  ingresses a committed profile cannot name) and reads its metrics
+#   pvc            fs lanes: the guide's shared KV-cache PVC exists -> NOT COVERED: a cluster object,
+#                  for fleet.config from a lane's own local file
+#   offload        evicted blocks are loaded back rather than recomputed, so long shared prefixes get
+#                  faster -> a benchmark, not llmdv; no response field shows a tier hit
+#   context        each overlay's window -> long_context.*, unhappy.context_overflow via
+#                  model.max_model_len (model parts)
+#   parsers        reasoning and tool parsers per overlay -> model.reasoning and model.tools
+
+guide: tiered-prefix-cache
+
+capabilities:
+  # Not declared, on purpose. The cache suite reads cached_tokens from each response, and no
+  # overlay of this guide asks an engine to report it: none passes vLLM's
+  # --enable-prompt-tokens-details or SGLang's --enable-cache-report (FROM values:
+  # G/modelserver/). With no cached_tokens, the cache cases would fail on a correct stack for want
+  # of the field, and a hit served from the CPU or filesystem tier is invisible to a client anyway.
+  cache_reuse: null
+
+# The cases this guide's lanes run by default (`llmdv verify --all` runs everything). They test
+# what a lane's own deployment can get wrong: the router path, the overlay's parsers and window,
+# and what this guide changes. Engine and model conformance, the rest of the suite, depends only
+# on the engine build, model and flags, which many lanes share; it runs with `--all` once per
+# configuration (profiles/llm-d/README.md, "Which lane runs everything").
+selection:
+  # Every lane: the router serves each API a client uses, and refuses what it should.
+  - contract.*
+  - discovery.models_lists_declared_model
+  - discovery.unknown_model_no_fallback
+  - discovery.models_parses_with_openai_sdk
+  - openai_chat.basic_non_streaming
+  - openai_chat.streaming_sse
+  - openai_chat.stop_reason
+  - openai_completions.basic_non_streaming
+  - openai_completions.streaming_matches_json
+  - openai_completions.stop_reason
+  - anthropic_messages.basic_non_streaming
+  - anthropic_messages.streaming_sse
+  - openai_responses.basic_non_streaming
+  - openai_responses.streaming_sse
+  - streaming.sse_framing
+  - unhappy.unknown_path
+  - unhappy.malformed_json
+  - unhappy.missing_model
+  - unhappy.wrong_method
+  - unhappy.error_envelope_fields
+  - transport.connection
+  - transport.health_status
+  # Every lane: the overlay's parser flags take effect (skips where the model part has none).
+  - openai_chat.configured_reasoning
+  - tools.auto_call
+  - tools.auto_stream
+  # Every lane: the overlay's context window is the one declared.
+  - long_context.*
+  - unhappy.context_overflow
+  - unhappy.token_limit_over_context
+  # This guide: the guide's check sends completions sharing a long prefix.
+  - openai_completions.prompt_forms

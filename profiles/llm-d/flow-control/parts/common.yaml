@@ -1,0 +1,125 @@
+# Part: what every flow-control profile shares. Not a profile on its own; a combination file
+# beside this folder lists it last in `extends`. Never extends anything.
+#
+# G = guides/flow-control, OB = guides/optimized-baseline, R = guides/recipes, at llm-d 9ca8ff0.
+#
+# No `name` here: each combination names itself, so each run says which one it was.
+
+#
+# The router, as this guide configures it (FROM values: G/router/flow-control.values.yaml, layered
+# on R/router/base.values.yaml; helm release `flow-control`, so the Service is flow-control-epp):
+#   feature gate      flowControl
+#   scheduling        profile `default` = queue-scorer 2, kv-cache-utilization-scorer 2,
+#                     prefix-cache-scorer 3 (not optimized-baseline's prefix-cache-affinity-filter
+#                     and token-load-scorer)
+#   flow control      maxBytes 10Gi, maxRequests 1k, defaultRequestTTL 60s; saturation detector
+#                     concurrency-detector (maxConcurrency 132, concurrencyMode requests,
+#                     headroom 0.0); priority bands 100 (maxRequests 500), 0 (200), -10 (50), each
+#                     round-robin-fairness-policy and fcfs-ordering-policy
+#   objectives        G/objectives.yaml: InferenceObjectives premium-traffic (100),
+#                     standard-traffic (0), best-effort-traffic (-10), on pool flow-control
+# CI-only changes (FROM values: G/scripts/nightly-deploy-gke.sh): maxConcurrency lowered to 4,
+# EPP --v=4, Envoy log level info, EPP metrics auth off, and the model server cut to one replica.
+# With one replica and maxConcurrency 4, the pool dispatches four requests at once and queues the
+# rest in the EPP for up to defaultRequestTTL (60s) before rejecting them.
+#
+# What that means for llmdv's own run, which sends one request at a time: flow control is
+# work-conserving, so a single request never queues, and every case sees the router as
+# optimized-baseline's would. Two cases send concurrent requests: scenarios.cancel_burst (eight
+# streams at once) and the cache suite's parallel sub-agents (four; not run here, since
+# cache_reuse is not declared). Under the CI setting, four of cancel_burst's streams wait in the
+# EPP until a cancelled stream frees its slot; well inside the 60s TTL and the band's 200-request
+# limit, so a correct stack still serves them. A rejection there (429, 503 or 500 with
+# x-llm-d-request-dropped-reason) is a finding, not a skip.
+#
+# Model servers: this guide keeps no modelserver/ overlay. Each lane renders optimized-baseline's
+# and relabels it (`sed s/optimized-baseline/flow-control/g`), so the model, window and parsers
+# are optimized-baseline's (the model parts list the overlays).
+#
+# The guide's claims (G/README.md, G/guide.yaml) and where each one lands. Router claims it
+# shares with optimized-baseline (surfaces, streaming pass-through, the EPP's error envelopes,
+# header aliases) land as ../../optimized-baseline/parts/common.yaml maps them.
+#   1   the flowControl feature gate is on ("Initializing Flow Control layer" in the EPP log,
+#       guide.yaml verify.tests.feature_gate) -> NOT COVERED: needs log access (fleet.logs) a
+#       committed profile does not carry
+#   2   maxConcurrency is the one value in the values file (verify.tests.max_concurrency)
+#       -> NOT COVERED: a config read, fleet.config, same reason
+#   3   llm_d_epp_flow_control_pool_saturation reads 0 on an idle pool, per-flow series appear
+#       after a flow's first request (README "Proof of Queuing") -> NOT COVERED: needs the EPP
+#       metrics port (9090) and an EPP-metrics contract
+#   4   requests are classified by x-llm-d-inference-fairness-id and x-llm-d-inference-objective
+#       into a band; a premium request is accounted under priority="100" (README Use Case 1)
+#       -> headers declared `consumed` in ../../parts/topology/standalone.yaml, which skip as
+#          requires_load (#23); the per-band accounting needs the EPP metrics as in 3
+#   5   an objective that names no InferenceObjective falls back to band 0 (G/guide.yaml,
+#       deploy.objectives) -> NOT COVERED: invisible to a client without contention (#23)
+#   6   backpressure: past maxConcurrency x ready replicas the EPP holds requests rather than
+#       dispatching (README Use Case 2, .github/scripts/e2e/e2e-validate-flow-control.sh)
+#       -> NOT COVERED: requires_load (#23)
+#   7   strict priority: under contention best-effort waits longer than premium (the CI
+#       validator's QoS gap) -> NOT COVERED: requires_load (#23)
+#   8   round-robin fairness between tenants in one band, FCFS within a flow -> NOT COVERED:
+#       requires_load (#23); the guide itself scopes weighted fairness at scale to a benchmark
+#   9   shedding: a band at its maxRequests, the global limits, or a request queued past
+#       defaultRequestTTL is rejected with 429, 503 or 500 and x-llm-d-request-dropped-reason
+#       (FROM docs: docs/api-reference/epp-http-headers.md) -> NOT COVERED: requires_load (#23).
+#       The header's absence on a success is declared in the topology part
+#   10  latency and throughput under multi-tenant load -> a benchmark (the guide's Benchmarking
+#       section), not llmdv
+#   11  one model, Qwen/Qwen3-32B, as optimized-baseline serves it -> model parts,
+#       discovery.models_lists_declared_model, discovery.unknown_model_no_fallback
+
+guide: flow-control
+
+capabilities:
+  # Not declared, on purpose, as in optimized-baseline. The cache suite reads cached_tokens from
+  # each response, and neither overlay this guide's lanes render (OB/modelserver/gpu/vllm/gke,
+  # OB/modelserver/amd/vllm/base) passes vLLM's --enable-prompt-tokens-details. With no
+  # cached_tokens, `affinity: routed` would fail on a correct stack for want of the field.
+  cache_reuse: null
+
+# The cases this guide's lanes run by default (`llmdv verify --all` runs everything). They test
+# what a lane's own deployment can get wrong: the router path, the overlay's parsers and window,
+# and what this guide changes. Engine and model conformance, the rest of the suite, depends only
+# on the engine build, model and flags, which many lanes share; it runs with `--all` once per
+# configuration (profiles/llm-d/README.md, "Which lane runs everything").
+selection:
+  # Every lane: the router serves each API a client uses, and refuses what it should.
+  - contract.*
+  - discovery.models_lists_declared_model
+  - discovery.unknown_model_no_fallback
+  - discovery.models_parses_with_openai_sdk
+  - openai_chat.basic_non_streaming
+  - openai_chat.streaming_sse
+  - openai_chat.stop_reason
+  - openai_completions.basic_non_streaming
+  - openai_completions.streaming_matches_json
+  - openai_completions.stop_reason
+  - anthropic_messages.basic_non_streaming
+  - anthropic_messages.streaming_sse
+  - openai_responses.basic_non_streaming
+  - openai_responses.streaming_sse
+  - streaming.sse_framing
+  - unhappy.unknown_path
+  - unhappy.malformed_json
+  - unhappy.missing_model
+  - unhappy.wrong_method
+  - unhappy.error_envelope_fields
+  - transport.connection
+  - transport.health_status
+  # Every lane: the overlay's parser flags take effect (skips where the model part has none).
+  - openai_chat.configured_reasoning
+  - tools.auto_call
+  - tools.auto_stream
+  # Every lane: the overlay's context window is the one declared.
+  - long_context.*
+  - unhappy.context_overflow
+  - unhappy.token_limit_over_context
+  # This guide: requests queue in the router: concurrent and cancelled requests must still be
+  # served, and a cancelled one must free its slot.
+  - scenarios.cancel_burst
+  - streaming.cancel_then_next
+  - streaming.disconnect_before_output
+  - openai_chat.disconnect_recovery
+  - anthropic_messages.disconnect_recovery
+  - openai_responses.disconnect_recovery

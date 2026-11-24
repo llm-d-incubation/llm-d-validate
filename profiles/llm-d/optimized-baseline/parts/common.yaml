@@ -1,7 +1,7 @@
 # Part: what every optimized-baseline profile shares. Not a profile on its own; a combination file
 # beside this folder lists it last in `extends`. Never extends anything.
 #
-# G = guides/optimized-baseline, R = guides/recipes, at llm-d 565373b.
+# G = guides/optimized-baseline, R = guides/recipes, at llm-d 9ca8ff0.
 #
 # No `name` here: the guide spans many combinations (engine, model configuration and topology),
 # and each run must say which one it was. The combination file names itself.
@@ -93,7 +93,50 @@ capabilities:
   # Not declared, on purpose. The cache suite reads cached_tokens from each response, and no
   # overlay of this guide asks an engine to report it: none passes vLLM's
   # --enable-prompt-tokens-details or SGLang's --enable-cache-report (FROM values:
-  # G/modelserver/, against guides/pd-disaggregation, which does). With no cached_tokens,
+  # G/modelserver/; at llm-d 9ca8ff0 only pd-disaggregation's community TPU v7 overlays, which no
+  # lane runs, pass either). With no cached_tokens,
   # `affinity: routed` would fail on a correct stack for want of the field, not for want of
   # affinity. The guide's own prefix-affinity claim (3 above) needs routing.prefix_affinity.
   cache_reuse: null
+
+# The cases this guide's lanes run by default (`llmdv verify --all` runs everything). They test
+# what a lane's own deployment can get wrong: the router path, the overlay's parsers and window,
+# and what this guide changes. Engine and model conformance, the rest of the suite, depends only
+# on the engine build, model and flags, which many lanes share; it runs with `--all` once per
+# configuration (profiles/llm-d/README.md, "Which lane runs everything").
+selection:
+  # Every lane: the router serves each API a client uses, and refuses what it should.
+  - contract.*
+  - discovery.models_lists_declared_model
+  - discovery.unknown_model_no_fallback
+  - discovery.models_parses_with_openai_sdk
+  - openai_chat.basic_non_streaming
+  - openai_chat.streaming_sse
+  - openai_chat.stop_reason
+  - openai_completions.basic_non_streaming
+  - openai_completions.streaming_matches_json
+  - openai_completions.stop_reason
+  - anthropic_messages.basic_non_streaming
+  - anthropic_messages.streaming_sse
+  - openai_responses.basic_non_streaming
+  - openai_responses.streaming_sse
+  - streaming.sse_framing
+  - unhappy.unknown_path
+  - unhappy.malformed_json
+  - unhappy.missing_model
+  - unhappy.wrong_method
+  - unhappy.error_envelope_fields
+  - transport.connection
+  - transport.health_status
+  # Every lane: the overlay's parser flags take effect (skips where the model part has none).
+  - openai_chat.configured_reasoning
+  - tools.auto_call
+  - tools.auto_stream
+  # Every lane: the overlay's context window is the one declared.
+  - long_context.*
+  - unhappy.context_overflow
+  - unhappy.token_limit_over_context
+  # This guide: claims 1-2 and 13: completions with a shared prefix, and streaming through the
+  # router.
+  - openai_completions.prompt_forms
+  - streaming.*

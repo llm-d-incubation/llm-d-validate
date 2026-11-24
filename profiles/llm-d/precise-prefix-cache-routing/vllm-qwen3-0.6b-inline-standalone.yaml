@@ -1,0 +1,39 @@
+# The precise-prefix-cache-routing guide in standalone mode (the client reaches the EPP's own
+# listener):
+# vLLM serving Qwen/Qwen3-0.6B with no parsers (an Intel XPU vLLM build).
+#
+# STATUS: WRITTEN, NOT RUN. llm-d 9ca8ff0.
+#
+# CI lane that deploys this configuration (llm-d's nightly-e2e-precise-prefix-cache-routing-<lane>
+# workflow; it runs in standalone mode, gateway_class epponly):
+#   intel-acc-xpu-vllm-x              xpu/vllm (the lane sets no provider, so it applies that
+#                                     folder's own kustomization, which includes `base`)
+# Identity flags per lane:
+#   intel-acc-xpu-vllm-x              --identity accelerator=xpu --identity provider=base
+#
+# llm-d-xpu v1.0.0 with --enable-scale-out, --block-size=64 and --kv-events-config (FROM
+# values: modelserver/xpu/vllm/base/patch-vllm.yaml).
+# The router's token-producer modelName stays Qwen/Qwen3-32B (FROM values: router/
+# precise-prefix-cache-routing.values.yaml) while these pods serve Qwen/Qwen3-0.6B; the guide's
+# README asks the operator to edit it by hand. Unedited, every render call names a model the
+# pods do not serve and is refused (README.md, "Upstream notes").
+#
+# How a lane runs it, after deploying the guide in standalone mode (guide.yaml deploy.standalone)
+# with one of the overlays above (GUIDE_NAME=precise-prefix-cache-routing):
+#   export LLMDV_EPP_URL=http://<GUIDE_NAME>-epp.<namespace>.svc.cluster.local
+#   # or from outside the cluster:
+#   #   kubectl port-forward -n <namespace> svc/<GUIDE_NAME>-epp 18080:80 &
+#   #   export LLMDV_EPP_URL=http://localhost:18080
+#   llmdv profile validate profiles/llm-d/precise-prefix-cache-routing/vllm-qwen3-0.6b-inline-standalone.yaml
+#   llmdv verify --profile profiles/llm-d/precise-prefix-cache-routing/vllm-qwen3-0.6b-inline-standalone.yaml \
+#     <the lane's identity flags above>
+
+extends:
+  - ../parts/base.yaml
+  - ../parts/topology/standalone.yaml
+  - ../parts/engines/vllm.yaml
+  - ../parts/models/qwen3-0.6b-inline.yaml
+  - ../parts/sentinels/unmeasured.yaml
+  - parts/common.yaml
+
+name: precise-prefix-cache-routing-vllm-qwen3-0.6b-inline-standalone

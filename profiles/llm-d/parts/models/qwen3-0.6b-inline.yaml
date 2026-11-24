@@ -2,10 +2,19 @@
 # tool-call parsers. Not a profile on its own; a combination file lists it after the engine part.
 # Never extends anything.
 #
-# Used by (overlays as ACCELERATOR_TYPE/MODEL_SERVER/INFRA_PROVIDER, at llm-d 565373b):
+# Used by (overlays as ACCELERATOR_TYPE/MODEL_SERVER/INFRA_PROVIDER, at llm-d 9ca8ff0):
 #   xpu/vllm/base               an Intel XPU vLLM build; --dtype=float16 --disable-sliding-window
 #   xpu/sglang/base             an Intel XPU SGLang build; --dtype=float16
 # FROM values: guides/optimized-baseline/modelserver/xpu/{vllm,sglang}/base/.
+#   fast-model-actuation platform/{gke,ocp}
+#                               vLLM run by the FMA launcher image v0.8.0 (the vLLM version is
+#                               not pinned anywhere in the guide); --model Qwen/Qwen3-0.6B
+#                               --enable-sleep-mode --gpu-memory-utilization 0.9
+# FROM values: guides/fast-model-actuation/modelserver/inferenceserverconfig.yaml.
+# Also used by precise-prefix-cache-routing xpu/vllm/base (the same build and flags, plus
+# --enable-scale-out, --block-size=64 and KV events) and predicted-latency-routing xpu/vllm/base
+# (optimized-baseline's xpu/vllm overlay, unchanged). FROM values:
+# guides/{precise-prefix-cache-routing,predicted-latency-routing}/modelserver/xpu/vllm/.
 #
 # Excluded, and why:
 #   model.tools         no tool parser

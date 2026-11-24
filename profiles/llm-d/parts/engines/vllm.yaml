@@ -6,9 +6,12 @@
 # guides/optimized-baseline/modelserver/*/vllm/): the upstream vllm-openai v0.31.0 images (CUDA,
 # ROCm, CPU, TPU), vllm-torchtpu v0.29.0, and vendor builds derived from vLLM (a v0.28.0 fork, a
 # 0.24.0 fork, rbln-serve 0.12.0 as a vLLM plugin, and two vendor images whose vLLM version the
-# config does not state). They share vLLM's OpenAI-compatible server, so they share its request
-# vocabulary; an older or forked build that lacks an extension fails that field's case, which is
-# the measurement.
+# config does not state). The other guides' lanes add: vllm-openai-rocm v0.32.0-rc.2 (an llm-d
+# build; pd-disaggregation and wide-ep on AMD), llm-d-xpu v1.0.0 (pd-disaggregation and wide-ep on
+# Intel XPU), vllm-tpu v0.31.0, vLLM inside the fast-model-actuation launcher (version not
+# stated), and vLLM's floating `nightly` image on keda-epp's OpenShift lane. They share vLLM's
+# OpenAI-compatible server, so they share its request vocabulary; an older or forked build that
+# lacks an extension fails that field's case, which is the measurement.
 
 #
 # Not declared here, and why:

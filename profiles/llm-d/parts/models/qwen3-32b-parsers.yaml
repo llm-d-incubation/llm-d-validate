@@ -2,11 +2,22 @@
 # tool-call parser with automatic tool choice. Not a profile on its own; a combination file lists
 # it after the engine part. Never extends anything.
 #
-# Used by (overlays as ACCELERATOR_TYPE/MODEL_SERVER/INFRA_PROVIDER, at llm-d 565373b):
+# Used by (overlays as ACCELERATOR_TYPE/MODEL_SERVER/INFRA_PROVIDER, at llm-d 9ca8ff0):
 #   gpu/vllm/{base,gke,ocp}     vllm --reasoning-parser=qwen3 --tool-call-parser=hermes
 #                               --enable-auto-tool-choice
 #   gpu/sglang/{base,gke}       sglang --reasoning-parser=qwen3 --tool-call-parser=qwen
 # FROM values: guides/optimized-baseline/modelserver/gpu/{vllm,sglang}/base/patch-*.yaml.
+# The same vLLM overlays, deployed by other guides' lanes:
+#   flow-control       optimized-baseline gpu/vllm/gke, relabelled
+#   agentic-api        guides/agentic-api/modelserver/gpu/vllm/gke (optimized-baseline gpu/vllm/gke)
+#   async-multitenant  guides/batch-serving/asynchronous-processing/multitenant/modelserver/
+#                      gpu/vllm/gke (optimized-baseline gpu/vllm/base, relabelled, NCCL patch)
+#   keda-epp           optimized-baseline gpu/vllm/gke and gpu/vllm/base
+# Also used by precise-prefix-cache-routing gpu/vllm/{base,gke,ocp} (vllm, same parsers, plus
+# --block-size=64 and KV events), and tiered-prefix-cache gpu/vllm/{lmcache-connector,native}/cpu/
+# {base,gke,ocp} (vllm, same parsers) and gpu/sglang/native/cpu/gke (sglang v0.5.22, same
+# parsers, HiCache). FROM values: guides/{precise-prefix-cache-routing,tiered-prefix-cache}/
+# modelserver/gpu/.
 #
 # The parser NAMES are the engine's own flag values, so each combination file states them; this
 # part states the shape a client sees, which is the same for both engines.

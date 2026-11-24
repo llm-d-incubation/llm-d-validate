@@ -1,0 +1,39 @@
+# The fast-model-actuation guide in standalone mode (the client reaches the EPP's own listener):
+# vLLM, run by the FMA launcher and reached through the FMA requester's TCP proxy, serving
+# Qwen/Qwen3-0.6B with no parsers: inline <think>, no tool calls.
+#
+# STATUS: WRITTEN, NOT RUN. llm-d 9ca8ff0. Composed from the guide's shipped config and the API
+# references. Only the router layer has been measured (on kind, with a simulator engine; see
+# ../parts/topology/standalone.yaml).
+#
+# CI lanes that deploy this configuration (llm-d's nightly-e2e-fast-model-actuation-<lane>
+# workflows; each runs in standalone mode, gateway_class epponly):
+#   gke-acc-gpu-vllm-x                INFRA_PROVIDER=gke: platform/gke (modelserver/ plus the GKE
+#                                     component: privileged launcher with the host driver tree,
+#                                     GKE node labels and taint toleration)
+#   ibm-acc-gpu-vllm-x                INFRA_PROVIDER=ocp: platform/ocp (modelserver/ as-is, on the
+#                                     `nvidia` RuntimeClass)
+# Both apply the same InferenceServerConfig (`--model Qwen/Qwen3-0.6B --enable-sleep-mode
+# --gpu-memory-utilization 0.9`) to the same launcher and requester images (v0.8.0), so they look
+# the same to a client. The vLLM version is the launcher image's; the guide does not pin it.
+# Not covered: fast-model-actuation-keda (its own guide.yaml, deferred); see README.md.
+#
+# How a lane runs it, after deploying the guide in standalone mode (guide.yaml deploy.standalone
+# and deploy.modelserver, through the requester rollout):
+#   export LLMDV_EPP_URL=http://<GUIDE_NAME>-epp.<namespace>.svc.cluster.local
+#   # or from outside the cluster:
+#   #   kubectl port-forward -n <namespace> svc/<GUIDE_NAME>-epp 18080:80 &
+#   #   export LLMDV_EPP_URL=http://localhost:18080
+#   llmdv profile validate profiles/llm-d/fast-model-actuation/vllm-qwen3-0.6b-inline-standalone.yaml
+#   llmdv verify --profile profiles/llm-d/fast-model-actuation/vllm-qwen3-0.6b-inline-standalone.yaml \
+#     --identity accelerator=gpu --identity provider=<INFRA_PROVIDER>
+
+extends:
+  - ../parts/base.yaml
+  - ../parts/topology/standalone.yaml
+  - ../parts/engines/vllm.yaml
+  - ../parts/models/qwen3-0.6b-inline.yaml
+  - ../parts/sentinels/unmeasured.yaml
+  - parts/common.yaml
+
+name: fast-model-actuation-vllm-qwen3-0.6b-inline-standalone

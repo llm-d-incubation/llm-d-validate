@@ -1,0 +1,111 @@
+# Part: what every keda-epp profile shares. Not a profile on its own; a combination file beside
+# this folder lists it last in `extends`. Never extends anything.
+#
+# K = guides/workload-autoscaling/keda-epp, S = guides/workload-autoscaling/scripts,
+# OB = guides/optimized-baseline, R = guides/recipes, at llm-d 9ca8ff0.
+#
+# No `name` here: each combination names itself, so each run says which one it was.
+
+#
+# The guide autoscales optimized-baseline's model server with a KEDA ScaledObject on an EPP
+# metric. Its lanes deploy the router and model server themselves (FROM values: S/nightly-deploy-*):
+#   gke    helm release keda-epp-gke (Service keda-epp-gke-epp): R/router/base.values.yaml,
+#          OB/router/optimized-baseline.values.yaml, R/router/features/monitoring-gke.values.yaml,
+#          K/optimized-baseline/router.values.yaml; model server OB/modelserver/gpu/vllm/gke;
+#          ScaledObject K/optimized-baseline/overlays/k8s/queue (flow-control queue size and
+#          running requests), against Google Managed Prometheus
+#   amd    helm release keda-epp-rocm (Service keda-epp-rocm-epp): the same router values with
+#          R/router/features/monitoring.values.yaml; model server OB/modelserver/amd/vllm/base;
+#          ScaledObject overlays/k8s/queue
+#   ibm    helm release keda-epp-inflight (Service keda-epp-inflight-epp): R/router/base,
+#          OB/router/optimized-baseline.values.yaml and monitoring.values.yaml, NOT
+#          K/optimized-baseline/router.values.yaml, so no flow control; model server
+#          OB/modelserver/gpu/vllm/base; ScaledObject overlays/ocp/inflight
+#          (llm_d_epp_inflight_requests), against Thanos
+# K/optimized-baseline/router.values.yaml (gke and amd) turns on the flowControl feature gate with
+# no flowControl section, so the EPP's defaults apply (global-strict fairness, FCFS,
+# utilization-detector; FROM docs: guides/flow-control/README.md "Default Configuration"), and
+# replaces optimized-baseline's scheduling profile with queue-scorer 2,
+# kv-cache-utilization-scorer 2, prefix-cache-scorer 3, no-hit-lru-scorer 2. Every lane starts the
+# model server at one replica with maxReplicaCount 2.
+#
+# What that means for llmdv's run: with one request at a time, neither flow control (work
+# conserving) nor the scheduling profile changes what a client sees, so lanes that serve the same
+# model configuration share a combination. The replica count is not fixed: the lane's
+# scale-event validator drives the HPA from 1 to 2 and back. A run that overlaps a scale event
+# may see a second replica join the pool, or stay Pending; nothing declared here depends on the
+# replica count (cache_reuse is not declared, and no case reads per-pod counters).
+#
+# The guide's claims (K/README.md, K/guide.yaml verify, .github/scripts/e2e/
+# e2e-validate-scale-event.sh) and where each one lands. Router claims it shares with
+# optimized-baseline land as ../../optimized-baseline/parts/common.yaml maps them.
+#   1   the router serves chat and text completions (the shared e2e smoke loop at
+#       <release>-epp) -> openai_chat.*, openai_completions.*
+#   2   the EPP emits llm_d_epp_inflight_requests, llm_d_epp_request_running and, with flow
+#       control, llm_d_epp_flow_control_queue_size, and Prometheus or Thanos has them -> NOT
+#       COVERED: needs the EPP metrics port and the monitoring stack, which a committed profile
+#       does not carry
+#   3   the ScaledObject is Ready and KEDA creates the HPA (verify.tests.scaledobject, hpa)
+#       -> NOT COVERED: reads of cluster objects, fleet.config
+#   4   a concurrent burst raises desiredReplicas above min, and the drain brings it back
+#       (verify.tests.scale_event) -> NOT COVERED: requires_load (#23) and HPA reads
+#   5   the flowControl feature gate is on where the queue signal is used -> NOT COVERED: needs
+#       EPP logs (fleet.logs)
+#   6   overshoot while pods start (K/README.md) -> NOT COVERED: a scaling claim, requires_load
+#   7   one model, Qwen/Qwen3-32B, as optimized-baseline serves it -> model parts,
+#       discovery.models_lists_declared_model, discovery.unknown_model_no_fallback
+
+guide: keda-epp
+
+capabilities:
+  # Not declared, on purpose, as in optimized-baseline. The cache suite reads cached_tokens from
+  # each response, and none of the overlays this guide's lanes render (OB/modelserver/gpu/vllm/gke,
+  # gpu/vllm/base, amd/vllm/base) passes vLLM's --enable-prompt-tokens-details. With no
+  # cached_tokens, `affinity: routed` would fail on a correct stack for want of the field.
+  cache_reuse: null
+
+# The cases this guide's lanes run by default (`llmdv verify --all` runs everything). They test
+# what a lane's own deployment can get wrong: the router path, the overlay's parsers and window,
+# and what this guide changes. Engine and model conformance, the rest of the suite, depends only
+# on the engine build, model and flags, which many lanes share; it runs with `--all` once per
+# configuration (profiles/llm-d/README.md, "Which lane runs everything").
+selection:
+  # Every lane: the router serves each API a client uses, and refuses what it should.
+  - contract.*
+  - discovery.models_lists_declared_model
+  - discovery.unknown_model_no_fallback
+  - discovery.models_parses_with_openai_sdk
+  - openai_chat.basic_non_streaming
+  - openai_chat.streaming_sse
+  - openai_chat.stop_reason
+  - openai_completions.basic_non_streaming
+  - openai_completions.streaming_matches_json
+  - openai_completions.stop_reason
+  - anthropic_messages.basic_non_streaming
+  - anthropic_messages.streaming_sse
+  - openai_responses.basic_non_streaming
+  - openai_responses.streaming_sse
+  - streaming.sse_framing
+  - unhappy.unknown_path
+  - unhappy.malformed_json
+  - unhappy.missing_model
+  - unhappy.wrong_method
+  - unhappy.error_envelope_fields
+  - transport.connection
+  - transport.health_status
+  # Every lane: the overlay's parser flags take effect (skips where the model part has none).
+  - openai_chat.configured_reasoning
+  - tools.auto_call
+  - tools.auto_stream
+  # Every lane: the overlay's context window is the one declared.
+  - long_context.*
+  - unhappy.context_overflow
+  - unhappy.token_limit_over_context
+  # This guide: the gke and amd routers run flow control, and replicas change during a run:
+  # concurrent and cancelled requests must still be served.
+  - scenarios.cancel_burst
+  - streaming.cancel_then_next
+  - streaming.disconnect_before_output
+  - openai_chat.disconnect_recovery
+  - anthropic_messages.disconnect_recovery
+  - openai_responses.disconnect_recovery

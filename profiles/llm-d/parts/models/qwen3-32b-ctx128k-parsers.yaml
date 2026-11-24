@@ -1,0 +1,54 @@
+# Part: Qwen/Qwen3-32B with its context RoPE-scaled (YaRN, factor 3.2) to a 131072-token window,
+# served WITH a reasoning parser and a tool-call parser with automatic tool choice. Not a profile
+# on its own; a combination file lists it after the engine part. Never extends anything.
+#
+# Used by (overlays as ACCELERATOR_TYPE/MODEL_SERVER/INFRA_PROVIDER, at llm-d 9ca8ff0):
+#   predicted-latency-routing   gpu/vllm/{base,gke,ocp}   vllm-openai v0.31.0
+#   predicted-latency-routing   amd/vllm/base             vllm-openai-rocm v0.31.0
+#   each with --max-model-len=131072, --hf-overrides (YaRN, factor 3.2,
+#   original_max_position_embeddings 40960), --reasoning-parser=qwen3 --tool-call-parser=hermes
+#   --enable-auto-tool-choice
+# FROM values: guides/predicted-latency-routing/modelserver/{gpu,amd}/vllm/base/patch-vllm.yaml,
+# which patch the optimized-baseline model servers. On AMD the patch adds the parsers that
+# optimized-baseline's AMD overlay does not pass.
+#
+# The same shape as qwen3-32b-parsers.yaml at a window 3.2 times larger. The parser NAMES are the
+# engine's flag values, so each combination file states them.
+#
+# Excluded, and why:
+#   answer_max_tokens, effort_rendering   as in qwen3-32b-parsers.yaml
+
+model:
+  # FROM values: the first argument of `vllm serve`. The ocp overlay loads from a local path but
+  # keeps this id with --served-model-name.
+  public_id: Qwen/Qwen3-32B
+  aliases: []
+  # FROM values: --max-model-len=131072, made possible by --hf-overrides setting
+  # max_position_embeddings to 131072 with YaRN rope scaling (patch-vllm.yaml above). The first
+  # run's GET /v1/models (vLLM's max_model_len) confirms the engine took it.
+  max_model_len: 131072
+  reasoning:
+    # A reasoning parser moves the <think> block out of `content` into its own field. The
+    # field's name is the engine's, so each combination states it beside the parser names.
+    # INTENT: Qwen3 thinks unless asked not to (its template's enable_thinking defaults to
+    # true).
+    default_on: true
+  tools:
+    # FROM values: --enable-auto-tool-choice.
+    auto_choice: true
+    # INTENT: Qwen3 wraps each call in <tool_call> tags; a tag left in the answer text is a call
+    # the parser missed.
+    markup: ["<tool_call>"]
+
+capabilities:
+  # INTENT: every effort each API defines; see qwen3-32b-parsers.yaml.
+  chat_reasoning_efforts: [minimal, low, medium, high, xhigh, max]
+  chat_quiet_efforts: [none]
+  responses_reasoning_efforts: [none, minimal, low, medium, high, xhigh, max]
+  messages_thinking: [enabled, adaptive, disabled]
+  messages_efforts: [low, medium, high, xhigh, max]
+  # INTENT: a reasoning parser lets the engine count reasoning tokens apart from the answer.
+  reasoning_tokens: [chat_completions, responses]
+  # INTENT: declared accepted on a text-only model; expected to fail until the team marks it
+  # (Rule 1, red flags).
+  vision: [chat_completions, messages, responses]

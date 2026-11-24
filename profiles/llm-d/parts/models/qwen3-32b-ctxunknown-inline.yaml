@@ -2,7 +2,7 @@
 # window no flag sets and no source states. Not a profile on its own; a combination file lists it
 # after the engine part. Never extends anything.
 #
-# Used by (overlays as ACCELERATOR_TYPE/MODEL_SERVER/INFRA_PROVIDER, at llm-d 565373b):
+# Used by (overlays as ACCELERATOR_TYPE/MODEL_SERVER/INFRA_PROVIDER, at llm-d 9ca8ff0):
 #   amd/atom/{base,amd-ci}      atom-dev v0.1.7-rc0
 #   gpu/trtllm/{base,gke}       trtllm-serve 1.3.0rc29
 # FROM values: guides/optimized-baseline/modelserver/{amd/atom,gpu/trtllm}/base/ pass no parser

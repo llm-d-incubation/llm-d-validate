@@ -1,0 +1,99 @@
+# Part: what every agentic-api profile shares. Not a profile on its own; a combination file
+# beside this folder lists it last in `extends`. Never extends anything.
+#
+# G = guides/agentic-api, OB = guides/optimized-baseline, R = guides/recipes, at llm-d 9ca8ff0.
+#
+# No `name` here: each combination names itself, so each run says which one it was.
+
+#
+# What these profiles cover: only the guide's llm-d router, the `agentic-api-epp` Service. The
+# guide deploys (FROM values: G/guide.yaml deploy, G/scripts/nightly-deploy-gke.sh):
+#   router         helm release `agentic-api` with R/router/base.values.yaml and
+#                  OB/router/optimized-baseline.values.yaml, unchanged: approx-prefix-cache-producer,
+#                  inflight-load-producer, prefix-cache-affinity-filter, token-load-scorer; it
+#                  selects pods labeled llm-d.ai/guide=optimized-baseline. The same router config
+#                  as optimized-baseline, so its router claims land as
+#                  ../../optimized-baseline/parts/common.yaml maps them
+#   model server   G/modelserver/gpu/vllm/gke, which only includes OB/modelserver/gpu/vllm/gke
+#                  (rendered: identical, labels included); CI cuts it to one replica
+#   PostgreSQL     PostgreSQL 17, the state store (G/manifests/postgres.yaml)
+#   agentic-api    vllm/agentic-api:v0.9.0 on Service agentic-api port 9000, sending each
+#                  inference round to the router at agentic-api-epp:80 (G/guide.yaml LLM_API_BASE)
+#
+# The guide's claims (G/README.md, G/guide.yaml verify, G/verify.py, run by
+# .github/scripts/e2e/e2e-validate-agentic-api.sh) and where each one lands:
+#   1   the router serves chat and text completions (the shared e2e smoke loop at
+#       agentic-api-epp) -> openai_chat.*, openai_completions.*
+#   2   the model server exposes vLLM's stateless /v1/responses, which agentic-api delegates each
+#       round to (G/README.md "Supported Accelerators and Model Servers") -> openai_responses.*
+#       at the router
+#   3   the model server runs with --enable-auto-tool-choice and the tool-call and reasoning
+#       parsers -> model.tools and model.reasoning (../../parts/models/qwen3-32b-parsers.yaml,
+#       parser names in the combination); the tools suite at the router
+#   4   agentic-api health and model discovery on :9000 (verify.py [1/4]) -> NOT COVERED: needs
+#       an ingress for agentic-api; see README "Follow-up"
+#   5   stateful /v1/responses: store: true, then a turn carrying only previous_response_id,
+#       rehydrated from PostgreSQL (verify.py [2/4]) -> NOT COVERED, same reason
+#   6   the webhook tool loop, function_call -> function_call_output through
+#       previous_response_id (verify.py [3/4]) -> NOT COVERED, same reason
+#   7   WebSocket /v1/responses with a response.create frame (verify.py [4/4]) -> NOT COVERED:
+#       llmdv has no WebSocket transport
+#   8   coding harnesses (Codex CLI) against agentic-api -> NOT COVERED: a client profile needs
+#       the agentic-api ingress first
+
+guide: agentic-api
+
+capabilities:
+  # Not declared, on purpose, as in optimized-baseline. The cache suite reads cached_tokens from
+  # each response, and the overlay this guide's lane renders (OB/modelserver/gpu/vllm/gke) does
+  # not pass vLLM's --enable-prompt-tokens-details. With no cached_tokens, `affinity: routed`
+  # would fail on a correct stack for want of the field.
+  cache_reuse: null
+
+# The cases this guide's lanes run by default (`llmdv verify --all` runs everything). They test
+# what a lane's own deployment can get wrong: the router path, the overlay's parsers and window,
+# and what this guide changes. Engine and model conformance, the rest of the suite, depends only
+# on the engine build, model and flags, which many lanes share; it runs with `--all` once per
+# configuration (profiles/llm-d/README.md, "Which lane runs everything").
+selection:
+  # Every lane: the router serves each API a client uses, and refuses what it should.
+  - contract.*
+  - discovery.models_lists_declared_model
+  - discovery.unknown_model_no_fallback
+  - discovery.models_parses_with_openai_sdk
+  - openai_chat.basic_non_streaming
+  - openai_chat.streaming_sse
+  - openai_chat.stop_reason
+  - openai_completions.basic_non_streaming
+  - openai_completions.streaming_matches_json
+  - openai_completions.stop_reason
+  - anthropic_messages.basic_non_streaming
+  - anthropic_messages.streaming_sse
+  - openai_responses.basic_non_streaming
+  - openai_responses.streaming_sse
+  - streaming.sse_framing
+  - unhappy.unknown_path
+  - unhappy.malformed_json
+  - unhappy.missing_model
+  - unhappy.wrong_method
+  - unhappy.error_envelope_fields
+  - transport.connection
+  - transport.health_status
+  # Every lane: the overlay's parser flags take effect (skips where the model part has none).
+  - openai_chat.configured_reasoning
+  - tools.auto_call
+  - tools.auto_stream
+  # Every lane: the overlay's context window is the one declared.
+  - long_context.*
+  - unhappy.context_overflow
+  - unhappy.token_limit_over_context
+  # This guide: agentic-api calls vLLM's stateless Responses API through this router.
+  - openai_responses.input_items
+  - openai_responses.instructions
+  - openai_responses.function_output
+  - openai_responses.streamed_tool_loop
+  - openai_responses.stateless_contract
+  - openai_responses.previous_id_unstored
+  - openai_responses.response_object
+  - openai_responses.sdk_parse
+  - openai_responses.input_tokens

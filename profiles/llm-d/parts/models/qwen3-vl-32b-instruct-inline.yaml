@@ -1,0 +1,80 @@
+# Part: Qwen/Qwen3-VL-32B-Instruct, a vision-language model, at the model's own 262144-token
+# window, served WITHOUT reasoning or tool-call parsers. The Instruct variant does not think, so
+# no reasoning reaches the client in any shape, and no tool call is parsed. Not a profile on its
+# own; a combination file lists it after the engine part. Never extends anything.
+#
+# Used by (overlays at llm-d 9ca8ff0, rendered with kubectl kustomize):
+#   multimodal-serving aggregation/modelserver/gpu/vllm/gke
+#                               vllm-openai v0.31.0, --tensor-parallel-size=2
+#                               --mm-processor-cache-gb 20
+#   multimodal-serving aggregation/modelserver/tpu/v7/vllm/qwen3-vl (and .../gke, which renders
+#                               the same manifests)
+#                               vllm-tpu v0.31.0, --tensor-parallel-size=4
+#                               --mm-processor-cache-gb 20
+#   multimodal-serving e-disaggregation/modelserver/gpu/vllm/e-pd/gke
+#                               vllm-openai v0.31.0 in both roles. Encode pods: --mm-encoder-only,
+#                               --trust-remote-code, --enforce-eager, --no-enable-prefix-caching;
+#                               decode (prefill and decode) pods on --port=8200 behind the routing
+#                               sidecar on :8000. Both roles pass the same model id and no window
+#                               or parser flag, so a client sees one model
+# FROM values: guides/multimodal-serving/{aggregation,e-disaggregation}/modelserver/ (the base
+# patch-vllm.yaml, patch-encode.yaml and patch-decode.yaml files those overlays build on).
+#
+# Excluded, and why:
+#   model.tools         no tool parser
+#   reasoning_tokens    no reasoning parser, and the Instruct model does not reason, so there is
+#                       nothing to count apart from the answer
+#   answer_max_tokens   opt-in, and no source states the budget this model needs for a one-word
+#                       answer; set it from the first run's recorded usage
+#   effort_rendering    no source states an effort marker in the chat template
+#   chat_reasoning_efforts, messages_thinking `enabled`
+#                       each case requires the model to produce reasoning, which the Instruct
+#                       model does not do; the vocabularies are split as in
+#                       deepseek-v3-ctx36k-inline.yaml (declared where the case checks API
+#                       behaviour any correct stack shows, left out where it checks that the model
+#                       reasons)
+
+model:
+  # FROM values: the first argument of `vllm serve` in every role; no --served-model-name.
+  public_id: Qwen/Qwen3-VL-32B-Instruct
+  aliases: []
+  # FROM values: no overlay listed above passes --max-model-len, so the engine uses the model's
+  # own window. DERIVED: 262144 is text_config.max_position_embeddings in the model's
+  # config.json on Hugging Face (Qwen/Qwen3-VL-32B-Instruct, architectures
+  # Qwen3VLForConditionalGeneration; the file has no top-level max_position_embeddings), not a
+  # guide value. The first run's GET /v1/models (vLLM's max_model_len) confirms it.
+  max_model_len: 262144
+  reasoning:
+    # FROM values: no --reasoning-parser in any role of any overlay listed above.
+    parser: null
+    field: null
+    # INTENT: the Instruct variant is the non-thinking Qwen3-VL model (the Thinking variant is a
+    # separate checkpoint), so no <think> block reaches the client and the reasoning cases skip
+    # as undeclared.
+    inline_tag: null
+    default_on: false
+  tools:
+    # FROM values: no --tool-call-parser and no --enable-auto-tool-choice in any role, so the
+    # tool cases skip as undeclared: the parser they need does not exist here.
+    parser: null
+    auto_choice: false
+
+capabilities:
+  # INTENT: `none` is the quiet effort, and a correct stack answers it with no reasoning.
+  chat_quiet_efforts: [none]
+  # INTENT: every Responses effort; the case checks the effort is echoed, and that `none` returns
+  # no reasoning, neither of which needs a reasoning model.
+  responses_reasoning_efforts: [none, minimal, low, medium, high, xhigh, max]
+  # INTENT: `adaptive` lets the model decide (no thinking is a valid answer) and `disabled` asks
+  # for none. `enabled` is left out (see the header).
+  messages_thinking: [adaptive, disabled]
+  # INTENT: every Messages effort. anthropic_messages.effort_effect expects high effort to produce
+  # more output than low; whether this template and engine act on effort is for the run to show.
+  messages_efforts: [low, medium, high, xhigh, max]
+  # INTENT: the model reads images, and vLLM's OpenAI Chat, Anthropic Messages and Responses
+  # surfaces each define an image input part. This is the guide's own capability: its README
+  # and guide.yaml verify.tests.request send an inline base64 PNG in a Chat `image_url` part and
+  # expect the answer to name its colour (FROM docs: guides/multimodal-serving/README.md,
+  # "Send Test Requests"). The guide exercises only Chat; Messages and Responses are declared
+  # because the APIs define them, and the run is their measurement.
+  vision: [chat_completions, messages, responses]

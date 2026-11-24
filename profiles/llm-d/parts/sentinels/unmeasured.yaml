@@ -1,0 +1,40 @@
+# Part: the change sentinels a combination starts with, before any run has measured them, for a
+# model served without a tool-call parser: no tool contract parts (the `tools` prompt pins
+# count a prompt with tools in it, which needs no parser).
+# Not a profile on its own; a combination lists it before parts/common.yaml. Never extends
+# anything.
+#
+# INTENT: placeholders, as .agents/skills/writing-an-infra-profile/SKILL.md step 6 describes.
+# Their real values depend on one exact stack (template, tokenizer, engine build, parsers), so
+# they cannot be shared. The first run with --evidence all fails each pin with the observed
+# count and records each contract part's exchange; the combination then sets its own
+# `prompt_pins` and `contract_baseline` to those values, citing the build, and they override
+# these.
+
+capabilities:
+  prompt_pins:
+    chat_completions: {conversation: 1, tools: 1}
+    completions: {conversation: 1}
+    messages: {conversation: 1, tools: 1}
+    responses: {conversation: 1, tools: 1}
+  contract_baseline:
+    chat_completions:
+      response: {llmdv_seed: [absent]}
+      stream: {llmdv_seed: [absent]}
+      error: {llmdv_seed: [absent]}
+      invalid: {llmdv_seed: [absent]}
+    completions:
+      response: {llmdv_seed: [absent]}
+      stream: {llmdv_seed: [absent]}
+      error: {llmdv_seed: [absent]}
+      invalid: {llmdv_seed: [absent]}
+    messages:
+      response: {llmdv_seed: [absent]}
+      stream: {llmdv_seed: [absent]}
+      error: {llmdv_seed: [absent]}
+      invalid: {llmdv_seed: [absent]}
+    responses:
+      response: {llmdv_seed: [absent]}
+      stream: {llmdv_seed: [absent]}
+      error: {llmdv_seed: [absent]}
+      invalid: {llmdv_seed: [absent]}

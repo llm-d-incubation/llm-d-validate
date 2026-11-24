@@ -1,0 +1,34 @@
+# The wide-ep guide in standalone mode (the client reaches the EPP's own listener): an Intel XPU
+# vLLM build serving deepseek-ai/DeepSeek-V2-Lite-Chat at a 2048-token window, aggregated (no P/D,
+# no routing sidecar), with no parsers: a non-reasoning model, no tool calls.
+#
+# STATUS: WRITTEN, NOT RUN. llm-d 9ca8ff0. Composed from the guide's shipped config and the API
+# references. Only the router layer has been measured (on kind, with a simulator engine; see
+# ../parts/topology/standalone.yaml).
+#
+# CI lane that deploys this configuration (llm-d's nightly-e2e-wide-ep-<lane> workflow; it runs
+# in standalone mode, gateway_class epponly):
+#   intel-acc-xpu-vllm-x              xpu/vllm/xpu-ci
+# guide.yaml advertises Qwen/Qwen3-235B-A22B for xpu; that is the xpu `base` overlay, which no
+# lane deploys. The 2048-token window makes some cases' budgets overflow; the model part lists
+# them.
+#
+# How a lane runs it, after deploying the guide in standalone mode (guide.yaml deploy.standalone)
+# with the overlay above:
+#   export LLMDV_EPP_URL=http://<GUIDE_NAME>-epp.<namespace>.svc.cluster.local
+#   # or from outside the cluster:
+#   #   kubectl port-forward -n <namespace> svc/<GUIDE_NAME>-epp 18080:80 &
+#   #   export LLMDV_EPP_URL=http://localhost:18080
+#   llmdv profile validate profiles/llm-d/wide-ep/vllm-deepseek-v2-lite-chat-ctx2k-inline-standalone.yaml
+#   llmdv verify --profile profiles/llm-d/wide-ep/vllm-deepseek-v2-lite-chat-ctx2k-inline-standalone.yaml \
+#     --identity accelerator=xpu --identity provider=xpu-ci
+
+extends:
+  - ../parts/base.yaml
+  - ../parts/topology/standalone.yaml
+  - ../parts/engines/vllm.yaml
+  - ../parts/models/deepseek-v2-lite-chat-ctx2k-inline.yaml
+  - ../parts/sentinels/unmeasured.yaml
+  - parts/common.yaml
+
+name: wide-ep-vllm-deepseek-v2-lite-chat-ctx2k-inline-standalone

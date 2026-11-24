@@ -10,7 +10,7 @@
 # header dispositions in topology/, because llmdv keys those by ingress id.
 #
 # Provenance tags, one per declaration (profiles/llm-d/README.md has the full table):
-#   FROM values: <path>   the guide's shipped config at llm-d 565373b
+#   FROM values: <path>   the guide's shipped config at llm-d 9ca8ff0
 #   FROM docs: <path>     the llm-d documentation at that commit, or profiles/REFERENCE.md here
 #   INTENT                how a correct stack behaves, as the API itself defines it (Rule 1)
 #   MEASURED 2026-11-16 on kind (real EPP, simulator engine)

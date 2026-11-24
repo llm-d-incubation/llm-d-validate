@@ -1,0 +1,47 @@
+# The flow-control guide in standalone mode (the client reaches the EPP's own listener, with flow
+# control on): vLLM serving Qwen/Qwen3-32B with the qwen3 reasoning parser and the hermes tool
+# parser.
+#
+# STATUS: WRITTEN, NOT RUN. llm-d 9ca8ff0. Composed from the guide's shipped config and the API
+# references. Only the router layer has been measured, and that with optimized-baseline's router
+# config, without flow control (on kind, with a simulator engine; see
+# ../parts/topology/standalone.yaml).
+#
+# CI lanes that deploy this configuration (llm-d's nightly-e2e-flow-control-<lane> workflows;
+# standalone mode, through reusable-nightly-e2e-gke with a custom_deploy_script):
+#   gke-acc-gpu-vllm-x    guides/flow-control/scripts/nightly-deploy-gke.sh with
+#                         ACCELERATOR_TYPE=gpu INFRA_PROVIDER=gke: renders
+#                         guides/optimized-baseline/modelserver/gpu/vllm/gke, relabelled for this
+#                         guide, one replica
+#
+# How a lane runs it, after the deploy script:
+#   export LLMDV_EPP_URL=http://flow-control-epp.<namespace>.svc.cluster.local
+#   # or from outside the cluster:
+#   #   kubectl port-forward -n <namespace> svc/flow-control-epp 18080:80 &
+#   #   export LLMDV_EPP_URL=http://localhost:18080
+#   llmdv profile validate profiles/llm-d/flow-control/vllm-qwen3-32b-parsers-standalone.yaml
+#   llmdv verify --profile profiles/llm-d/flow-control/vllm-qwen3-32b-parsers-standalone.yaml \
+#     --identity accelerator=gpu --identity provider=gke
+
+extends:
+  - ../parts/base.yaml
+  - ../parts/topology/standalone.yaml
+  - ../parts/engines/vllm.yaml
+  - ../parts/models/qwen3-32b-parsers.yaml
+  - ../parts/sentinels/unmeasured-with-tools.yaml
+  - parts/common.yaml
+
+name: flow-control-vllm-qwen3-32b-parsers-standalone
+
+model:
+  # FROM values: the overlay's own flag values (--reasoning-parser=qwen3,
+  # --tool-call-parser=hermes). The model part declares the shape a client sees; the names
+  # belong to the engine, so they are stated here.
+  reasoning:
+    parser: qwen3
+    # MEASURED on another deployment (vLLM 0.32 behind an llm-d router): the field is
+    # `reasoning`, and `reasoning_content` is absent. Not yet observed on this guide's vLLM
+    # v0.31.0; the first run settles it.
+    field: reasoning
+  tools:
+    parser: hermes
