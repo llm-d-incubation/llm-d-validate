@@ -33,3 +33,24 @@ extends:
   - parts/common.yaml
 
 name: precise-prefix-cache-routing-vllm-qwen3-32b-inline-standalone
+
+ingresses:
+  # Overrides ../parts/topology/standalone.yaml on purpose: this lane's engine runs with
+  # --enable-scale-out (FROM values: modelserver/amd/vllm/base/patch-vllm.yaml), and vLLM v0.30
+  # and later register the four render routes only with that flag (FROM docs:
+  # vllm@v0.31.0:vllm/entrypoints/scale_out/factories.py, register_scale_out_api_routers; the
+  # routes in vllm/entrypoints/scale_out/render/api_router.py). Through the EPP, the router claims
+  # the chat, completions and messages render routes (FROM docs: llm-d-router
+  # parsers/openai/openai.go:133 and anthropic.go:69) and passes
+  # /v1/responses/render through; it does not re-tokenize a client's render call (the
+  # token-producer returns early for one) and routes it by model to one pod. Declared here, not
+  # in parts/common.yaml, because the TPU v5p lane's engine runs without the flag.
+  - id: epp
+    surfaces: [chat_completions, completions, messages, responses, chat_render, completions_render, messages_render, responses_render]
+
+capabilities:
+  # INTENT: the router looks its cache up by the token prefix it renders, so a prompt that grows
+  # by one turn must keep the earlier turns' tokens. A synthetic check.
+  prefix_stability: [chat_render, messages_render]
+  # render_pins are not declared: an undeclared pin skips, and a placeholder would certainly
+  # fail. They are added from the first run's evidence.

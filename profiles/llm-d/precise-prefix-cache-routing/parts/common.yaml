@@ -28,12 +28,12 @@
 # The router's 64-token blocks match the engines' --block-size=64. Not declared as
 # cache_reuse.block_size, because cache_reuse is not declared (below).
 #
-# Render surfaces are NOT declared, on purpose. Whether an engine serves its render routes is an
-# existence fact, and no run has measured it on these engines (see ../../parts/topology/
-# standalone.yaml). This guide's engines are expected to serve them, since the router depends on
-# them; the router forwards every path, so on the first run contract.undeclared_surfaces_absent
-# names each render route that answers through the EPP, and they are declared then, in the
-# combinations, with the change sentinels (render_pins) that go with them.
+# Render surfaces are declared in the combinations, not here: surfaces are keyed by ingress id,
+# and the lanes differ. vLLM v0.30 and later register the four render routes only with
+# --enable-scale-out (FROM docs: vllm@v0.31.0:vllm/entrypoints/scale_out/factories.py), so the
+# GPU, AMD and XPU combinations declare all four, with prefix_stability on chat_render and
+# messages_render, and the TPU v5p combination declares none. contract checks each both ways.
+# render_pins are not declared: an undeclared pin skips, and they are added from the first run.
 #
 # Router claims this guide shares with optimized-baseline (error envelopes, header handling,
 # streaming pass-through, the EPP's HTTP APIs, FailOpen, gateway mode): see
@@ -43,8 +43,8 @@
 #   render         every model-server pod answers /v1/completions/render with token_ids for MODEL,
 #                  called on the pod, not through the router
 #                  -> NOT COVERED: needs a per-pod engine ingress, and a committed profile names no
-#                     pod. Through the router the render routes reach some replica, which the
-#                     render suite checks once the surfaces are declared (above)
+#                     pod. Through the router a client's render call reaches one replica, which
+#                     the render suite checks on the lanes that declare the surfaces (above)
 #   request        /v1/completions through the EPP answers -> openai_completions.*
 #   messages       /v1/messages through the EPP, which the router renders through
 #                  /v1/messages/render -> anthropic_messages.*

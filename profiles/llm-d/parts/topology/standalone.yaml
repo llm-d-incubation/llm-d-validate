@@ -27,7 +27,14 @@
 #                                engine), render routes, /tokenize, /metrics and /health all reach
 #                                a replica, as the EPP restricts no path. If an engine serves them,
 #                                contract.undeclared_surfaces_absent fails and says which; declare
-#                                them then. The simulator part declares them, since it serves them
+#                                them then. The simulator part declares them, since it serves them.
+#                                No other guide's engine serves them by default: vLLM v0.30 and
+#                                later register them only with --enable-scale-out (FROM docs:
+#                                vllm@v0.31.0:vllm/entrypoints/scale_out/factories.py), which of
+#                                the guides profiled here only precise-prefix-cache-routing's
+#                                non-TPU overlays pass. Those combinations declare them, as does
+#                                fast-model-actuation's, whose vLLM v0.26.0 serves chat and
+#                                completions render with no flag
 #   bad_credentials, credential_headers, auth   the EPP and its Envoy sidecar authenticate nothing
 #                                (FROM values: guides/recipes/router/base.values.yaml sets no auth
 #                                filter)

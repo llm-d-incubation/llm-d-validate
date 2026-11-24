@@ -30,4 +30,4 @@ The requester's TCP proxy sits between the EPP and vLLM on every request. It sho
 
 ## Upstream notes
 
-- The FMA launcher image (`ghcr.io/llm-d-incubation/llm-d-fast-model-actuation/launcher:v0.8.0`, `modelserver/launcherconfig.yaml`) does not state the vLLM version it runs, and nothing in the guide pins one, so the engine build is known only from the image.
+- The FMA launcher image (`ghcr.io/llm-d-incubation/llm-d-fast-model-actuation/launcher:v0.8.0`, `modelserver/launcherconfig.yaml`) is built on `vllm-openai:v0.26.0` (`llm-d-fast-model-actuation@v0.8.0:dockerfiles/Dockerfile.launcher.benchmark:1`); nothing in the guide pins a vLLM version, so a new launcher tag changes the engine. vLLM v0.26 serves `/v1/chat/completions/render` and `/v1/completions/render` without `--enable-scale-out` and has no Messages or Responses render route, so the combination declares `chat_render` and `completions_render`.
