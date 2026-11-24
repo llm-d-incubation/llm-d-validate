@@ -726,7 +726,10 @@ def pytest_collection_finish(session: pytest.Session) -> None:
     if left_out and not session.config.option.collectonly:
         log.info("%d case(s) left out by the profile's selection (--all runs them)", left_out)
     if not session.items:
-        log.warning("no cases collected -- check --ingress/--client/--surface and -k/-m")
+        log.warning(
+            "no cases collected -- check --ingress/--client/--surface, -k/-m and the "
+            "profile's selection (--all runs every case)"
+        )
 
 
 def _phase_heading(config: pytest.Config, phase: str) -> None:

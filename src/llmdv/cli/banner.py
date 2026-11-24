@@ -371,7 +371,7 @@ def finish(
             tail = f"  {pal.paint(fix, pal.dim)}" if fix else ""
             emit(f"    {issue:<40} ×{count}{tail}")
         for entry in known_unmatched or []:
-            # Either the fix landed and the entry should go, or a -k left its cases out.
+            # A case it covers ran and no failure matched: the fix may have landed.
             note = f"matched no failure this run ({entry.get('check')})"
             emit(f"    {entry.get('issue', '?'):<40} {pal.paint(note, pal.dim)}")
 

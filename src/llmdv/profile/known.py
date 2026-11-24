@@ -135,15 +135,24 @@ def _parts(version: str) -> tuple[int, ...]:
 
 
 def unmatched(entries: Iterable[KnownFailure], records: Iterable[Mapping[str, Any]]) -> list[dict]:
-    """The entries that labelled no record: candidates for pruning, or for a `-k` that left
-    their cases out. Matched by issue and check, which together name an entry."""
+    """The entries that labelled no record although a case they cover ran: candidates for
+    pruning, because the fix may have landed. Matched by issue and check, which together name
+    an entry. An entry none of whose cases ran (the profile's `selection` or a `-k` left them
+    out, or they skipped) says nothing about this run, so it is not listed."""
+    records = list(records)
     used = {
         (str(k.get("issue")), str(k.get("check")))
         for r in records
         if (k := r.get("known_failure")) and k.get("status") in LABELLED
     }
+    ran = [
+        (r.get("case_id"), r.get("variant") or None, r.get("ingress"))
+        for r in records
+        if r.get("outcome") != "skip"
+    ]
     return [
         {"check": e.check, "issue": e.issue}
         for e in entries
         if not any(issue == e.issue and e.names_check(check) for issue, check in used)
+        and any(e.covers(case_id, variant, ingress) for case_id, variant, ingress in ran)
     ]
