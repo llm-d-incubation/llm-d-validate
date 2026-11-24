@@ -27,14 +27,17 @@
 
 ## How it works
 
-`llmdv` sends real requests to a deployed [llm-d](https://github.com/llm-d/llm-d) stack, or to any
-OpenAI- or Anthropic-compatible one, and checks every answer.
+`llmdv` sends real requests through every layer of a deployed [llm-d](https://github.com/llm-d/llm-d)
+stack, or any OpenAI- or Anthropic-compatible one. It checks each answer against the API,
+pinpoints the layer that breaks, and flags what regressed since the last run.
 
-- **It tests every layer on its own.** llmdv calls each layer you can reach (gateway, router,
+- **It tests every layer on its own.** `llmdv` calls each layer you can reach (gateway, router,
   engine) through Chat, Completions, Messages and Responses, and exercises streaming, tools,
   caching, headers and failure paths, so you see exactly which layer holds and which one breaks.
 - **A profile defines correct.** It describes your stack: its ingresses, its model and what each
   layer serves. Every verdict traces back to a line in that file.
+- **It catches regressions.** Compare runs, and `llmdv` flags every case that changed and every
+  build that changed under it, so a regression never hides behind a passing health check.
 - **Every run produces evidence.** You get the results, every request and response, a replay
   script for each failure, and an optional dashboard to explore the whole run.
 
@@ -42,12 +45,12 @@ OpenAI- or Anthropic-compatible one, and checks every answer.
 > `llmdv` is read-only: it sends requests and reads what comes back, and it never deploys,
 > patches, scales or restarts anything. Cluster access, when you grant it, runs through a
 > read-only verb allowlist. You name credentials by
-> environment variable; llmdv keeps them out of every file and redacts them from every log.
+> environment variable; `llmdv` keeps them out of every file and redacts them from every log.
 
 ## Test an llm-d guide
 
 Every [supported llm-d guide](https://github.com/llm-d-incubation/llm-d-validate/blob/main/profiles/README.md#supported-llm-d-guides) comes with ready
-profiles. They test the guide's router (the EPP) directly: give llmdv the EPP's URL and run. No
+profiles. They test the guide's router (the EPP) directly: give `llmdv` the EPP's URL and run. No
 key is needed.
 
 ```sh
@@ -59,8 +62,8 @@ llmdv verify --profile profiles/llm-d/optimized-baseline/vllm-qwen3-32b-parsers-
 
 Pick the combination and `--identity` flags that match your deployment from the guide's folder.
 Running a gateway in front of the router (Istio, kgateway, LiteLLM)? Add it as one more ingress in
-a short local file, and llmdv tests both layers:
-[add your gateway](https://github.com/llm-d-incubation/llm-d-validate/blob/main/profiles/README.md#add-your-gateway). llmdv runs on Python 3.10 or newer.
+a short local file, and `llmdv` tests both layers:
+[add your gateway](https://github.com/llm-d-incubation/llm-d-validate/blob/main/profiles/README.md#add-your-gateway). `llmdv` runs on Python 3.10 or newer.
 
 ## Test your own stack
 
