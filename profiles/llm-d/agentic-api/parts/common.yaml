@@ -49,13 +49,9 @@ capabilities:
   # not pass vLLM's --enable-prompt-tokens-details. With no cached_tokens, `affinity: routed`
   # would fail on a correct stack for want of the field.
   cache_reuse: null
-  # FROM docs: G/README.md ("The llm-d Router and vLLM are stateless"; agentic-api "delegates
-  # each inference round to vLLM's own stateless Responses API"). At the router this guide
-  # declares no response state, overriding ../../parts/base.yaml's stateful INTENT: state lives
-  # in agentic-api's PostgreSQL store, which no ingress here reaches (claim 4).
-  stateless_responses: true
-  stateful_responses: false
-  background_responses: false
+  # Response state: stateless at the router, as ../../parts/base.yaml declares for every guide,
+  # which is what G/README.md says (claim 2: "The llm-d Router and vLLM are stateless").
+  # A future agentic-api ingress, in front of its own PostgreSQL store, is where stateful belongs.
 
 # The cases this guide's lanes run by default (`llmdv verify --all` runs everything). They test
 # what a lane's own deployment can get wrong: the router path, the overlay's parsers and window,
