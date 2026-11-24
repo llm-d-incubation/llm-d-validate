@@ -497,6 +497,29 @@ def test_old_vllm_options_key_names_its_replacement(tmp_path, text, where):
     assert "vllm_options: renamed" in str(caught.value)
 
 
+KNOWN = "known_failures:\n  - {{check: c, issue: '#1', cases: ['{}']}}\n"
+
+
+@pytest.mark.parametrize(
+    "case",
+    [
+        "field_options.vllm_observable",
+        "field_options.vllm_*",
+        "field_options.vllm_observable[chat]",
+    ],
+)
+def test_a_known_failure_naming_the_renamed_case_names_its_replacement(tmp_path, case):
+    """It would otherwise silently stop matching the case it was written for."""
+    with pytest.raises(loader.ProfileError, match="use 'field_options.extension_observable'"):
+        loader.load(write(tmp_path, MINIMAL + KNOWN.format(case)))
+
+
+@pytest.mark.parametrize("case", ["field_options.extension_observable", "field_options.*"])
+def test_a_known_failure_naming_the_new_case_or_both_loads(tmp_path, case):
+    profile = loader.load(write(tmp_path, MINIMAL + KNOWN.format(case)))
+    assert profile.known_failures[0].cases == (case,)
+
+
 @pytest.mark.parametrize(
     "text,where",
     [

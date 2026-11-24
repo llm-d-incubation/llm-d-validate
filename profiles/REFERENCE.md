@@ -503,7 +503,7 @@ known_failures:
 | --- | --- | --- | --- |
 | `check` | string | **required** | The name of the first named check recorded not-ok, the key failure groups are built on. `*` and `?` are wild, with at least one literal character: an entry can cover a family of checks, never every check. A failure of any other check is a plain failure, whatever the case. |
 | `issue` | string | **required** | Where it is tracked: `owner/repo#N`, `#N` for this repository, or a URL. |
-| `cases` | list of string | any case | Globs over the case id (`tools.*`) or `id[variant]` (`openai_chat.request_field[logit_bias]`). Brackets are literal. |
+| `cases` | list of string | any case | Globs over the case id (`tools.*`) or `id[variant]` (`openai_chat.request_field[logit_bias]`). Brackets are literal. A glob that names a renamed case id (`field_options.vllm_observable`) and not its replacement is refused, naming the new id. |
 | `ingress` | string or list | any ingress | Declared ingress ids. |
 | `fix` | string | none | Where the fix is, for the reader: a PR, a release, a config change. |
 | `until` | mapping | none | The build the fix ships in, as signals the run records in `outcome.json`'s `stack` block: `x-litellm-version`, `system_fingerprint`, `server`, a router header. Values are quoted strings (`"1.104.1"`; YAML would read `1.100` as the number 1.1). The fix is expected once every named signal has been seen at or past its value: equal, or a later dotted version, compared after the same literal prefix (`Python/3.13` reads the number after `Python/`). A value with no dotted number, such as a commit fingerprint, matches by equality only. |

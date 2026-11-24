@@ -101,6 +101,7 @@ from .schema import (
     Tls,
     Tools,
     Vantage,
+    matches_case,
     parse_setting,
 )
 
@@ -577,11 +578,13 @@ def _known_failures(raw: Any) -> tuple[KnownFailure, ...]:
                     f"{where}.until.{name}: expected a quoted version string, got {value!r}"
                 )
             until[signal] = value
+        cases = parse.strings(item.get("cases") or [], f"{where}.cases")
+        _refuse_renamed_cases(cases, f"{where}.cases")
         out.append(
             KnownFailure(
                 check=check,
                 issue=issue,
-                cases=parse.strings(item.get("cases") or [], f"{where}.cases"),
+                cases=cases,
                 ingresses=_one_or_more(item.get("ingress"), f"{where}.ingress"),
                 fix=parse.string(item["fix"], f"{where}.fix")
                 if item.get("fix") is not None
@@ -590,6 +593,23 @@ def _known_failures(raw: Any) -> tuple[KnownFailure, ...]:
             )
         )
     return tuple(out)
+
+
+# Case ids that were renamed, so an entry naming the old one would silently stop matching.
+_RENAMED_CASES = {"field_options.vllm_observable": "field_options.extension_observable"}
+
+
+def _names_case(pattern: str, case_id: str) -> bool:
+    return matches_case((pattern,), case_id, None) or pattern.startswith(f"{case_id}[")
+
+
+def _refuse_renamed_cases(cases: tuple[str, ...], where: str) -> None:
+    for index, pattern in enumerate(cases):
+        for old, new in _RENAMED_CASES.items():
+            if _names_case(pattern, old) and not _names_case(pattern, new):
+                raise ProfileError(
+                    f"{where}[{index}]: {pattern!r} names {old!r}, which was renamed; use {new!r}"
+                )
 
 
 def _block(value: Any, where: str) -> dict[str, Any]:
