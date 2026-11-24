@@ -27,26 +27,26 @@
 #                       established
 
 model:
-  # The lane's simulator flag --model.
+  # INTENT: the simulator flag --model this part assumes the lane passes.
   public_id: Qwen/Qwen3-32B
   aliases: []
-  # The lane's simulator flag --max-model-len.
+  # INTENT: the simulator flag --max-model-len this part assumes the lane passes.
   max_model_len: 40960
   reasoning:
-    # The simulator does not reason: no parser and no inline block.
+    # INTENT: the simulator does not reason: no parser and no inline block.
     parser: null
     field: null
     inline_tag: null
     default_on: false
   tools:
-    # Synthetic tool calls; no parser to declare.
+    # INTENT: synthetic tool calls; no parser to declare.
     parser: null
     auto_choice: false
 
 capabilities:
-  # The simulator reads no images.
+  # INTENT: the simulator reads no images.
   vision: false
-  # Overrides parts/base.yaml: no response state is asserted on the simulator.
+  # INTENT, overriding parts/base.yaml: no response state is asserted on the simulator.
   stateful_responses: false
   background_responses: false
   responses_compact: null

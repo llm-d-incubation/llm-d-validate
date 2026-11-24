@@ -165,9 +165,10 @@ headers:
   # The SLO headers. FROM docs: the same page, "Service Level Objectives": read only by SLO
   # admission plugins. They are declared here and not in a guide's common part because llmdv keys
   # header dispositions by ingress id, which differs between topologies. `ignored` holds for a
-  # router configured with no SLO plugin, which is every optimized-baseline router config
-  # (guides/optimized-baseline.yaml says why); a guide that configures one overrides these in its
-  # combination files.
+  # router configured with no SLO plugin, which is every optimized-baseline router config (FROM
+  # values: guides/optimized-baseline/router/*.values.yaml name none; ../../optimized-baseline/
+  # parts/common.yaml says why); a guide that configures one overrides these in its combination
+  # files.
   x-llm-d-slo-ttft-ms:
     epp: ignored
   x-llm-d-slo-tpot-ms:

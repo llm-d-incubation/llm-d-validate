@@ -12,12 +12,12 @@
 #                        guides/workload-autoscaling/scripts/nightly-deploy-amd-keda-epp.sh:
 #                        guides/optimized-baseline/modelserver/amd/vllm/base
 #                        (vllm-openai-rocm v0.31.0), flow control on, queue ScaledObject;
-#                        Service keda-epp-rocm-epp
+#                        Service <release>-rocm-epp
 #
 # How a lane runs it, after the deploy script:
-#   export LLMDV_EPP_URL=http://keda-epp-rocm-epp.<namespace>.svc.cluster.local
+#   export LLMDV_EPP_URL=http://<release>-rocm-epp.<namespace>.svc.cluster.local
 #   # or from outside the cluster:
-#   #   kubectl port-forward -n <namespace> svc/keda-epp-rocm-epp 18080:80 &
+#   #   kubectl port-forward -n <namespace> svc/<release>-rocm-epp 18080:80 &
 #   #   export LLMDV_EPP_URL=http://localhost:18080
 #   llmdv profile validate profiles/llm-d/keda-epp/vllm-qwen3-32b-inline-standalone.yaml
 #   llmdv verify --profile profiles/llm-d/keda-epp/vllm-qwen3-32b-inline-standalone.yaml \

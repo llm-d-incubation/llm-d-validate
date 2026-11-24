@@ -123,16 +123,16 @@ A guide's `selection` (in its `parts/common.yaml`) is what its lanes run by defa
 | vllm | `qwen3-32b-ctx9k-parsers` | TPU | `pd-disaggregation/vllm-qwen3-32b-ctx9k-parsers-standalone` | — |
 | atom | `qwen3-32b-ctxunknown-inline` | AMD | `optimized-baseline/atom-qwen3-32b-ctxunknown-inline-standalone` | — |
 | sglang | `qwen3-32b-inline` | AMD | `optimized-baseline/sglang-qwen3-32b-inline-standalone` | — |
-| vllm | `qwen3-32b-inline` | AMD | `optimized-baseline/vllm-qwen3-32b-inline-standalone` | flow-control, keda-epp, pd-disaggregation, precise-prefix-cache-routing, tiered-prefix-cache |
+| vllm | `qwen3-32b-inline` | AMD | `optimized-baseline/vllm-qwen3-32b-inline-standalone` | flow-control, keda-epp, pd-disaggregation\*, precise-prefix-cache-routing, tiered-prefix-cache |
 | vllm | `qwen3-32b-inline` | TPU | `optimized-baseline/vllm-qwen3-32b-inline-standalone` | tiered-prefix-cache |
 | vllm | `qwen3-32b-inline` | Intel XPU | `tiered-prefix-cache/vllm-qwen3-32b-inline-standalone` | — |
 | sglang | `qwen3-32b-parsers` | NVIDIA GPU | `optimized-baseline/sglang-qwen3-32b-parsers-standalone` | tiered-prefix-cache |
-| vllm | `qwen3-32b-parsers` | NVIDIA GPU | `optimized-baseline/vllm-qwen3-32b-parsers-standalone` | agentic-api, async-multitenant, flow-control, keda-epp, precise-prefix-cache-routing, tiered-prefix-cache |
+| vllm | `qwen3-32b-parsers` | NVIDIA GPU | `optimized-baseline/vllm-qwen3-32b-parsers-standalone` | agentic-api, async-multitenant, flow-control, keda-epp\*, precise-prefix-cache-routing, tiered-prefix-cache |
 | vllm | `qwen3-8b-ctx20k-inline` | Intel XPU | `tiered-prefix-cache/vllm-qwen3-8b-ctx20k-inline-standalone` | — |
 | vllm | `qwen3-vl-32b-instruct-inline` | NVIDIA GPU | `multimodal-serving/vllm-qwen3-vl-32b-instruct-inline-standalone` | — |
 | vllm | `qwen3-vl-32b-instruct-inline` | TPU | `multimodal-serving/vllm-qwen3-vl-32b-instruct-inline-standalone` | — |
 
-Two lanes run a different engine build from the rest of their configuration, so each runs `--all` too: pd-disaggregation's `amd-ci-acc-rocm-vllm-moriio` (vllm-openai-rocm v0.32.0-rc.2, an llm-d build) and keda-epp's `ibm-acc-gpu-vllm-x` (vLLM's floating `nightly` image). A lane whose engine image changes runs `--all` once on the new build; `llmdv compare` reports the build change (`the stack changed`).
+\* One of this guide's lanes for the configuration runs `--all` too. Two lanes run a different engine build from the rest of their configuration, so each runs `--all`: pd-disaggregation's `amd-ci-acc-rocm-vllm-moriio` (vllm-openai-rocm v0.32.0-rc.2, an llm-d build) and keda-epp's `ibm-acc-gpu-vllm-x` (vLLM's floating `nightly` image). A lane whose engine image changes runs `--all` once on the new build; `llmdv compare` reports the build change (`the stack changed`).
 
 ## optimized-baseline coverage
 

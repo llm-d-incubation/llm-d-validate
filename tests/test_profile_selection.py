@@ -257,3 +257,21 @@ def test_a_selection_naming_the_renamed_case_names_its_replacement(tmp_path):
     profile = _selected(tmp_path, "http://127.0.0.1:9", "field_options.vllm_observable")
     with pytest.raises(loader.ProfileError, match="use 'field_options.extension_observable'"):
         loader.load(profile)
+
+
+GUIDE_COMBINATIONS = sorted(
+    str(path.relative_to(ROOT))
+    for path in (ROOT / "profiles" / "llm-d").glob("*/*.yaml")
+    if path.parent.name != "parts"
+)
+
+
+@pytest.mark.parametrize("combination", GUIDE_COMBINATIONS)
+def test_every_guide_combination_plans_under_its_selection(combination):
+    """Every glob a guide selects matches a case (a renamed or removed case fails here, offline,
+    rather than as exit 2 on a lane), and the selection keeps the contract cases."""
+    path = ROOT / combination
+    assert loader.load(path).selection, "a guide combination declares a selection"
+    plan = _plan(path)
+    assert plan["selection"]["profile"]["left_out"] > 0
+    assert any(row["case_id"].startswith("contract.") for row in plan["cases"])

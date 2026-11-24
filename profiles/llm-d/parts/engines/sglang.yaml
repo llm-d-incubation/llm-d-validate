@@ -1,9 +1,10 @@
 # Part: SGLang, for a stack whose replicas run `sglang.launch_server`. Not a profile on its own; a
 # combination file lists it after the topology part. Never extends anything.
 #
-# Used by the SGLang overlays of optimized-baseline (FROM values:
-# guides/optimized-baseline/modelserver/*/sglang/): sglang v0.5.22 (CUDA, and a ROCm build),
-# sglang v0.1.0-tpu, an Intel XPU build and a vendor build for DeepSeek-V4. The NVIDIA GPU overlay
+# Used by the SGLang overlays optimized-baseline's lanes deploy, rendered at llm-d 9ca8ff0 (FROM
+# values: guides/optimized-baseline/modelserver/{gpu,amd,tpu/v5p}/sglang/): sglang v0.5.22
+# (gpu/sglang/gke), sglang v0.5.22-rocm724-mi35x (amd/sglang/amd-ci) and sglang v0.1.0-tpu
+# (tpu/v5p/sglang). The NVIDIA GPU overlay
 # also runs SGLang's Rust HTTP frontend (SGLANG_RUST_SERVER=1, guides/optimized-baseline/README.md,
 # "Tuning"); its combination file says so, since that is an overlay fact, not an engine-wide one.
 # The other guides' SGLang lanes run sglang v0.5.22 (pd-disaggregation with gpt-oss-120b,

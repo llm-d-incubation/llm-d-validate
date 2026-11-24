@@ -6,7 +6,7 @@
 # No `name` here: each combination names itself, so each run says which one it was.
 
 #
-# What these profiles cover: only the guide's llm-d router, the `agentic-api-epp` Service. The
+# What these profiles cover: only the guide's llm-d router, the `<GUIDE_NAME>-epp` Service. The
 # guide deploys (FROM values: G/guide.yaml deploy, G/scripts/nightly-deploy-gke.sh):
 #   router         helm release `agentic-api` with R/router/base.values.yaml and
 #                  OB/router/optimized-baseline.values.yaml, unchanged: approx-prefix-cache-producer,
@@ -17,13 +17,13 @@
 #   model server   G/modelserver/gpu/vllm/gke, which only includes OB/modelserver/gpu/vllm/gke
 #                  (rendered: identical, labels included); CI cuts it to one replica
 #   PostgreSQL     PostgreSQL 17, the state store (G/manifests/postgres.yaml)
-#   agentic-api    vllm/agentic-api:v0.9.0 on Service agentic-api port 9000, sending each
-#                  inference round to the router at agentic-api-epp:80 (G/guide.yaml LLM_API_BASE)
+#   agentic-api    vllm/agentic-api:v0.9.0 on its own Service, port 9000, sending each
+#                  inference round to the router at <GUIDE_NAME>-epp:80 (G/guide.yaml LLM_API_BASE)
 #
 # The guide's claims (G/README.md, G/guide.yaml verify, G/verify.py, run by
 # .github/scripts/e2e/e2e-validate-agentic-api.sh) and where each one lands:
 #   1   the router serves chat and text completions (the shared e2e smoke loop at
-#       agentic-api-epp) -> openai_chat.*, openai_completions.*
+#       <GUIDE_NAME>-epp) -> openai_chat.*, openai_completions.*
 #   2   the model server exposes vLLM's stateless /v1/responses, which agentic-api delegates each
 #       round to (G/README.md "Supported Accelerators and Model Servers") -> openai_responses.*
 #       at the router
@@ -49,6 +49,13 @@ capabilities:
   # not pass vLLM's --enable-prompt-tokens-details. With no cached_tokens, `affinity: routed`
   # would fail on a correct stack for want of the field.
   cache_reuse: null
+  # FROM docs: G/README.md ("The llm-d Router and vLLM are stateless"; agentic-api "delegates
+  # each inference round to vLLM's own stateless Responses API"). At the router this guide
+  # declares no response state, overriding ../../parts/base.yaml's stateful INTENT: state lives
+  # in agentic-api's PostgreSQL store, which no ingress here reaches (claim 4).
+  stateless_responses: true
+  stateful_responses: false
+  background_responses: false
 
 # The cases this guide's lanes run by default (`llmdv verify --all` runs everything). They test
 # what a lane's own deployment can get wrong: the router path, the overlay's parsers and window,

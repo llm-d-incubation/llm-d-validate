@@ -2,7 +2,7 @@
 
 Profiles for llm-d's [flow-control guide](https://github.com/llm-d/llm-d/tree/main/guides/flow-control) at llm-d `9ca8ff0`: the llm-d router with its `flowControl` feature gate on, priority bands 100, 0 and -10, round-robin fairness and FCFS ordering, in front of optimized-baseline's vLLM model servers. Every profile here is WRITTEN, NOT RUN.
 
-The profiles test the router (EPP) each lane exposes, in standalone mode, through `../parts/topology/standalone.yaml`. The helm release is `flow-control`, so the Service is `flow-control-epp` on port 80 (the lanes' `gateway_host`).
+The profiles test the router (EPP) each lane exposes, in standalone mode, through `../parts/topology/standalone.yaml`. The helm release is `flow-control`, so the Service is `<GUIDE_NAME>-epp` on port 80 (the lanes' `gateway_host`).
 
 ## Lanes
 
@@ -16,7 +16,7 @@ Both lanes run `guides/flow-control/scripts/nightly-deploy-gke.sh` as a `custom_
 The provider value is the `INFRA_PROVIDER` the lane passes to the deploy script.
 
 ```sh
-export LLMDV_EPP_URL=http://flow-control-epp.<namespace>.svc.cluster.local
+export LLMDV_EPP_URL=http://<GUIDE_NAME>-epp.<namespace>.svc.cluster.local
 llmdv verify --profile profiles/llm-d/flow-control/vllm-qwen3-32b-parsers-standalone.yaml \
   --identity accelerator=gpu --identity provider=gke
 ```
