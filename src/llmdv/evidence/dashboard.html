@@ -141,6 +141,7 @@ details.panel > .body { padding: 0 0.9rem 0.9rem; }
   for (const ing of ingresses) {
     const m = ing.model || P.model || {};
     h += `<div class="card"><h3>${esc(ing.id)} <span class="pill">${esc(ing.kind)}</span></h3>` + kv({
+      'fronts': isObj(D.fronts) ? ((D.fronts[ing.id] || []).join(', ') || 'nothing') : undefined,
       'endpoint': ing.base_url, 'auth': ing.auth ? `${ing.auth.type || 'none'}${ing.auth.key_env ? ' via $' + ing.auth.key_env : ''}` : 'none',
       'surfaces': (ing.surfaces || []).join(', '), 'health path': ing.health_path, 'timeouts': ing.timeouts,
       'rate limited': ing.rate_limited, 'proxy': (ing.setup || {}).proxy, 'tls verify': (ing.tls || {}).verify,

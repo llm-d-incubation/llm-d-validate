@@ -108,7 +108,8 @@ One entry per addressable layer. One ingress is a complete profile; each further
 | Key | Type | Default | Meaning |
 | --- | --- | --- | --- |
 | `id` | string | **required** | Short, unique name: letters, digits, `.`, `_` and `-`, starting with a letter or a digit. It becomes the pytest parameter id, so `-k <id>` selects one column. |
-| `kind` | `gateway` \| `router` \| `engine` | **required** | Where the layer sits, never which product it is: a gateway is the client's front door (LiteLLM, Kong), a router picks a backend (the llm-d router), an engine generates (vLLM, SGLang). Reports order the layers outermost first by it: `gateway`, `router`, `engine`. Two ingresses of one kind are peers: reports never compare them with each other. Name the product in `id`, and in the top-level `engine` and `gateway` for run identity. The product names `litellm`, `llmd_router` and `vllm` are refused with the position that replaces them. |
+| `kind` | `gateway` \| `router` \| `engine` | **required** | Where the layer sits, never which product it is: a gateway is the client's front door (LiteLLM, Kong), a router picks a backend (the llm-d router), an engine generates (vLLM, SGLang). Unless some ingress declares `fronts`, reports order the layers outermost first by it: `gateway`, `router`, `engine`, and two ingresses of one kind are peers that reports never compare with each other. Name the product in `id`, and in the top-level `engine` and `gateway` for run identity. The product names `litellm`, `llmd_router` and `vllm` are refused with the position that replaces them. |
+| `fronts` | list of ingress ids | not declared | The ingresses this layer forwards to. Once any ingress declares it, the declared edges are the whole layer graph and `kind` no longer orders it; an ingress that leaves it out then fronts nothing, the same as `[]`. See [Declared layer edges](#declared-layer-edges). |
 | `base_url` | string | **required** unless `base_url_env` is set | Must start with `http://` or `https://`. |
 | `base_url_env` | string | none | Environment variable holding the URL. A committed profile uses it so no hostname enters the repository. Declaring both is an error; an unset variable fails preflight. |
 | `auth` | mapping | `{type: none}` | See [ingresses[].auth](#ingressesauth). |
@@ -211,6 +212,28 @@ Every key is optional; a case whose key is absent skips as `undeclared`. Paths m
 | `max_gap_s` | seconds | none | Longest gap between deltas. |
 | `min_tokens_per_s` | number | none | Lowest output rate. |
 | `next_request_s` | seconds | none | Time to serve the next request after a cancel or client timeout. The retry after a client timeout streams and is held to this until its first output delta; with `min_tokens_per_s` declared, the whole retry also gets its reported output at that rate. |
+
+### Declared layer edges
+
+Every cross-layer reading (the summary's attribution, the alert feed's `points_at`, the Messages prompt-size comparison) uses one layer graph. Without `fronts` it is derived from `kind`: each ingress fronts every ingress of the next deeper kind present. That cannot describe a stack with two layers of one kind in series, such as a P/D deployment where the router forwards to the decode pod's routing sidecar, which forwards to the prefill and decode engines:
+
+```yaml
+ingresses:
+  - id: epp
+    kind: router
+    fronts: [sidecar]
+  - id: sidecar      # the decode pod's routing sidecar
+    kind: router
+    fronts: [prefill, decode]
+  - id: prefill
+    kind: engine
+  - id: decode
+    kind: engine
+```
+
+With these edges a failure is attributed `epp` against `sidecar`, and `sidecar` against `prefill` and `decode`. `prefill` and `decode` are peers and are never compared. An ingress is compared only with the nearest ingresses behind it that reported, so with `sidecar` not selected, `epp` is compared with both engines.
+
+The graph is checked when the profile loads, and a bad one is an invalid profile (exit 2 from `llmdv profile validate` and `llmdv verify`) naming the first problem: a `fronts` entry that names no ingress, an id listed twice in one `fronts`, an ingress that lists itself, a cycle (named by its path, `epp -> sidecar -> epp`), or, with more than one ingress, an ingress on no edge. Reports order the layers so that every ingress comes before the ones it fronts, by always placing next the earliest-declared ingress that is ready, meaning every ingress that fronts it is already placed. A fleet-suite row with no `ingress` is reported at the last selected layer in that order.
 
 ### Per-ingress overrides
 

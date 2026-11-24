@@ -45,16 +45,18 @@ class IngressKind(str, Enum):
 
 # How deep each kind sits in a stack, outermost first. An engine generates rather than
 # forwarding, so it is terminal, and a gateway is the front door. The layer graph
-# (`topology.py`) is derived from these depths: each ingress fronts every ingress at the next
-# deeper depth present.
+# (`topology.py`) is derived from these depths, unless an ingress declares `fronts`: each
+# ingress fronts every ingress at the next deeper depth present.
 #
 # Two ingresses of the same kind tie: they keep declaration order in `Profile.chain`, and they
-# are peers in the graph, never compared with each other.
+# are peers in the graph, never compared with each other. A profile that declares `fronts`
+# orders its layers by those edges instead (`Topology.declare`).
 _KIND_DEPTH = {IngressKind.GATEWAY: 0, IngressKind.ROUTER: 1, IngressKind.ENGINE: 2}
 
 
 def depth(kind: IngressKind | str) -> int:
-    """How deep a kind sits, 0 outermost: the order `Profile.chain` reads the layers in."""
+    """How deep a kind sits, 0 outermost: the order `Profile.chain` reads the layers in when the
+    profile declares no `fronts`."""
     return _KIND_DEPTH[IngressKind(kind)]
 
 
@@ -404,6 +406,9 @@ class Ingress:
     tls: Tls = field(default_factory=Tls)
     # Declared HTTP behavior; see profile/transport.py.
     transport: TransportContract = field(default_factory=TransportContract)
+    # The ingress ids this layer forwards to (`topology.py`). None is undeclared, and the graph
+    # is derived from `kind` unless another ingress declares; () is declared as fronting none.
+    fronts: tuple[str, ...] | None = None
 
     @property
     def log_sources(self) -> tuple[LogSource, ...]:
@@ -1052,16 +1057,29 @@ class Profile:
     def ingress_ids(self) -> tuple[str, ...]:
         return tuple(item.id for item in self.ingresses)
 
+    @property
+    def declares_fronts(self) -> bool:
+        """Whether any ingress declares `fronts`, making the declared edges the whole graph."""
+        return any(item.fronts is not None for item in self.ingresses)
+
     def topology(self) -> Topology:
-        """Which ingress fronts which, derived from each ingress's kind."""
+        """Which ingress fronts which: the declared `fronts`, or else derived from each kind.
+
+        Once any ingress declares `fronts`, the declared edges are the whole graph, and an
+        ingress that declares none fronts nothing. Raises ProfileError for a declared graph
+        that is not one. `loader.load` builds the graph and refuses such a profile, so for a
+        loaded profile this never raises; a profile built in code is checked by `validate`.
+        """
+        if self.declares_fronts:
+            return Topology.declare((item.id, item.fronts or ()) for item in self.ingresses)
         return Topology.derive((item.id, _KIND_DEPTH[item.kind]) for item in self.ingresses)
 
     def chain(self) -> list[str]:
         """Declared ingress ids, outermost first: the topology's order.
 
-        Ordered by what each `kind` fronts rather than by declaration order, so a profile that
-        happens to list the engine first still reports the gateway as the outer layer. Two
-        ingresses of the same kind tie and keep declaration order.
+        Ordered by the declared `fronts` edges when the profile has any, otherwise by what each
+        `kind` fronts, never by declaration order alone: a profile that happens to list the
+        engine first still reports the gateway as the outer layer. Ties keep declaration order.
         """
         return list(self.topology().order)
 

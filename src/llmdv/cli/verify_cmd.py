@@ -711,10 +711,16 @@ def _attribution_section(ingresses: list[str], profile: Profile | None = None) -
         shape = ["chain, outermost first: " + " -> ".join(declared)]
     else:
         edges = ", ".join(f"{outer} -> {inner}" for outer, inner in pairs) or "none"
+        # Declared edges can put two layers of one kind in series, so the peer rule is stated
+        # by edge there; a derived graph keeps the wording its runs have always had.
+        if profile.declares_fronts:
+            peers = "the declared edges; peers are never compared"
+        else:
+            peers = "layers of one kind are peers and are never compared"
         shape = [
             "layers, outermost first: " + ", ".join(declared),
             "",
-            f"compared along: {edges} (layers of one kind are peers and are never compared)",
+            f"compared along: {edges} ({peers})",
         ]
     return [
         "## attribution (a hypothesis, not a proof)",
@@ -791,8 +797,8 @@ def _no_declared_order(ran: list[str], declared: list[str], has_profile: bool) -
         "nothing in this run declared.",
         "",
         "The columns above are still real results, each for the address it names. Declaring "
-        "these ingresses in the profile -- with their `kind`, which is what orders the chain -- "
-        "is what turns them into an attribution.",
+        "these ingresses in the profile -- with their `kind`, or `fronts` edges, which order "
+        "the chain -- is what turns them into an attribution.",
         "",
         "`served_by` is still recorded on every result, so where a layer reveals which backend",
         "answered, the evidence is kept even though this run cannot act on it.",

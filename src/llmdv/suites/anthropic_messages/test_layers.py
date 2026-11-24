@@ -25,19 +25,22 @@ def _body(surface, model):
 def test_prompt_size_matches_the_engine(
     request, client, client_factory, profile, surface, model, ingress
 ):
+    behind = profile.topology().behind(ingress.id)
     engines = [
         candidate
-        for candidate in profile.ingresses
+        for candidate in (profile.ingress(name) for name in behind)
         if candidate.kind is IngressKind.ENGINE
         and surface.name in candidate.surfaces
         and "prompt_accounting" in candidate.capabilities.messages_checks
     ]
-    # Two engines may serve different models, and nothing in a profile says which one a layer
-    # fronts, so the comparison is only made when there is exactly one.
-    if ingress.kind is IngressKind.ENGINE or len(engines) != 1:
+    # Only an engine behind this layer can be the one it forwards to. Two engines behind it may
+    # serve different models, or different phases of one request, so the comparison is only
+    # made when there is exactly one.
+    if len(engines) != 1:
+        found = ", ".join(repr(item.id) for item in engines) or "none"
         pytest.skip(
-            f"[undeclared] comparing {ingress.id!r} needs exactly one engine ingress declaring "
-            f"prompt_accounting on Messages, and a layer in front of it; found {len(engines)}"
+            f"[undeclared] comparing {ingress.id!r} needs exactly one engine ingress behind it "
+            f"declaring prompt_accounting on Messages; found {found}"
         )
     (engine,) = engines
     reference = prompt_size(

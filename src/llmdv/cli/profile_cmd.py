@@ -119,6 +119,8 @@ def cmd_show(args: argparse.Namespace) -> int:
             auth += f" (${ingress.auth.key_env})"
         emit(f"  {ingress.id:<10} {ingress.kind.value:<13} {ingress.base_url}")
         emit(f"  {'':<10} auth={auth}  surfaces={', '.join(ingress.surfaces) or 'none'}")
+        if profile.declares_fronts:
+            emit(f"  {'':<10} fronts={', '.join(ingress.fronts or ()) or 'nothing'}")
         for line in contract_lines(ingress.model, ingress.capabilities):
             emit(f"  {'':<10} {line}")
     emit("")

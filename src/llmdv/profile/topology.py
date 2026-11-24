@@ -1,10 +1,16 @@
 """Which ingress forwards to which: the layer graph that every cross-layer reading uses.
 
-A profile lists its ingresses; this module says how they are stacked. The edges are derived
-from each ingress's depth (`schema.depth`): every ingress fronts every ingress at the next
-deeper depth that is present. LiteLLM fronts the router, the router fronts the engines, and
-two ingresses at one depth -- two engines, say a prefill and a decode pool -- are peers with no
-edge between them.
+A profile lists its ingresses; this module says how they are stacked, in one of two ways.
+
+- Derived (`derive`), when no ingress declares `fronts`: the edges come from each ingress's
+  depth (`schema.depth`), and every ingress fronts every ingress at the next deeper depth that
+  is present. The gateway fronts the router, the router fronts the engines, and two ingresses
+  at one depth -- two engines, say a prefill and a decode pool -- are peers with no edge
+  between them.
+- Declared (`declare`), when any ingress declares `fronts`: the declared edges are the graph
+  and nothing is derived. That describes arrangements depth cannot, such as a routing sidecar
+  between the router and the prefill and decode engines. The loader builds it when the profile
+  loads, so a bad graph is a profile error rather than a mid-run surprise.
 
 There is one pairing rule, and both the summary's attribution ladder and the alert feed use
 it: an ingress is compared only with the nearest ingresses behind it that reported. From the
@@ -21,9 +27,12 @@ recorded (see `evidence/alerts.py`).
 
 from __future__ import annotations
 
+import heapq
 from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
 from typing import Any
+
+from .errors import ProfileError
 
 
 @dataclass(frozen=True)
@@ -52,6 +61,68 @@ class Topology:
             for name, mine in ranked
         }
         return cls(order=tuple(name for name, _ in ranked), fronts=fronts)
+
+    @classmethod
+    def declare(cls, layers: Iterable[tuple[str, Iterable[str]]]) -> Topology:
+        """The graph a profile declares, from `(id, fronts)` in declaration order.
+
+        Raises ProfileError naming the first problem, checked in this order: a `fronts` entry
+        naming no ingress, an id listed twice in one `fronts`, an ingress that fronts itself, a
+        cycle (reported as its path), and, with more than one ingress, an ingress on no edge at
+        all. `order` is topological, built by always taking the earliest-declared ingress that
+        is ready, so every edge points later in it.
+
+        An id declared twice is the loader's to refuse; here its first declaration stands.
+        """
+        fronts: dict[str, tuple[str, ...]] = {}
+        where: dict[str, str] = {}
+        for index, (name, targets) in enumerate(layers):
+            if name not in fronts:
+                fronts[name] = tuple(targets)
+                where[name] = f"ingresses[{index}]({name})"
+        names = list(fronts)
+        for name in names:
+            for position, target in enumerate(fronts[name]):
+                if target not in fronts:
+                    raise ProfileError(f"{where[name]}.fronts[{position}]: no ingress {target!r}")
+        for name in names:
+            for position, target in enumerate(fronts[name]):
+                if target in fronts[name][:position]:
+                    raise ProfileError(f"{where[name]}.fronts[{position}]: lists {target!r} twice")
+        for name in names:
+            if name in fronts[name]:
+                raise ProfileError(f"{where[name]}.fronts: lists itself")
+        cycle = _cycle(names, fronts)
+        if cycle:
+            raise ProfileError(f"ingresses: fronts form a cycle: {' -> '.join(cycle)}")
+        if len(names) > 1:
+            connected = {target for targets in fronts.values() for target in targets}
+            connected |= {name for name, targets in fronts.items() if targets}
+            for name in names:
+                if name not in connected:
+                    raise ProfileError(
+                        f"{where[name]}: on no edge; it fronts nothing and nothing fronts it"
+                    )
+        # Kahn's algorithm, always taking the earliest-declared ingress that is ready: a heap of
+        # declaration positions, so a long chain orders in one pass.
+        position = {name: index for index, name in enumerate(names)}
+        waiting = dict.fromkeys(names, 0)
+        for targets in fronts.values():
+            for target in targets:
+                waiting[target] += 1
+        ready = [position[name] for name in names if waiting[name] == 0]
+        heapq.heapify(ready)
+        order: list[str] = []
+        while ready:
+            name = names[heapq.heappop(ready)]
+            order.append(name)
+            for target in fronts[name]:
+                waiting[target] -= 1
+                if waiting[target] == 0:
+                    heapq.heappush(ready, position[target])
+        if len(order) < len(names):  # Unreachable after the cycle check; never a crash.
+            raise ProfileError("ingresses: fronts cannot be ordered")
+        return cls(order=tuple(order), fronts={name: fronts[name] for name in order})
 
     @classmethod
     def from_record(cls, body: Any) -> Topology | None:
@@ -88,6 +159,17 @@ class Topology:
         """
         return set(names) <= set(self.order)
 
+    def behind(self, name: str) -> tuple[str, ...]:
+        """Every ingress reachable from `name` through its edges, in `order`."""
+        found: set[str] = set()
+        stack = list(self.fronts.get(name, ()))
+        while stack:
+            item = stack.pop()
+            if item not in found:
+                found.add(item)
+                stack.extend(self.fronts.get(item, ()))
+        return tuple(item for item in self.order if item in found)
+
     def nearest(self, name: str, reported: Iterable[str]) -> list[str]:
         """The reported ingresses the fewest steps behind `name`.
 
@@ -113,3 +195,33 @@ class Topology:
         wanted = set(reported)
         members = [item for item in self.order if item in wanted]
         return [(outer, inner) for outer in members for inner in self.nearest(outer, members)]
+
+
+def _cycle(names: list[str], fronts: Mapping[str, tuple[str, ...]]) -> list[str]:
+    """The first cycle a depth-first walk finds, as a path ending where it starts, or [].
+
+    Walked with an explicit stack, not recursion, so no chain is too deep to check.
+    """
+    done: set[str] = set()
+    for start in names:
+        if start in done:
+            continue
+        path: list[str] = [start]
+        on_path = {start}
+        pending = [iter(fronts.get(start, ()))]
+        while pending:
+            target = next(pending[-1], None)
+            if target is None:
+                finished = path.pop()
+                on_path.discard(finished)
+                done.add(finished)
+                pending.pop()
+                continue
+            if target in on_path:
+                return [*path[path.index(target) :], target]
+            if target in done:
+                continue
+            path.append(target)
+            on_path.add(target)
+            pending.append(iter(fronts.get(target, ())))
+    return []

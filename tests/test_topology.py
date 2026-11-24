@@ -472,3 +472,190 @@ def test_a_derived_order_is_topological_and_peers_have_no_edge(seed):
         later = [d for d in present if d > depths[name]]
         want = [n for n in topology.order if later and depths[n] == later[0]]
         assert list(targets) == want
+
+
+# ------------------------------------------------------------------------ the declared graph
+
+# The P/D stack of profiles/REFERENCE.md, declared in an order that is not topological.
+DECLARED_PD = (
+    ("decode", ()),
+    ("epp", ("sidecar",)),
+    ("prefill", ()),
+    ("sidecar", ("prefill", "decode")),
+)
+
+
+def test_a_declared_graph_is_ordered_topologically_with_ties_in_declaration_order():
+    topology = Topology.declare(DECLARED_PD)
+    assert topology.order == ("epp", "sidecar", "decode", "prefill")
+    assert dict(topology.fronts) == dict(DECLARED_PD)
+
+
+def test_a_declared_graph_compares_along_its_edges_only():
+    topology = Topology.declare(DECLARED_PD)
+    assert topology.pairs(["epp", "sidecar", "prefill", "decode"]) == [
+        ("epp", "sidecar"),
+        ("sidecar", "decode"),
+        ("sidecar", "prefill"),
+    ]
+    # Without the sidecar reporting, the router is compared with both engines behind it.
+    assert topology.pairs(["epp", "prefill", "decode"]) == [("epp", "decode"), ("epp", "prefill")]
+
+
+def test_behind_is_everything_reachable_in_order():
+    topology = Topology.declare(DECLARED_PD)
+    assert topology.behind("epp") == ("sidecar", "decode", "prefill")
+    assert topology.behind("sidecar") == ("decode", "prefill")
+    assert topology.behind("decode") == ()
+    assert topology.behind("unknown") == ()
+    assert Topology.derive([("gw", 0), ("r", 1), ("e", 2)]).behind("gw") == ("r", "e")
+
+
+@pytest.mark.parametrize(
+    "layers, problem",
+    [
+        (
+            [("epp", ("sidcar",)), ("sidecar", ())],
+            "ingresses[0](epp).fronts[0]: no ingress 'sidcar'",
+        ),
+        ([("epp", ("epp",)), ("e", ())], "ingresses[0](epp).fronts: lists itself"),
+        (
+            [("gw", ("epp",)), ("epp", ("sidecar",)), ("sidecar", ("epp",))],
+            "ingresses: fronts form a cycle: epp -> sidecar -> epp",
+        ),
+        (
+            [("epp", ("decode",)), ("decode", ()), ("prefill", ())],
+            "ingresses[2](prefill): on no edge; it fronts nothing and nothing fronts it",
+        ),
+        # Checked in order: the unknown id is named before the cycle and the loner.
+        (
+            [("a", ("b",)), ("b", ("a", "x")), ("c", ())],
+            "ingresses[1](b).fronts[1]: no ingress 'x'",
+        ),
+    ],
+)
+def test_a_declared_graph_that_is_not_one_names_its_first_problem(layers, problem):
+    with pytest.raises(loader.ProfileError) as caught:
+        Topology.declare(layers)
+    assert caught.value.problems == (problem,)
+
+
+def test_one_ingress_declared_as_fronting_nothing_is_a_graph():
+    assert Topology.declare([("only", ())]).order == ("only",)
+
+
+def test_a_declared_graph_round_trips_through_its_record():
+    topology = Topology.declare(DECLARED_PD)
+    record = json.loads(json.dumps(topology.as_record()))
+    assert Topology.from_record(record) == topology
+
+
+@pytest.mark.parametrize(
+    "layers",
+    [
+        [("a", ("b",)), ("a", ("b",)), ("b", ())],
+        [("a", ("b",)), ("b", ()), ("a", ())],
+    ],
+)
+def test_a_duplicate_id_counts_once_with_its_first_declaration(layers):
+    """The loader refuses a duplicate id; a graph built in code still orders, never hangs."""
+    topology = Topology.declare(layers)
+    assert topology.order == ("a", "b")
+    assert dict(topology.fronts) == {"a": ("b",), "b": ()}
+
+
+def test_an_id_listed_twice_in_one_fronts_is_refused():
+    with pytest.raises(loader.ProfileError) as caught:
+        Topology.declare([("a", ("b", "c", "b")), ("b", ()), ("c", ())])
+    assert caught.value.problems == ("ingresses[0](a).fronts[2]: lists 'b' twice",)
+
+
+def random_declared(rng: random.Random) -> list[tuple[str, tuple[str, ...]]]:
+    """A connected acyclic declaration in a shuffled order: every ingress but the first in
+    rank is fronted by one ranked before it, and some get further edges forward in rank."""
+    ranked = [f"n{i}" for i in range(rng.randint(2, 7))]
+    edges: dict[str, list[str]] = {name: [] for name in ranked}
+    for index, name in enumerate(ranked[1:], start=1):
+        edges[rng.choice(ranked[:index])].append(name)
+    for index, name in enumerate(ranked):
+        for later in ranked[index + 1 :]:
+            if later not in edges[name] and rng.random() < 0.3:
+                edges[name].append(later)
+    declared = [(name, tuple(targets)) for name, targets in edges.items()]
+    rng.shuffle(declared)
+    return declared
+
+
+@pytest.mark.parametrize("seed", range(100))
+def test_a_declared_order_puts_every_edge_later(seed):
+    layers = random_declared(random.Random(seed))
+    topology = Topology.declare(layers)
+    position = {name: index for index, name in enumerate(topology.order)}
+    assert all(position[t] > position[n] for n, targets in layers for t in targets)
+    assert Topology.from_record(topology.as_record()) == topology
+
+
+@pytest.mark.parametrize("seed", range(100))
+def test_a_back_edge_is_reported_as_a_cycle_along_real_edges(seed):
+    rng = random.Random(seed)
+    layers = random_declared(rng)
+    topology = Topology.declare(layers)
+    start = rng.choice([name for name in topology.order if topology.behind(name)])
+    back = rng.choice(topology.behind(start))
+    fronts = dict(layers)
+    fronts[back] = (*fronts[back], start)
+    with pytest.raises(loader.ProfileError) as caught:
+        Topology.declare(fronts.items())
+    (problem,) = caught.value.problems
+    assert problem.startswith("ingresses: fronts form a cycle: ")
+    path = problem.removeprefix("ingresses: fronts form a cycle: ").split(" -> ")
+    assert len(path) >= 3 and path[0] == path[-1]
+    assert all(inner in fronts[outer] for outer, inner in itertools.pairwise(path))
+
+
+def _cycle_recursive(names, fronts):
+    """The cycle search as first written, recursively: the oracle for the iterative one."""
+    done, path = set(), []
+
+    def walk(name):
+        if name in path:
+            return [*path[path.index(name) :], name]
+        if name in done:
+            return []
+        path.append(name)
+        for target in fronts.get(name, ()):
+            found = walk(target)
+            if found:
+                return found
+        path.pop()
+        done.add(name)
+        return []
+
+    for name in names:
+        found = walk(name)
+        if found:
+            return found
+    return []
+
+
+@pytest.mark.parametrize("seed", range(300))
+def test_the_iterative_cycle_search_finds_what_the_recursive_one_did(seed):
+    from llmdv.profile.topology import _cycle
+
+    rng = random.Random(seed)
+    names = [f"n{i}" for i in range(rng.randint(1, 9))]
+    fronts = {
+        name: tuple(dict.fromkeys(rng.sample(names, rng.randint(0, min(3, len(names))))))
+        for name in names
+    }
+    assert _cycle(names, fronts) == _cycle_recursive(names, fronts)
+
+
+def test_a_very_long_chain_is_ordered_and_a_cycle_at_its_end_is_named():
+    """No recursion limit: a chain of any length is checked as a profile, never a crash."""
+    depth_ = 5000
+    chain = [(f"i{k}", (f"i{k + 1}",) if k < depth_ - 1 else ()) for k in range(depth_)]
+    assert Topology.declare(chain).order[-1] == f"i{depth_ - 1}"
+    looped = chain[:-1] + [(f"i{depth_ - 1}", ("i0",))]
+    with pytest.raises(loader.ProfileError, match="fronts form a cycle: i0 -> i1"):
+        Topology.declare(looped)

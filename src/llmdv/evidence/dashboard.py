@@ -138,6 +138,20 @@ def ingress_auth_env(profile: dict) -> dict[str, str | None]:
     return out
 
 
+def declared_fronts(profile: dict) -> dict[str, list[str]] | None:
+    """What each ingress fronts, when the profile declares `fronts`; None when it derives them.
+
+    Once one ingress declares, the declared edges are the whole graph, so an ingress that
+    declares none fronts nothing.
+    """
+    ingresses = [ing for ing in as_list(profile.get("ingresses")) if isinstance(ing, dict)]
+    if not any(ing.get("fronts") is not None for ing in ingresses):
+        return None
+    return {
+        str(ing.get("id")): [str(name) for name in as_list(ing.get("fronts"))] for ing in ingresses
+    }
+
+
 # -------------------------------------------------------------------------------- the evidence
 
 
@@ -439,6 +453,7 @@ def build(run: Path, body_cap: int, max_exchanges: int) -> dict:
         ],
         "profile_raw": profile_raw,
         "profile": profile,
+        "fronts": declared_fronts(profile),
         "reproduce": reproduce,
         "summary_md": summary_md,
         "publication": publication,
