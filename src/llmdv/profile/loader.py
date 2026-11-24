@@ -825,7 +825,10 @@ _PRODUCT_KINDS = {"litellm": "gateway", "llmd_router": "router", "vllm": "engine
 
 # Run identity names the products at the top level (`engine`, `gateway`), where a profile
 # without that layer as an ingress can still state it.
-_RETIRED_INGRESS_KEYS = {"role": "kind", "implementation": "the top-level engine or gateway"}
+_RETIRED_INGRESS_KEYS = {
+    "role": "kind for the layer's position, and the top-level engine or gateway for its product",
+    "implementation": "the top-level engine or gateway",
+}
 
 
 def _refuse_retired_keys(raw: dict[str, Any], at: str) -> None:
@@ -843,13 +846,14 @@ def _kind(value: Any, where: str) -> IngressKind:
     valid = ", ".join(member.value for member in IngressKind)
     if value is None:
         raise ProfileError(f"{where}: required; one of {valid}")
-    product = value.strip().lower() if isinstance(value, str) else None
-    if product in _PRODUCT_KINDS:
+    # Case and padding are forgiven for a position as for a product name: `Engine` is `engine`.
+    name = value.strip().lower() if isinstance(value, str) else None
+    if name in _PRODUCT_KINDS:
         raise ProfileError(
             f"{where}: {value!r} names a product, not a position; "
-            f"use {_PRODUCT_KINDS[product]!r} (one of {valid})"
+            f"use {_PRODUCT_KINDS[name]!r} (one of {valid})"
         )
-    return _enum(IngressKind, value, None, where)
+    return _enum(IngressKind, name if name is not None else value, None, where)
 
 
 def _ingress(

@@ -97,8 +97,19 @@ def test_an_unknown_kind_is_refused_with_the_valid_ones(tmp_path):
         loader.load(write(tmp_path, MINIMAL.replace("kind: engine", "kind: sidecar")))
 
 
+@pytest.mark.parametrize("value", ["Engine", " ENGINE "])
+def test_a_position_is_read_whatever_its_case(tmp_path, value):
+    """As a product name is recognised in any case, so is a position."""
+    profile = loader.load(write(tmp_path, MINIMAL.replace("kind: engine", f"kind: '{value}'")))
+    assert profile.ingresses[0].kind is IngressKind.ENGINE
+
+
 @pytest.mark.parametrize(
-    "key, replacement", [("role", "use kind"), ("implementation", "top-level engine or gateway")]
+    "key, replacement",
+    [
+        ("role", "use kind for the layer's position, and the top-level engine or gateway"),
+        ("implementation", "top-level engine or gateway"),
+    ],
 )
 def test_a_retired_ingress_field_is_refused_naming_its_replacement(tmp_path, key, replacement):
     with pytest.raises(
