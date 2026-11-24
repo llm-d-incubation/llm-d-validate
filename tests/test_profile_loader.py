@@ -505,11 +505,10 @@ def test_disposition_observability_maps_to_skip_classes():
     assert SkipClass.for_disposition(Disposition.ECHOED) is None
 
 
-def test_a_profile_still_setting_the_removed_responses_capability_loads(tmp_path):
-    """The removed key is ignored like any other unknown key, so an existing profile still runs."""
-    profile = loader.load(write(tmp_path, MINIMAL + "capabilities:\n  responses: true\n"))
-    assert [d for d in loader.validate(profile) if d.level == "error"] == []
-    assert not hasattr(profile.capabilities, "responses")
+def test_the_removed_responses_capability_is_refused_naming_what_replaced_it(tmp_path):
+    """Unknown capability keys are refused, and this one says where its meaning went."""
+    with pytest.raises(loader.ProfileError, match=r"capabilities\.responses: removed; .*surfaces"):
+        loader.load(write(tmp_path, MINIMAL + "capabilities:\n  responses: true\n"))
 
 
 @pytest.mark.parametrize(
@@ -854,3 +853,72 @@ def test_a_malformed_samples_entry_is_refused_naming_it(tmp_path, entry, message
     with pytest.raises(loader.ProfileError, match=re.escape(message)) as caught:
         loader.load(write(tmp_path, MINIMAL + f"capabilities:\n  samples: {entry}\n"))
     assert "capabilities.samples" in str(caught.value)
+
+
+def test_a_top_level_capability_typo_is_refused_naming_the_key(tmp_path):
+    """A typo once loaded silently and declared nothing, so its cases skipped as undeclared."""
+    with pytest.raises(loader.ProfileError, match=r"capabilities\.count_token: unknown field"):
+        loader.load(write(tmp_path, MINIMAL + "capabilities:\n  count_token: true\n"))
+
+
+def test_a_top_level_typo_exits_two_from_profile_validate(tmp_path):
+    path = write(tmp_path, MINIMAL + "capabilities:\n  vllm_optionz: [ignore_eos]\n")
+    result = run_llmdv("profile", "validate", str(path))
+    assert result.returncode == 2, result.stderr
+    assert "capabilities.vllm_optionz: unknown field" in result.stderr
+
+
+@pytest.mark.parametrize(
+    "text, where",
+    [
+        (
+            MINIMAL + "capabilities:\n  count_token: true\n  vllm_optionz: [x]\n"
+            "  count_tokens: 'yes'\n",
+            "capabilities",
+        ),
+        (
+            MINIMAL + "    capabilities:\n      count_token: true\n      vllm_optionz: [x]\n"
+            "      count_tokens: 'yes'\n",
+            "ingresses[0](direct).capabilities",
+        ),
+    ],
+    ids=["top-level", "ingress"],
+)
+def test_every_capability_problem_is_reported_in_one_load(tmp_path, text, where):
+    """Two typos and a bad value beside them: all three, not only the first typo."""
+    with pytest.raises(loader.ProfileError) as caught:
+        loader.load(write(tmp_path, text))
+    paths = [line.split(": ")[1] for line in str(caught.value).splitlines()]
+    assert paths == [f"{where}.count_token", f"{where}.vllm_optionz", f"{where}.count_tokens"]
+
+
+def test_a_renamed_key_beside_a_typo_keeps_its_own_message(tmp_path):
+    text = MINIMAL + "capabilities:\n  vllm_options: [ignore_eos]\n  count_token: true\n"
+    with pytest.raises(loader.ProfileError) as caught:
+        loader.load(write(tmp_path, text))
+    message = str(caught.value)
+    assert "capabilities.vllm_options: renamed" in message
+    assert "capabilities.count_token: unknown field" in message
+    assert "vllm_options: unknown field" not in message
+
+
+def test_a_top_level_typo_does_not_break_an_ingress_that_refines_an_inherited_value(tmp_path):
+    """`glm-5.3` refines the inherited `cache_reuse` in one ingress; a typo at the top level is
+    reported once, there, and the refinement still sees what it refines."""
+    import shutil
+    from pathlib import Path
+
+    source = Path(__file__).resolve().parents[1] / "profiles" / "examples" / "custom-llm-d"
+    copy = tmp_path / "custom-llm-d"
+    shutil.copytree(source, copy)
+    profile = copy / "glm-5.3.yaml"
+    loader.load(profile)  # loads clean as committed
+    text = profile.read_text()
+    assert "\ncapabilities:\n" in text
+    profile.write_text(
+        text.replace("\ncapabilities:\n", "\ncapabilities:\n  count_token: true\n", 1)
+    )
+    with pytest.raises(loader.ProfileError) as caught:
+        loader.load(profile)
+    problems = [line.split(": ", 1)[1] for line in str(caught.value).splitlines()]
+    assert problems == ["capabilities.count_token: unknown field"], problems

@@ -471,10 +471,17 @@ def _build(raw: dict[str, Any], path: Path, clients_dir: Path) -> Profile:
     # it was declared, and its ingresses then check only their own overrides.
     defaults: dict[str, dict[str, Any]] = {"model": {}, "capabilities": {}}
 
-    def inherited(key: str, parse_block):
+    def inherited(key: str, parse_block, usable=None):
         def run():
             block = _block(raw.get(key), key)
-            value = parse_block(block)
+            try:
+                value = parse_block(block)
+            except ProfileError:
+                # What still parses on its own is inherited, so a typo beside it does not make
+                # every ingress's partial override fail for want of what it refines.
+                if usable is not None:
+                    defaults[key] = usable(block)
+                raise
             defaults[key] = block
             return value
 
@@ -491,7 +498,7 @@ def _build(raw: dict[str, Any], path: Path, clients_dir: Path) -> Profile:
                 vantage=lambda: _enum(Vantage, raw.get("vantage"), Vantage.EXTERNAL, "vantage"),
                 environment=lambda: _environment(_block(raw.get("environment"), "environment")),
                 model=inherited("model", _model),
-                capabilities=inherited("capabilities", _capabilities),
+                capabilities=inherited("capabilities", _capabilities, _usable_capabilities),
                 ingresses=lambda: _every(
                     partial(
                         _ingress,
@@ -788,31 +795,54 @@ def _renamed_capabilities(raw: Any, where: str) -> list[str]:
     ]
 
 
+# Capability keys that no longer exist, and what says the same thing now.
+_REMOVED_CAPABILITIES = {
+    "responses": "whether an ingress serves the Responses API is its `surfaces` list",
+}
+
+# Capabilities an ingress override may clear with `null`, back to undeclared.
+_NULLABLE_CAPABILITIES = (
+    "cache_reuse",
+    "effort_rendering",
+    "model_info",
+    "model_retrieval",
+    "responses_input_tokens",
+    "responses_compact",
+)
+
+
+def _capability_keys(
+    raw: dict[str, Any], where: str, nullable: tuple[str, ...] | None
+) -> tuple[dict[str, Any], list[str]]:
+    """The block's keys llmdv knows, and one problem per key it does not, all at once.
+
+    A renamed key is named as renamed, not again as unknown. With `nullable`, a null on any
+    other key is a problem too. The known keys go on to the block's own checks, so a typo never
+    hides a bad value beside it.
+    """
+    known = {item.name for item in fields(Capabilities)}
+    problems = _renamed_capabilities(raw, where)
+    kept: dict[str, Any] = {}
+    for key, value in raw.items():
+        if key in _RENAMED_CAPABILITIES:
+            continue
+        if key in _REMOVED_CAPABILITIES:
+            problems.append(f"{where}.{key}: removed; {_REMOVED_CAPABILITIES[key]}")
+        elif key not in known:
+            problems.append(f"{where}.{key}: unknown field")
+        elif nullable is not None and value is None and key not in nullable:
+            problems.append(f"{where}.{key}: cannot be null")
+        else:
+            kept[key] = value
+    return kept, problems
+
+
 def _ingress_capabilities(override: Any, defaults: dict[str, Any], where: str) -> Capabilities:
-    renamed = _renamed_capabilities(override, where)
-    if renamed:
-        # Named as renamed above, not again as an unknown field.
-        override = {
-            key: value for key, value in override.items() if key not in _RENAMED_CAPABILITIES
-        }
-    try:
-        _check_override_keys(
-            override,
-            Capabilities,
-            where,
-            nullable=(
-                "cache_reuse",
-                "effort_rendering",
-                "model_info",
-                "model_retrieval",
-                "responses_input_tokens",
-                "responses_compact",
-            ),
-        )
-    except ProfileError as exc:
-        raise ProfileError(*renamed, *exc.problems) from None
-    # The defaults were checked for renamed keys where they were declared.
-    return _capability_block(compose.merge(defaults, override), where, renamed)
+    if not isinstance(override, dict):
+        _check_override_keys(override, Capabilities, where)  # names the expected mapping
+    kept, problems = _capability_keys(override, where, _NULLABLE_CAPABILITIES)
+    # The defaults were checked where they were declared.
+    return _capability_block(compose.merge(defaults, kept), where, problems)
 
 
 def _model(raw: dict[str, Any], where: str = "model") -> Model:
@@ -1136,12 +1166,28 @@ def _contract_surfaces(value: Any, where: str) -> bool | tuple[str, ...]:
     return selected
 
 
+def _usable_capabilities(raw: dict[str, Any]) -> dict[str, Any]:
+    """The known keys of a top-level block that failed, if they parse on their own, else none.
+
+    Ingresses inherit these, so a typo at the top level is reported there once and does not
+    turn into a false error on every ingress whose override refines an inherited value. A bad
+    value is not inherited, so it is not reported again per ingress either.
+    """
+    kept, _ = _capability_keys(raw, "capabilities", None)
+    try:
+        _capability_block(kept, "capabilities", [])
+    except ProfileError:
+        return {}
+    return kept
+
+
 def _capabilities(raw: dict[str, Any], where: str = "capabilities") -> Capabilities:
-    return _capability_block(raw, where, _renamed_capabilities(raw, where))
+    kept, problems = _capability_keys(raw, where, None) if isinstance(raw, dict) else (raw, [])
+    return _capability_block(kept, where, problems)
 
 
-def _capability_block(raw: dict[str, Any], where: str, renamed: list[str]) -> Capabilities:
-    """The block's capabilities, or every problem in it, `renamed` first, raised once."""
+def _capability_block(raw: dict[str, Any], where: str, earlier: list[str]) -> Capabilities:
+    """The block's capabilities, or every problem in it, `earlier` first, raised once."""
     try:
         values = _each(
             prefix_stability=lambda: _surface_capability(
@@ -1284,9 +1330,9 @@ def _capability_block(raw: dict[str, Any], where: str, renamed: list[str]) -> Ca
             ),
         )
     except ProfileError as exc:
-        raise ProfileError(*renamed, *exc.problems) from None
-    if renamed:
-        raise ProfileError(*renamed)
+        raise ProfileError(*earlier, *exc.problems) from None
+    if earlier:
+        raise ProfileError(*earlier)
     return Capabilities(**values)
 
 
