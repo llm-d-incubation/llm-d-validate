@@ -12,11 +12,13 @@ cases that apply, and tests every layer against it. Find your starting point:
 
 llmdv tests each llm-d guide below with ready profiles. Once you have deployed a guide, point
 llmdv at its router (the EPP), and it tests that your deployment behaves as the guide and the
-APIs say. In every
-guide, llmdv tests each API a client uses, the errors the router must return, the overlay's
-reasoning and tool parsers, and its context window. It also tests what each guide changes:
+APIs say.
 
-| Guide | What llmdv also tests in this guide, and why | Profiles |
+Every guide gets the same base tests: each API a client uses, the errors the router must return,
+the overlay's reasoning and tool parsers, and its context window. On top of those, each guide is
+tested on what makes it different:
+
+| Guide | Tests specific to this guide, and why | Profiles |
 | --- | --- | --- |
 | [agentic-api](llm-d/agentic-api/README.md) | the Responses API in depth (input items, instructions, tool loops, no stored state), because agentic-api calls vLLM's stateless Responses API through the router | 1 |
 | [async-multitenant](llm-d/async-multitenant/README.md) | concurrent and cancelled requests still served, and flow control's queue header, because the router queues and evicts work | 1 |
@@ -26,7 +28,7 @@ reasoning and tool parsers, and its context window. It also tests what each guid
 | [multimodal-serving](llm-d/multimodal-serving/README.md) | images on Chat, Messages and Responses, and bad images refused, because the guide serves a vision model, through an encode step on one lane | 1 |
 | [optimized-baseline](llm-d/optimized-baseline/README.md) | completions sharing a prefix, and streaming through the router: the guide's own claims | 7, plus a simulator profile |
 | [pd-disaggregation](llm-d/pd-disaggregation/README.md) | streaming, usage frames, `n` choices and error shapes, because every request passes the decode pod's routing sidecar, which splits `n` and rewrites usage frames | 5 |
-| [pod-snapshot](llm-d/pod-snapshot/README.md) | nothing more: snapshot and restore are cluster state, which a client cannot see | 2 |
+| [pod-snapshot](llm-d/pod-snapshot/README.md) | none: snapshot and restore are cluster state, which a client cannot see | 2 |
 | [precise-prefix-cache-routing](llm-d/precise-prefix-cache-routing/README.md) | token counts and rendered prompts that agree with the engine, because the router renders every prompt | 4 |
 | [predicted-latency-routing](llm-d/predicted-latency-routing/README.md) | streaming as well as non-streaming clients, at a 128k window on GPU and AMD | 2 |
 | [tiered-prefix-cache](llm-d/tiered-prefix-cache/README.md) | completions sharing a long prefix, the request the guide's own check sends | 5 |
