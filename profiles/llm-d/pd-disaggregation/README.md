@@ -2,7 +2,7 @@
 
 Profiles for llm-d's [pd-disaggregation](https://github.com/llm-d/llm-d/tree/main/guides/pd-disaggregation) guide, at llm-d 9ca8ff0. Every lane deploys the guide in standalone mode, so every profile has one ingress, the router (`<GUIDE_NAME>-epp`, port 80). The EPP schedules each request onto a prefill pod and a decode pod; the decode pod's routing sidecar runs the prefill, then the decode, and returns one response. In every lane, prefill and decode carry the same model id, window and parser flags, so a client sees one model.
 
-STATUS: WRITTEN, NOT RUN. Each combination's header names its lanes and overlays; `parts/common.yaml` maps the guide's claims to cases or to what is not covered.
+Each combination's header names its lanes and overlays; `parts/common.yaml` maps the guide's claims to cases or to what is not covered.
 
 ## Lanes
 

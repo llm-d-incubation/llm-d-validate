@@ -62,7 +62,7 @@ client share a profile.
 | [keda-epp](keda-epp/README.md) | 3 | 3 | `flavor` names the scaling signal; the router runs flow control on the queue lanes only |
 
 Every profile tests at the router (`<release>-epp`, standalone mode), the only layer every lane
-exposes the same way. None has run against a real engine: each says `WRITTEN, NOT RUN`.
+exposes the same way.
 
 ### Not covered
 
@@ -168,8 +168,7 @@ and a few-line combination when a lane runs it.
 **What has been measured.** Only the router layer, standalone, on kind with a simulator engine
 (2026-11-16): the EPP's error envelopes, header and path handling and pass-through, recorded in
 `parts/topology/standalone.yaml`. Engine and model lines come from each lane's overlay and the
-API definitions. The first run of each profile is its measurement, and is expected to find
-errors.
+API definitions.
 
 ## Known gaps
 

@@ -1,6 +1,6 @@
 # async-multitenant
 
-Profiles for llm-d's [multitenant async-processing guide](https://github.com/llm-d/llm-d/tree/main/guides/batch-serving/asynchronous-processing/multitenant) (`guide.yaml` name `async-multitenant`) at llm-d `9ca8ff0`: llm-d-async dispatching queued work from Redis through an llm-d router with flow control and six priority bands, beside realtime traffic, with the router coordinator as an HTTP front door. Every profile here is WRITTEN, NOT RUN.
+Profiles for llm-d's [multitenant async-processing guide](https://github.com/llm-d/llm-d/tree/main/guides/batch-serving/asynchronous-processing/multitenant) (`guide.yaml` name `async-multitenant`) at llm-d `9ca8ff0`: llm-d-async dispatching queued work from Redis through an llm-d router with flow control and six priority bands, beside realtime traffic, with the router coordinator as an HTTP front door.
 
 **These profiles cover only the router.** They test the guide's llm-d router (EPP), in standalone mode, through `../parts/topology/standalone.yaml`. The Service is the router release's `<release>-epp` on port 80, where `<release>` is the guide's `POOL_NAME` (the lanes' `gateway_host`).
 

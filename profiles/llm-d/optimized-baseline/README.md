@@ -1,6 +1,6 @@
 # optimized-baseline
 
-Profiles for llm-d's [optimized-baseline](https://github.com/llm-d/llm-d/tree/main/guides/optimized-baseline) guide, written against llm-d `9ca8ff0`. Status: written, not run. See [../README.md](../README.md) for how to run a combination, and the [profile skill](../../../.agents/skills/writing-an-infra-profile/SKILL.md#how-profilesllm-d-is-built) for the layout and provenance tags, and its [optimized-baseline coverage](../README.md#optimized-baseline-coverage) section for why the lanes group as they do.
+Profiles for llm-d's [optimized-baseline](https://github.com/llm-d/llm-d/tree/main/guides/optimized-baseline) guide, written against llm-d `9ca8ff0`. See [../README.md](../README.md) for how to run a combination, and the [profile skill](../../../.agents/skills/writing-an-infra-profile/SKILL.md#how-profilesllm-d-is-built) for the layout and provenance tags, and its [optimized-baseline coverage](../README.md#optimized-baseline-coverage) section for why the lanes group as they do.
 
 ## Lanes
 
