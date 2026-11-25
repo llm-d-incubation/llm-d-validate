@@ -13,6 +13,7 @@ from pathlib import Path
 
 from ..http import redact
 from ..log.setup import get_logger
+from .paths import relative_key, run_name
 from .remote import (
     DELIVERY,
     WRITE_CHECK_KEY,
@@ -109,7 +110,12 @@ class S3Sink:
         return self.target.uri
 
     def _key(self, *parts: str) -> str:
-        return "/".join(part.strip("/") for part in (self.prefix, *parts) if part)
+        # Public helpers historically accept directory-style prefixes and optional empty
+        # components. Normalize boundary slashes only; validation still rejects internal
+        # traversal, repeated separators, backslashes and NULs before any request is sent.
+        components = [part.strip("/") for part in parts if part.strip("/")]
+        key = relative_key(*components) if components else ""
+        return "/".join(part for part in (self.prefix, key) if part)
 
     def _client(self):
         if self._s3 is not None:
@@ -184,15 +190,15 @@ class S3Sink:
 
     def publish(self, run_dir: Path, name: str) -> str:
         """Upload a frozen run directory under `<prefix>/<name>/`, MANIFEST.json last."""
+        destination = self._key(run_name(name))
         client = self._client()
-        destination = self._key(name)
 
         def put(relpath: str) -> None:
             content_type = mimetypes.guess_type(relpath)[0] or "application/octet-stream"
             with (run_dir / relpath).open("rb") as body:
                 client.put_object(
                     Bucket=self.bucket,
-                    Key=f"{destination}/{relpath}",
+                    Key=self._key(name, relpath),
                     Body=body,
                     ContentType=content_type,
                 )

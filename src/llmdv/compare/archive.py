@@ -16,6 +16,8 @@ from pathlib import Path
 
 from ..http.redact import scrub
 from ..output import manifest
+from ..output.paths import UnsafeName as UnsafeName
+from ..output.paths import contained_path, safe
 from ..output.remote import UnsupportedRemote, parse_remote_uri
 from ..results.read import OUTCOMES, UnreadableSchema, check_schema
 
@@ -30,23 +32,6 @@ class InvalidRun(Exception):
 
 class ArchiveUnreadable(Exception):
     """The store holding the runs cannot be read: the operator's environment, not the runs."""
-
-
-class UnsafeName(Exception):
-    """A profile or run id that would address something outside the archive."""
-
-
-def safe(value: str, what: str) -> str:
-    """Reject a path segment that could leave the prefix it belongs under.
-
-    A profile name comes from a field somebody writes in a YAML file, and a run id from a
-    recorded result. Both become path segments here. On a shared bucket, `../other-team` would
-    otherwise read another team's runs -- and `publish_one` would write into them.
-    """
-    text = str(value)
-    if not text or text in {".", ".."} or "/" in text or "\\" in text or text.startswith("."):
-        raise UnsafeName(f"unsafe {what}: {value!r}")
-    return text
 
 
 def _s3(target, patience=None):
@@ -362,7 +347,7 @@ def publish_one(uri: str, profile: str, run_id: str, path: Path) -> str:
     run_id = safe(run_id, "run id")
     target = parse_remote_uri(uri)
     if target.scheme == "file":
-        destination = Path(target.location) / profile / run_id / path.name
+        destination = contained_path(Path(target.location), profile, run_id, path.name)
         destination.parent.mkdir(parents=True, exist_ok=True)
         destination.write_bytes(path.read_bytes())
         return str(destination)

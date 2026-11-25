@@ -17,6 +17,7 @@ from ..http.redact import scrub
 from ..log.setup import get_logger
 from . import manifest
 from .base import ObjectSink
+from .paths import contained_path, run_name
 
 # Not "output.*": that would nest under the primary-output logger, printing to stdout.
 log = get_logger("sink.remote")
@@ -138,21 +139,22 @@ class FileSink:
     def check(self) -> None:
         root = Path(self.target.location).expanduser()
         root.mkdir(parents=True, exist_ok=True)
-        probe = root / WRITE_CHECK_KEY
+        probe = contained_path(root, WRITE_CHECK_KEY)
         probe.write_bytes(b"llmdv preflight write check\n")
         probe.unlink(missing_ok=True)
 
     def put_bytes(self, data: bytes, *parts: str, content_type: str | None = None) -> str:
-        target = Path(self.target.location).expanduser().joinpath(*parts)
+        target = contained_path(Path(self.target.location), *parts)
         target.parent.mkdir(parents=True, exist_ok=True)
         target.write_bytes(data)
         return target.as_uri()
 
     def publish(self, run_dir: Path, name: str) -> str:
-        destination = Path(self.target.location).expanduser() / name
+        root = Path(self.target.location)
+        destination = contained_path(root, run_name(name))
 
         def put(relpath: str) -> None:
-            target = destination / relpath
+            target = contained_path(root, name, relpath)
             target.parent.mkdir(parents=True, exist_ok=True)
             shutil.copy2(run_dir / relpath, target)
 
