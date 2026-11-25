@@ -55,10 +55,10 @@ Every llm-d guide at [Tier 3](https://github.com/llm-d/llm-d/blob/main/guides/GU
 Pick the one for the overlay you deployed from the guide's README, point `llmdv` at the guide's
 router (the EPP), and run it:
 
-```sh
+```bash
 ./install.sh && source .venv/bin/activate
 P=profiles/llm-d/optimized-baseline/vllm-qwen3-32b-parsers-standalone.yaml
-export LLMDV_EPP_URL=<your EPP's URL>          # the router needs no key
+export LLMDV_EPP_URL=<your EPP's URL>
 
 llmdv profile show $P --test-sets             # what the profile's test sets hold, offline
 llmdv plan --profile $P                       # the cases a plain run selects, and why any skip
@@ -79,7 +79,7 @@ For other model-serving stacks, whether or not they use llm-d, start from an exa
 Copy the closest one, fill in its placeholders, and run it. The quick start's commands work the
 same way on it:
 
-```sh
+```bash
 cp profiles/examples/example-gateway-only.yaml profiles/my-stack.local.yaml   # set base_url and model
 export LLMDV_GATEWAY_KEY='<gateway key>'
 llmdv profile validate profiles/my-stack.local.yaml    # check the profile, offline
