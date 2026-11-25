@@ -62,13 +62,19 @@ def write(
         lines += [f"#   {command}" for command in forwards]
         lines.append("")
 
+    # llmdv options must precede the separator that forwards the remaining argv to pytest.
+    boundary = argv.index("--") if "--" in argv else len(argv)
+    command = f'{shlex.join(argv[:boundary])} --local-output "$OUT"'
+    if boundary < len(argv):
+        command += " " + shlex.join(argv[boundary:])
+
     lines += [
         "# Each invocation creates a fresh run directory under this output root.",
         "# Override the root with LLMDV_RERUN_OUT; earlier runs are preserved.",
         'OUT="${LLMDV_RERUN_OUT:-$(mktemp -d -t llmdv-rerun)}"',
         "",
         "# The original invocation, with the profile repointed at the copy beside this script.",
-        f'{shlex.join(argv)} --local-output "$OUT"',
+        command,
         "",
         'echo "rerun results under: $OUT"',
         "",
@@ -86,13 +92,20 @@ def rewrite_argv(argv: list[str], profile_flag_value: str) -> list[str]:
     """
     out: list[str] = []
     skip_next = False
-    for token in argv:
+    tokens = iter(argv)
+    for token in tokens:
         if skip_next:
             skip_next = False
             continue
+        if token == "--":
+            out += [token, *tokens]
+            break
         if token == "--profile":
             out += ["--profile", profile_flag_value]
             skip_next = True
+            continue
+        if token.startswith("--profile="):
+            out += ["--profile", profile_flag_value]
             continue
         if token in {"--local-output", "--run-dir"}:
             skip_next = True
