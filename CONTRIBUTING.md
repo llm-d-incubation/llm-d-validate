@@ -129,6 +129,9 @@ python .github/scripts/live_summary.py runs/<run> --profile <name> --gateway <na
 
 ## Adding a case
 
+[docs/writing-tests.md](docs/writing-tests.md) walks through writing a case, proving it can fail
+and running it. In short:
+
 - **Prove it can fail.** Add the defect to a fake (usually `tests/fakes.py`) and assert that the case fails
   against it, including that a recorded check is marked not-ok. A case that cannot fail checks
   nothing.

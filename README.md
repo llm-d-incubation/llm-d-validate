@@ -102,5 +102,6 @@ what turns it on.
 - [Test suites](https://github.com/llm-d-incubation/llm-d-validate/blob/main/docs/test-suites.md): what each suite checks, the profile key that turns it on,
   and how to run one.
 - [Architecture](https://github.com/llm-d-incubation/llm-d-validate/blob/main/docs/architecture.md): how the code fits together.
+- [Writing tests](https://github.com/llm-d-incubation/llm-d-validate/blob/main/docs/writing-tests.md): add a case or a suite, prove it can fail, and run it.
 - [Contributing](https://github.com/llm-d-incubation/llm-d-validate/blob/main/CONTRIBUTING.md): we welcome questions and ideas in the
   [llm-d Slack](https://llm-d.ai/slack) and in this repository's issues.

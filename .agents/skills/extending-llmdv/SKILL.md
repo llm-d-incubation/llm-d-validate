@@ -1,6 +1,6 @@
 ---
 name: extending-llmdv
-description: Use when adding or changing a surface, test case, client, assertion or profile capability in the llmdv functional test library, when supporting another gateway, router or engine product, when choosing between surface_generic and surface markers, or when a new case has only ever passed.
+description: Use when adding or changing a surface, client, assertion or profile capability in the llmdv functional test library, or when supporting another gateway, router or engine product. For a test case or a test suite, use writing-a-test-case.
 ---
 
 # Extending llmdv
@@ -23,36 +23,9 @@ A product needs no code: `kind` is a position (`gateway`, `router`, `engine`), n
 
 What a product's responses reveal is evidence, not behaviour, and it lives in one table, `ingress/signals.py`, read at every layer. A profile can declare a header the table does not know (`ingresses[].version_headers`) without any code. To add it for everyone, add a row once the header has been seen on a real response, with a comment saying where: `Reveals.VERSION` if the value names a build or layer and is safe to publish (mark `build=True` only if it changes when the build does), `Reveals.BACKEND` if it may name a host, pod or Service (never published), `Reveals.RECORDED` for other evidence, `Reveals.SIGNATURE` for a product's own body text. An exact `backend` header always wins over a published prefix.
 
-## Add a case
+## Add a case or a suite
 
-```python
-pytestmark = pytest.mark.surface_generic
-
-
-@pytest.mark.case_id("group.what_it_proves")
-def test_something(client, surface, model, ingress):
-    exchange = client.post(surface.path, json_body=surface.minimal_body(model.public_id))
-    journal.record("http_status", exchange.status, "200", ok=exchange.status == 200)
-    assert exchange.status == 200
-```
-
-| The case | Mark it | It runs |
-|---|---|---|
-| holds on any generation surface | `surface_generic`, and take `surface` | once per drivable generation surface |
-| needs a surface feature | `surface_generic("tools")` | once per drivable surface with it |
-| holds on any render surface | `surface_generic("render")` | once per drivable render surface |
-| asserts one surface's own grammar | `surface("chat_completions")` | on that surface only |
-| does not touch a surface (e.g. `GET /v1/models`) | no `surface` argument | once per ingress |
-
-- The closest marker decides. Both markers on one function, or a feature outside `SURFACE_FEATURES`, fails collection as an llmdv defect. A known feature no drivable surface has yet gives one `skip:not_implemented` row.
-- Prefer `surface_generic`: a new surface then inherits the case.
-- A generic case builds every request through the surface (`minimal_body`, `stream_body`, `invalid_body`, `structured_output_body`) and never writes a wire field name. A body in one surface's shape is garbled on the others: refused for the wrong reason so it passes, or ignored so it fails and blames the fleet.
-- The llm-d guide profiles run only the cases their `selection:` globs name (`profiles/llm-d/<guide>/parts/common.yaml`). A new case reaches those lanes only if a glob matches it, so add it to the guides whose claims it tests. Renaming or removing a case id a selection names makes that profile exit 2; check with `llmdv plan --profile <combination>` over every combination under `profiles/llm-d/`.
-- `case_id`'s prefix becomes the phase in the output. Use the package's own name. A prefix that names another suite also adds that suite's marker, so `-m openai_chat` selects `openai_chat.disconnect_recovery` in `streaming/`. A prefix that differs from its package fails collection unless the pair is listed, with its reason, in `PREFIX_EXCEPTIONS` in `plugin.py`; add one only when the output and `-m` should group the case away from its package.
-- Gate on a profile capability with `@pytest.mark.needs("<capability>")`, or on one value of a closed vocabulary with `needs("<field>:<value>")`. An unknown name is a usage error at collection, never a silent skip.
-- Mark a case that can disturb a shared fleet `@pytest.mark.disruptive("<reason>")`: it then skips as `excluded_by_policy` under `fleet_policy: shared`.
-- A new `suites/<dir>` becomes a pytest marker automatically; its place in the output order is `PHASE_ORDER` in `plugin.py`.
-- Every skip is classified, never bare. There are six classes (`SkipClass` in `profile/schema.py`): `undeclared`, `not_implemented`, `requires_instrumentation`, `requires_load`, `excluded_by_policy`, `throttled`.
+Cases, suites, markers, fixtures and proving a case can fail have their own skill: [writing-a-test-case](../writing-a-test-case/SKILL.md).
 
 ## Add a client
 

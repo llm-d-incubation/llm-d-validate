@@ -19,7 +19,8 @@ Each lives at `.agents/skills/<name>/SKILL.md`. Load the one that matches before
 |---|---|
 | [writing-an-infra-profile](.agents/skills/writing-an-infra-profile/SKILL.md) | writing, updating or reviewing a profile; choosing any declaration; naming a component behind an ingress; several profiles for one stack or an llm-d guide; publishing a profile written against a private stack |
 | [probing-a-fleet-before-asserting](.agents/skills/probing-a-fleet-before-asserting/SKILL.md) | writing or changing an assertion about a live response, or a live case fails |
-| [extending-llmdv](.agents/skills/extending-llmdv/SKILL.md) | adding a surface, case, client, assertion or capability, or supporting another gateway, router or engine product |
+| [writing-a-test-case](.agents/skills/writing-a-test-case/SKILL.md) | adding or changing a test case or a test suite: markers, fixtures, proving it can fail, a new suite, the follow-ups |
+| [extending-llmdv](.agents/skills/extending-llmdv/SKILL.md) | adding a surface, client, assertion or capability, or supporting another gateway, router or engine product |
 | [testing-a-model-deployment](.agents/skills/testing-a-model-deployment/SKILL.md) | testing a model you were handed endpoints for (a LiteLLM gateway, a router or EPP route, or both): picking and pointing a profile, first checks, the run, the comparison |
 | [running-and-comparing-live-runs](.agents/skills/running-and-comparing-live-runs/SKILL.md) | starting a live run (PC, unattended or cluster job), publishing one, pulling one back, comparing runs |
 | [reporting-a-run](.agents/skills/reporting-a-run/SKILL.md) | sharing a run directory; building the annotated HTML dashboard and its notes |

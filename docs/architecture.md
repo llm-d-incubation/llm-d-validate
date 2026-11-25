@@ -207,7 +207,8 @@ test that checked nothing.
 A new surface, case, client or assertion is additive, and a new product at any layer needs no
 code. Preserve the invariants above and prove the new case can fail: add the defect to
 `tests/fakes.py` and assert the failure, including that a recorded check is marked not-ok. The
-steps are in the [`extending-llmdv`](../.agents/skills/extending-llmdv/SKILL.md) skill.
+steps are in the [`extending-llmdv`](../.agents/skills/extending-llmdv/SKILL.md) skill; for a
+new case or suite, start with [writing-tests.md](writing-tests.md).
 
 ## Testing your change
 

@@ -78,6 +78,27 @@ for everything else a profile can declare.
 A custom llm-d deployment, or a stack with no llm-d at all, is described by its own profile: any
 OpenAI- or Anthropic-compatible gateway, router or engine, in series.
 
+### Write your first profile
+
+Each step links to the section below that covers it in detail.
+
+1. **Copy the closest example** to a gitignored file named for your system:
+   `profiles/<system>/<model>.local.yaml`. See [Start from the closest example](#start-from-the-closest-example).
+2. **Name the model**: `model.public_id` is the id the ingress advertises on `GET /v1/models`, and
+   `model.max_model_len` its context window. See [The minimum](#the-minimum).
+3. **Describe each layer you can reach** as an ingress: its `kind` is where it sits (`gateway`,
+   `router` or `engine`), and `base_url_env` names the variable that holds its URL.
+4. **Name the credential by variable** with `auth: {type: bearer, key_env: <VAR>}`, or
+   `auth: {type: none}` for a layer that authenticates nothing. The key itself never enters the file.
+5. **Declare what the stack serves**: each ingress's `surfaces`, its `error_status`, and the
+   `capabilities` it supports, as a correct stack would behave rather than as this one does today.
+   See [Declare intended behaviour](#declare-intended-behaviour) and [REFERENCE.md](REFERENCE.md#capabilities).
+6. **Check it offline** with `llmdv profile validate <profile>`, then preview what runs and what
+   skips with `llmdv plan --profile <profile>`. See [Validate, plan, verify](#validate-plan-verify).
+7. **Run the declarations first** with `llmdv verify --profile <profile> -m contract`, fix any
+   stale `surfaces` or `headers` line it finds, then run the full suite with
+   `llmdv verify --profile <profile>`.
+
 ### Start from the closest example
 
 The examples are templates with placeholders. Each validates offline; none runs as-is.
@@ -99,18 +120,15 @@ per model; parts never run on their own. Its values were measured on one deploym
 beside each line; measure yours. Put your URLs, keys and the model ids your gateway serves in a
 gitignored `*.local.yaml` that extends one of the two files.
 
-To start your own:
+Pick the example whose shape matches what you can reach (with only a gateway URL and a key, that
+is `example-gateway-only.yaml`) and copy it under a `.local.yaml` name so git ignores it:
 
-1. Pick the example whose shape matches what you can reach. With only a gateway URL and a key,
-   that is `example-gateway-only.yaml`.
-2. Copy it into a folder named for your system, with a `.local.yaml` name so git ignores it:
+```sh
+mkdir -p profiles/<system>
+cp profiles/examples/example-gateway-only.yaml profiles/<system>/<model>.local.yaml
+```
 
-   ```sh
-   mkdir -p profiles/<system>
-   cp profiles/examples/example-gateway-only.yaml profiles/<system>/<model>.local.yaml
-   ```
-
-3. Replace every `<...>` placeholder. The comments in the example explain each choice.
+Then replace every `<...>` placeholder. The comments in the example explain each choice.
 
 ```
 profiles/
