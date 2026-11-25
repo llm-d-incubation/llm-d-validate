@@ -11,7 +11,7 @@ import yaml
 from llmdv.cli import job_cmd
 from llmdv.cli.main import build_parser
 from llmdv.profile import inspection, loader, test_sets
-from tests.fakes import FakeFleet, profile_yaml, run_llmdv
+from tests.fakes import FakeFleet, only_run, profile_yaml, run_llmdv
 from tests.test_profile_extends import write
 
 BASIC = "openai_chat.basic_non_streaming"
@@ -34,7 +34,7 @@ def verify(path, out, *flags):
     result = run_llmdv(
         "verify", "--profile", str(path), "--local-output", str(out), "--pod-logs", "off", *flags
     )
-    outcome = json.loads((out / "outcome.json").read_text())
+    outcome = json.loads((only_run(out) / "outcome.json").read_text())
     return result, outcome
 
 
@@ -71,7 +71,7 @@ def test_missing_scope_is_usage_before_requests(tmp_path, flags):
     result, outcome = verify(path, tmp_path / "run", *flags)
     assert result.returncode == 2, result.stderr
     assert outcome["verification"]["class"] == "usage"
-    assert not (tmp_path / "run" / "results.jsonl").exists()
+    assert not (only_run(tmp_path / "run") / "results.jsonl").exists()
 
 
 @pytest.mark.parametrize(
