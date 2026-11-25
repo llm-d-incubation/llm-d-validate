@@ -96,7 +96,7 @@ Suspect a moment in the fleet when failures:
 - coincide with two `system_fingerprint` values in `outcome.json` `stack`, or a pod restart (`kubectl get pod … -o jsonpath='{.status.containerStatuses[0].restartCount}'`). Compare the build part of the fingerprint (`vllm-<version>+g<sha>`); the suffix after the parallelism (`-tp<n>-<hash>`) differs between deployments of one build, so it alone does not mean a different engine;
 - flip between runs: check the same cases in the previous runs (running-and-comparing-live-runs).
 
-Then rerun the two or three smallest cases now: `llmdv verify --profile <profile> --evidence all -k "<test functions>"`. The name is the part of `nodeid` after `::`: the function name alone selects every variant, and the full `name[variant]`, quoted, selects one. Add `--all` when the case is outside the profile's `selection` (every llm-d guide profile declares one, and a run made with `--all` records `selection.all: true` in `outcome.json`); otherwise `-k` finds nothing to run. Model-dependent cases (tool arguments, effort ordering, repeats at temperature 0) can flip without any change; call them stochastic, not fixed or broken, from one run.
+Then rerun the two or three smallest cases now: `llmdv verify --profile <profile> --evidence all -k "<test functions>"`. The name is the part of `nodeid` after `::`: the function name alone selects every variant, and the full `name[variant]`, quoted, selects one. Add `--full-suite` when the case is outside the profile's `test_sets.default` (every llm-d guide profile declares one, and a run made with `--full-suite` records `coverage.mode: full-suite` in `outcome.json`); otherwise `-k` finds nothing to run. Model-dependent cases (tool arguments, effort ordering, repeats at temperature 0) can flip without any change; call them stochastic, not fixed or broken, from one run.
 
 ### How did it fail?
 
@@ -133,7 +133,7 @@ Prove it with an A/B where you can: the same request against two endpoints that 
 
 - The bundle's `repro.sh` replays the exact request. It embeds the real hostname and no credential: it rebuilds the auth header from the variable the profile's `auth.key_env` names and refuses to run until you export it. Replace the host with `$BASE` before sharing it anywhere.
 - Trim it to the smallest request that still fails, run it, and keep the real output; a filter (`jq`, a status) that shows the defect makes it readable.
-- The library repro is `llmdv verify --profile <profile path> --evidence all -k "<test function>"`: the committed profile if there is one, else the run's own `profile.used.yaml` (with its URL variables exported), plus `--all` when the case is outside the profile's `selection`. `reproduce.sh` reruns the whole run.
+- The library repro is `llmdv verify --profile <profile path> --evidence all -k "<test function>"`: the committed profile if there is one, else the run's own `profile.used.yaml` (with its URL variables exported), plus `--full-suite` when the case is outside the profile's `test_sets.default`. `reproduce.sh` reruns the whole run.
 - The dashboard has a replay curl per exchange too.
 
 ## 3. Hand back a triage

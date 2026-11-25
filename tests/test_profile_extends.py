@@ -15,6 +15,7 @@ from llmdv.profile import compose, loader
 from tests.fakes import FakeFleet, only_run, profile_yaml, run_llmdv
 
 PARENT = {
+    "test_sets": {"default": ["*"]},
     "schema": "llmdv.profile/1",
     "name": "shared",
     "model": {"public_id": "org/model", "reasoning": {"parser": "deepseek_r1"}},
@@ -159,6 +160,7 @@ def test_the_composed_profile_is_written_whole_with_where_each_key_was_set(tmp_p
         "#   shared.yaml",
         "#   local.yaml",
         "# Where each key was set:",
+        "#   test_sets: shared.yaml",
         "#   schema: shared.yaml",
         "#   name: (file name)",
         "#   model: shared.yaml, local.yaml",
@@ -458,7 +460,8 @@ def test_the_known_top_level_keys_are_the_profile_s_fields_and_extends():
     assert set(loader.TOP_LEVEL_KEYS) == {
         "schema", "name", "vantage", "environment", "guide", "engine", "gateway", "model",
         "ingresses", "capabilities",
-        "headers", "clients", "fleet_policy", "fleet", "known_failures", "selection", "extends",
+        "headers", "clients", "fleet_policy", "fleet", "known_failures",
+        "test_sets", "extends",
     }  # fmt: skip
 
 

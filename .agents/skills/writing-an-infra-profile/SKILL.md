@@ -11,10 +11,11 @@ Field reference: [`profiles/REFERENCE.md`](../../../profiles/REFERENCE.md). How 
 
 ## Procedure
 
-1. **Copy the closest profile.** A committed real profile for the same layer is the best start; the examples cover the shapes:
+1. **Choose a starting point.** Reuse a committed profile when it describes the intended deployment. For a new stack without a matching profile, start with `examples/example-minimal.yaml` and add the contracts it promises; fuller examples cover setup and model-specific declarations:
 
    | Start from | Ingress kinds | Use for |
    |---|---|---|
+   | `examples/example-minimal.yaml` | one endpoint; choose its position | a first custom profile with model id, URL/key variables and expected error statuses |
    | `examples/example-engine-only.yaml` | `engine` (vLLM) | a single model server reached directly, with nothing in front |
    | `examples/example-gateway-only.yaml` | `gateway` (LiteLLM) | a model behind a LiteLLM gateway: a URL and a key are all you have |
    | `examples/example-two-ingress.yaml` | `engine` + `router` | engine and router, with port-forwards |
@@ -23,11 +24,13 @@ Field reference: [`profiles/REFERENCE.md`](../../../profiles/REFERENCE.md). How 
 
    A variant of an existing profile (another namespace, an in-cluster copy) is a short file with `extends: <parent>.yaml` that names only what differs; see `examples/example-two-ingress-staging.yaml`. Several configurations of one stack (models, engines, an llm-d guide's CI lanes) share parts; see [More than one configuration](#more-than-one-configuration-parts-and-combinations).
 
+   The minimal starter is an authoring scaffold, not complete coverage. Use `plan` to review its gaps and declare eligible features before treating it as a finished validation profile; a failed probe is not a reason to disable a promised feature.
+
    Declare only the layers you can reach. One ingress is a complete profile; a declared but unreachable layer fails preflight.
 
 2. **Put it at `profiles/<system>/<model>.yaml`.** A copy with real cluster detail is `profiles/<system>/<model>.local.yaml`, which is gitignored. A committed profile names its URL and key by variable (`base_url_env`, `auth.key_env`) and never stores either; a `.local.yaml` may write `base_url` inline, but declaring both is an error. An unset variable passes `llmdv profile validate` and fails preflight (exit 3). No namespace, cluster name, context, hostname, pod or Service name in a committed file. A committed profile gets a short note on how to run it beside it: a `README.md` in its folder, one per folder for a set of combinations, as each llm-d guide has.
 
-3. **Fill what exists by measuring it.** Model id and context length from the gateway's `GET /v1/models` (a gateway's ids are usually not the engine's). If you have cluster access, the `environment` block (`cluster`, `context`, `namespace`, `kubeconfig`, `metrics`; optional, and no gateway-only profile has one); check the kubeconfig holds the context, or `profile show --setup` prints `-l <selector>` instead of a pod. Selectors, never pod names, in `setup.requires`. The reasoning shape from one request: a populated reasoning field means declare `parser` and the `field` you saw (`reasoning` on recent vLLM; `reasoning_content` on older vLLM, on SGLang and through LiteLLM, which renames it); an inline `<think>` block means `parser: null`. Surfaces by sending a **shape-valid** body to each path at each layer (an empty `{}` answers 400 on an absent route).
+3. **Fill what exists by measuring it.** Model id and context length from the gateway's `GET /v1/models` (a gateway's ids are usually not the engine's). If you have cluster access, the `environment` block (`cluster`, `context`, `namespace`, `kubeconfig`, `metrics`; optional, and no gateway-only profile has one); check the kubeconfig holds the context, or `profile show --setup` prints `-l <selector>` instead of a pod. Selectors, never pod names, in `setup.requires`. The reasoning shape from one request: a populated reasoning field means declare `parser` and the `field` you saw (`reasoning` on recent vLLM; `reasoning_content` on older vLLM, on SGLang and through LiteLLM, which renames it); an inline `<think>` block means `parser: null`. Probe surfaces with a **shape-valid** body at each layer (an empty `{}` answers 400 on an absent route). Compare observations with the intended surfaces; a promised route returning 404 is a finding, not a reason to remove its declaration.
 
    Per layer:
    - **LiteLLM (`kind: gateway`):** `rate_limited: true` (a 429 then skips as `throttled`), `health_path: /health/liveliness`, `capabilities.model_info` from its `GET /v1/model/info`. Its model id is the gateway's (often prefixed, e.g. `<provider>/…`, and suffixed per gateway, e.g. `-staging`), not the engine's.
@@ -58,21 +61,46 @@ Field reference: [`profiles/REFERENCE.md`](../../../profiles/REFERENCE.md). How 
    | `render_pins` | 64 zeros under each declared render surface and pin: `{chat_render: {conversation: "000…0", tools: "000…0"}}` |
    | `contract_baseline` part | `{llmdv_seed: [absent]}` |
 
-   Run `llmdv verify --profile <profile> --evidence all --all` against a known-good build (`--all`, because a profile's `selection` may leave the pin cases out). Each pin fails with the observed value in its `canonical_input_tokens` or `canonical_render_digest` check; each contract part passes with its exchange in `exchanges.jsonl`, which `llmdv.assertions.contract` (`shape`, `stream_shape`, `baseline`) turns into a baseline. Replace the placeholders.
+   Run `llmdv verify --profile <profile> --evidence all --full-suite` against a known-good build (`--full-suite`, because a profile's `test_sets.default` may leave the pin cases out). Each pin fails with the observed value in its `canonical_input_tokens` or `canonical_render_digest` check; each contract part passes with its exchange in `exchanges.jsonl`, which `llmdv.assertions.contract` (`shape`, `stream_shape`, `baseline`) turns into a baseline. Replace the placeholders.
 
    **Render.** The render cases run only on the `*_render` surfaces an ingress declares: `render.stability` and `render.unknown_model` on each, `render.synthetic_prefix` only with `prefix_stability`, and a render pin only under a declared render surface. `contract` checks surfaces both ways, so declare a render surface only where the stack is meant to serve it; otherwise leave it out with a comment saying so, and those cases skip as `undeclared`. The cache keys that depend on rendering (`render_equivalent`, `stripped_system_prefix`, `equivalent_settings`, `canonical_tool_keys`) are in [REFERENCE.md](../../../profiles/REFERENCE.md#cache_reuse).
 
 7. **Validate and run the contract suite:**
    ```sh
    llmdv profile validate <profile>          # offline: schema and consistency
+   llmdv profile explain <profile>           # effective values and source assignments
+   llmdv profile explain <profile> --field 'ingresses[gateway].model' # use your ingress id
    llmdv profile show <profile> --matrix     # surfaces per ingress: what runs, what skips
    llmdv plan --profile <profile> -q         # offline: cases that would run and skip, by skip class
    llmdv profile show <profile> --setup      # resolved port-forwards
-   llmdv verify --profile <profile> -m contract
+   llmdv verify --profile <profile> --full-suite -m contract
    ```
+   `explain` focuses on declared fields; `--field` also shows omitted fields and library defaults. Source assignments follow precedence order: global model/capability defaults apply before ingress overrides, even if a later file changes the global value. This identifies the source file, not the evidence or rationale behind a declaration; keep provenance comments.
+
+   For a standalone copy, use `llmdv profile show <profile> --yaml > /tmp/profile-expanded.yaml`. It removes `extends`, preserves the profile name and environment-variable references, and anchors relative client executables. It does not expand all library defaults or preserve original comments. Keep the sources for editing and write the export to a different path. Both authoring views hide environment-derived values; literals in the source remain visible, so export is not a publishing scrub.
+
    Expect the first contract run to find errors. That is the suite working.
 
 8. **List every empty capability field.** Each must be an exclusion named in the profile header with its reason.
+
+## Test sets for shorter runs
+
+Keep the deployment contract intact when a user wants less coverage. `test_sets.default` remains the
+profile's default list of case-id globs; `test_sets: {quick-api: [<case-id>, ...]}` defines
+optional alternatives. `--test-set NAME` replaces the default; `--full-suite` is mutually exclusive
+and bypasses it. Repeat `--test-set` to combine named sets; `--all-test-sets` combines all
+profile-defined sets. These modes are mutually exclusive. A plain run without `default` exits 2;
+never silently fall back to the full suite. CLI name wildcards are invalid. Other selectors narrow scope.
+
+Use `profile show <profile> --test-sets` to list built-in and custom subsets, then
+`plan --profile <profile> --test-set smoke` to preview the built-in quick check. The same flag
+works on `verify` and `job`. Respect a user's request for a subset; do not silently run the full
+suite. Report the chosen test sets and run/skip counts as partial coverage. Full validation of
+an llm-d guide configuration still follows the lane coverage requirements below.
+
+Share custom names through `extends`; their lists replace, and `null` removes a name. Built-in
+names are reserved. See [test sets](../../../profiles/REFERENCE.md#test_sets)
+for the schema and the exact scope of smoke.
 
 ## More than one configuration: parts and combinations
 
@@ -83,6 +111,7 @@ When one stack needs several profiles, write each fact once in a **part** and li
 - A combination is `extends: [parts/…, …]`, a `name`, and only what belongs to that one stack: the engine's own names (parser names, the reasoning field), block size, per-layer differences and the change sentinels.
 - Name a model part by what a client sees (model, context window, parsers), never by accelerator or cluster. Configurations that give a client the same model, window, parsers and engine share one combination; tell their runs apart with `--identity accelerator=<value> --identity provider=<value>` (and `--identity llm-d-ref=<value>` when applicable), not `--label`. For an llm-d guide, follow llm-d's own lane inputs: `accelerator` is the guide's `ACCELERATOR_TYPE`, `provider` the `INFRA_PROVIDER` folder the lane renders (with any connector the guide folds into it, such as `nixl/amd-ci`; `base` when the lane sets none), and every other variable the guide's lanes vary (connector, variant, topology, scaler) goes into one `--identity flavor=`, llm-d's values joined with `/` in overlay-path order (`flavor=lmcache-connector/cpu`), passed on every lane of that guide, rather than a new profile or a label.
 - Tag every line with where its value came from: `FROM values: <path>` (shipped configuration), `FROM docs: <path>`, `INTENT` (Rule 1), `DERIVED`, or `MEASURED on <where>`. Nothing unmeasured is tagged measured; a profile no run has exercised says `WRITTEN, NOT RUN` in its header.
+- Mappings merge; ordinary lists replace; `null` clears where allowed. Ingress lists merge by `id`, so `ingresses: []` does not remove inherited ingresses. Inspect unexpected overrides with `profile explain <combination> --field <field>`.
 - Validate and plan a combination, never a part: `llmdv profile validate <combination>` and `llmdv plan --profile <combination> -q`.
 
 ### Profiles for an llm-d guide
@@ -101,7 +130,7 @@ Write a profile for each configuration a nightly lane deploys, as the rendered m
 1. List the guide's nightly workflows in llm-d and the deploy scripts they call. For each lane read its accelerator, engine, provider and gateway class.
 2. Render the overlay that lane applies, locally (`kubectl kustomize <path>`, never against a cluster). A lane that sets no provider applies the accelerator and engine folder's own kustomization. Read the model, context window, parsers, engine build and flags, for each role (prefill and decode can differ). Check what you read against `guide.yaml` and the README.
 3. Group lanes that look the same to a client. Each group is one combination; its header names its lanes, and the directory's README maps every lane to its profile with the exact `--identity` flags that keep lanes sharing a combination apart, lists what no lane runs, and records under "Upstream notes" every disagreement between the guide's sources.
-4. Give the guide's `parts/common.yaml` a `selection:` of the cases the guide's claims touch, keeping `contract.*` (see [REFERENCE.md](../../../profiles/REFERENCE.md#selection)), and check every glob with `llmdv plan --profile <combination>`. Rule 3 still holds for the configuration: one lane per configuration runs `--all`, recorded in `profiles/llm-d/README.md` under "Which lane runs everything", as does a lane whose engine build differs from the rest of its configuration.
+4. Give the guide's `parts/common.yaml` a `test_sets.default` of the cases the guide's claims touch, keeping `contract.*` (see [REFERENCE.md](../../../profiles/REFERENCE.md#test_sets)), and check every glob with `llmdv plan --profile <combination>`. Rule 3 still holds for the configuration: one lane per configuration runs `--full-suite`, recorded in `profiles/llm-d/README.md` under "Which lane runs everything", as does a lane whose engine build differs from the rest of its configuration.
 5. A layer the kinds cannot order (a routing sidecar between the router and the engines, two routers in series, a coordinator in front of the router) is placed with `fronts`; see [Declared layer edges](../../../profiles/REFERENCE.md#declared-layer-edges). An ingress may front only ingresses at its own position or deeper.
 
 #### How profiles/llm-d is built
@@ -162,7 +191,8 @@ Behaviour lines change only after the team triages a failure, and the comment th
 
 | The line says | Declare | Example |
 |---|---|---|
-| whether something **exists** here | what you measured | surfaces served, model id, context window, health path, KV block size |
+| deployment facts | configuration and measurements, with their sources recorded | model id, context window, health path, KV block size |
+| what the deployment **promises to serve** | the intended surfaces and capabilities; record probes separately | a promised route returning 404 remains declared and fails |
 | how something should **behave** | what a correct stack does, per the API's own definition | `invalid_api_version: [400]`, every feature `accepted`, `unstructured_errors: []` |
 
 ```yaml
@@ -199,9 +229,10 @@ The full list of what each header, body field and marker reveals is the evidence
 
 Declare every value `llmdv`'s vocabularies define (in `profile/schema.py`, `profile/transport.py` and `surfaces/base.py` under `src/llmdv/`) for the target surfaces, even one an upstream API does not document. Honour schema constraints (surface names from `SURFACE_PATHS`; disjoint lists such as `chat_reasoning_efforts` and `chat_quiet_efforts`). "Not probed yet" is never a reason to leave something out: the run is the measurement.
 
-Leave a case out only when the thing it needs does not exist here (a 404 route, no cluster or metrics access, no instrument, no second ingress), or it executes model-written code on the operator's machine.
+Leave a case out when its feature is outside the intended contract, its required access or instrument is unavailable (no cluster or metrics access, no instrument, no second ingress), or it executes model-written code on the operator's machine. A promised route returning 404 is a failure to investigate, not an exclusion.
 
-A profile's `selection:` is not a way to leave a case out of a configuration: it narrows what one lane runs, and only when another lane runs the same configuration with `--all` (see [Profiles for an llm-d guide](#profiles-for-an-llm-d-guide)). A profile that is the only one for its configuration declares no selection.
+A profile's `test_sets.default` is not a way to leave a case out of a configuration: it narrows what one lane runs, and only when another lane runs the same configuration with `--full-suite` (see [Profiles for an llm-d guide](#profiles-for-an-llm-d-guide)). For a configuration whose canonical lane should exercise the library, invoke that lane with
+`--full-suite`; a profile without `test_sets.default` requires an explicit coverage choice.
 
 ## Rule 4: failures are left for the team
 

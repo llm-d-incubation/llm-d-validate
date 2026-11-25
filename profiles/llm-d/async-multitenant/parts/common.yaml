@@ -81,48 +81,49 @@ headers:
   x-llm-d-flow-queue-duration-ms:
     epp: promised
 
-# The cases this guide's lanes run by default (`llmdv verify --all` runs everything). They test
+# The cases this guide's lanes run by default (`llmdv verify --full-suite` runs everything). They test
 # what a lane's own deployment can get wrong: the router path, the overlay's parsers and window,
 # and what this guide changes. Engine and model conformance, the rest of the suite, depends only
-# on the engine build, model and flags, which many lanes share; it runs with `--all` once per
+# on the engine build, model and flags, which many lanes share; it runs with `--full-suite` once per
 # configuration (profiles/llm-d/README.md, "Which lane runs everything").
-selection:
-  # Every lane: the router serves each API a client uses, and refuses what it should.
-  - contract.*
-  - discovery.models_lists_declared_model
-  - discovery.unknown_model_no_fallback
-  - discovery.models_parses_with_openai_sdk
-  - openai_chat.basic_non_streaming
-  - openai_chat.streaming_sse
-  - openai_chat.stop_reason
-  - openai_completions.basic_non_streaming
-  - openai_completions.streaming_matches_json
-  - openai_completions.stop_reason
-  - anthropic_messages.basic_non_streaming
-  - anthropic_messages.streaming_sse
-  - openai_responses.basic_non_streaming
-  - openai_responses.streaming_sse
-  - streaming.sse_framing
-  - unhappy.unknown_path
-  - unhappy.malformed_json
-  - unhappy.missing_model
-  - unhappy.wrong_method
-  - unhappy.error_envelope_fields
-  - transport.connection
-  - transport.health_status
-  # Every lane: the overlay's parser flags take effect (skips where the model part has none).
-  - openai_chat.configured_reasoning
-  - tools.auto_call
-  - tools.auto_stream
-  # Every lane: the overlay's context window is the one declared.
-  - long_context.*
-  - unhappy.context_overflow
-  - unhappy.token_limit_over_context
-  # This guide: the router runs flow control with eviction or holdback: concurrent and cancelled
-  # requests must still be served.
-  - scenarios.cancel_burst
-  - streaming.cancel_then_next
-  - streaming.disconnect_before_output
-  - openai_chat.disconnect_recovery
-  - anthropic_messages.disconnect_recovery
-  - openai_responses.disconnect_recovery
+test_sets:
+  default:
+    # Every lane: the router serves each API a client uses, and refuses what it should.
+    - contract.*
+    - discovery.models_lists_declared_model
+    - discovery.unknown_model_no_fallback
+    - discovery.models_parses_with_openai_sdk
+    - openai_chat.basic_non_streaming
+    - openai_chat.streaming_sse
+    - openai_chat.stop_reason
+    - openai_completions.basic_non_streaming
+    - openai_completions.streaming_matches_json
+    - openai_completions.stop_reason
+    - anthropic_messages.basic_non_streaming
+    - anthropic_messages.streaming_sse
+    - openai_responses.basic_non_streaming
+    - openai_responses.streaming_sse
+    - streaming.sse_framing
+    - unhappy.unknown_path
+    - unhappy.malformed_json
+    - unhappy.missing_model
+    - unhappy.wrong_method
+    - unhappy.error_envelope_fields
+    - transport.connection
+    - transport.health_status
+    # Every lane: the overlay's parser flags take effect (skips where the model part has none).
+    - openai_chat.configured_reasoning
+    - tools.auto_call
+    - tools.auto_stream
+    # Every lane: the overlay's context window is the one declared.
+    - long_context.*
+    - unhappy.context_overflow
+    - unhappy.token_limit_over_context
+    # This guide: the router runs flow control with eviction or holdback: concurrent and cancelled
+    # requests must still be served.
+    - scenarios.cancel_burst
+    - streaming.cancel_then_next
+    - streaming.disconnect_before_output
+    - openai_chat.disconnect_recovery
+    - anthropic_messages.disconnect_recovery
+    - openai_responses.disconnect_recovery

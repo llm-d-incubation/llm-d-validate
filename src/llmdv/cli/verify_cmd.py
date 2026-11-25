@@ -29,6 +29,8 @@ from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
 
+import yaml
+
 from .. import __version__, identity, preflight
 from ..collect import KubectlLogCollector, NoopCollector
 from ..evidence import dashboard, reproduce
@@ -53,7 +55,7 @@ from ..output import (
 )
 from ..output.local import claim_run_dir
 from ..output.remote import PublicationStatus, deliver, parse_remote_uri
-from ..profile import loader
+from ..profile import compose, loader, test_sets
 from ..profile.schema import Profile
 from ..results.read import check_schema
 from ..results.record import new_run_id
@@ -191,12 +193,45 @@ def add_selection_arguments(parser: argparse.ArgumentParser) -> None:
     )
     parser.add_argument("-k", dest="keyword", default=None, help="pytest keyword expression")
     parser.add_argument("-m", dest="marker", default=None, help="pytest marker expression")
-    parser.add_argument(
-        "--all",
-        action="store_true",
-        help="ignore the profile's `selection` and run every case; the selectors above still "
-        "narrow",
+    subset = parser.add_mutually_exclusive_group()
+    subset.add_argument(
+        "--test-set",
+        action="append",
+        default=[],
+        metavar="NAME",
+        help="run a named test set; repeat to combine sets",
     )
+    subset.add_argument(
+        "--all-test-sets", action="store_true", help="combine every profile-defined test set"
+    )
+    subset.add_argument(
+        "--full-suite", action="store_true", help="select every library verification case"
+    )
+
+
+def resolve_coverage(profile: Profile, args: argparse.Namespace) -> test_sets.Coverage:
+    return test_sets.resolve(
+        profile,
+        getattr(args, "test_set", ()),
+        all_sets=getattr(args, "all_test_sets", False),
+        full_suite=getattr(args, "full_suite", False),
+    )
+
+
+def coverage_record(selected: test_sets.Coverage, args: argparse.Namespace) -> dict:
+    return {
+        **selected.record(),
+        "filters": {
+            "ingress": args.ingress,
+            "client": args.client,
+            "surface": args.surface,
+            "keyword": args.keyword,
+            "marker": args.marker,
+            "pytest_args": [
+                item for item in (getattr(args, "pytest_args", None) or []) if item != "--"
+            ],
+        },
+    }
 
 
 @dataclass
@@ -330,11 +365,15 @@ def _verify(args: argparse.Namespace, run: _Run) -> int:
         log.error("%s", exc)
         return USAGE
     run.outcome.topology = profile.topology().as_record()
-    run.outcome.selection = {
-        "cases": list(profile.selection),
-        "all": args.all,
-        "in_force": bool(profile.selection) and not args.all,
-    }
+    try:
+        selected = resolve_coverage(profile, args)
+    except loader.ProfileError as exc:
+        log.error("%s", exc)
+        return USAGE
+    run.outcome.coverage = coverage_record(selected, args)
+    emit(f"Coverage: {selected.label}")
+    if selected.mode != "full-suite":
+        emit("A pass covers the selected checks; review run and skip counts.")
     run.outcome.write(run_dir)
 
     diagnostics = loader.validate(profile)
@@ -366,11 +405,13 @@ def _verify(args: argparse.Namespace, run: _Run) -> int:
         for message in bad:
             log.error("%s", message)
         return USAGE
-    # So are the profile's selection globs: a typo is exit 2 before preflight sends a request.
-    unmatched = _unmatched_selection(profile, args)
-    if unmatched:
-        log.error("%s", unmatched)
-        return USAGE
+    # Scope and filter errors are checked offline before preflight sends a request.
+    code, planned, message = _validate_scope(args)
+    if code != OK:
+        log.error("%s", message)
+        return code
+    run.outcome.coverage = planned
+    run.outcome.write(run_dir)
     run.profile = profile
 
     kube = KubeContext(
@@ -868,7 +909,19 @@ def _write_reproduce(args, profile, run_dir, setup_commands) -> None:
     key_envs = sorted(
         {ingress.auth.key_env for ingress in profile.ingresses if ingress.auth.key_env}
     )
-    argv = reproduce.rewrite_argv(["llmdv", *sys.argv[1:]], "profile.used.yaml")
+    selected = resolve_coverage(profile, args)
+    argv = ["llmdv", *sys.argv[1:]]
+    profile_file = "profile.used.yaml"
+    if selected.mode != "full-suite":
+        _, chain = loader.load_with_sources(args.profile)
+        document = compose.resolved(chain, standalone=True)
+        document["test_sets"] = {"recorded-run": list(selected.cases)}
+        profile_file = "profile.replay.yaml"
+        (run_dir / profile_file).write_text(
+            yaml.safe_dump(document, sort_keys=False), encoding="utf-8"
+        )
+        argv = reproduce.frozen_scope_argv(argv, "recorded-run")
+    argv = reproduce.rewrite_argv(argv, profile_file)
     reproduce.write(
         run_dir,
         profile_name=profile.name,
@@ -884,6 +937,10 @@ def _unknown_selectors(profile, args) -> list[str]:
     from ..surfaces.base import KNOWN_SURFACES
 
     problems: list[str] = []
+    try:
+        resolve_coverage(profile, args)
+    except loader.ProfileError as exc:
+        problems.append(str(exc))
     for ingress_id in args.ingress or []:
         if ingress_id not in profile.ingress_ids:
             problems.append(
@@ -906,26 +963,39 @@ def _unknown_selectors(profile, args) -> list[str]:
     return problems
 
 
-def _unmatched_selection(profile: Profile, args: argparse.Namespace) -> str | None:
-    """Why the profile's `selection` names a glob that matches no case, or None.
-
-    The plugin checks the globs against the collected cases, which in a run happens only after
-    preflight has contacted the fleet. So verify first asks `llmdv plan`, which collects the
-    same cases offline, in a child process so that this run's pytest session starts clean. Any
-    other problem plan reports is left for the run itself to report.
-    """
-    if not profile.selection or getattr(args, "all", False):
-        return None
-    command = [sys.executable, "-m", "llmdv.cli.main", "plan", "--profile", args.profile, "--json"]
-    for ingress_id in args.ingress or []:
-        command += ["--ingress", ingress_id]
-    result = subprocess.run(command, capture_output=True, text=True, check=False)  # noqa: S603 -- our own interpreter and CLI
-    if result.returncode != USAGE:
-        return None
-    for line in result.stderr.splitlines():
-        if "selection: " in line:
-            return line[line.index("selection: ") :]
-    return None
+def _validate_scope(args: argparse.Namespace) -> tuple[int, dict | None, str]:
+    """Resolve and collect offline before preflight, including zero-case and filter errors."""
+    command = [
+        sys.executable,
+        "-m",
+        "llmdv.cli.main",
+        "plan",
+        "--profile",
+        str(args.profile),
+        "--json",
+    ]
+    for name in getattr(args, "test_set", ()):
+        command += ["--test-set", name]
+    if args.all_test_sets:
+        command += ["--all-test-sets"]
+    if args.full_suite:
+        command += ["--full-suite"]
+    for flag, values in (
+        ("--ingress", args.ingress),
+        ("--client", args.client),
+        ("--surface", args.surface),
+    ):
+        for value in values:
+            command += [flag, value]
+    if args.keyword:
+        command += ["-k", args.keyword]
+    if args.marker:
+        command += ["-m", args.marker]
+    command += [item for item in (getattr(args, "pytest_args", None) or []) if item != "--"]
+    result = subprocess.run(command, capture_output=True, text=True, check=False)  # noqa: S603
+    if result.returncode != OK:
+        return result.returncode, None, result.stderr.strip() or "Coverage planning failed"
+    return OK, json.loads(result.stdout)["coverage"], ""
 
 
 # pytest's own exit codes. Collapsing these into "tests failed" would report a llmdv defect or a
@@ -952,7 +1022,7 @@ def _map_pytest_exit(code: int, interrupted: bool = False) -> int:
     if code == 5:
         log.warning(
             "no tests were collected; check --ingress/--client/--surface, -k/-m and the "
-            "profile's selection (--all runs every case)"
+            "test sets; use profile show --test-sets to list available sets"
         )
         return USAGE
     return INTERNAL
@@ -1018,8 +1088,12 @@ def selection_argv(args: argparse.Namespace) -> list[str]:
         argv += ["--llmdv-client", client_id]
     for surface in args.surface:
         argv += ["--llmdv-surface", surface]
-    if getattr(args, "all", False):
-        argv += ["--llmdv-all"]
+    for name in getattr(args, "test_set", ()):
+        argv += ["--llmdv-test-set", name]
+    if getattr(args, "all_test_sets", False):
+        argv += ["--llmdv-all-test-sets"]
+    if getattr(args, "full_suite", False):
+        argv += ["--llmdv-full-suite"]
     if args.keyword:
         argv += ["-k", args.keyword]
     if args.marker:

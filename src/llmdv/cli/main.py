@@ -137,6 +137,28 @@ def _resolve_level(args: argparse.Namespace) -> str:
 
 def main(argv: list[str] | None = None) -> int:
     parser = build_parser()
+    provided = list(sys.argv[1:] if argv is None else argv)
+    replacements = {
+        "--selection": "--test-set",
+        "--selections": "--test-sets",
+        "--all": "--full-suite",
+        "--llmdv-selection": "--test-set",
+        "--llmdv-all": "--full-suite",
+    }
+    for token in provided:
+        old = token.split("=", 1)[0]
+        if old in replacements:
+            parser.error(f"{old} was removed; use {replacements[old]}")
+        if old in {
+            "--llmdv-test-set",
+            "--llmdv-all-test-sets",
+            "--llmdv-full-suite",
+            "--llmdv-ingress",
+            "--llmdv-client",
+            "--llmdv-surface",
+            "--llmdv-profile",
+        }:
+            parser.error(f"{old} is a pytest plugin option; use {old.replace('--llmdv-', '--')}")
     # parse_known_args rather than parse_args: `llmdv verify` forwards anything it does not
     # recognise to pytest, so `llmdv verify --profile p -x --tb=short` works. The cost is that a
     # typo in a llmdv flag reaches pytest instead of being caught here -- pytest then rejects it,

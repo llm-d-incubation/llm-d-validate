@@ -15,7 +15,7 @@ import argparse
 from ..kube import KubeContext, KubeError
 from ..log.setup import emit, get_logger
 from ..preflight import _command_for
-from ..profile import loader
+from ..profile import inspection, loader, test_sets
 from ..surfaces.base import SURFACE_PATHS
 from .contract_display import contract_lines
 from .exit_codes import OK, USAGE
@@ -37,18 +37,38 @@ def add_parser(subparsers, parents) -> None:
 
     show = actions.add_parser("show", parents=parents, help="print the resolved profile")
     show.add_argument("path", help="path to the profile YAML")
-    show.add_argument(
+    modes = show.add_mutually_exclusive_group()
+    modes.add_argument(
         "--setup",
         action="store_true",
         help="print the setup commands for each ingress, resolving selectors live",
     )
-    show.add_argument(
+    modes.add_argument(
         "--matrix",
         action="store_true",
         help="print the surface matrix this profile implies, including what will skip; "
         "`llmdv plan` lists the cases",
     )
+    modes.add_argument(
+        "--yaml",
+        action="store_true",
+        help="export standalone YAML, preserving environment-variable names; no network access",
+    )
+    modes.add_argument(
+        "--test-sets",
+        action="store_true",
+        help="list built-in and profile-defined test sets and their case-id globs",
+    )
     show.set_defaults(func=cmd_show)
+
+    explain = actions.add_parser(
+        "explain", parents=parents, help="effective values and the files that set or override them"
+    )
+    explain.add_argument("path", help="path to the profile YAML")
+    explain.add_argument(
+        "--field", help="one field or block, e.g. 'ingresses[gateway].model.max_model_len'"
+    )
+    explain.set_defaults(func=cmd_explain)
 
 
 def cmd_validate(args: argparse.Namespace) -> int:
@@ -72,11 +92,29 @@ def cmd_validate(args: argparse.Namespace) -> int:
 
 def cmd_show(args: argparse.Namespace) -> int:
     try:
-        profile = loader.load(args.path)
+        profile, chain = loader.load_with_sources(args.path)
     except loader.ProfileError as exc:
         log.error("%s", exc)
         return USAGE
 
+    if getattr(args, "test_sets", False):
+        emit(
+            "Default test set: "
+            + ("default" if "default" in profile.test_sets else "none (explicit choice required)")
+        )
+        for source, named in (("built-in", test_sets.BUILTIN), ("profile", profile.test_sets)):
+            for name, cases in sorted(named.items()):
+                emit(f"\n{name} ({source})")
+                for case in cases:
+                    emit(f"  {case}")
+        emit(
+            "\nUse --test-set NAME (repeatable), --all-test-sets or --full-suite "
+            "with plan, verify or job."
+        )
+        return OK
+    if getattr(args, "yaml", False):
+        emit(inspection.export_yaml(chain).rstrip())
+        return OK
     if args.setup:
         return _show_setup(args, profile)
     if args.matrix:
@@ -148,6 +186,17 @@ def cmd_show(args: argparse.Namespace) -> int:
             emit(f"  {entry.check:<32} {entry.issue}  [{scope} @ {layers}]{until}")
             if entry.fix:
                 emit(f"  {'':<32} fix: {entry.fix}")
+    return OK
+
+
+def cmd_explain(args: argparse.Namespace) -> int:
+    try:
+        profile, chain = loader.load_with_sources(args.path)
+        text = inspection.explain_text(profile, chain, args.field)
+    except loader.ProfileError as exc:
+        log.error("%s", exc)
+        return USAGE
+    emit(text)
     return OK
 
 

@@ -98,54 +98,55 @@ capabilities:
   # judged from it. Claim 5 needs routing.prefix_affinity instead.
   cache_reuse: null
 
-# The cases this guide's lanes run by default (`llmdv verify --all` runs everything). They test
+# The cases this guide's lanes run by default (`llmdv verify --full-suite` runs everything). They test
 # what a lane's own deployment can get wrong: the router path, the overlay's parsers and window,
 # and what this guide changes. Engine and model conformance, the rest of the suite, depends only
-# on the engine build, model and flags, which many lanes share; it runs with `--all` once per
+# on the engine build, model and flags, which many lanes share; it runs with `--full-suite` once per
 # configuration (profiles/llm-d/README.md, "Which lane runs everything").
-selection:
-  # Every lane: the router serves each API a client uses, and refuses what it should.
-  - contract.*
-  - discovery.models_lists_declared_model
-  - discovery.unknown_model_no_fallback
-  - discovery.models_parses_with_openai_sdk
-  - openai_chat.basic_non_streaming
-  - openai_chat.streaming_sse
-  - openai_chat.stop_reason
-  - openai_completions.basic_non_streaming
-  - openai_completions.streaming_matches_json
-  - openai_completions.stop_reason
-  - anthropic_messages.basic_non_streaming
-  - anthropic_messages.streaming_sse
-  - openai_responses.basic_non_streaming
-  - openai_responses.streaming_sse
-  - streaming.sse_framing
-  - unhappy.unknown_path
-  - unhappy.malformed_json
-  - unhappy.missing_model
-  - unhappy.wrong_method
-  - unhappy.error_envelope_fields
-  - transport.connection
-  - transport.health_status
-  # Every lane: the overlay's parser flags take effect (skips where the model part has none).
-  - openai_chat.configured_reasoning
-  - tools.auto_call
-  - tools.auto_stream
-  # Every lane: the overlay's context window is the one declared.
-  - long_context.*
-  - unhappy.context_overflow
-  - unhappy.token_limit_over_context
-  # This guide: every request passes the decode pod's routing sidecar: streaming, long prompts and
-  # error paths through it.
-  - openai_completions.prompt_forms
-  - streaming.*
-  - unhappy.invalid_token_limit
-  - unhappy.streaming_validation
-  # The sidecar deletes `n` on the prefill leg only; the decode leg must still return n choices.
-  - openai_completions.multiple_choices
-  # The sidecar re-marshals the usage frame; it must still parse and count the same tokens.
-  - openai_chat.streaming_include_usage
-  # Every frame carries usage, so the sidecar rewrites every frame.
-  - openai_chat.continuous_usage
-  # The sidecar's own 400s, and prefill 400s it relays, must keep the API's error shape.
-  - unhappy.wrong_field_type
+test_sets:
+  default:
+    # Every lane: the router serves each API a client uses, and refuses what it should.
+    - contract.*
+    - discovery.models_lists_declared_model
+    - discovery.unknown_model_no_fallback
+    - discovery.models_parses_with_openai_sdk
+    - openai_chat.basic_non_streaming
+    - openai_chat.streaming_sse
+    - openai_chat.stop_reason
+    - openai_completions.basic_non_streaming
+    - openai_completions.streaming_matches_json
+    - openai_completions.stop_reason
+    - anthropic_messages.basic_non_streaming
+    - anthropic_messages.streaming_sse
+    - openai_responses.basic_non_streaming
+    - openai_responses.streaming_sse
+    - streaming.sse_framing
+    - unhappy.unknown_path
+    - unhappy.malformed_json
+    - unhappy.missing_model
+    - unhappy.wrong_method
+    - unhappy.error_envelope_fields
+    - transport.connection
+    - transport.health_status
+    # Every lane: the overlay's parser flags take effect (skips where the model part has none).
+    - openai_chat.configured_reasoning
+    - tools.auto_call
+    - tools.auto_stream
+    # Every lane: the overlay's context window is the one declared.
+    - long_context.*
+    - unhappy.context_overflow
+    - unhappy.token_limit_over_context
+    # This guide: every request passes the decode pod's routing sidecar: streaming, long prompts and
+    # error paths through it.
+    - openai_completions.prompt_forms
+    - streaming.*
+    - unhappy.invalid_token_limit
+    - unhappy.streaming_validation
+    # The sidecar deletes `n` on the prefill leg only; the decode leg must still return n choices.
+    - openai_completions.multiple_choices
+    # The sidecar re-marshals the usage frame; it must still parse and count the same tokens.
+    - openai_chat.streaming_include_usage
+    # Every frame carries usage, so the sidecar rewrites every frame.
+    - openai_chat.continuous_usage
+    # The sidecar's own 400s, and prefill 400s it relays, must keep the API's error shape.
+    - unhappy.wrong_field_type

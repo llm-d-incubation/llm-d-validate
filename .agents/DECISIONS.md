@@ -211,14 +211,14 @@ Human reference: [../docs/compare.md](../docs/compare.md).
 | `skip → fail` | new evidence, not new breakage |
 
 Zero cases is never a pass, a changed `profile_digest` is reported before the findings with the
-declarations that moved. A profile's `selection` is not digested: compare says *the selection
-changed*, lists cases only one run selected under *Outside the selection*, and names the
+declarations that moved. A profile's `test_sets` are not digested: compare says *the coverage
+changed*, lists cases only one run selected under *Outside the coverage*, and names the
 baseline it judged against. Automatic baselines match the run identity; a missing identity is never
 selected, and the default trigger is `manual`.
 
 *Why:* a skip is an absence of evidence. Reporting it as a failure trains people to ignore the
 alert, and hiding it lets coverage drain away. Silence after a fix is how people stop trusting
-the report. A run that recorded nothing (an OOM kill, an empty selection) would otherwise
+the report. A run that recorded nothing (an OOM kill, an empty run) would otherwise
 compare as "nothing failing". And one tightened declaration routinely explains a whole delta,
 so the reader needs to see it before the cases.
 
@@ -231,3 +231,12 @@ pinned exactly and used only where SDK compatibility is itself the requirement.
 methods, header manipulation, mid-stream disconnects. Pinning matters because a proxy or SDK
 version change can alter response shapes; a floating range would make results
 meaningless across runs.
+
+
+## Test sets make coverage an explicit choice
+
+Profiles use `test_sets`, with an optional deliberate `default`. A plain run without a default
+is a usage error. Repeated `--test-set` chooses a union, `--all-test-sets` combines profile-defined
+sets, and `--full-suite` explicitly requests the library. Built-in names are reserved; wildcard
+syntax stays inside YAML case patterns. Each `--test-set` takes one name so it cannot swallow pytest arguments. Coverage is recorded separately from the deployment contract and does not
+change its digest. The migration removes the former selection keys and flags outright.

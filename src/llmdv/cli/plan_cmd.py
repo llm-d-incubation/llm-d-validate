@@ -27,6 +27,8 @@ from .verify_cmd import (
     _run_pytest,
     _unknown_selectors,
     add_selection_arguments,
+    coverage_record,
+    resolve_coverage,
     selection_argv,
 )
 
@@ -62,12 +64,26 @@ class _Planner:
     def __init__(self) -> None:
         self.rows: list[dict] = []
         self.left_out = 0
+        self.excluded = []
+        self.filtered = 0
 
     def pytest_collection_finish(self, session) -> None:
         from ..plugin import plan_row
 
         self.rows = [plan_row(item) for item in session.items]
         self.left_out = getattr(session.config, "_llmdv_left_out", 0)
+        included = {
+            (r["ingress"] or "-", r["case_id"] or r["nodeid"], r["variant"] or r["surface"] or "")
+            for r in self.rows
+        }
+        self.excluded = [
+            key
+            for key in getattr(session.config, "_llmdv_scope_inventory", [])
+            if tuple(key) not in included
+        ]
+        self.filtered = getattr(session.config, "_llmdv_after_sets", len(self.rows)) - len(
+            self.rows
+        )
 
 
 def cmd_plan(args: argparse.Namespace) -> int:
@@ -100,7 +116,9 @@ def cmd_plan(args: argparse.Namespace) -> int:
     if code != OK:
         return code
 
-    document = _document(profile.name, args, planner.rows, profile.selection, planner.left_out)
+    selected = resolve_coverage(profile, args)
+    document = _document(profile.name, args, planner.rows, selected, planner.left_out)
+    document["coverage"].update(excluded=planner.excluded, excluded_by_filters=planner.filtered)
     if args.json:
         emit(json.dumps(document, indent=2))
     else:
@@ -110,7 +128,7 @@ def cmd_plan(args: argparse.Namespace) -> int:
 
 
 def _document(
-    name: str, args: argparse.Namespace, rows: list[dict], globs: tuple[str, ...], left_out: int
+    name: str, args: argparse.Namespace, rows: list[dict], selected, left_out: int
 ) -> dict:
     by_suite: dict[str, dict[str, int]] = {}
     for row in rows:
@@ -122,18 +140,7 @@ def _document(
     return {
         "schema": SCHEMA,
         "profile": {"name": name, "path": str(Path(args.profile).resolve())},
-        "selection": {
-            "ingress": args.ingress,
-            "client": args.client,
-            "surface": args.surface,
-            "keyword": args.keyword,
-            "marker": args.marker,
-            "pytest_args": [item for item in (args.pytest_args or []) if item != "--"],
-            "all": args.all,
-            # The profile's own selection and how many collected cases it deselected, which
-            # are in neither `counts` nor `cases`.
-            "profile": {"cases": list(globs), "left_out": left_out},
-        },
+        "coverage": {**coverage_record(selected, args), "excluded_by_test_sets": left_out},
         "counts": {
             "total": len(rows),
             "run": sum(1 for row in rows if row["outcome"] == "run"),
@@ -152,9 +159,13 @@ def _text(document: dict, counts_only: bool) -> list[str]:
         f"{document['profile']['name']}: {counts['total']} cases, "
         f"{counts['run']} would run, {counts['skip']} would skip before running",
     ]
-    left_out = document["selection"]["profile"]["left_out"]
-    if left_out:
-        lines.append(f"{left_out} left out by the profile's selection (--all runs them)")
+    coverage = document["coverage"]
+    names = ", ".join(f"{entry['name']} ({entry['source']})" for entry in coverage["sets"])
+    lines.append(f"Coverage: {coverage['mode']}" + (f" — {names}" if names else ""))
+    lines.append(
+        f"{coverage['excluded_by_test_sets']} excluded by test sets; "
+        f"{coverage.get('excluded_by_filters', 0)} excluded by other filters"
+    )
     lines.append("")
     width = max([len("suite"), *map(len, counts["by_suite"])])
     lines.append(f"  {'suite'.ljust(width)}   run  skip")

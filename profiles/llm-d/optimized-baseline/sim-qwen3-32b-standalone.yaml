@@ -36,7 +36,7 @@ ingresses:
 
 capabilities:
   # Change sentinels: placeholders, as .agents/skills/writing-an-infra-profile/SKILL.md step 6
-  # describes. The first run with --evidence all --all supplies the values; replace these with
+  # describes. The first run with --evidence all --full-suite supplies the values; replace these with
   # them and cite the simulator version.
   prompt_pins:
     chat_completions: {conversation: 1, tools: 1}

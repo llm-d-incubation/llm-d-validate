@@ -51,7 +51,7 @@ ingresses:
     surfaces: [chat_completions, completions, messages, responses]
     timeouts: {connect: 5, request: 300, stream_idle: 60}
     error_status:
-      # As measured on vLLM 0.30 in example-two-ingress.yaml; re-measure on your version.
+      # Expected statuses, also observed on vLLM 0.30 in example-two-ingress.yaml.
       unknown_model: [404]
       unknown_path: [404]
       wrong_method: [405]
@@ -66,14 +66,14 @@ ingresses:
       requires: []
 
 capabilities:
-  # Declared false until probed, so their cases skip as undeclared rather than assert against an
-  # unverified feature; flip each once checked.
+  # Enable features promised by your deployment; a failing probe does not disable a promise.
+  # These optional features are not declared as supported here. Review the plan's gaps.
   count_tokens: false
   stateful_responses: false
   structured_output: false
   # Set for a multimodal model served with its vision path on; the image cases then run.
   vision: false
-  # Engine-specific request options (see REFERENCE.md). Left empty until each is probed.
+  # Engine-specific request options (see REFERENCE.md). Declare the options your deployment promises.
   extension_options: []
 
 headers:
@@ -86,3 +86,17 @@ clients:
   - id: <your-client>
     surfaces: [chat_completions]
     needs: [streaming]
+
+# A small default for first runs. Use --full-suite for broader verification.
+test_sets:
+  default:
+    - contract.*
+    - discovery.models_lists_declared_model
+    - openai_chat.basic_non_streaming
+    - openai_chat.streaming_sse
+    - openai_completions.basic_non_streaming
+    - streaming.completions_lifecycle[True]
+    - openai_responses.basic_non_streaming
+    - openai_responses.streaming_sse
+    - anthropic_messages.basic_non_streaming
+    - anthropic_messages.streaming_sse

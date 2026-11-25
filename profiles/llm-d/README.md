@@ -93,16 +93,16 @@ exposes the same way. None has run against a real engine: each says `WRITTEN, NO
 
 ## Which lane runs everything
 
-A guide's `selection` (in its `parts/common.yaml`) is what its lanes run by default: the router
+A guide's `test_sets.default` (in its `parts/common.yaml`) is what its lanes run by default: the router
 path, the overlay's parsers and window, and what the guide changes. The rest of the suite is
 engine and model conformance, which depends only on the engine build, the model and its
-client-visible flags, so one lane per configuration runs it with `llmdv verify --all` and the
+client-visible flags, so one lane per configuration runs it with `llmdv verify --full-suite` and the
 others rely on that run. Where optimized-baseline deploys a configuration, its lane is the one.
 
 Each profile below is `<guide>/<engine>-<model part>[-<variant>]-standalone`. GPU means NVIDIA GPU, XPU
 Intel XPU.
 
-| Profile that runs `--all` | Accelerator | Also deploys it (selection only) |
+| Profile that runs `--full-suite` | Accelerator | Also deploys it (default test set only) |
 | --- | --- | --- |
 | `wide-ep/vllm-deepseek-r1-0528-tools` | GPU | — |
 | `wide-ep/vllm-deepseek-v2-lite-chat-ctx2k-inline` | XPU | — |
@@ -128,11 +128,11 @@ Intel XPU.
 | `optimized-baseline/vllm-qwen3-32b-inline` | TPU | tiered-prefix-cache |
 | `optimized-baseline/vllm-qwen3-32b-parsers` | GPU | agentic-api, async-multitenant, flow-control, keda-epp\*, precise-prefix-cache-routing, tiered-prefix-cache |
 
-\* One of this guide's lanes for the configuration runs `--all` too. Two lanes run a different
-engine build from the rest of their configuration, so each runs `--all`: pd-disaggregation's
+\* One of this guide's lanes for the configuration runs `--full-suite` too. Two lanes run a different
+engine build from the rest of their configuration, so each runs `--full-suite`: pd-disaggregation's
 `amd-ci-acc-rocm-vllm-moriio` (vllm-openai-rocm v0.32.0-rc.2, an llm-d build) and keda-epp's
 `ibm-acc-gpu-vllm-x` (vLLM's floating `nightly` image). A lane whose engine image changes runs
-`--all` once on the new build; `llmdv compare` reports the build change (`the stack changed`).
+`--full-suite` once on the new build; `llmdv compare` reports the build change (`the stack changed`).
 
 ## optimized-baseline coverage
 

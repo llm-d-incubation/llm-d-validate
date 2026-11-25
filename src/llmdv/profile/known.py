@@ -137,7 +137,7 @@ def _parts(version: str) -> tuple[int, ...]:
 def unmatched(entries: Iterable[KnownFailure], records: Iterable[Mapping[str, Any]]) -> list[dict]:
     """The entries that labelled no record although a case they cover ran: candidates for
     pruning, because the fix may have landed. Matched by issue and check, which together name
-    an entry. An entry none of whose cases ran (the profile's `selection` or a `-k` left them
+    an entry. An entry none of whose cases ran (the run's test sets or a `-k` left them
     out, or they skipped) says nothing about this run, so it is not listed. A case ran only if
     it reached a verdict against the fleet: it recorded checks, and its ingress's local
     connection was not lost. A setup error records no check and a lost port-forward says

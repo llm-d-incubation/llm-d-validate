@@ -23,7 +23,7 @@ The recurring failure here is an assertion that is plausible, reads correctly in
      -H "Authorization: Bearer $<KEY_ENV>" \
      -H 'Content-Type: application/json' -d @body.json -D headers.txt > probe.json
    ```
-   Drop the `Authorization` line for a router reached directly; it authenticates nothing. The best capture is often a recorded one: `llmdv verify --profile <profile> --evidence all -k <case>` writes every exchange to `exchanges.jsonl` (add `--all` if the profile's `selection` leaves the case out).
+   Drop the `Authorization` line for a router reached directly; it authenticates nothing. The best capture is often a recorded one: `llmdv verify --profile <profile> --evidence all -k <case>` writes every exchange to `exchanges.jsonl` (add `--full-suite` if the profile's `test_sets.default` leaves the case out).
 
 4. **Probe every declared layer, not one.** Engine, router and gateway ingresses disagree on error status, on which paths exist, on which headers come back, and on whether a response is transformed.
 

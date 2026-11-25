@@ -117,7 +117,9 @@ Each stage fails in its own way, which is what lets the exit code say who is to 
 flowchart TB
     A["llmdv verify --profile"] --> B["load and validate the profile<br/>offline"]
     B -->|"malformed or inconsistent"| E2["exit 2: usage or profile"]
-    B --> C["preflight: reachability, proxy hygiene,<br/>secrets, key and model access,<br/>destination writable, pod log access"]
+    B --> S["resolve test sets and filters<br/>collect and validate scope offline"]
+    S -->|"missing default, invalid scope or zero cases"| E2
+    S --> C["preflight: reachability, proxy hygiene,<br/>secrets, key and model access,<br/>destination writable, pod log access"]
     C -->|"unsatisfied"| E3["exit 3: your vantage point"]
     C --> D["collect cases over ingress and surface"]
     D --> F["run each case, recording checks and exchanges"]

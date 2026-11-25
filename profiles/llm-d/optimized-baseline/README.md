@@ -21,7 +21,7 @@ Every lane runs standalone: the client calls the `<GUIDE_NAME>-epp` Service on p
 
 `sim-qwen3-32b-standalone` is not a lane: it runs the guide's router in front of llm-d-inference-sim, for kind or CI without accelerators.
 
-These lanes run the guide's `selection` (`parts/common.yaml`). The lanes that run every case with `--all`, one per configuration, are listed in [Which lane runs everything](../README.md#which-lane-runs-everything).
+These lanes run the guide's `test_sets.default` (`parts/common.yaml`). The lanes that run every case with `--full-suite`, one per configuration, are listed in [Which lane runs everything](../README.md#which-lane-runs-everything).
 
 ## Not covered, and why
 

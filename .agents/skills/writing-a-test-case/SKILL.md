@@ -1,6 +1,8 @@
 ---
 name: writing-a-test-case
-description: Use when adding or changing a test case or a test suite in `llmdv`: choosing between surface_generic and surface markers, naming a case_id, gating on a capability or fleet policy, adding a suites/<name> package, proving a case can fail against the fake fleet, or updating the guide selections and docs a case reaches; also when a new case has only ever passed.
+description: >-
+  Use when adding or changing a test case or suite in llmdv: markers, case IDs,
+  capability and policy gates, fake-fleet failure tests, and profile test-set follow-ups.
 ---
 
 # Writing a test case
@@ -33,7 +35,7 @@ def test_something(client, surface, model, ingress):
 - The closest marker decides. Both markers on one function, or a feature outside `SURFACE_FEATURES`, fails collection as an `llmdv` defect. A known feature no drivable surface has yet gives one `skip:not_implemented` row.
 - Prefer `surface_generic`: a new surface then inherits the case.
 - A generic case builds every request through the surface (`minimal_body`, `stream_body`, `invalid_body`, `structured_output_body`) and never writes a wire field name. A body in one surface's shape is garbled on the others: refused for the wrong reason so it passes, or ignored so it fails and blames the fleet.
-- The llm-d guide profiles run only the cases their `selection:` globs name (`profiles/llm-d/<guide>/parts/common.yaml`). A new case reaches those lanes only if a glob matches it, so add it to the guides whose claims it tests. Renaming or removing a case id a selection names makes that profile exit 2; check with `llmdv plan --profile <combination>` over every combination under `profiles/llm-d/`.
+- The llm-d guide profiles run only the cases their `test_sets.default` globs name (`profiles/llm-d/<guide>/parts/common.yaml`). A new case reaches those lanes only if a glob matches it, so add it to the guides whose claims it tests. Renaming or removing a case id a test set names makes that profile exit 2; check with `llmdv plan --profile <combination>` over every combination under `profiles/llm-d/`.
 - `case_id`'s prefix becomes the phase in the output. Use the package's own name. A prefix that names another suite also adds that suite's marker, so `-m openai_chat` selects `openai_chat.disconnect_recovery` in `streaming/`. A prefix that differs from its package fails collection unless the pair is listed, with its reason, in `PREFIX_EXCEPTIONS` in `plugin.py`; add one only when the output and `-m` should group the case away from its package.
 - Gate on a profile capability with `@pytest.mark.needs("<capability>")`, or on one value of a closed vocabulary with `needs("<field>:<value>")`. An unknown name is a usage error at collection, never a silent skip. `needs` is read only for a case that runs on a surface (`surface` or `surface_generic`): `gate()` in `plugin.py` returns before reading it for a case with no surface, so gate such a case inside its body instead.
 - Mark a case that can disturb a shared fleet `@pytest.mark.disruptive("<reason>")`: it then skips as `excluded_by_policy` under `fleet_policy: shared`.
@@ -61,8 +63,13 @@ A case that has never failed has not been tested. For every new case, and every 
 
 ## The follow-ups
 
+- When renaming or removing a case, check the built-in test sets in `profile/test_sets.py`
+  and profile-defined `test_sets` as well as the default `test_sets.default`. Named subsets reuse
+  existing case IDs; do not duplicate tests into a smoke suite. Add to `smoke` only when the
+  case belongs in its small discovery/generation/streaming scope; `tests/test_test_sets.py`
+  checks its test-set behavior.
 - Update the suite's row in [docs/test-suites.md](../../../docs/test-suites.md) (what it checks, what enables it, its status); close or edit a Gaps row if the case fills one. A new suite gets a new row.
-- Add the case to the `selection:` of each llm-d guide whose claims it tests (`profiles/llm-d/<guide>/parts/common.yaml`), and run `llmdv plan --profile <combination>` over every combination under `profiles/llm-d/` after renaming or removing a case id.
+- Add the case to the `test_sets.default` of each llm-d guide whose claims it tests (`profiles/llm-d/<guide>/parts/common.yaml`), and run `llmdv plan --profile <combination>` over every combination under `profiles/llm-d/` after renaming or removing a case id.
 - For a new suite, regenerate the coverage graphic with `python docs/images/make_coverage_svg.py`; a test checks the graphic lists every suite.
 - A new capability or marker the case needs is a profile change, not a case change: follow [extending-llmdv](../extending-llmdv/SKILL.md#add-a-profile-capability).
 

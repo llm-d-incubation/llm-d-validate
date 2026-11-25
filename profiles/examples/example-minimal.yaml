@@ -1,0 +1,34 @@
+# Starter: one reachable endpoint. Copy to a *.local.yaml file and set the model id.
+# LLMDV_BASE_URL and LLMDV_API_KEY hold your URL and key; their values stay out of this file.
+# Choose gateway, router or engine by the endpoint's position, and list its intended APIs.
+schema: llmdv.profile/1
+name: example-minimal
+model:
+  public_id: <model-id>
+ingresses:
+  - id: gateway
+    kind: gateway
+    base_url_env: LLMDV_BASE_URL
+    auth: {type: bearer, key_env: LLMDV_API_KEY} # Use {type: none} if no key is required.
+    surfaces: [chat_completions]
+    error_status: # Expected contract, not values copied from a failing response.
+      unknown_model: [404]
+      unknown_path: [404]
+      wrong_method: [405]
+      bad_credentials: [401]
+# This starter omits optional capability declarations; their cases skip as undeclared.
+# Use `llmdv plan --profile <file>` to see gaps, then add the contracts relevant to your stack.
+
+# A small default for first runs. Use --full-suite for broader verification.
+test_sets:
+  default:
+    - contract.*
+    - discovery.models_lists_declared_model
+    - openai_chat.basic_non_streaming
+    - openai_chat.streaming_sse
+    - openai_completions.basic_non_streaming
+    - streaming.completions_lifecycle[True]
+    - openai_responses.basic_non_streaming
+    - openai_responses.streaming_sse
+    - anthropic_messages.basic_non_streaming
+    - anthropic_messages.streaming_sse

@@ -83,6 +83,13 @@ llmdv plan --profile profiles/my-stack.local.yaml      # preview what runs and w
 llmdv verify --profile profiles/my-stack.local.yaml    # run it against your stack
 ```
 
+For a quick check of discovery, generation and streaming, use
+`llmdv verify --profile profiles/my-stack.local.yaml --test-set smoke`. Preview it with
+`llmdv plan` and the same flags. Plain runs use `test_sets.default` and exit 2 if it is absent.
+Repeat `--test-set NAME` to combine subsets, use `--all-test-sets` for all profile-defined sets,
+or `--full-suite` for the library. Other filters still narrow the scope.
+[Custom test sets](docs/cli.md#test-sets-and-coverage) let you save your own subsets.
+
 Git ignores `*.local.yaml` profiles, so your hosts stay out of the repository.
 [Writing a profile](https://github.com/llm-d-incubation/llm-d-validate/blob/main/docs/writing-profiles.md) walks through the other
 examples, `extends` and what to declare.

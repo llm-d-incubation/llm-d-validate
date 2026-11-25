@@ -38,7 +38,7 @@ def write(
         f"# Re-run the llmdv verification recorded in this directory ({profile_name}).",
         f"# llmdv {__version__}   profile digest {profile_digest or 'unknown'}",
         "#",
-        "# The profile is taken from profile.used.yaml beside this script, NOT from the",
+        "# The profile is taken from the archived YAML beside this script, NOT from the",
         "# repository: a profile in git may have changed since, and a verdict only means",
         "# something against the declarations it was made with.",
         "set -euo pipefail",
@@ -113,4 +113,23 @@ def rewrite_argv(argv: list[str], profile_flag_value: str) -> list[str]:
         if token.startswith(("--local-output=", "--run-dir=")):
             continue
         out.append(token)
+    return out
+
+
+def frozen_scope_argv(argv: list[str], name: str) -> list[str]:
+    """Use a saved definition instead of consulting a potentially changed built-in set."""
+    out = []
+    skip_next = False
+    for token in argv:
+        if skip_next:
+            skip_next = False
+            continue
+        if token == "--test-set":
+            skip_next = True
+            continue
+        if token.startswith("--test-set=") or token in {"--all-test-sets", "--full-suite"}:
+            continue
+        out.append(token)
+    position = out.index("--") if "--" in out else len(out)
+    out[position:position] = ["--test-set", name]
     return out

@@ -166,7 +166,7 @@ def archive(
     triggers=None,
     accelerators=None,
     flavors=None,
-    selections=None,
+    coverages=None,
 ):
     """A published-run layout: <root>/<profile>/<run-id>/results.jsonl."""
     for run_id, records in (runs or {}).items():
@@ -191,8 +191,8 @@ def archive(
             if run_id in (flavors or {}):
                 # None writes `"flavor": null`, as a real run without a flavor does.
                 body["identity"]["flavor"] = flavors[run_id]
-        if run_id in (selections or {}):
-            body["selection"] = selections[run_id]
+        if run_id in (coverages or {}):
+            body["coverage"] = coverages[run_id]
         (d / "outcome.json").write_text(json.dumps(body))
         manifest.write(d)
     return f"file://{tmp_path}"
@@ -1374,7 +1374,7 @@ def test_a_reverted_profile_is_compared_with_and_named_by_the_run_it_was_judged_
     assert delta.newly_failing
 
 
-# ----------------------------------------------------------------- runs under a selection
+# ----------------------------------------------------------------- runs under a coverage
 
 from llmdv.profile import loader  # noqa: E402
 
@@ -1382,8 +1382,12 @@ PROFILE = "name: p\ningresses:\n  - {id: gw, kind: gateway, url: http://gw}\n"
 
 
 def selected(*globs, all_=False):
-    """What `outcome.json` records under `selection` for a run."""
-    return {"cases": list(globs), "all": all_, "in_force": bool(globs) and not all_}
+    """What `outcome.json` records under `coverage` for a run."""
+    return {
+        "cases": list(globs),
+        "mode": "full-suite" if all_ or not globs else "named",
+        "sets": [],
+    }
 
 
 def digest_of(tmp_path, text):
@@ -1392,20 +1396,20 @@ def digest_of(tmp_path, text):
     return loader.contract_digest(path)
 
 
-def test_editing_the_selection_leaves_the_contract_digest_alone(tmp_path):
-    """A selection changes which cases run, never what a case asserts."""
+def test_editing_the_coverage_leaves_the_contract_digest_alone(tmp_path):
+    """A coverage changes which cases run, never what a case asserts."""
     plain = digest_of(tmp_path, PROFILE)
-    narrow = digest_of(tmp_path, PROFILE + "selection: [contract.*]\n")
-    wide = digest_of(tmp_path, PROFILE + "selection: [contract.*, openai_chat.*]\n")
+    narrow = digest_of(tmp_path, PROFILE + "test_sets: {default: [contract.*]}\n")
+    wide = digest_of(tmp_path, PROFILE + "test_sets: {default: [contract.*, openai_chat.*]}\n")
     assert plain == narrow == wide
     assert plain != digest_of(tmp_path, PROFILE.replace("http://gw", "http://other"))
 
 
-def test_narrowing_the_selection_keeps_the_window_so_a_flaky_case_stays_flaky(tmp_path):
+def test_narrowing_the_coverage_keeps_the_window_so_a_flaky_case_stays_flaky(tmp_path):
     """Reproduces (a): two full runs disagree about `a`, then the profile is narrowed. The
     history must survive the edit, so `a` is flaky, not newly failing."""
     full = digest_of(tmp_path, PROFILE)
-    narrow = digest_of(tmp_path, PROFILE + "selection: [a]\n")
+    narrow = digest_of(tmp_path, PROFILE + "test_sets: {default: [a]}\n")
     d = compare_window(
         [[rec("a", "pass", digest=full), rec("b", "pass", digest=full)]]
         + [[rec("a", "fail", digest=full), rec("b", "pass", digest=full)]],
@@ -1415,16 +1419,16 @@ def test_narrowing_the_selection_keeps_the_window_so_a_flaky_case_stays_flaky(tm
     )
     assert not d.digest_changed and d.window_dropped == 0
     assert d.newly_failing == [] and d.flaky == ["a@litellm (.F.)"]
-    assert d.vanished == [] and d.outside_selection == ["b@litellm"]
-    assert d.selection_changes == ["added a"]
+    assert d.vanished == [] and d.outside_coverage == ["b@litellm"]
+    assert d.coverage_changes == ["added a", "mode: full-suite → named"]
 
 
-def test_widening_the_selection_judges_a_case_against_the_full_runs_that_held_it(tmp_path):
+def test_widening_the_coverage_judges_a_case_against_the_full_runs_that_held_it(tmp_path):
     """Reproduces (b): `b` passed in an earlier `--all` run, the previous run was selected
-    without it, then the profile's selection was widened to take `b` in, and it fails now.
+    without it, then the profile's coverage was widened to take `b` in, and it fails now.
     That is a regression, not a new case."""
-    narrow = digest_of(tmp_path, PROFILE + "selection: [a]\n")
-    wide = digest_of(tmp_path, PROFILE + "selection: [a, b]\n")
+    narrow = digest_of(tmp_path, PROFILE + "test_sets: {default: [a]}\n")
+    wide = digest_of(tmp_path, PROFILE + "test_sets: {default: [a, b]}\n")
     d = compare_window(
         [
             [rec("a", "pass", digest=narrow), rec("b", "pass", digest=narrow)],
@@ -1436,20 +1440,23 @@ def test_widening_the_selection_judges_a_case_against_the_full_runs_that_held_it
     )
     assert d.newly_failing == ["b@litellm"] and d.appeared == []
     assert d.transitions[("litellm", "b", "")] == "regressed"
-    assert d.selection_changes == ["added b"]
+    assert d.coverage_changes == ["added b"]
 
 
-def test_a_case_only_the_wider_run_selected_is_outside_the_selection_not_new():
+def test_a_case_only_the_wider_run_selected_is_outside_the_coverage_not_new():
     d = compare_window(
         [[rec("a", "pass")]], [rec("a", "pass"), rec("b", "fail")], [selected("a")], selected()
     )
-    assert d.appeared == [] and d.outside_selection == ["b@litellm"]
+    assert d.appeared == [] and d.outside_coverage == ["b@litellm"]
     assert ("litellm", "b", "") not in d.transitions and not d.regressed
     text = render(d, "p", "r1", "r2")
-    assert "selection changed" in text and "Outside the selection (1)" in text
+    assert "coverage changed" in text and "Outside the coverage (1)" in text
     assert "Failing new cases" not in text and "Suite changed" not in text
     record = as_record(d, "r1", "r2")
-    assert record["selection"] == {"changes": ["removed a"], "outside": ["b@litellm"]}
+    assert record["coverage"] == {
+        "changes": ["removed a", "mode: named → full-suite"],
+        "outside": ["b@litellm"],
+    }
 
 
 def test_a_variant_glob_is_matched_against_the_variant():
@@ -1459,17 +1466,17 @@ def test_a_variant_glob_is_matched_against_the_variant():
         [selected()],
         selected("c[x]"),
     )
-    assert d.outside_selection == ["c[y]@litellm"] and d.vanished == []
+    assert d.outside_coverage == ["c[y]@litellm"] and d.vanished == []
 
 
-def test_a_case_the_selection_holds_and_the_run_lost_is_still_suite_churn():
-    """Only what the selection explains moves: a selected case with no record vanished."""
+def test_a_case_the_coverage_holds_and_the_run_lost_is_still_suite_churn():
+    """Only what the coverage explains moves: a selected case with no record vanished."""
     d = compare_window([[rec("a", "pass"), rec("b", "pass")]], [rec("a", "pass")], [None], None)
-    assert d.vanished == ["b@litellm"] and d.outside_selection == []
+    assert d.vanished == ["b@litellm"] and d.outside_coverage == []
     d = compare_window(
         [[rec("a", "pass"), rec("b", "pass")]], [rec("a", "pass")], [selected()], selected("*")
     )
-    assert d.vanished == ["b@litellm"] and d.outside_selection == []
+    assert d.vanished == ["b@litellm"] and d.outside_coverage == []
 
 
 def test_an_all_run_against_a_selected_one_names_the_all():
@@ -1479,8 +1486,8 @@ def test_an_all_run_against_a_selected_one_names_the_all():
         [selected("a")],
         selected("a", all_=True),
     )
-    assert d.selection_changes == ["this run ran with --all"]
-    assert d.outside_selection == ["b@litellm"]
+    assert d.coverage_changes == ["mode: named → full-suite"]
+    assert d.outside_coverage == ["b@litellm"]
 
 
 def test_a_fix_is_seen_landing_when_the_previous_run_did_not_select_the_case():
@@ -1506,7 +1513,7 @@ def test_a_case_the_previous_run_did_not_select_is_seen_to_stop_running():
     assert d.stopped_running == ["b@litellm (throttled)"]
 
 
-def test_the_comparison_reads_each_runs_selection_from_its_outcome(tmp_path):
+def test_the_comparison_reads_each_runs_coverage_from_its_outcome(tmp_path):
     runs = {
         "2026-01-01T00-00-00Z": [rec("a", "pass"), rec("b", "pass")],
         "2026-01-02T00-00-00Z": [rec("a", "pass")],
@@ -1514,17 +1521,20 @@ def test_the_comparison_reads_each_runs_selection_from_its_outcome(tmp_path):
     uri = archive(
         tmp_path,
         runs=runs,
-        selections={"2026-01-01T00-00-00Z": selected(), "2026-01-02T00-00-00Z": selected("a")},
+        coverages={"2026-01-01T00-00-00Z": selected(), "2026-01-02T00-00-00Z": selected("a")},
     )
     delta, _ = compare_cmd._compare_baselines(
         uri, "p", list(runs)[1:], [rec("a", "pass"), rec("b", "fail")], selected()
     )
-    assert delta.outside_selection == ["b@litellm"] and delta.selection_changes == ["removed a"]
+    assert delta.outside_coverage == ["b@litellm"] and delta.coverage_changes == [
+        "removed a",
+        "mode: named → full-suite",
+    ]
 
 
-def test_cases_an_older_full_run_held_are_outside_a_selection_both_runs_share():
+def test_cases_an_older_full_run_held_are_outside_a_coverage_both_runs_share():
     """A full run held `b1` and `b2`; the baseline and this run both selected `a*`. The cases
-    are outside the selection with no selection change, and the report says what is true:
+    are outside the coverage with no coverage change, and the report says what is true:
     neither run selected them, so it cannot say only one did."""
     d = compare_window(
         [[rec("a1", "pass"), rec("b1", "pass"), rec("b2", "pass")], [rec("a1", "pass")]],
@@ -1532,17 +1542,17 @@ def test_cases_an_older_full_run_held_are_outside_a_selection_both_runs_share():
         [selected(), selected("a*")],
         selected("a*"),
     )
-    assert d.selection_changes == [] and d.vanished == []
-    assert d.outside_selection == ["b1@litellm", "b2@litellm"]
+    assert d.coverage_changes == [] and d.vanished == []
+    assert d.outside_coverage == ["b1@litellm", "b2@litellm"]
     text = render(d, "p", "r1", "r2")
-    assert "selection changed" not in text
+    assert "coverage changed" not in text
     assert "only one of these runs selected them" not in text
     assert (
-        "Outside the selection (2): a run of the window held them and a selection left them "
+        "Outside the coverage (2): a run of the window held them and a coverage left them "
         "out of this run" in " ".join(text.split())
     )
     record = as_record(d, "r1", "r2")
-    assert record["selection"] == {"changes": [], "outside": ["b1@litellm", "b2@litellm"]}
+    assert record["coverage"] == {"changes": [], "outside": ["b1@litellm", "b2@litellm"]}
 
 
 def test_a_known_failure_only_this_run_selected_is_listed_once_as_known():
@@ -1554,8 +1564,8 @@ def test_a_known_failure_only_this_run_selected_is_listed_once_as_known():
         selected(),
     )
     assert [e["label"] for e in d.known_failing] == ["b2@litellm"]
-    assert d.outside_selection == [] and d.appeared == []
+    assert d.outside_coverage == [] and d.appeared == []
     assert d.current_failing == ["b2@litellm"] and not d.regressed
     text = render(d, "p", "r1", "r2")
-    assert text.count("b2@litellm") == 1 and "Outside the selection" not in text
-    assert as_record(d, "r1", "r2")["selection"]["outside"] == []
+    assert text.count("b2@litellm") == 1 and "Outside the coverage" not in text
+    assert as_record(d, "r1", "r2")["coverage"]["outside"] == []

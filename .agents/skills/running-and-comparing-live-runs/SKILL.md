@@ -13,7 +13,7 @@ Before the first live step, check what the person has and ask only for what is m
 
 1. **Check nobody else is running against this gateway.** One live run per gateway at a time: cache and session cases depend on what earlier requests left behind, and the key is rate-limited.
 2. **Never pass `-n`.** `llmdv verify` refuses parallel workers; live cases run one at a time.
-3. **Run the contract first.** `-m contract` takes about a minute and proves the gateway, the key and (when publishing) the bucket before an hour-long full run. A preflight failure exits `3`: nothing was tested.
+3. **Run the contract first.** `--full-suite -m contract` takes about a minute and proves the gateway, the key and (when publishing) the bucket before an hour-long full run. A preflight failure exits `3`: nothing was tested.
 
 ## Credentials, without echoing them
 
@@ -28,9 +28,9 @@ Publishing and pulling runs need the bucket variables exported ([`.agents/ENVIRO
 **From a PC** (at the repository root, with `.venv` active):
 
 ```sh
-llmdv verify --profile <profile> -m contract
-llmdv verify --profile <profile> --analyze        # the profile's selection; lands in runs/<timestamp>/
-llmdv verify --profile <profile> --analyze --all  # every case, whatever the profile selects
+llmdv verify --profile <profile> --full-suite -m contract
+llmdv verify --profile <profile> --analyze        # the profile's default test set; lands in runs/<timestamp>/
+llmdv verify --profile <profile> --analyze --full-suite  # every case, whatever the profile selects
 ```
 
 To publish it, add:
@@ -40,20 +40,20 @@ To publish it, add:
 --identity trigger=manual --label "actor=$USER"
 ```
 
-A profile that declares `selection:` (every llm-d guide profile does) runs only the cases it names; `llmdv plan --profile <profile>` says how many it leaves out. One lane per configuration runs `--all` (`profiles/llm-d/README.md`, "Which lane runs everything"), as does a lane whose engine build changed. Use a `*.local.yaml` copy for machine-specific changes, and keep the machine awake. A multi-ingress profile runs every ingress; `--ingress <id>` (repeatable) restricts it, and `llmdv profile show <profile> --setup` prints any port-forwards it needs.
+A plain run requires `test_sets.default` (every llm-d guide profile has one) and runs only the cases it names; `llmdv plan --profile <profile>` says how many it leaves out. One lane per configuration runs `--full-suite` (`profiles/llm-d/README.md`, "Which lane runs everything"), as does a lane whose engine build changed. Use a `*.local.yaml` copy for machine-specific changes, and keep the machine awake. A multi-ingress profile runs every ingress; `--ingress <id>` (repeatable) restricts it, and `llmdv profile show <profile> --setup` prints any port-forwards it needs.
 
 **Unattended** (`llmdv job`, e.g. as a CronJob or a CI step):
 
 ```sh
-llmdv job --profile <profile> --remote-output "s3://$AWS_BUCKET/<prefix>" -- -m contract
+llmdv job --profile <profile> --remote-output "s3://$AWS_BUCKET/<prefix>" --full-suite -- -m contract
 ```
 
-Flags the job does not know go to `llmdv verify` (`llmdv job --profile <profile> --all`); arguments after `--` reach pytest unparsed, so put verify's own flags such as `--all` or `--evidence all` before it. Results go to `--remote-output`, or `LLMDV_RESULTS_URI` when it is not given; `outcome.json` in the job log says where.
+Flags the job does not know go to `llmdv verify` (`llmdv job --profile <profile> --full-suite`); arguments after `--` reach pytest unparsed, so put verify's own flags such as `--full-suite` or `--evidence all` before it. Results go to `--remote-output`, or `LLMDV_RESULTS_URI` when it is not given; `outcome.json` in the job log says where.
 
 **From a cluster job** (`deploy/trigger.sh`, needs the `llmdv-trigger` Role):
 
 ```sh
-job="$(deploy/trigger.sh -n <namespace> --trigger manual --id <id> -- -m contract)"
+job="$(deploy/trigger.sh -n <namespace> --trigger manual --id <id> -- --full-suite -m contract)"
 kubectl -n <namespace> logs -f "job/$job"
 ```
 

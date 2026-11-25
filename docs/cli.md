@@ -7,7 +7,8 @@ Lookup for every `llmdv` command. For a first run, read [getting-started.md](get
 | Command | Purpose |
 | --- | --- |
 | `profile validate <path>` | offline schema and consistency checks |
-| `profile show <path>` | the resolved profile; `--matrix` the surfaces it implies, `--setup` each ingress's setup commands, pods resolved live (the only profile command that reads a cluster; the commands never include a local kubeconfig path) |
+| `profile show <path>` | the resolved profile; `--test-sets` lists named subsets; `--yaml` exports standalone declarations with environment-variable names preserved; `--matrix` the surfaces it implies, `--setup` each ingress's setup commands, pods resolved live (the only profile command that reads a cluster; the commands never include a local kubeconfig path) |
+| `profile explain <path> [--field FIELD]` | offline effective values and source assignments; a field or block such as `ingresses[gateway].model` also includes library defaults; environment values are hidden |
 | `plan` | the cases `verify` would run and skip; sends nothing |
 | `verify` (`run`, `execute`) | run the cases against a deployed fleet |
 | `job` | one unattended run: verify, publish (even after a crash), notify |
@@ -61,10 +62,10 @@ llmdv verify --profile P --surface responses   # one API surface
 llmdv verify --profile P --ingress litellm     # one layer
 llmdv verify --profile P -m "not disruptive"   # leave the fleet alone
 llmdv verify --profile P -k discovery          # a pytest keyword expression
-llmdv verify --profile P --all                 # set the profile's selection aside
+llmdv verify --profile P --full-suite                 # run the full suite before applying other filters
 ```
 
-Repeating a selector is a union; different selectors intersect. `-k` and `-m` narrow a selection
+Repeating `--ingress`, `--client` or `--surface` is a union; different selectors intersect. `-k` and `-m` narrow the chosen scope
 but never widen it. The ingress id is the parametrisation id, so `-k router` keeps one column.
 
 `-m` takes one marker per suite package under `src/llmdv/suites/`: `anthropic_messages`,
@@ -77,16 +78,58 @@ in `streaming/`. Cases also carry `disruptive`, `surface`, `surface_generic`, `c
 and `samples`. An unknown marker exits `2` and lists the real ones, rather than deselecting
 everything and reporting `PASSED`.
 
-A profile's [`selection`](../profiles/REFERENCE.md#selection) of case-id globs limits `verify`,
-`plan` and `job` to the cases it names; the selectors above narrow within it, and `--all` sets it
-aside. Cases it leaves out are deselected, not skipped: they appear in no result and no skip
-class, and the run says how many. A glob that matches no case exits `2` before preflight.
-`outcome.json` records the selection under `selection`.
+### Test sets and coverage
+
+A profile's `test_sets` defines reusable subsets of case-ID patterns. A plain invocation uses
+`default` and exits 2 if no default is configured. Choose the scope explicitly with one of:
+
+```sh
+llmdv profile show P --test-sets
+llmdv plan --profile P --test-set smoke
+llmdv verify --profile P --test-set quick-api --test-set tools
+llmdv verify --profile P --all-test-sets
+llmdv verify --profile P --full-suite
+```
+
+Repeated `--test-set` flags combine named sets and deduplicate cases. `--all-test-sets` combines
+all profile-defined sets, including `default`, but excludes built-ins. `--full-suite` selects
+all library verification cases. These three modes are mutually exclusive. Each replaces the
+default; ingress, client, surface, keyword and marker filters still narrow the chosen scope.
+`job` accepts the same arguments. There are no CLI set-name wildcards: `--test-set '*'` is an
+error; use `--all-test-sets` instead.
+
+```yaml
+test_sets:
+  default:
+    - contract.*
+    - discovery.models_lists_declared_model
+    - openai_chat.basic_non_streaming
+  quick-api:
+    - openai_chat.basic_non_streaming
+    - openai_chat.streaming_sse
+  tools:
+    - tools.*
+```
+
+`smoke` is a reserved built-in set: discovery, basic generation and streaming for Chat
+Completions, Completions, Responses and Messages. Undeclared APIs skip normally. A smoke pass
+covers only those checks, not tools, reasoning-specific behavior, quality, load, long context,
+cache or fleet invariants. Preflight still runs and runtime depends on the model and ingresses.
+
+Unknown names, an empty profile with `--all-test-sets`, unmatched patterns in a chosen set and
+zero cases after filters exit 2 before preflight. Patterns in unchosen sets are not matched
+against the suite. Empty lists are invalid declarations. See [test_sets](../profiles/REFERENCE.md#test_sets).
+
+Plan JSON and `outcome.json` use `coverage`: `mode` (`default`, `named`, `all-test-sets`, or
+`full-suite`), resolved `sets` (name, source, patterns), deduplicated `cases` patterns, `filters`,
+and recorded exclusions. Comparisons read coverage to distinguish omitted checks from suite
+changes. Plan text distinguishes exclusions from skips and warns if the resolved default omits
+contract checks. A run where all cases skip provides no executed checks.
 
 ### See what will run
 
 ```sh
-llmdv plan --profile P -m contract            # counts per suite and skip class, then the cases
+llmdv plan --profile P --full-suite -m contract            # counts per suite and skip class, then the cases
 llmdv plan --profile P --ingress router -q    # counts only
 llmdv plan --profile P --json                 # an llmdv.plan/1 document, one row per case
 ```
@@ -96,8 +139,7 @@ with its [class](#skip-classes) and reason, and statistical cases' resolved samp
 sends no request and reads no cluster, so it works before any port-forward is up. It shows the
 skips decided up front (`undeclared`, `not_implemented`, `excluded_by_policy`); a planned case
 can still skip at run time (`throttled`, `requires_instrumentation`, a declaration the case reads
-itself). Selector errors exit `2`. Under a `selection` it says how many cases it left out;
-`--json` puts the globs and that count under `selection.profile`. `profile show --matrix` is the
+itself). Selector errors exit `2`. It reports the cases left out by coverage and other filters; `--json` records this under `coverage`. `profile show --matrix` is the
 coarser view: surfaces per ingress.
 
 ### Driving a real Claude Code client
@@ -219,7 +261,8 @@ runs/<profile>-<utc-timestamp>-<unique-id>/  # echoed in the banner and the summ
   summary.md                     # the per-ingress table and the attribution reading
   llmdv.log                      # always full DEBUG, redacted
   profile.used.yaml              # the profile as the run read it
-  reproduce.sh                   # reruns the whole verification
+  profile.replay.yaml            # test-set runs: freezes the resolved case patterns
+  reproduce.sh                   # reruns the recorded verification scope
   dashboard.html                 # with --analyze, or llmdv analyze afterwards
   logs/                          # pod logs with --pod-logs; index references whole offloads
   failures/<ingress>/<case>/     # always written for a failure
@@ -273,8 +316,10 @@ bash runs/<run>/failures/<ingress>/<case>/repro.sh   # replay one exchange
 cd runs/<run> && ./reproduce.sh                       # rerun the verification into a fresh directory
 ```
 
-`reproduce.sh` reads the `profile.used.yaml` beside it, not the repository's copy. Both scripts
-read credentials from the environment.
+`reproduce.sh` uses the archived profile beside it. For test-set runs it reads
+`profile.replay.yaml`, which freezes the resolved patterns as `test_sets.recorded-run`; for
+`--full-suite` runs it reads `profile.used.yaml`. Other filters are retained. Use the recorded
+`llmdv` version to reproduce the same library cases. Both scripts read credentials from the environment.
 
 ### The dashboard
 

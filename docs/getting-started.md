@@ -38,6 +38,23 @@ keep the values. Never commit a credentials file, and never paste its values int
 issue or a chat. If your credentials file sets variables without `export`, load it with
 `set -a; source <file>; set +a`.
 
+## Start with a smoke check
+
+Once you have a profile and its endpoint variables, preview and run the built-in test set:
+
+```sh
+llmdv plan --profile <profile> --test-set smoke
+llmdv verify --profile <profile> --test-set smoke
+```
+
+This checks model discovery, basic generation and streaming for the supported APIs your profile
+declares. It is a quick check of those paths, not full validation; review which checks ran and
+which skipped. `--test-set smoke` replaces the profile's default subset. For broader testing,
+run without the flag to use a configured default (an absent default exits 2), or use
+`--full-suite` for every case. Repeat `--test-set` to combine sets; `--all-test-sets` runs all
+profile-defined sets.
+You can also [define test sets](cli.md#test-sets-and-coverage) for your workflow.
+
 ## Test a deployed llm-d guide
 
 Every llm-d guide at [Tier 3](https://github.com/llm-d/llm-d/blob/main/guides/GUIDES-POLICY.md#5-production-readiness-tiers) (Validated: run end to end every
@@ -53,7 +70,7 @@ P=profiles/llm-d/optimized-baseline/vllm-qwen3-32b-parsers-standalone.yaml
 export LLMDV_EPP_URL=<your EPP's URL>
 llmdv profile validate $P                 # offline schema and consistency checks
 llmdv plan --profile $P                   # every case verify would run or skip; sends nothing
-llmdv verify --profile $P -m contract     # about a minute: the profile against reality
+llmdv verify --profile $P --full-suite -m contract     # about a minute: the profile against reality
 llmdv verify --profile $P --identity accelerator=gpu --identity provider=gke
 ```
 
@@ -66,8 +83,8 @@ Pass the lane's accelerator and provider with `--identity`: one combination cove
 overlays, and identity keeps their runs apart. Each guide folder's README gives the exact flags
 per lane; [cli.md](cli.md#commands) lists every identity key.
 
-A guide profile runs its `selection` by default: the router path, the overlay's parsers and
-window, and what the guide changes. `--all` runs every case, including engine and model
+A guide profile runs its `test_sets.default` by default: the router path, the overlay's parsers and
+window, and what the guide changes. `--full-suite` runs every case, including engine and model
 conformance. One lane per configuration needs it; the table in
 [profiles/llm-d/README.md](../profiles/llm-d/README.md#which-lane-runs-everything) names it.
 [test-suites.md](test-suites.md) lists every suite, what it checks, and how to run one on its own
@@ -108,8 +125,8 @@ With only a gateway URL and a key, start from
 P=profiles/<system>/<model>.local.yaml
 export LLMDV_GATEWAY_KEY='<gateway key>'
 llmdv profile validate $P
-llmdv verify --profile $P -m contract
-llmdv verify --profile $P --analyze       # the full run, with a dashboard
+llmdv verify --profile $P --full-suite -m contract
+llmdv verify --profile $P --analyze       # the default test set, with a dashboard
 ```
 
 A profile can also declare the local setup its layers need, as
@@ -182,12 +199,12 @@ prints `outcome.json`, however verify ended. That suits a Kubernetes CronJob or 
 [`Containerfile`](../Containerfile) builds a runner image.
 
 ```sh
-llmdv job --profile /etc/llmdv/profile.yaml --remote-output "s3://$AWS_BUCKET/<prefix>" -- -m contract
+llmdv job --profile /etc/llmdv/profile.yaml --remote-output "s3://$AWS_BUCKET/<prefix>" --full-suite -- -m contract
 ```
 
 - **Settings** come from flags or the environment: `LLMDV_PROFILE`, `LLMDV_RESULTS_URI`,
   `LLMDV_NOTIFY_WEBHOOK`, and the rest in `llmdv job --help`.
-- **Flags the job does not know** go to `llmdv verify`, such as `--all` or `--evidence all`.
+- **Flags the job does not know** go to `llmdv verify`, such as `--full-suite` or `--evidence all`.
   Arguments after `--` reach pytest unparsed, such as `-- -m contract`. `--analyze` and
   `--compare` are the job's own: a dashboard in the run, and a comparison after publishing.
 - **If publishing fails** and a fallback is configured (`--fallback-output` or
@@ -206,7 +223,7 @@ or prefix from your other runs.
 - **Never pass `-n`.** Live runs are always one case at a time; `llmdv verify` refuses it.
 - **Keep one-off runs apart from scheduled ones.** Publish them under a different prefix or label,
   so a one-off never becomes one side of the next comparison.
-- **Start with `-m contract`.** It proves the gateway, the key and the bucket work, in a minute,
+- **Start with `--full-suite -m contract`.** It proves the gateway, the key and the bucket work, in a minute,
   before you spend an hour on the full run.
 - **Keep the machine awake.** A sleeping laptop stalls requests, and the cases in flight fail on
   the stream-idle timeout.

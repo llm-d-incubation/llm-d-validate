@@ -2950,6 +2950,7 @@ def profile_yaml(
     )
     return f"""
 schema: llmdv.profile/1
+test_sets: {{default: ["*"]}}
 name: fake
 vantage: external{policy}
 model:
