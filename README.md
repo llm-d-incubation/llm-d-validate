@@ -55,7 +55,7 @@ night) includes a ready-to-use
 written against llm-d `9ca8ff0` and not yet run against a real engine.
 After deploying a guide, use its profile to verify that your deployment behaves as specified by
 the guide and its APIs. By default, the profiles target the guide's router (the EPP), so give
-`llmdv` the EPP's URL. No key is needed.
+`llmdv` the EPP's URL.
 
 ```sh
 ./install.sh && source .venv/bin/activate
@@ -68,7 +68,7 @@ Pick the profile and `--identity` flags that match your configuration from the g
 
 To include a gateway (Istio, agentgateway, LiteLLM) or engine in your tests, add it as another
 ingress, and `llmdv` tests each layer on its own. See
-[test through your gateway](https://github.com/llm-d-incubation/llm-d-validate/blob/main/profiles/README.md#test-through-your-gateway).
+[include a gateway or engine](https://github.com/llm-d-incubation/llm-d-validate/blob/main/profiles/README.md#include-a-gateway-or-engine).
 
 ## Test your own stack
 
@@ -89,7 +89,7 @@ examples, `extends` and what to declare.
 
 ## What it tests
 
-Nineteen suites and growing, from every API surface to failure paths and fleet invariants. Run any
+19 suites and growing, from every API surface to failure paths and fleet invariants. Run any
 one on its own with `-m <marker>`; [test suites](https://github.com/llm-d-incubation/llm-d-validate/blob/main/docs/test-suites.md) describes each one and
 what turns it on.
 

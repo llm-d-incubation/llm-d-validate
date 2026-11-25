@@ -5,8 +5,9 @@ relevant test cases and verify that each layer of the stack meets those expectat
 
 Every [llm-d guide](#llm-d-guide-validation-profiles) at [Tier 3](https://github.com/llm-d/llm-d/blob/main/guides/GUIDES-POLICY.md#5-production-readiness-tiers)
 (Validated: run end to end every night) includes a ready-to-use profile. After deploying a guide,
-use its profile to verify that your deployment behaves as specified by the guide and its APIs. By default, these profiles target the guide's router. To include a gateway or
-engine in your tests, simply [add it as another ingress](#test-through-your-gateway).
+use its profile to verify that your deployment behaves as specified by the guide and its APIs.
+By default, these profiles target the guide's router. To include a gateway or engine in your
+tests, simply [add it as another ingress](#include-a-gateway-or-engine).
 
 For other model-serving stacks, `llmdv` also provides [example profiles](#your-own-stack) as a
 starting point, whether or not your deployment uses llm-d.
@@ -58,25 +59,31 @@ why. [llm-d/README.md](llm-d/README.md) explains how to pick one, and has the
 against llm-d `9ca8ff0` and none has been run against a real engine yet: each says
 `WRITTEN, NOT RUN`, and its first run is its measurement.
 
-### Test through your gateway
+### Include a gateway or engine
 
-If your guide already sits behind a gateway (Istio, agentgateway, LiteLLM or your own), `llmdv` can
-test through it too. Nothing in your stack changes: name the gateway's URL in a short local file
-that extends the guide's profile:
+The ready profiles test the guide's router. If your stack also exposes a gateway in front of it
+(Istio, agentgateway, LiteLLM or your own) or the engine behind it, add each as another ingress in
+a short local file that extends the guide's profile. Nothing in your stack changes:
 
 ```yaml
 # profiles/my-guide.local.yaml (gitignored)
 extends: llm-d/optimized-baseline/vllm-qwen3-32b-parsers-standalone.yaml
 name: my-optimized-baseline
 ingresses:
-  - id: gateway
+  - id: gateway                                     # in front of the router
     kind: gateway
     base_url_env: MY_GATEWAY_URL
     auth: {type: bearer, key_env: MY_GATEWAY_KEY}   # or {type: none}
     surfaces: [chat_completions, completions]       # the APIs your gateway routes
+  - id: engine                                      # behind the router
+    kind: engine
+    base_url_env: MY_ENGINE_URL
+    auth: {type: none}
+    surfaces: [chat_completions, completions, messages, responses]
 ```
 
-`llmdv` then tests the gateway and the router separately, so a failure shows which one caused it.
+Keep only the ones you can reach. `llmdv` then tests each layer separately, so a failure shows
+which one caused it.
 
 ## Your own stack
 

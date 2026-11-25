@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1440 646" width="1440" height="646" role="img" aria-labelledby="t d">
 <title id="t">What llmdv tests</title>
-<desc id="d">Nineteen test suites and growing, in four groups, each with the pytest marker that runs it: API surfaces, model behaviour, failure and resilience, contract and change. Every case runs per layer: gateway, router, engine.</desc>
+<desc id="d">19 test suites and growing, in four groups, each with the pytest marker that runs it: API surfaces, model behaviour, failure and resilience, contract and change. Every case runs per layer: gateway, router, engine.</desc>
 <rect width="1440" height="646" rx="18" fill="#181430"/>
 <text x="60" y="78" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="34" font-weight="700" fill="#f3f0ff">What <tspan font-family="SFMono-Regular, Menlo, Consolas, 'Liberation Mono', monospace">llmdv</tspan> tests</text>
 <text x="60" y="114" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="19" fill="#a9a1d5">19 suites and growing, run against every layer you can reach. Run any one with <tspan font-family="SFMono-Regular, Menlo, Consolas, 'Liberation Mono', monospace" fill="#d6cff5">-m &lt;marker&gt;</tspan>.</text>
