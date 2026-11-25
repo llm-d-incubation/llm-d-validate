@@ -20,7 +20,7 @@ from typing import Any
 import httpx
 
 from ..log.setup import get_logger
-from . import redact, sse
+from . import auth_replay, redact, sse
 
 log = get_logger("http")
 
@@ -67,6 +67,7 @@ class Exchange:
     # observed the missing response.
     connection_failed: bool = field(default=False, repr=False)
     failed_at: float = field(default=0.0, repr=False, compare=False)
+    request_auth: list[dict] = field(default_factory=list)
 
     @property
     def ok(self) -> bool:
@@ -86,6 +87,7 @@ class Exchange:
             "method": self.method,
             "url": self.url,
             "request_headers": self.request_headers,
+            "request_auth": self.request_auth,
             "request_body": self.request_body,
             "status": self.status,
             "response_headers": self.response_headers,
@@ -188,6 +190,7 @@ class RecordingClient:
             method=method.upper(),
             url=url,
             request_headers=redact.redact_headers(sent),
+            request_auth=auth_replay.capture(sent, self.default_headers),
             request_body=json_body if raw_body is None else _preview(raw_body),
         )
         if record_body is not None:
@@ -270,6 +273,7 @@ class RecordingClient:
             method="POST",
             url=url,
             request_headers=redact.redact_headers(sent),
+            request_auth=auth_replay.capture(sent, self.default_headers),
             request_body=json_body,
         )
         transcript = sse.Transcript()
@@ -406,8 +410,9 @@ class SdkRecorder:
     Hooks accept any httpx-compatible request and response, including httpx2 objects.
     """
 
-    def __init__(self, client: Any) -> None:
+    def __init__(self, client: Any, *, auth_headers: dict[str, str] | None = None) -> None:
         self.exchanges: list[Exchange] = []
+        self.auth_headers = dict(auth_headers or {})
         # `response.elapsed` is not populated inside a response hook, so timing is taken from a
         # request hook instead. Recording 0.000s would be worse than recording nothing: it reads
         # as an instant round trip in evidence someone is relying on.
@@ -433,6 +438,7 @@ class SdkRecorder:
             method=request.method,
             url=str(request.url),
             request_headers=redact.redact_headers(dict(request.headers)),
+            request_auth=auth_replay.capture(request.headers, self.auth_headers),
             request_body=_decode(getattr(request, "content", b"")),
             status=response.status_code,
             response_headers=redact.redact_headers(dict(response.headers)),

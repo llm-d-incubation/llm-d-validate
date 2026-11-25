@@ -67,6 +67,7 @@ def make_run(tmp_path, *, finished=True, publication=None, reason="AssertionErro
         "surface": "chat_completions", "seq": 0, "method": "POST",
         "url": "https://gateway.example/v1/chat/completions",
         "request_headers": {"Authorization": "***REDACTED***", "Content-Type": "application/json"},
+        "request_auth": [{"header": "authorization", "kind": "profile_bearer"}],
         "request_body": {"model": "m", "messages": []}, "status": 500,
         "response_headers": {"x-litellm-version": "1.97.0"}, "response_body": {"error": "x"},
         "elapsed_s": 0.2, "transport_error": None,

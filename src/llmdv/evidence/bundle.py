@@ -176,6 +176,7 @@ def write(run_dir: Path, context: FailureContext) -> str:
                 "method": primary.method,
                 "url": primary.url,
                 "headers": primary.request_headers,
+                "auth": primary.request_auth,
                 "body": primary.request_body,
             },
         )

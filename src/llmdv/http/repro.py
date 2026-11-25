@@ -12,7 +12,7 @@ import re
 import shlex
 
 from ..profile.schema import Auth, AuthType
-from . import redact
+from . import auth_replay
 from .client import Exchange
 
 SKIP_HEADERS = frozenset({"host", "content-length", "connection", "accept-encoding", "user-agent"})
@@ -29,7 +29,19 @@ def to_curl(
         "",
     ]
 
-    if auth and auth.type is not AuthType.NONE and auth.key_env:
+    key_env = auth.key_env if auth and auth.type is not AuthType.NONE else None
+    headers = {
+        name: value
+        for name, value in (exchange.request_headers or {}).items()
+        if name.lower() not in SKIP_HEADERS
+    }
+    header_args, needs_key, unavailable = auth_replay.header_arguments(
+        headers, exchange.request_auth, key_env
+    )
+    if unavailable:
+        return "\n".join(lines) + auth_replay.unavailable_script() + "\n"
+
+    if needs_key:
         lines += [
             "# This ingress authenticates. Export the same variable the profile names:",
             f': "${{{auth.key_env}:?set {auth.key_env} before running this script}}"',
@@ -43,18 +55,8 @@ def to_curl(
 
     args = ["curl", "-sS", "-i", "-X", exchange.method, exchange.url]
 
-    for name, value in (exchange.request_headers or {}).items():
-        if name.lower() in SKIP_HEADERS:
-            continue
-        if value == redact.SENTINEL and auth and auth.key_env:
-            # Rebuild the real header from the environment rather than printing a sentinel
-            # that would be sent literally.
-            if name.lower() == "authorization":
-                args += ["-H", f"Authorization: Bearer ${{{auth.key_env}}}"]
-            else:
-                args += ["-H", f"{name}: ${{{auth.key_env}}}"]
-            continue
-        args += ["-H", f"{name}: {value}"]
+    for header in header_args:
+        args += ["-H", header]
 
     if exchange.request_body is not None:
         body = (
