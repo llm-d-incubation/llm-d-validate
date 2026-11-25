@@ -1,7 +1,14 @@
 # Profiles
 
 A profile tells `llmdv` what your stack is and how a correct one behaves. `llmdv` reads it, picks the
-cases that apply, and tests every layer you defined against it. Find your starting point:
+cases that apply, and tests every layer you defined against it.
+
+`llmdv` tests each [llm-d guide](#testing-llm-d-guides) with ready profiles. Once you have
+deployed a guide, point `llmdv` at its ingresses, and it checks that each one behaves as the guide
+and the APIs define. The ready profiles name the guide's router, as the guides deploy it by
+default. To test a gateway or an engine as well, [add it as one more ingress](#test-through-your-gateway).
+
+Find your starting point:
 
 | You have | Start here |
 | --- | --- |
@@ -9,11 +16,6 @@ cases that apply, and tests every layer you defined against it. Find your starti
 | any other OpenAI- or Anthropic-compatible stack | [Your own stack](#your-own-stack): write a profile |
 
 ## Testing llm-d guides
-
-`llmdv` tests each llm-d guide below with ready profiles. Once you have deployed a guide, point
-`llmdv` at its ingresses, and it checks that each one behaves as the guide and the APIs define.
-The ready profiles name the guide's router, as the guides deploy it by default. To test a gateway
-or an engine as well, [add it as one more ingress](#test-through-your-gateway).
 
 Every guide gets the same base tests: each API a client uses, the errors the router must return,
 the overlay's reasoning and tool parsers, and its context window. On top of those, each guide is
