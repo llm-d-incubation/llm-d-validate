@@ -23,7 +23,7 @@ llmdv verify --profile profiles/llm-d/optimized-baseline/vllm-qwen3-32b-parsers-
 ```
 
 The EPP needs no key. To include a gateway or engine in your tests, add it as another ingress in a
-local file that extends the combination: [test through your gateway](../README.md#test-through-your-gateway).
+local file that extends the combination: [include a gateway or engine](../README.md#include-a-gateway-or-engine).
 
 A combination is `<engine>-<model-config>[-<variant>]-<topology>.yaml`, with a variant only where
 lanes of one configuration differ to a client (keda-epp's `queue` and `inflight`); files in a `parts/` folder never run

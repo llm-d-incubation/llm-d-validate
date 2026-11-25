@@ -60,7 +60,7 @@ llmdv verify --profile $P --identity accelerator=gpu --identity provider=gke
 To include a gateway or engine in your tests, add it as another ingress in a short local file
 that extends the combination; `llmdv` then tests each layer and says which one a failure came
 from. See
-[test through your gateway](../profiles/README.md#test-through-your-gateway).
+[include a gateway or engine](../profiles/README.md#include-a-gateway-or-engine).
 
 Pass the lane's accelerator and provider with `--identity`: one combination covers several
 overlays, and identity keeps their runs apart. Each guide folder's README gives the exact flags
