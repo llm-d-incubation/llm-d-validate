@@ -107,11 +107,30 @@ def redact_value(value: Any) -> Any:
     would let the bearer pattern swallow a closing quote and corrupt the file, and a body is
     only redacted at all if something walks into it: a gateway that echoes the key back in a
     JSON error body would otherwise land in exchanges.jsonl, response.json and the results.
+
+    Property names are strings too. If several names redact to the same string, retain every
+    value under numbered names instead of silently overwriting evidence. Reserve all redacted
+    names first so a generated suffix cannot displace an actual property. The resulting names
+    are stable when evidence passes through this redactor again.
     """
     if isinstance(value, str):
         return scrub(value)
     if isinstance(value, dict):
-        return {key: redact_value(item) for key, item in value.items()}
+        entries = [
+            (scrub(key) if isinstance(key, str) else key, item) for key, item in value.items()
+        ]
+        reserved = {key for key, _ in entries}
+        out = {}
+        for key, item in entries:
+            name = key
+            index = 2
+            if name in out:
+                name = f"{key} [{index}]"
+                while name in reserved or name in out:
+                    index += 1
+                    name = f"{key} [{index}]"
+            out[name] = redact_value(item)
+        return out
     if isinstance(value, (list, tuple)):
         return [redact_value(item) for item in value]
     return value

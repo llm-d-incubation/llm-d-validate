@@ -51,6 +51,7 @@ class EchoingGateway:
                             "message": f"Authentication Error, invalid key {token}",
                             "type": "auth_error",
                             "api_key": token,
+                            token: "credential echoed as a property name",
                         }
                     },
                 )
