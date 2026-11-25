@@ -1,6 +1,6 @@
 # pd-disaggregation
 
-Profiles for llm-d's [pd-disaggregation](https://github.com/llm-d/llm-d/tree/main/guides/pd-disaggregation) guide, at llm-d 9ca8ff0. Every lane deploys the guide in standalone mode, so every profile has one ingress, the router (`<GUIDE_NAME>-epp`, port 80). The EPP schedules each request onto a prefill pod and a decode pod; the decode pod's routing sidecar runs the prefill, then the decode, and returns one response. In every lane, prefill and decode carry the same model id, window and parser flags, so a client sees one model.
+Profiles for llm-d's [pd-disaggregation](https://github.com/llm-d/llm-d/tree/main/guides/pd-disaggregation) guide. Every lane deploys the guide in standalone mode, so every profile has one ingress, the router (`<GUIDE_NAME>-epp`, port 80). The EPP schedules each request onto a prefill pod and a decode pod; the decode pod's routing sidecar runs the prefill, then the decode, and returns one response. In every lane, prefill and decode carry the same model id, window and parser flags, so a client sees one model.
 
 Each combination's header names its lanes and overlays; `parts/common.yaml` maps the guide's claims to cases or to what is not covered.
 
@@ -84,7 +84,7 @@ llmdv plan --profile $P --json           # the same, as JSON
 
 ## Upstream notes
 
-Facts found while writing these profiles, at llm-d 9ca8ff0, for llm-d to decide on:
+Facts found while writing these profiles, for llm-d to decide on:
 
 - `ibm-acc-gpu-vllm-x` deploys `gpu/vllm/ocp`, but `ocp` is not among the gpu `providers` in `guides/pd-disaggregation/guide.yaml`, nor among the `INFRA_PROVIDER` values there.
 - `amd-ci-acc-rocm-vllm-moriio` deploys `amd/vllm/moriio/amd-ci-1p1d-tp8`, which serves `Qwen/Qwen3-32B` with no reasoning or tool parser, while guide.yaml's `amd` cell advertises `openai/gpt-oss-120b` (only the `MODEL` comment mentions the MoRI-IO model). The NIXL lane on the same accelerator serves gpt-oss-120b with both parsers, so the two AMD lanes present different models and API shapes under one validated cell.

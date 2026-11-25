@@ -1,6 +1,6 @@
 # agentic-api
 
-Profiles for llm-d's [agentic-api guide](https://github.com/llm-d/llm-d/tree/main/guides/agentic-api) at llm-d `9ca8ff0`. The guide puts vLLM Agentic API (`vllm/agentic-api:v0.9.0`, Service `agentic-api` on port 9000), backed by PostgreSQL, in front of an llm-d router and optimized-baseline's vLLM model server.
+Profiles for llm-d's [agentic-api guide](https://github.com/llm-d/llm-d/tree/main/guides/agentic-api). The guide puts vLLM Agentic API (`vllm/agentic-api:v0.9.0`, Service `agentic-api` on port 9000), backed by PostgreSQL, in front of an llm-d router and optimized-baseline's vLLM model server.
 
 **These profiles cover only the router.** They test the guide's llm-d router (EPP), in standalone mode, through `../parts/topology/standalone.yaml`. The helm release is `agentic-api`, so the Service is `<GUIDE_NAME>-epp` on port 80 (the lane's `gateway_host`). Its router config is optimized-baseline's, unchanged, so the router behaves as optimized-baseline's does.
 

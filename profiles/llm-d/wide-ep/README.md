@@ -1,6 +1,6 @@
 # wide-ep profiles
 
-Profiles for llm-d's `wide-ep` guide (wide expert parallelism with P/D disaggregation), written from llm-d 9ca8ff0. How the parts and combinations fit together, and the provenance tags, are in the [profile skill](../../../.agents/skills/writing-an-infra-profile/SKILL.md#how-profilesllm-d-is-built).
+Profiles for llm-d's `wide-ep` guide (wide expert parallelism with P/D disaggregation). How the parts and combinations fit together, and the provenance tags, are in the [profile skill](../../../.agents/skills/writing-an-infra-profile/SKILL.md#how-profilesllm-d-is-built).
 
 ## Lanes and profiles
 
@@ -85,7 +85,7 @@ llmdv plan --profile $P --json           # the same, as JSON
 
 ## Upstream notes
 
-Facts at llm-d 9ca8ff0 that do not agree with each other:
+Facts in llm-d that do not agree with each other:
 
 - `ibm-acc-gpu-vllm-x` deploys `INFRA_PROVIDER=ocp` (`guides/wide-ep/modelserver/gpu/vllm/ocp/`), but `guides/wide-ep/guide.yaml` lists only `base`, `gke` and `coreweave` as gpu providers, and its `INFRA_PROVIDER` values omit `ocp`.
 - `intel-acc-xpu-vllm-x` deploys `xpu/vllm/xpu-ci`, which serves `deepseek-ai/DeepSeek-V2-Lite-Chat` (TP2 with expert parallelism within each pod, no data parallelism; its kustomization says CI has no RDMA network), while `guide.yaml` and the README's support table advertise `Qwen/Qwen3-235B-A22B` on 16 XPUs with DP2/EP across pods and list only `base` as an xpu provider. `xpu-ci` is in `INFRA_PROVIDER`'s values but not in the xpu provider list. The xpu-ci LeaderWorkerSet keeps the name `wide-ep-xpu-qwen3-235b`.
