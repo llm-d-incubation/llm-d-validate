@@ -11,9 +11,9 @@ cases that apply, and tests every layer you defined against it. Find your starti
 ## Testing llm-d guides
 
 `llmdv` tests each llm-d guide below with ready profiles. Once you have deployed a guide, point
-`llmdv` at its ingresses: a gateway, the router (the EPP), the engine (vLLM, SGLang), whichever
-you can reach. It tests that each behaves as the guide and the APIs say. The ready profiles name the
-router; any other layer is [one more ingress](#test-through-your-gateway).
+`llmdv` at its ingresses, and it checks that each one behaves as the guide and the APIs define.
+The ready profiles name the guide's router, as the guides deploy it by default. To test a gateway
+or an engine as well, [add it as one more ingress](#test-through-your-gateway).
 
 Every guide gets the same base tests: each API a client uses, the errors the router must return,
 the overlay's reasoning and tool parsers, and its context window. On top of those, each guide is
