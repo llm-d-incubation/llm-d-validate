@@ -15,7 +15,6 @@
 
 <p align="center">
   <a href="https://github.com/llm-d-incubation/llm-d-validate#quick-start-test-a-deployed-llm-d-guide">Quick start</a> ·
-  <a href="https://github.com/llm-d-incubation/llm-d-validate/blob/main/docs/getting-started.md">Getting started</a> ·
   <a href="https://github.com/llm-d-incubation/llm-d-validate/blob/main/profiles/README.md">Profiles</a> ·
   <a href="https://github.com/llm-d-incubation/llm-d-validate/blob/main/docs/cli.md">CLI reference</a> ·
   <a href="https://github.com/llm-d-incubation/llm-d-validate/blob/main/docs/test-suites.md">Test suites</a> ·
@@ -72,7 +71,8 @@ Narrow any run with `-m <suite>` or `-k <case>`;
 [choosing what runs](https://github.com/llm-d-incubation/llm-d-validate/blob/main/docs/cli.md#test-sets-and-coverage)
 explains test sets, suites and the full suite. To test a gateway (Istio, agentgateway, LiteLLM) or
 the engine as well, [add it as another ingress](https://github.com/llm-d-incubation/llm-d-validate/blob/main/profiles/README.md#include-a-gateway-or-engine),
-and `llmdv` tests each layer on its own.
+and `llmdv` tests each layer on its own. [Getting started](https://github.com/llm-d-incubation/llm-d-validate/blob/main/docs/getting-started.md)
+has the details: reading the results, publishing and comparing runs, and running unattended.
 
 ## Test your own stack
 
