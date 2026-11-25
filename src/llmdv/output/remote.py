@@ -18,6 +18,7 @@ from ..log.setup import get_logger
 from . import manifest
 from .base import ObjectSink
 from .paths import contained_path, run_name
+from .source import source_path
 
 # Not "output.*": that would nest under the primary-output logger, printing to stdout.
 log = get_logger("sink.remote")
@@ -156,7 +157,7 @@ class FileSink:
         def put(relpath: str) -> None:
             target = contained_path(root, name, relpath)
             target.parent.mkdir(parents=True, exist_ok=True)
-            shutil.copy2(run_dir / relpath, target)
+            shutil.copy2(source_path(run_dir, relpath), target)
 
         publish_files(run_dir, put)
         log.info("published run to %s", destination)
