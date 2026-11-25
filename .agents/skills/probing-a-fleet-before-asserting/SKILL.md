@@ -12,7 +12,7 @@ The recurring failure here is an assertion that is plausible, reads correctly in
 ## Procedure
 
 1. **Read [`.agents/GROUND-TRUTH.md`](../../GROUND-TRUTH.md) first.** It lists behaviours already measured, so you do not rediscover them, and its "Tooling pitfalls" section covers common probe mistakes (inline JSON, `| head`).
-2. **Reach the layer directly.** For a layer behind a port-forward, `llmdv profile show <profile> --setup` prints the forwards with pods resolved live. For a gateway or a router route, export the profile's `base_url_env` and `auth.key_env` variables instead (`--setup` then prints "no setup required"); the testing-a-model-deployment skill shows the credential mapping.
+2. **Reach the layer directly.** Export the profile's `base_url_env` and `auth.key_env` variables and call that URL; the testing-a-model-deployment skill shows the credential mapping. If the profile declares local setup, `llmdv profile show <profile> --setup` prints it, with pods resolved live (a profile that declares none prints "no setup required").
 
 3. **Send the real request and keep the whole response.** Body in a file, output to a file:
    ```sh

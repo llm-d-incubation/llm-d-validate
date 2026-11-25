@@ -104,7 +104,7 @@ Write a profile for each configuration a nightly lane deploys, as the rendered m
 
 #### How profiles/llm-d is built
 
-**A sum, not a product.** A guide ships one router configuration, several engines, many model configurations and two topologies. One file per combination would repeat every fact in dozens of files, so each fact lives in one part and a combination lists the parts:
+**A sum, not a product.** A guide ships one router configuration, several engines, many model configurations, and one topology today: the standalone router (`parts/topology/standalone.yaml`). A gateway topology is added when a lane runs gateway mode. One file per combination would repeat every fact in dozens of files, so each fact lives in one part and a combination lists the parts:
 
 ```
 profiles/llm-d/
@@ -123,7 +123,7 @@ A combination is `extends: [../parts/base.yaml, ../parts/topology/<t>.yaml, ../p
 
 - **No key is set by two parts,** so the order of the list changes nothing. The exceptions, each on purpose: the simulator's model part overrides five `base.yaml` keys, and the simulator, the precise-prefix-cache-routing GPU, AMD and XPU and the fast-model-actuation combinations override the standalone surfaces, and each says so in a comment. A run's `profile.used.yaml` names the file that set each key.
 - **`tests/test_example_profiles.py` checks every part** through the combinations that list it.
-- **Ingress-keyed facts live in the topology part.** llmdv keys surfaces, error statuses and header dispositions by ingress id, and the ids differ by topology (`epp`, `gateway`). So the SLO headers, which the guides leave without effect, are declared there, not in a guide's `parts/common.yaml`.
+- **Ingress-keyed facts live in the topology part.** llmdv keys surfaces, error statuses and header dispositions by ingress id (`epp` in the standalone topology), so ingress-keyed facts such as the SLO headers, which the guides leave without effect, are declared in the topology part, not in a guide's `parts/common.yaml`.
 - **Model parts are named by the configuration a client sees** (`qwen3-32b-ctx16k-parsers`), never by accelerator; their headers list the overlays that use them.
 
 **Which source owns which fact:**

@@ -31,7 +31,7 @@ Not every model is behind LiteLLM. Look in this order, read-only, and stop at th
    ```
    An empty line means that gateway does not serve it; an error means the gateway is down, not that the model is absent. Ask which gateways (prod, staging, test, a canary) the user can reach.
 2. **The deployment manifests**, if the user can point you to them. The router's Route host and the namespace are set there.
-3. **The cluster**, if the person has access to the one serving it: `kubectl get route -A | grep -i <model>` (or `oc`), or `kubectl -n <namespace> get route`. A model with no Route is reachable only by port-forward (`setup.requires` in a profile; see the `example-two-ingress.yaml` engine ingress).
+3. **The cluster**, if the person has access to the one serving it: `kubectl get route -A | grep -i <model>` (or `oc`), or `kubectl -n <namespace> get route`. If no URL for the router turns up, ask the deployment owner which address to test (step 4); a profile can also declare local setup in `setup.requires` (see the `example-two-ingress.yaml` engine ingress).
 4. **A person.** If none of these finds it, ask the user or the deployment owner: "Where is <model> served, and which URL should I test (a gateway, the router route, or both)?" Do not guess a URL from a naming pattern.
 
 Record where each endpoint came from; a URL found in a manifest is a hypothesis until a request to it answers with the right model.
@@ -74,7 +74,7 @@ Every `.local.yaml` is gitignored and may write `base_url` inline. A committed p
 - `model: {public_id: <the id from the router's /v1/models>}` (the engine's served name, not the gateway's);
 - `error_status` and `unstructured_errors`: start from `examples/example-two-ingress.yaml`'s router ingress, and read [`.agents/GROUND-TRUTH.md`](../../GROUND-TRUTH.md) on the EPP's plain-text errors;
 - `surfaces`: what the router serves (often the render routes too); the contract run checks them;
-- `transport` and `setup`: none needed for a route reached directly; a port-forward needs `setup.requires`.
+- `transport` and `setup`: `setup` only for local setup the profile declares (`setup.requires`); none otherwise.
 
 ## 5. Point the profile at the endpoints
 
