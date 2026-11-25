@@ -65,9 +65,7 @@ llmdv verify --profile profiles/llm-d/optimized-baseline/vllm-qwen3-32b-parsers-
 Each guide's folder holds a profile for every configuration llm-d's nightly lanes cover, and a
 README that maps each lane to its profile and `--identity` flags and says what is not tested, and
 why. [llm-d/README.md](llm-d/README.md) explains how to pick one, and has the
-[lane counts and the guides not covered](llm-d/README.md#coverage). The profiles are written
-against llm-d `9ca8ff0` and none has been run against a real engine yet: each says
-`WRITTEN, NOT RUN`, and its first run is its measurement.
+[lane counts and the guides not covered](llm-d/README.md#coverage).
 
 ### Include a gateway or engine
 

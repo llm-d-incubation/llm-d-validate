@@ -1,6 +1,6 @@
 # wide-ep profiles
 
-Profiles for llm-d's `wide-ep` guide (wide expert parallelism with P/D disaggregation), written from llm-d 9ca8ff0. How the parts and combinations fit together, and the provenance tags, are in the [profile skill](../../../.agents/skills/writing-an-infra-profile/SKILL.md#how-profilesllm-d-is-built). Every profile here is **WRITTEN, NOT RUN**: no lane has run `llmdv` against this guide yet, and the first run of each is its measurement.
+Profiles for llm-d's `wide-ep` guide (wide expert parallelism with P/D disaggregation), written from llm-d 9ca8ff0. How the parts and combinations fit together, and the provenance tags, are in the [profile skill](../../../.agents/skills/writing-an-infra-profile/SKILL.md#how-profilesllm-d-is-built).
 
 ## Lanes and profiles
 

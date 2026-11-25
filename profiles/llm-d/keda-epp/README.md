@@ -1,6 +1,6 @@
 # keda-epp
 
-Profiles for llm-d's [keda-epp guide](https://github.com/llm-d/llm-d/tree/main/guides/workload-autoscaling/keda-epp) (`guides/workload-autoscaling/keda-epp`) at llm-d `9ca8ff0`: optimized-baseline's model server, autoscaled by a KEDA `ScaledObject` on an EPP metric (flow-control queue size and running requests, or in-flight requests). Every profile here is WRITTEN, NOT RUN.
+Profiles for llm-d's [keda-epp guide](https://github.com/llm-d/llm-d/tree/main/guides/workload-autoscaling/keda-epp) (`guides/workload-autoscaling/keda-epp`) at llm-d `9ca8ff0`: optimized-baseline's model server, autoscaled by a KEDA `ScaledObject` on an EPP metric (flow-control queue size and running requests, or in-flight requests).
 
 The profiles test the router (EPP) each lane exposes, in standalone mode, through `../parts/topology/standalone.yaml`. Each lane installs the router under its own helm release, so the Service differs per lane (each lane's `gateway_host`).
 
