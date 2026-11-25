@@ -110,8 +110,12 @@ class S3Sink:
         return self.target.uri
 
     def _key(self, *parts: str) -> str:
-        key = relative_key(*parts)
-        return f"{self.prefix}/{key}" if self.prefix else key
+        # Public helpers historically accept directory-style prefixes and optional empty
+        # components. Normalize boundary slashes only; validation still rejects internal
+        # traversal, repeated separators, backslashes and NULs before any request is sent.
+        components = [part.strip("/") for part in parts if part.strip("/")]
+        key = relative_key(*components) if components else ""
+        return "/".join(part for part in (self.prefix, key) if part)
 
     def _client(self):
         if self._s3 is not None:

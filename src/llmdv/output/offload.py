@@ -6,7 +6,7 @@ import hashlib
 
 from ..http.redact import scrub
 from ..log.setup import get_logger
-from .paths import run_name
+from .paths import relative_key, run_name
 from .remote import Patience, sink_for
 
 log = get_logger("sink.offload")
@@ -49,6 +49,7 @@ class Offloader:
             return {"status": "skipped", "error": f"an earlier upload failed: {self._failure}"}
         try:
             run_name(self.run_name)
+            relative_key(relpath)
             if self._sink is None:
                 self._sink = sink_for(self.uri, patience=OFFLOAD)
             uri = self._sink.put_bytes(data, self.run_name, "offloaded", relpath)
