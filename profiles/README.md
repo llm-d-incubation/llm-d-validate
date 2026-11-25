@@ -18,7 +18,7 @@ Every guide gets the same base tests: each API a client uses, the errors the rou
 the overlay's reasoning and tool parsers, and its context window. On top of those, each guide is
 tested on what makes it different:
 
-| Guide | Tests specific to this guide, and why | Profiles |
+| Guide under test | Tests specific to this guide, and why | Profiles |
 | --- | --- | --- |
 | [agentic-api](llm-d/agentic-api/README.md) | the Responses API in depth (input items, instructions, tool loops, no stored state), because agentic-api calls vLLM's stateless Responses API through the router | 1 |
 | [async-multitenant](llm-d/async-multitenant/README.md) | concurrent and cancelled requests still served, and flow control's queue header, because the router queues and evicts work | 1 |
