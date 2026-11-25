@@ -5,14 +5,14 @@ paths"; this repository says guide). Each states what a correct stack does when 
 deployed as shipped with one model-server overlay, for every configuration a nightly lane deploys
 at llm-d `9ca8ff0`.
 
-They are data on top of llmdv: nothing in `src/` knows about them, and any other stack is
+They are data on top of `llmdv`: nothing in `src/` knows about them, and any other stack is
 described by its own profile ([profiles/README.md](../README.md)). How the folders are built and
 where each value comes from:
 [the profile skill](../../.agents/skills/writing-an-infra-profile/SKILL.md#how-profilesllm-d-is-built).
 
 ## Run one
 
-Deploy the guide with an overlay a combination covers (its header lists them), give llmdv the
+Deploy the guide with an overlay a combination covers (its header lists them), give `llmdv` the
 router's URL, and run:
 
 ```sh
@@ -67,10 +67,10 @@ exposes the same way. None has run against a real engine: each says `WRITTEN, NO
 - **fast-model-actuation-keda** (2 lanes, #130). The pool scales from zero on the router's
   flow-control queue size only (`minReplicaCount: 0`, `cooldownPeriod: 30`; llm-d 9ca8ff0
   `guides/fast-model-actuation/fast-model-actuation-keda/keda/base/kustomization.yaml`), and
-  llmdv's one-at-a-time requests never queue. So the pool can drop to zero mid-run and
+  `llmdv`'s one-at-a-time requests never queue. So the pool can drop to zero mid-run and
   cold-start, holding a request up to the router's `noEndpointRequestTTL` of 300 s
   (`guides/fast-model-actuation/fast-model-actuation-keda/router/fast-model-actuation-keda.values.yaml`).
-  llmdv has no warm-up; tolerating that means raising `stream_idle` and `stream_budget`
+  `llmdv` has no warm-up; tolerating that means raising `stream_idle` and `stream_budget`
   ([parts/topology/standalone.yaml](parts/topology/standalone.yaml)) for every streaming check.
 - **ci-async-kind-e2e** runs on pull requests and by hand, never nightly (llm-d 9ca8ff0
   `.github/workflows/ci-async-kind-e2e.yaml`). Its temporary kind cluster (optimized-baseline's
@@ -175,11 +175,11 @@ errors.
   `reasoning_content` for SGLang (inferred); neither observed on this guide's builds.
 - **Prefix affinity** (`routing.prefix_affinity`, #27): the guide's central claim, that shared-prefix
   requests stay on one pod, needs a case family reading per-pod counters. Kind showed it for sequential requests (ten of
-  ten on one replica), but llmdv cannot check it yet. Nor can the cache suite: no overlay asks the
+  ten on one replica), but `llmdv` cannot check it yet. Nor can the cache suite: no overlay asks the
   engine to report `cached_tokens`, so `cache_reuse` is undeclared.
 - **Gateway mode** (#24): no lane runs it, so no profile has a `kind: gateway` ingress.
 - **Surfaces**: the EPP also routes `/v1/embeddings` and `/inference/v1/generate` (both answered
-  on kind), which llmdv has no surface for.
+  on kind), which `llmdv` has no surface for.
 - **Engine ingresses**: none, because a committed profile names no pod and per-replica URLs are a
   lane's to provide. An engine layer, when added, is `kind: engine`, with SGLang's and Atom's
   error statuses, health paths and metric names declared on it, not implied by the kind.

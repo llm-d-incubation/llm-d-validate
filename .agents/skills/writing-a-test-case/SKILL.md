@@ -1,6 +1,6 @@
 ---
 name: writing-a-test-case
-description: Use when adding or changing a test case or a test suite in llmdv: choosing between surface_generic and surface markers, naming a case_id, gating on a capability or fleet policy, adding a suites/<name> package, proving a case can fail against the fake fleet, or updating the guide selections and docs a case reaches; also when a new case has only ever passed.
+description: Use when adding or changing a test case or a test suite in `llmdv`: choosing between surface_generic and surface markers, naming a case_id, gating on a capability or fleet policy, adding a suites/<name> package, proving a case can fail against the fake fleet, or updating the guide selections and docs a case reaches; also when a new case has only ever passed.
 ---
 
 # Writing a test case
@@ -30,7 +30,7 @@ def test_something(client, surface, model, ingress):
 | asserts one surface's own grammar | `surface("chat_completions")` | on that surface only |
 | does not touch a surface (e.g. `GET /v1/models`) | no `surface` argument | once per ingress |
 
-- The closest marker decides. Both markers on one function, or a feature outside `SURFACE_FEATURES`, fails collection as an llmdv defect. A known feature no drivable surface has yet gives one `skip:not_implemented` row.
+- The closest marker decides. Both markers on one function, or a feature outside `SURFACE_FEATURES`, fails collection as an `llmdv` defect. A known feature no drivable surface has yet gives one `skip:not_implemented` row.
 - Prefer `surface_generic`: a new surface then inherits the case.
 - A generic case builds every request through the surface (`minimal_body`, `stream_body`, `invalid_body`, `structured_output_body`) and never writes a wire field name. A body in one surface's shape is garbled on the others: refused for the wrong reason so it passes, or ignored so it fails and blames the fleet.
 - The llm-d guide profiles run only the cases their `selection:` globs name (`profiles/llm-d/<guide>/parts/common.yaml`). A new case reaches those lanes only if a glob matches it, so add it to the guides whose claims it tests. Renaming or removing a case id a selection names makes that profile exit 2; check with `llmdv plan --profile <combination>` over every combination under `profiles/llm-d/`.

@@ -1,6 +1,6 @@
 # Writing a test case
 
-A case is a pytest function in a module under `src/llmdv/suites/<suite>/`. llmdv runs it against
+A case is a pytest function in a module under `src/llmdv/suites/<suite>/`. `llmdv` runs it against
 every layer a profile declares (gateway, router, engine), so one case tells you which layer broke.
 A case records what it observed, then asserts what the API defines: not what one deployment
 happens to do today.

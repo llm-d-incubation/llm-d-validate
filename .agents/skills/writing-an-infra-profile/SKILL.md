@@ -1,6 +1,6 @@
 ---
 name: writing-an-infra-profile
-description: Use when writing, updating or reviewing an llmdv infra-profile; when choosing error_status, unstructured_errors, header dispositions, efforts, capabilities or change sentinels; when deciding which case families to leave out; when tempted to declare what a probe returned; before naming LiteLLM, an llm-d router or EPP, or vLLM behind an ingress; when one stack needs several profiles (models, engines, an llm-d guide's CI lanes); or when publishing a profile that was written against a private stack.
+description: Use when writing, updating or reviewing an `llmdv` infra-profile; when choosing error_status, unstructured_errors, header dispositions, efforts, capabilities or change sentinels; when deciding which case families to leave out; when tempted to declare what a probe returned; before naming LiteLLM, an llm-d router or EPP, or vLLM behind an ingress; when one stack needs several profiles (models, engines, an llm-d guide's CI lanes); or when publishing a profile that was written against a private stack.
 ---
 
 # Writing an infra-profile
@@ -123,7 +123,7 @@ A combination is `extends: [../parts/base.yaml, ../parts/topology/<t>.yaml, ../p
 
 - **No key is set by two parts,** so the order of the list changes nothing. The exceptions, each on purpose: the simulator's model part overrides five `base.yaml` keys, and the simulator, the precise-prefix-cache-routing GPU, AMD and XPU and the fast-model-actuation combinations override the standalone surfaces, and each says so in a comment. A run's `profile.used.yaml` names the file that set each key.
 - **`tests/test_example_profiles.py` checks every part** through the combinations that list it.
-- **Ingress-keyed facts live in the topology part.** llmdv keys surfaces, error statuses and header dispositions by ingress id (`epp` in the standalone topology), so ingress-keyed facts such as the SLO headers, which the guides leave without effect, are declared in the topology part, not in a guide's `parts/common.yaml`.
+- **Ingress-keyed facts live in the topology part.** `llmdv` keys surfaces, error statuses and header dispositions by ingress id (`epp` in the standalone topology), so ingress-keyed facts such as the SLO headers, which the guides leave without effect, are declared in the topology part, not in a guide's `parts/common.yaml`.
 - **Model parts are named by the configuration a client sees** (`qwen3-32b-ctx16k-parsers`), never by accelerator; their headers list the overlays that use them.
 
 **Which source owns which fact:**
@@ -195,7 +195,7 @@ The full list of what each header, body field and marker reveals is the evidence
 
 ## Rule 3: everything eligible runs
 
-Declare every value llmdv's vocabularies define (in `profile/schema.py`, `profile/transport.py` and `surfaces/base.py` under `src/llmdv/`) for the target surfaces, even one an upstream API does not document. Honour schema constraints (surface names from `SURFACE_PATHS`; disjoint lists such as `chat_reasoning_efforts` and `chat_quiet_efforts`). "Not probed yet" is never a reason to leave something out: the run is the measurement.
+Declare every value `llmdv`'s vocabularies define (in `profile/schema.py`, `profile/transport.py` and `surfaces/base.py` under `src/llmdv/`) for the target surfaces, even one an upstream API does not document. Honour schema constraints (surface names from `SURFACE_PATHS`; disjoint lists such as `chat_reasoning_efforts` and `chat_quiet_efforts`). "Not probed yet" is never a reason to leave something out: the run is the measurement.
 
 Leave a case out only when the thing it needs does not exist here (a 404 route, no cluster or metrics access, no instrument, no second ingress), or it executes model-written code on the operator's machine.
 

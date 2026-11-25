@@ -50,8 +50,8 @@ pinpoints the layer that breaks, and flags what regressed since the last run.
 ## Test an llm-d guide
 
 The llm-d guides have [ready profiles](https://github.com/llm-d-incubation/llm-d-validate/blob/main/profiles/README.md#testing-llm-d-guides)
-for testing it once deployed. They test the guide's router (the EPP) directly: give `llmdv` the EPP's URL and run. No
-key is needed.
+for testing each one once deployed. They test the guide's router (the EPP) directly: give
+`llmdv` the EPP's URL and run. No key is needed.
 
 ```sh
 ./install.sh && source .venv/bin/activate

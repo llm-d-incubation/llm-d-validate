@@ -1,4 +1,4 @@
-# Running llmdv unattended
+# Running `llmdv` unattended
 
 Deploy `llmdv job` to a cluster, give it credentials, start runs on demand, and read what they
 left. Object storage and Slack are optional. Installing, local runs, publishing and pulling runs
@@ -12,7 +12,7 @@ output file is in [docs/cli.md](../docs/cli.md).
 | [`base/`](base/) | the kustomize base, with no cluster detail: `cronjob.yaml` (the one pod spec, scheduled nightly, cloned by `trigger.sh`) and `role-trigger.yaml` (the `llmdv-trigger` Role a caller needs) |
 | [`overlays/example/`](overlays/example/) | a placeholder overlay to copy: `kustomization.yaml` (namespace, image, the `llmdv-settings` and profile ConfigMaps) and `profile.yaml` (`vantage: in-cluster`, reaching the fleet by Service DNS) |
 | [`secrets.env.example`](secrets.env.example) | empty credential fields to fill in outside the repository |
-| [`../Containerfile`](../Containerfile) | the image: llmdv with both publishing backends and pinned Claude Code, running `llmdv job` |
+| [`../Containerfile`](../Containerfile) | the image: `llmdv` with both publishing backends and pinned Claude Code, running `llmdv job` |
 
 Real overlays carry cluster detail: keep them with the fleet's manifests or in a gitignored
 `deploy/overlays/*.local/` directory.
@@ -107,7 +107,7 @@ use the default `LLMDV_S3_AUTH=aws` with `AWS_ENDPOINT_URL`, `AWS_ACCESS_KEY_ID`
 
 A storage Secret holding `api-key` and `service-instance-id` uses IAM through
 [`ibm-cos-sdk`](https://cloud.ibm.com/docs/cloud-object-storage?topic=cloud-object-storage-python)
-(the `ibm-cos` extra, in the image), which exchanges the key for a token and refreshes it. llmdv
+(the `ibm-cos` extra, in the image), which exchanges the key for a token and refreshes it. `llmdv`
 registers the key and tokens for redaction. In `llmdv-settings`:
 
 ```yaml

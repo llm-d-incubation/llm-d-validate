@@ -21,8 +21,8 @@ llmdv verify --profile profiles/llm-d/async-multitenant/vllm-qwen3-32b-parsers-s
 
 ## Not covered
 
-- **Eviction, holdback, priority and fairness under saturation** (`requires_load`, #23). The lanes' validator runs an inference-perf experiment with realtime and async traffic at 20/80/90/100 % of the router's capacity; llmdv has no load mode. The objective and fairness headers are declared `consumed` in the topology part and skip as `requires_load`.
-- **The coordinator** (`llm-d-coordinator`, port 8080): `x-llm-d-async-mode` (`passthrough`, `wait`, `enqueue`) and `x-llm-d-tenant`. Covering it needs a coordinator ingress in front of the router (gateway position, `fronts: [epp]`, #24), measured surfaces and error statuses, and, for `enqueue`, a submit-and-poll surface llmdv does not have.
+- **Eviction, holdback, priority and fairness under saturation** (`requires_load`, #23). The lanes' validator runs an inference-perf experiment with realtime and async traffic at 20/80/90/100 % of the router's capacity; `llmdv` has no load mode. The objective and fairness headers are declared `consumed` in the topology part and skip as `requires_load`.
+- **The coordinator** (`llm-d-coordinator`, port 8080): `x-llm-d-async-mode` (`passthrough`, `wait`, `enqueue`) and `x-llm-d-tenant`. Covering it needs a coordinator ingress in front of the router (gateway position, `fronts: [epp]`, #24), measured surfaces and error statuses, and, for `enqueue`, a submit-and-poll surface `llmdv` does not have.
 - **llm-d-async and Redis**: queues, quota gates, tier priority and objective stamping are not HTTP surfaces.
 
 `parts/common.yaml` maps each of the guide's claims.

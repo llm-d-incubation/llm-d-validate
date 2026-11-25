@@ -1,6 +1,6 @@
 # Profiles
 
-A profile tells llmdv what your stack is and how a correct one behaves. llmdv reads it, picks the
+A profile tells `llmdv` what your stack is and how a correct one behaves. `llmdv` reads it, picks the
 cases that apply, and tests every layer against it. Find your starting point:
 
 | You have | Start here |
@@ -10,29 +10,30 @@ cases that apply, and tests every layer against it. Find your starting point:
 
 ## Testing llm-d guides
 
-llmdv tests each llm-d guide below with ready profiles. Once you have deployed a guide, point
-llmdv at its router (the EPP), and it tests that your deployment behaves as the guide and the
-APIs say.
+`llmdv` tests each llm-d guide below with ready profiles. Once you have deployed a guide, point
+`llmdv` at its ingresses: a gateway, the router (the EPP), the engine (vLLM, SGLang), whichever
+you can reach. It tests that each behaves as the guide and the APIs say. The ready profiles name the
+router; any other layer is [one more ingress](#test-through-your-gateway).
 
 Every guide gets the same base tests: each API a client uses, the errors the router must return,
 the overlay's reasoning and tool parsers, and its context window. On top of those, each guide is
 tested on what makes it different:
 
-| Guide under test | Tests specific to this guide, and why | Profiles |
+| Guide under test | What `llmdv` tests, and why | Profiles |
 | --- | --- | --- |
-| [agentic-api](llm-d/agentic-api/README.md) | the Responses API in depth (input items, instructions, tool loops, no stored state), because agentic-api calls vLLM's stateless Responses API through the router | 1 |
-| [async-multitenant](llm-d/async-multitenant/README.md) | concurrent and cancelled requests still served, and flow control's queue header, because the router queues and evicts work | 1 |
-| [fast-model-actuation](llm-d/fast-model-actuation/README.md) | HTTP edge cases (chunked bodies, long headers, encodings, `Expect`) and streaming, because a TCP proxy sits between the router and vLLM | 1 |
-| [flow-control](llm-d/flow-control/README.md) | flow control's queue header on every request, and a cancelled request freeing its slot, because requests queue in the router | 2 |
-| [keda-epp](llm-d/keda-epp/README.md) | concurrent and cancelled requests still served, because replicas change during a run; flow control's queue header on the two combinations whose router runs it | 3 |
-| [multimodal-serving](llm-d/multimodal-serving/README.md) | images on Chat, Messages and Responses, and bad images refused, because the guide serves a vision model, through an encode step on one lane | 1 |
-| [optimized-baseline](llm-d/optimized-baseline/README.md) | completions sharing a prefix, and streaming through the router: the guide's own claims | 7, plus a simulator profile |
-| [pd-disaggregation](llm-d/pd-disaggregation/README.md) | streaming, usage frames, `n` choices and error shapes, because every request passes the decode pod's routing sidecar, which splits `n` and rewrites usage frames | 5 |
-| [pod-snapshot](llm-d/pod-snapshot/README.md) | none: snapshot and restore are cluster state, which a client cannot see | 2 |
-| [precise-prefix-cache-routing](llm-d/precise-prefix-cache-routing/README.md) | token counts and rendered prompts that agree with the engine, because the router renders every prompt | 4 |
-| [predicted-latency-routing](llm-d/predicted-latency-routing/README.md) | streaming as well as non-streaming clients, at a 128k window on GPU and AMD | 2 |
-| [tiered-prefix-cache](llm-d/tiered-prefix-cache/README.md) | completions sharing a long prefix, the request the guide's own check sends | 5 |
-| [wide-ep](llm-d/wide-ep/README.md) | what pd-disaggregation tests, plus concurrent requests, because it uses the same sidecar and its check sends requests at once | 3 |
+| [agentic-api](llm-d/agentic-api/README.md) | The Responses API in depth (input items, instructions, tool loops, no stored state), because the agentic-api guide calls vLLM's stateless Responses API through the router | 1 |
+| [async-multitenant](llm-d/async-multitenant/README.md) | Concurrent and cancelled requests still served, and flow control's queue header, because the async-multitenant guide runs the router with flow control, which queues and evicts work | 1 |
+| [fast-model-actuation](llm-d/fast-model-actuation/README.md) | HTTP edge cases (chunked bodies, long headers, encodings, `Expect`) and streaming, because the fast-model-actuation guide puts a TCP proxy between the router and vLLM | 1 |
+| [flow-control](llm-d/flow-control/README.md) | Flow control's queue header on every request, and a cancelled request freeing its slot, because the flow-control guide queues requests in the router | 2 |
+| [keda-epp](llm-d/keda-epp/README.md) | Concurrent and cancelled requests still served, and flow control's queue header on two combinations, because the keda-epp guide autoscales the model server during a run and runs flow control in those two routers | 3 |
+| [multimodal-serving](llm-d/multimodal-serving/README.md) | Images on Chat, Messages and Responses, and bad images refused, because the multimodal-serving guide serves a vision model, with an encode step on one lane | 1 |
+| [optimized-baseline](llm-d/optimized-baseline/README.md) | Completions sharing a prefix, and streaming through the router, because the optimized-baseline guide claims both | 7, plus a simulator profile |
+| [pd-disaggregation](llm-d/pd-disaggregation/README.md) | Streaming, usage frames, `n` choices and error shapes, because the pd-disaggregation guide sends every request through the decode pod's routing sidecar, which splits `n` and rewrites usage frames | 5 |
+| [pod-snapshot](llm-d/pod-snapshot/README.md) | None, because the pod-snapshot guide changes only cluster state (snapshot and restore), which a client cannot see | 2 |
+| [precise-prefix-cache-routing](llm-d/precise-prefix-cache-routing/README.md) | Token counts and rendered prompts that agree with the engine, because the precise-prefix-cache-routing guide has the router render every prompt | 4 |
+| [predicted-latency-routing](llm-d/predicted-latency-routing/README.md) | Streaming and non-streaming clients at a 128k window, because the predicted-latency-routing guide serves both, at that window on GPU and AMD | 2 |
+| [tiered-prefix-cache](llm-d/tiered-prefix-cache/README.md) | Completions sharing a long prefix, because the tiered-prefix-cache guide offloads that prefix's KV-cache blocks, and its own check sends these requests | 5 |
+| [wide-ep](llm-d/wide-ep/README.md) | What pd-disaggregation tests, plus concurrent requests, because the wide-ep guide uses the same routing sidecar and its own check sends requests at once | 3 |
 
 Each guide's folder holds a profile for every configuration llm-d's nightly lanes cover, and a
 README that maps each lane to its profile and `--identity` flags and says what is not tested, and
@@ -42,7 +43,7 @@ yet: each says `WRITTEN, NOT RUN`, and its first run is its measurement.
 
 ## Test your guide
 
-Your guide is already deployed: give llmdv its EPP's URL and verify it with the profile that
+Your guide is already deployed: give `llmdv` its EPP's URL and verify it with the profile that
 matches your deployment. The EPP needs no key:
 
 ```sh
@@ -56,7 +57,7 @@ Each guide's folder names its combinations and their `--identity` flags;
 
 ### Test through your gateway
 
-If your guide already sits behind a gateway (Istio, agentgateway, LiteLLM or your own), llmdv can
+If your guide already sits behind a gateway (Istio, agentgateway, LiteLLM or your own), `llmdv` can
 test through it too. Nothing in your stack changes: name the gateway's URL in a short local file
 that extends the guide's profile:
 
@@ -72,7 +73,7 @@ ingresses:
     surfaces: [chat_completions, completions]       # the APIs your gateway routes
 ```
 
-llmdv then tests the gateway and the router separately, so a failure shows which one caused it.
+`llmdv` then tests the gateway and the router separately, so a failure shows which one caused it.
 
 ## Your own stack
 

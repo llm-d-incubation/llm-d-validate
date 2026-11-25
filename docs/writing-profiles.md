@@ -1,8 +1,8 @@
 # Writing a profile
 
-A profile tells llmdv what your stack is and how a correct one behaves: the model it serves, each
+A profile tells `llmdv` what your stack is and how a correct one behaves: the model it serves, each
 layer you can reach (an *ingress*), the APIs each layer exposes, and what each should answer.
-llmdv reads it, decides which cases apply, and checks the stack against it. This page walks
+`llmdv` reads it, decides which cases apply, and checks the stack against it. This page walks
 through writing one; every field is in [REFERENCE.md](../profiles/REFERENCE.md).
 
 ## The steps
@@ -146,7 +146,7 @@ and surfaces fail in **both** directions:
 - Declared present, actually absent: the surface regressed.
 - Declared absent, actually present: the profile is stale and that surface is going untested.
 
-A declaration llmdv cannot check from outside skips with the missing instrument named, rather
+A declaration `llmdv` cannot check from outside skips with the missing instrument named, rather
 than passing green.
 
 ## Declare intended behaviour

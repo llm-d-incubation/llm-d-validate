@@ -1,6 +1,6 @@
 ---
 name: running-and-comparing-live-runs
-description: Use when starting a live llmdv run against a real gateway (from a PC, unattended with llmdv job, or as a cluster job with trigger.sh), publishing a run or pulling a published run back from the results bucket, or listing or comparing runs with llmdv compare.
+description: Use when starting a live `llmdv` run against a real gateway (from a PC, unattended with `llmdv` job, or as a cluster job with trigger.sh), publishing a run or pulling a published run back from the results bucket, or listing or comparing runs with `llmdv` compare.
 ---
 
 # Running and comparing live runs

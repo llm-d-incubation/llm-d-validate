@@ -33,7 +33,7 @@ llmdv verify --profile profiles/llm-d/pd-disaggregation/<profile> <identity flag
 - **That requests are actually split** (prefill counters grow on prefill pods, `vllm:external_prefix_cache_hits_total` on decode pods, the router's `llm_d_epp_disagg_decision_total`): no response says which pod prefilled it, and a decode sidecar can serve a request on its own. These need per-role pod and EPP metrics read before and after, which need replica sets and cluster reads a committed profile does not carry (#24).
 - **Prefill prefix affinity and decode active-request balancing**: needs `routing.prefix_affinity` against the prefill role and per-pod counter deltas (#27).
 - **Prompt cache reuse** (`cache_reuse`): no lane's engine reports `cached_tokens`; only the community `tpu/v7` overlays pass `--enable-prompt-tokens-details` or `--enable-cache-report`.
-- **Latency, throughput, KV-transfer stalls**: a benchmark or load mode (#23), not llmdv.
+- **Latency, throughput, KV-transfer stalls**: a benchmark or load mode (#23), not `llmdv`.
 - **Configurations no lane runs**: every `community` cell in guide.yaml, and the validated cells' other providers (`gpu` base, `gke/a4x`, `gke/a4xmax`, `aws`, `cks-mooncake`; `amd` `nixl/base`, `nixl/oci`, `nixl/tensorwave`, `moriio/base`, `moriio/amd-ci`; `xpu` `rdma`). Gateway mode: no lane runs it.
 
 ## Upstream notes

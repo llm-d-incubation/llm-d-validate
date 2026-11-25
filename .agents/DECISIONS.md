@@ -71,7 +71,7 @@ after the failure has been triaged; until then the profile states the correct be
 
 ## A skip names what is missing
 
-A declaration llmdv cannot check from the client side skips with the missing instrument named,
+A declaration `llmdv` cannot check from the client side skips with the missing instrument named,
 rather than passing. There are six skip classes (`SkipClass` in `profile/schema.py`), and they
 are never collapsed; [AGENTS.md](../AGENTS.md#conventions-that-are-enforced) says what each means.
 
@@ -90,12 +90,12 @@ prints the command and checks whether it is satisfied.
 what it measures cannot be trusted with a kubeconfig, and the guarantee is only worth having if
 it is structural rather than a convention. Reading pod logs was added because reading a
 container's output changes nothing; the allowlist exists to keep writes unreachable, not to
-keep llmdv from reading. Managing tunnels was left out because a supervised background process
+keep `llmdv` from reading. Managing tunnels was left out because a supervised background process
 is one more thing to leak or die silently.
 
 ## Exit codes separate blame
 
-Each code names who is to blame: the fleet, the usage, the operator's environment, llmdv itself,
+Each code names who is to blame: the fleet, the usage, the operator's environment, `llmdv` itself,
 delivery, or an interruption. `EXITS` in `cli/exit_codes.py` is the one table of codes and
 meanings; [AGENTS.md](../AGENTS.md#conventions-that-are-enforced) summarizes it. Preflight runs
 before collection and checks every selected ingress, the credentials and the output destination.
@@ -115,7 +115,7 @@ The CLI uses the standard library's argparse, with `parse_known_args` (never
 *Why:* Click and Typer write help and errors straight to stdout and stderr, which fights the
 single-logger contract below; adopting them means disabling the parts one would adopt them for.
 `llmdv verify` must pass unknown arguments to pytest, which `parse_known_args` does plainly.
-`REMAINDER` swallows later llmdv flags into pytest's argv, so an llmdv usage error surfaces as a
+`REMAINDER` swallows later `llmdv` flags into pytest's argv, so an `llmdv` usage error surfaces as a
 pytest one. The CLI layer stays deliberately thin (parse, build a config, call a function), so a
 swap would not reach the library.
 

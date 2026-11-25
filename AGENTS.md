@@ -73,7 +73,7 @@ missing instrument, `excluded_by_policy` is a choice not to run on a shared flee
 **Exit codes separate blame** (`EXITS` in `cli/exit_codes.py`). `0` ok, `1` test failures (the
 fleet), `2` usage or invalid profile, `3` the operator's environment (preflight unsatisfied, a
 local port that refuses connections mid-run with no fleet failure, or a results store that cannot
-be used), `4` a llmdv defect, `5` verification passed but results or the notification were not
+be used), `4` a `llmdv` defect, `5` verification passed but results or the notification were not
 delivered, `6` interrupted. Never
 widen `1` to cover an environment problem, and never let `5` mask a verification failure: the
 verification code takes precedence.
@@ -101,7 +101,7 @@ The repo pins `ruff` exactly, in `pyproject.toml` and in `.pre-commit-config.yam
 stay in sync. `ruff check` alone is not the whole gate: formatting is enforced by a
 `ruff-format` pre-commit hook, so a change that lints clean can still be rejected on commit.
 `./install.sh --dev` installs both tools, and `pytest-xdist` for `-n auto`. Parallel is for
-llmdv's own offline tests only: `llmdv verify` and `llmdv job` refuse `-n` and always run live
+`llmdv`'s own offline tests only: `llmdv verify` and `llmdv job` refuse `-n` and always run live
 cases one at a time, so never try to parallelize a run against a fleet.
 
 A live run needs a profile and a URL for each ingress it names. A profile that declares local

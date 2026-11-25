@@ -1,9 +1,9 @@
 ---
 name: extending-llmdv
-description: Use when adding or changing a surface, client, assertion or profile capability in the llmdv functional test library, or when supporting another gateway, router or engine product. For a test case or a test suite, use writing-a-test-case.
+description: Use when adding or changing a surface, client, assertion or profile capability in the `llmdv` functional test library, or when supporting another gateway, router or engine product. For a test case or a test suite, use writing-a-test-case.
 ---
 
-# Extending llmdv
+# Extending `llmdv`
 
 Each addition is one module plus one registry line. [docs/architecture.md](../../../docs/architecture.md) has the layout; this is the procedure and the checks. Paths below are under `src/llmdv/` unless they start with `tests/`.
 

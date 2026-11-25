@@ -52,7 +52,7 @@ curl -sS -N -X POST "$BASE<path>" \
 
 ### With llm-d-validate
 
-**Prerequisite:** Python 3.10 or newer. Install llmdv once. `install.sh` creates `.venv`, installs llmdv into it and checks that the `llmdv` command runs. Rerunning it is safe.
+**Prerequisite:** Python 3.10 or newer. Install `llmdv` once. `install.sh` creates `.venv`, installs `llmdv` into it and checks that the `llmdv` command runs. Rerunning it is safe.
 
 ```sh
 git clone https://github.com/llm-d-incubation/llm-d-validate.git
