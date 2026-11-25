@@ -40,9 +40,10 @@ issue or a chat. If your credentials file sets variables without `export`, load 
 
 ## Test a deployed llm-d guide
 
-Each supported llm-d guide includes ready-to-use validation profiles under
-[`profiles/llm-d/`](../profiles/llm-d/), one per combination of engine, model configuration and
-topology. After deploying a guide with an overlay a combination covers (its header lists them),
+Every llm-d guide at [Tier 3](https://github.com/llm-d/llm-d/blob/main/guides/GUIDES-POLICY.md#5-production-readiness-tiers) (Validated: run end to end every
+night) includes ready-to-use validation profiles under [`profiles/llm-d/`](../profiles/llm-d/),
+one per combination of engine, model configuration and topology. They are written against llm-d
+`9ca8ff0` and not yet run against a real engine. After deploying a guide with an overlay a combination covers (its header lists them),
 use that combination to verify that your deployment behaves as specified by the guide and its
 APIs. By default it targets the guide's router, so give `llmdv` the EPP's URL. The EPP
 authenticates nothing, so no key is needed:

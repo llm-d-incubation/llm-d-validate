@@ -3,9 +3,9 @@
 A profile describes your stack and defines its expected behavior. `llmdv` uses it to select
 relevant test cases and verify that each layer of the stack meets those expectations.
 
-Each [supported llm-d guide](#llm-d-guide-validation-profiles) includes a ready-to-use profile. After
-deploying a guide, use its profile to verify that your deployment behaves as specified by the
-guide and its APIs. By default, these profiles target the guide's router. To include a gateway or
+Every [llm-d guide](#llm-d-guide-validation-profiles) at [Tier 3](https://github.com/llm-d/llm-d/blob/main/guides/GUIDES-POLICY.md#5-production-readiness-tiers)
+(Validated: run end to end every night) includes a ready-to-use profile. After deploying a guide,
+use its profile to verify that your deployment behaves as specified by the guide and its APIs. By default, these profiles target the guide's router. To include a gateway or
 engine in your tests, simply [add it as another ingress](#test-through-your-gateway).
 
 For other model-serving stacks, `llmdv` also provides [example profiles](#your-own-stack) as a
