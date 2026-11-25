@@ -97,7 +97,8 @@ what turns it on.
 
 - [Getting started](https://github.com/llm-d-incubation/llm-d-validate/blob/main/docs/getting-started.md): install, run, read the results, publish,
   compare and run unattended.
-- [Profiles](https://github.com/llm-d-incubation/llm-d-validate/blob/main/profiles/README.md) and the [field reference](https://github.com/llm-d-incubation/llm-d-validate/blob/main/profiles/REFERENCE.md).
+- [Profiles](https://github.com/llm-d-incubation/llm-d-validate/blob/main/profiles/README.md), [writing a profile](https://github.com/llm-d-incubation/llm-d-validate/blob/main/docs/writing-profiles.md) and the
+  [field reference](https://github.com/llm-d-incubation/llm-d-validate/blob/main/profiles/REFERENCE.md).
 - [CLI reference](https://github.com/llm-d-incubation/llm-d-validate/blob/main/docs/cli.md): every command, selecting cases, exit codes and output files.
 - [Test suites](https://github.com/llm-d-incubation/llm-d-validate/blob/main/docs/test-suites.md): what each suite checks, the profile key that turns it on,
   and how to run one.

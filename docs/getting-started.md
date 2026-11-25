@@ -92,7 +92,7 @@ the recorded checks under each case.
 
 Any OpenAI- or Anthropic-compatible gateway, router or engine works, with or without llm-d.
 Copy the closest example from [`profiles/examples/`](../profiles/examples/) to
-`profiles/<system>/<model>.local.yaml` and fill it in; [profiles/README.md](../profiles/README.md)
+`profiles/<system>/<model>.local.yaml` and fill it in; [writing-profiles.md](writing-profiles.md)
 explains the choice and the minimum, and [profiles/REFERENCE.md](../profiles/REFERENCE.md) every
 field. The `*.local.yaml` copy is gitignored, so cluster detail never enters the repository. A
 profile holds no secrets or hostnames, only the names of the variables that carry them.

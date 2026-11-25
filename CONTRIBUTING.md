@@ -144,8 +144,8 @@ and running it. In short:
 ## Adding a profile example
 
 Start from the closest file in [`profiles/examples/`](profiles/examples/) and follow
-[profiles/README.md](profiles/README.md). Declare what a correct stack does, and record what you
-measured in a comment beside the line.
+[docs/writing-profiles.md](docs/writing-profiles.md). Declare what a correct stack does, and
+record what you measured in a comment beside the line.
 
 **Never commit credentials, hostnames, namespaces or other cluster detail.** A committed profile
 names its URL and key by environment variable. Keep machine-specific copies as `*.local.yaml`,
