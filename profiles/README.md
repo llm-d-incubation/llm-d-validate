@@ -1,34 +1,25 @@
 # Profiles
 
-A profile tells `llmdv` what your stack is and how a correct one behaves. `llmdv` picks the cases
-that apply and tests every layer you defined against it.
+A profile tells `llmdv` what your stack is and how a correct one behaves. `llmdv` reads it, picks the
+cases that apply, and tests every layer you defined against it.
+
+`llmdv` tests each [llm-d guide](#testing-llm-d-guides) with ready profiles. Once you have
+deployed a guide, point `llmdv` at its ingresses, and it checks that each one behaves as the guide
+and the APIs define. The ready profiles name the guide's router, as the guides deploy it by
+default. To test a gateway or an engine as well, [add it as one more ingress](#test-through-your-gateway).
+
+Find your starting point:
 
 | You have | Start here |
 | --- | --- |
-| a deployed llm-d guide | [Test your guide](#test-your-guide) |
-| any other OpenAI- or Anthropic-compatible stack | [Your own stack](#your-own-stack) |
+| a deployed llm-d guide | [Test your guide](#test-your-guide): the guide's ready profile, and its EPP's URL |
+| any other OpenAI- or Anthropic-compatible stack | [Your own stack](#your-own-stack): write a profile |
 
-## Test your guide
-
-Every llm-d guide below has ready profiles. They name the guide's router (the EPP), as the guides
-deploy it by default. Give `llmdv` the EPP's URL, which needs no key, and run the profile for your
-configuration:
-
-```sh
-export LLMDV_EPP_URL=<your EPP's URL>
-llmdv verify --profile profiles/llm-d/optimized-baseline/vllm-qwen3-32b-parsers-standalone.yaml \
-  --identity accelerator=gpu --identity provider=gke
-```
-
-Each guide's README maps its nightly lanes to a profile and `--identity` flags, and says what is
-not tested, and why; [llm-d/README.md](llm-d/README.md) explains how to pick one. The profiles are
-written against llm-d `9ca8ff0` and are `WRITTEN, NOT RUN`: each one's first run is its
-measurement.
-
-### What each guide is tested on
+## Testing llm-d guides
 
 Every guide gets the same base tests: each API a client uses, the errors the router must return,
-the overlay's reasoning and tool parsers, and its context window. On top of those:
+the overlay's reasoning and tool parsers, and its context window. On top of those, each guide is
+tested on what makes it different:
 
 | Guide under test | What `llmdv` tests, and why | Profiles |
 | --- | --- | --- |
@@ -46,11 +37,31 @@ the overlay's reasoning and tool parsers, and its context window. On top of thos
 | [tiered-prefix-cache](llm-d/tiered-prefix-cache/README.md) | Completions sharing a long prefix, because the tiered-prefix-cache guide offloads that prefix's KV-cache blocks, and its own check sends these requests | 5 |
 | [wide-ep](llm-d/wide-ep/README.md) | What pd-disaggregation tests, plus concurrent requests, because the wide-ep guide uses the same routing sidecar and its own check sends requests at once | 3 |
 
+Each guide's folder holds a profile for every configuration llm-d's nightly lanes cover, and a
+README that maps each lane to its profile and `--identity` flags and says what is not tested, and
+why. [llm-d/README.md](llm-d/README.md#coverage) has the lane counts and the guides not covered.
+The profiles are written against llm-d `9ca8ff0` and none has been run against a real engine
+yet: each says `WRITTEN, NOT RUN`, and its first run is its measurement.
+
+## Test your guide
+
+Your guide is already deployed: give `llmdv` its EPP's URL and verify it with the profile that
+matches your deployment. The EPP needs no key:
+
+```sh
+export LLMDV_EPP_URL=<your EPP's URL>
+llmdv verify --profile profiles/llm-d/optimized-baseline/vllm-qwen3-32b-parsers-standalone.yaml \
+  --identity accelerator=gpu --identity provider=gke
+```
+
+Each guide's folder names its combinations and their `--identity` flags;
+[llm-d/README.md](llm-d/README.md) explains how to pick one.
+
 ### Test through your gateway
 
-A gateway in front of the router (Istio, agentgateway, LiteLLM or your own), or the engine behind
-it, is one more ingress in a short local file that extends the guide's profile. Nothing in your
-stack changes:
+If your guide already sits behind a gateway (Istio, agentgateway, LiteLLM or your own), `llmdv` can
+test through it too. Nothing in your stack changes: name the gateway's URL in a short local file
+that extends the guide's profile:
 
 ```yaml
 # profiles/my-guide.local.yaml (gitignored)
@@ -64,13 +75,12 @@ ingresses:
     surfaces: [chat_completions, completions]       # the APIs your gateway routes
 ```
 
-`llmdv` then tests each layer separately, so a failure shows which one caused it.
+`llmdv` then tests the gateway and the router separately, so a failure shows which one caused it.
 
 ## Your own stack
 
-Any OpenAI- or Anthropic-compatible gateway, router or engine, with or without llm-d, gets its own
-profile, with one ingress per layer you can reach. Copy the closest example, fill in its
-placeholders, and run it:
+Any OpenAI- or Anthropic-compatible gateway, router or engine, with or without llm-d, gets a
+profile of its own. Copy the closest example, fill in its placeholders, and run it:
 
 ```sh
 mkdir -p profiles/<system>
@@ -79,6 +89,9 @@ llmdv profile validate profiles/<system>/<model>.local.yaml
 llmdv verify --profile profiles/<system>/<model>.local.yaml -m contract
 ```
 
-`*.local.yaml` files are gitignored, so your hosts stay out of the repository.
-[Writing a profile](../docs/writing-profiles.md) walks through every step, and
+Each other layer you can reach, such as a gateway in front of a router, is one more ingress in
+the same file ([step 3](../docs/writing-profiles.md#the-steps)). `*.local.yaml` files are
+gitignored, so your hosts stay out of the repository.
+[Writing a profile](../docs/writing-profiles.md) walks through every step, the
+[examples](../docs/writing-profiles.md#start-from-the-closest-example) and `extends`;
 [REFERENCE.md](REFERENCE.md) lists every field.
