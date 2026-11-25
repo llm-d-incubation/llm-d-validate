@@ -40,6 +40,7 @@ def collect(marker: str) -> subprocess.CompletedProcess:
             "pytest",
             "--llmdv-profile",
             str(PROFILE),
+            "--llmdv-full-suite",
             str(SUITES),
             "-q",
             "--collect-only",
@@ -154,7 +155,15 @@ pytest.main(sys.argv[1:], plugins=[Dump()])
 
 def collected(*args: str) -> list[dict]:
     out = subprocess.run(
-        [sys.executable, "-c", _DUMP_MARKERS, "--llmdv-profile", str(PROFILE), str(SUITES)]
+        [
+            sys.executable,
+            "-c",
+            _DUMP_MARKERS,
+            "--llmdv-profile",
+            str(PROFILE),
+            "--llmdv-full-suite",
+            str(SUITES),
+        ]
         + ["-q", "--collect-only", "-p", "no:cacheprovider", *args],
         capture_output=True,
         text=True,

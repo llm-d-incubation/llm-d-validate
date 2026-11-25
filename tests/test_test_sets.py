@@ -13,9 +13,53 @@ from llmdv.cli.main import build_parser
 from llmdv.profile import inspection, loader, test_sets
 from tests.fakes import FakeFleet, only_run, profile_yaml, run_llmdv
 from tests.test_profile_extends import write
+from tests.test_suites_against_fake import run_pytest
 
 BASIC = "openai_chat.basic_non_streaming"
 STREAM = "openai_chat.streaming_sse"
+
+
+@pytest.mark.parametrize("sets", [None, {"default": ["missing.*"]}])
+@pytest.mark.parametrize("has_survivor", [False, True])
+def test_collection_errors_precede_scope_validation(tmp_path, sets, has_survivor):
+    suite = tmp_path / "suite"
+    suite.mkdir()
+    (suite / "test_broken.py").write_text('raise RuntimeError("injected collection failure")\n')
+    if has_survivor:
+        (suite / "test_survivor.py").write_text(
+            'import pytest\n@pytest.mark.case_id("probe.survivor")\ndef test_survivor(): pass\n'
+        )
+
+    result, records = run_pytest(suite, profile_at(tmp_path, sets), tmp_path / "run")
+
+    assert result.returncode == pytest.ExitCode.INTERRUPTED
+    assert "injected collection failure" in result.stdout
+    assert "matches no case" not in result.stderr
+    assert "No default test set" not in result.stderr
+    assert records == []
+
+
+def test_continuing_after_collection_errors_still_applies_scope(tmp_path):
+    suite = tmp_path / "suite"
+    suite.mkdir()
+    (suite / "test_broken.py").write_text('raise RuntimeError("injected collection failure")\n')
+    (suite / "test_survivor.py").write_text(
+        "import pytest\n"
+        '@pytest.mark.case_id("probe.keep")\ndef test_keep(): pass\n'
+        '@pytest.mark.case_id("probe.omit")\ndef test_omit(): assert False\n'
+    )
+    result, records = run_pytest(
+        suite,
+        profile_at(tmp_path, {"default": ["probe.keep"]}),
+        tmp_path / "run",
+        "--continue-on-collection-errors",
+    )
+
+    assert result.returncode == pytest.ExitCode.TESTS_FAILED
+    assert "injected collection failure" in result.stdout
+    assert [(record["case_id"], record["outcome"]) for record in records] == [
+        ("probe.keep", "pass")
+    ]
 
 
 def profile_at(tmp_path, sets=None):

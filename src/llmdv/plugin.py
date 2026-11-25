@@ -615,13 +615,20 @@ def _check_sample_rules(profile: Profile, items: list[pytest.Item]) -> None:
         raise pytest.UsageError("; ".join(sorted(problems)))
 
 
-def pytest_collection_modifyitems(config: pytest.Config, items: list[pytest.Item]) -> None:
+def pytest_collection_modifyitems(
+    session: pytest.Session, config: pytest.Config, items: list[pytest.Item]
+) -> None:
     """Apply the profile's selection, then --llmdv-client and --llmdv-surface, as intersecting
     filters.
 
     Selectors narrow; they never widen. A case with no surface marker is infrastructure (the
     contract suite, for instance) and is never filtered out by a surface selector.
     """
+    if session.testsfailed and not config.getoption("continue_on_collection_errors"):
+        # Let pytest report the collection failure. Validating a partial inventory can
+        # otherwise replace the defect with a misleading unmatched test-set usage error.
+        # Explicit continuation still applies scope to the surviving cases below.
+        return
     _check_capability_names(items)
     _check_case_prefixes(items)
 

@@ -410,6 +410,7 @@ def fleet_profile(path: Path, *blocks: str, ingress_extra: str = "") -> Path:
             """
             schema: llmdv.profile/1
             name: fleet-fake
+            test_sets: {default: ["*"]}
             model: {public_id: fake/Model-1B}
             ingresses:
               - id: fake
@@ -781,6 +782,7 @@ def header_label_profile(path: Path, ingress_url: str, metrics_url: str) -> Path
             f"""
             schema: llmdv.profile/1
             name: fleet-fake
+            test_sets: {{default: ["*"]}}
             model: {{public_id: fake/Model-1B}}
             ingresses:
               - id: fake
