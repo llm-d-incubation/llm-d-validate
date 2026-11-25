@@ -35,7 +35,7 @@ changes:
 | [precise-prefix-cache-routing](llm-d/precise-prefix-cache-routing/README.md) | token counts and rendered prompts that agree with the engine, because the router renders every prompt | 4 |
 | [predicted-latency-routing](llm-d/predicted-latency-routing/README.md) | streaming as well as non-streaming clients, at a 128k window on GPU and AMD | 2 |
 | [tiered-prefix-cache](llm-d/tiered-prefix-cache/README.md) | completions sharing a long prefix, the request the guide's own check sends | 5 |
-| [wide-ep](llm-d/wide-ep/README.md) | everything pd-disaggregation adds, plus concurrent requests, because it uses the same sidecar and its check sends requests at once | 3 |
+| [wide-ep](llm-d/wide-ep/README.md) | what pd-disaggregation tests, plus concurrent requests, because it uses the same sidecar and its check sends requests at once | 3 |
 
 Each guide's README says what it does not cover, and why; [llm-d/README.md](llm-d/README.md#coverage)
 has the lane counts and the guides not covered.
