@@ -15,7 +15,7 @@ Find your starting point:
 
 | You have | Start here |
 | --- | --- |
-| a deployed llm-d guide | [Test your guide](#test-your-guide): the guide's ready profile, and its EPP's URL |
+| a deployed llm-d guide | [Testing llm-d guides](#testing-llm-d-guides): the guide's ready profile, and its EPP's URL |
 | any other OpenAI- or Anthropic-compatible stack | [Your own stack](#your-own-stack): write a profile |
 
 ## Testing llm-d guides
@@ -40,16 +40,8 @@ tested on what makes it different:
 | [tiered-prefix-cache](llm-d/tiered-prefix-cache/README.md) | Completions sharing a long prefix, because the tiered-prefix-cache guide offloads that prefix's KV-cache blocks, and its own check sends these requests | 5 |
 | [wide-ep](llm-d/wide-ep/README.md) | What pd-disaggregation tests, plus concurrent requests, because the wide-ep guide uses the same routing sidecar and its own check sends requests at once | 3 |
 
-Each guide's folder holds a profile for every configuration llm-d's nightly lanes cover, and a
-README that maps each lane to its profile and `--identity` flags and says what is not tested, and
-why. [llm-d/README.md](llm-d/README.md#coverage) has the lane counts and the guides not covered.
-The profiles are written against llm-d `9ca8ff0` and none has been run against a real engine
-yet: each says `WRITTEN, NOT RUN`, and its first run is its measurement.
-
-## Test your guide
-
-Your guide is already deployed: give `llmdv` its EPP's URL and verify it with the profile that
-matches your deployment. The EPP needs no key:
+To test your guide, give `llmdv` its EPP's URL, which needs no key, and run the profile that
+matches your configuration:
 
 ```sh
 export LLMDV_EPP_URL=<your EPP's URL>
@@ -57,8 +49,12 @@ llmdv verify --profile profiles/llm-d/optimized-baseline/vllm-qwen3-32b-parsers-
   --identity accelerator=gpu --identity provider=gke
 ```
 
-Each guide's folder names its combinations and their `--identity` flags;
-[llm-d/README.md](llm-d/README.md) explains how to pick one.
+Each guide's folder holds a profile for every configuration llm-d's nightly lanes cover, and a
+README that maps each lane to its profile and `--identity` flags and says what is not tested, and
+why. [llm-d/README.md](llm-d/README.md) explains how to pick one, and has the
+[lane counts and the guides not covered](llm-d/README.md#coverage). The profiles are written
+against llm-d `9ca8ff0` and none has been run against a real engine yet: each says
+`WRITTEN, NOT RUN`, and its first run is its measurement.
 
 ### Test through your gateway
 
