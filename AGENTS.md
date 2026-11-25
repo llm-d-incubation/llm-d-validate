@@ -18,6 +18,7 @@ Each lives at `.agents/skills/<name>/SKILL.md`. Load the one that matches before
 | Skill | Use it when |
 |---|---|
 | [writing-an-infra-profile](.agents/skills/writing-an-infra-profile/SKILL.md) | writing, updating or reviewing a profile; choosing any declaration; naming a component behind an ingress; several profiles for one stack or an llm-d guide; publishing a profile written against a private stack |
+| [tracking-llm-d-guide-drift](.agents/skills/tracking-llm-d-guide-drift/SKILL.md) | checking `profiles/llm-d/` against llm-d upstream: a new Tier 3 guide or lane with no profile, a removed lane, or a changed overlay, router value or guide statement; before moving the commit the profiles are built from |
 | [probing-a-fleet-before-asserting](.agents/skills/probing-a-fleet-before-asserting/SKILL.md) | writing or changing an assertion about a live response, or a live case fails |
 | [writing-a-test-case](.agents/skills/writing-a-test-case/SKILL.md) | adding or changing a test case or a test suite: markers, fixtures, proving it can fail, a new suite, the follow-ups |
 | [extending-llmdv](.agents/skills/extending-llmdv/SKILL.md) | adding a surface, client, assertion or capability, or supporting another gateway, router or engine product |
