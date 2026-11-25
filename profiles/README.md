@@ -6,7 +6,7 @@ cases that apply, and tests every layer against it. Find your starting point:
 | You have | Start here |
 | --- | --- |
 | a deployed llm-d guide | [Test your guide](#test-your-guide): ready profiles, give llmdv the EPP's URL |
-| an llm-d guide with a gateway in front | [Add your gateway](#add-your-gateway): one more ingress |
+| an llm-d guide that already sits behind a gateway | [Test through your gateway](#test-through-your-gateway): one more URL |
 | any other OpenAI- or Anthropic-compatible stack | [Your own stack](#your-own-stack): write a profile |
 
 ## Supported llm-d guides
@@ -50,10 +50,11 @@ llmdv verify --profile profiles/llm-d/optimized-baseline/vllm-qwen3-32b-parsers-
 Each guide's folder names its combinations and their `--identity` flags;
 [llm-d/README.md](llm-d/README.md) explains how to pick one.
 
-## Add your gateway
+## Test through your gateway
 
-A gateway in front of the router (Istio, agentgateway, LiteLLM or your own) is one more ingress.
-Extend the guide's combination in a short local file:
+If your guide already sits behind a gateway (Istio, agentgateway, LiteLLM or your own), llmdv can
+test through it too. Nothing in your stack changes: name the gateway's URL in a short local file
+that extends the guide's profile:
 
 ```yaml
 # profiles/my-guide.local.yaml (gitignored)

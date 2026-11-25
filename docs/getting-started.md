@@ -54,9 +54,9 @@ llmdv verify --profile $P -m contract     # about a minute: the profile against 
 llmdv verify --profile $P --identity accelerator=gpu --identity provider=gke
 ```
 
-A gateway in front of the router is one more ingress in a short local file that extends the
-combination; llmdv then tests both layers and says which one a failure came from. See
-[add your gateway](../profiles/README.md#add-your-gateway).
+If a gateway already sits in front of the router, name its URL as one more ingress in a short
+local file that extends the combination; llmdv then tests both layers and says which one a failure came from. See
+[test through your gateway](../profiles/README.md#test-through-your-gateway).
 
 Pass the lane's accelerator and provider with `--identity`: one combination covers several
 overlays, and identity keeps their runs apart. Each guide folder's README gives the exact flags

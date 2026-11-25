@@ -22,8 +22,8 @@ llmdv verify --profile profiles/llm-d/optimized-baseline/vllm-qwen3-32b-parsers-
   --identity accelerator=gpu --identity provider=gke
 ```
 
-The EPP needs no key. A gateway in front of it is one more ingress in a local file that extends
-the combination: [add your gateway](../README.md#add-your-gateway).
+The EPP needs no key. If a gateway already sits in front of it, name its URL as one more ingress in
+a local file that extends the combination: [test through your gateway](../README.md#test-through-your-gateway).
 
 A combination is `<engine>-<model-config>[-<variant>]-<topology>.yaml`, with a variant only where
 lanes of one configuration differ to a client (keda-epp's `queue` and `inflight`); files in a `parts/` folder never run
