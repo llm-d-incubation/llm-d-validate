@@ -36,6 +36,15 @@ Conventions:
 
 ## extends
 
+Inspect composition with `llmdv profile explain <path>`; use
+`--field 'ingresses[gateway].model'` for a block, including defaults. Assignments are displayed
+in precedence order: profile-wide model/capability defaults first, ingress overrides last.
+The effective value includes loader normalization (for example, a nullable declaration may
+become a library default). `llmdv profile show <path> --yaml` exports standalone declarations,
+with no `extends`, preserving environment-variable names and anchoring relative client
+executables. Neither authoring view embeds values read from environment variables; literal
+values in the source remain visible. Original comments are not preserved in the export.
+
 `extends: <path>` makes a profile a set of changes to another one, its parent. The path is relative to the file that names it, as that file was named: a symbolic link is not followed first. `extends` may instead be a non-empty list of paths, to combine independent parts such as an engine, a gateway and a guide. A parent may extend further parents, by a path or a list.
 
 The files form one sequence, resolved depth first: a parent's own parents come before it, list entries left to right, and the file itself comes last. `extends: x.yaml` and `extends: [x.yaml]` mean the same.

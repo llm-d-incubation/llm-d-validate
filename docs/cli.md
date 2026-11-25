@@ -7,7 +7,8 @@ Lookup for every `llmdv` command. For a first run, read [getting-started.md](get
 | Command | Purpose |
 | --- | --- |
 | `profile validate <path>` | offline schema and consistency checks |
-| `profile show <path>` | the resolved profile; `--matrix` the surfaces it implies, `--setup` each ingress's setup commands, pods resolved live (the only profile command that reads a cluster; the commands never include a local kubeconfig path) |
+| `profile show <path>` | the resolved profile; `--yaml` exports standalone declarations with environment-variable names preserved; `--matrix` the surfaces it implies, `--setup` each ingress's setup commands, pods resolved live (the only profile command that reads a cluster; the commands never include a local kubeconfig path) |
+| `profile explain <path> [--field FIELD]` | offline effective values and source assignments; a field or block such as `ingresses[gateway].model` also includes library defaults; environment values are hidden |
 | `plan` | the cases `verify` would run and skip; sends nothing |
 | `verify` (`run`, `execute`) | run the cases against a deployed fleet |
 | `job` | one unattended run: verify, publish (even after a crash), notify |

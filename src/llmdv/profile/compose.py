@@ -159,17 +159,17 @@ def composed(chain: list[Layer]) -> dict[str, Any]:
     return reduce(compose, (layer.raw for layer in chain[1:]), chain[0].raw)
 
 
-def resolved(chain: list[Layer]) -> dict[str, Any]:
+def resolved(chain: list[Layer], *, standalone: bool = False) -> dict[str, Any]:
     """The profile a chain declares: `composed`, with what depends on the files settled.
 
     A name is never inherited: it is the loaded file's own `name`, or else that file's name
     without its suffix, written out so the mapping means the same from any other file. A
     relative client executable is written as the absolute path it resolves to, against the
     folder of the file that declared it. A file that extends nothing is returned as it is: its
-    own path already settles both.
+    own path already settles both. Set standalone to anchor these for export too.
     """
     profile = composed(chain)
-    if len(chain) == 1:
+    if len(chain) == 1 and not standalone:
         return profile
     leaf = chain[-1]
     name = leaf.raw.get("name") or leaf.path.stem
@@ -232,13 +232,15 @@ def _sets(node: Any, parts: list[tuple[str, str, str]]) -> bool:
     return True
 
 
-def render(chain: list[Layer]) -> str:
+def render(chain: list[Layer], *, standalone: bool = False) -> str:
     """The composed profile as YAML, headed by which file set each key.
 
     It loads exactly as the chain does, so a run directory needs no other file to repeat the
     run. Comments in the source files are not carried over.
     """
-    profile = resolved(chain)
+    # Exporting even a single file must preserve its implicit name and relative executables
+    # when the output is saved elsewhere. Keep the source comments tied to the real files.
+    profile = resolved(chain, standalone=standalone)
     leaf = chain[-1].path.parent
 
     def named(layer: Layer) -> str:

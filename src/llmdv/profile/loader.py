@@ -124,11 +124,17 @@ def load(path: str | Path) -> Profile:
 
     Raises ProfileError on unusable input, naming for each problem the file that set the value.
     """
+    return load_with_sources(path)[0]
+
+
+def load_with_sources(path: str | Path) -> tuple[Profile, list[compose.Layer]]:
+    """Load once, retaining the checked declarations for authoring tools."""
     chain = _layers(path)
     try:
         # A file that extends nothing resolves a relative client executable against its folder;
         # a chain's are already absolute.
-        return _build(compose.resolved(chain), chain[-1].path, chain[-1].path.parent)
+        profile = _build(compose.resolved(chain), chain[-1].path, chain[-1].path.parent)
+        return profile, chain
     except ProfileError as exc:
         raise ProfileError(
             *(

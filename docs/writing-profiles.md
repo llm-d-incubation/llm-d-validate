@@ -7,7 +7,7 @@ through writing one; every field is in [REFERENCE.md](../profiles/REFERENCE.md).
 
 ## The steps
 
-1. **Copy the closest example** to a gitignored `profiles/<system>/<model>.local.yaml`
+1. **Copy the minimal starter or closest example** to a gitignored `profiles/<system>/<model>.local.yaml`
    ([start from the closest example](#start-from-the-closest-example)).
 2. **Name the model**: `model.public_id` is the id the ingress advertises on `GET /v1/models`, and
    `model.max_model_len` its context window ([the minimum](#the-minimum)).
@@ -18,7 +18,8 @@ through writing one; every field is in [REFERENCE.md](../profiles/REFERENCE.md).
 5. **Declare what the stack serves**: each ingress's `surfaces`, its `error_status`, and the
    `capabilities` it supports, as a correct stack behaves
    ([declare intended behaviour](#declare-intended-behaviour)).
-6. **Check it offline** with `llmdv profile validate`, and preview what runs with `llmdv plan`.
+6. **Check it offline** with `llmdv profile validate`, inspect overrides with
+   `llmdv profile explain`, and preview what runs with `llmdv plan`.
 7. **Run the declarations first** with `llmdv verify -m contract`, then the full run
    ([validate, plan, verify](#validate-plan-verify)).
 
@@ -28,10 +29,11 @@ The examples are templates with placeholders. Each validates offline; none runs 
 
 | Example | Shape |
 | --- | --- |
+| [example-minimal.yaml](../profiles/examples/example-minimal.yaml) | One endpoint, model id, URL/key variables and expected error statuses. Start here and add the features your stack promises. |
 | [example-engine-only.yaml](../profiles/examples/example-engine-only.yaml) | One vLLM `engine` reached directly, such as `vllm serve`, with nothing in front and no cluster access. |
 | [example-gateway-only.yaml](../profiles/examples/example-gateway-only.yaml) | One LiteLLM `gateway` and no cluster access: the shape you get when a URL and a key are all you have. |
 | [example-two-ingress.yaml](../profiles/examples/example-two-ingress.yaml) | An llm-d fleet without LiteLLM: a vLLM `engine` and the llm-d `router`. Measured on a live stack; environment and Service names are placeholders. |
-| [example-three-ingress.yaml](../profiles/examples/example-three-ingress.yaml) | LiteLLM in front of the router and engine, including header dispositions. Replace each value with what you measure. |
+| [example-three-ingress.yaml](../profiles/examples/example-three-ingress.yaml) | LiteLLM in front of the router and engine, including header dispositions. Replace deployment facts with yours; choose behavior from the intended API contract. |
 | [example-two-ingress-staging.yaml](../profiles/examples/example-two-ingress-staging.yaml) | The two-ingress stack in a second namespace, written with [`extends`](#reuse-a-profile-with-extends) as only its changes. |
 | [custom-llm-d/](../profiles/examples/custom-llm-d/) | A deployment that follows none of llm-d's guides (LiteLLM, the llm-d router, vLLM), for two models, built from parts. |
 
@@ -40,15 +42,15 @@ model on prefill/decode vLLM) or [deepseek-v4.1-flash.yaml](../profiles/examples
 (a multimodal model, with the engine's render routes served at the router). `parts/` holds what
 both list: what the APIs promise (`base.yaml`), the LiteLLM layer, the router layer and one file
 per model; parts never run on their own. Its values were measured on one deployment and say so
-beside each line; measure yours. Put your URLs, keys and the model ids your gateway serves in a
-gitignored `*.local.yaml` that extends one of the two files.
+beside each line; compare yours and triage differences before adopting those expectations. Put
+your URLs, keys and the model ids your gateway serves in a gitignored `*.local.yaml` that extends one of the two files.
 
-Pick the example whose shape matches what you can reach (with only a gateway URL and a key, that
-is `example-gateway-only.yaml`) and copy it under a `.local.yaml` name so git ignores it:
+For a first profile, copy the minimal starter under a `.local.yaml` name so git ignores it.
+Use a fuller example when you need its setup, routing or model-specific declarations:
 
 ```sh
 mkdir -p profiles/<system>
-cp profiles/examples/example-gateway-only.yaml profiles/<system>/<model>.local.yaml
+cp profiles/examples/example-minimal.yaml profiles/<system>/<model>.local.yaml
 ```
 
 Then replace every `<...>` placeholder. The comments in the example explain each choice.
@@ -101,6 +103,36 @@ Mappings merge, lists and other values replace, `null` clears a value, and ingre
 not inherited: a file that sets none is named after itself. `llmdv profile show` and
 `llmdv profile validate` check the composed result, and a run's `profile.used.yaml` holds it
 whole, with a comment naming the file that set each key.
+
+## Inspect before running
+
+These commands are offline and do not need URL or credential variables to be set:
+
+```sh
+llmdv profile validate profiles/<system>/<model>.local.yaml
+llmdv profile explain profiles/<system>/<model>.local.yaml
+llmdv profile explain profiles/<system>/<model>.local.yaml --field 'ingresses[gateway].model'
+llmdv profile show profiles/<system>/<model>.local.yaml --yaml > /tmp/profile-expanded.yaml
+llmdv plan --profile profiles/<system>/<model>.local.yaml
+```
+
+`explain` shows effective values and the source assignments that led to them. The default view
+focuses on declared fields; `--field` also shows omitted fields and their library defaults.
+Model and capability defaults apply before ingress overrides, even when a later file changes a
+global default. For example, an ingress's `model.max_model_len: 8192` still wins over a later
+parent's top-level `model.max_model_len: 4096`.
+
+Mappings merge, but ordinary lists replace: changing `surfaces: [chat_completions, messages]`
+to `[chat_completions]` removes `messages`; it does not append to the old list. Ingress lists
+merge by `id`, so `ingresses: []` does not remove inherited ingresses. `null` clears a value
+where the schema permits it; `{}` leaves inherited mapping entries intact.
+
+`show --yaml` exports the composed declarations without `extends`. It preserves URL and key
+variable names, makes client executable paths absolute, and keeps the profile's name when saved
+elsewhere. It does not fill in every library default or preserve original comments. Keep the
+source files for editing. Do not redirect this output over a source file: the shell truncates it
+before the command reads it. These authoring views do not display values read from environment
+variables; literals already written into a profile remain visible.
 
 ## The minimum
 
@@ -155,6 +187,19 @@ A profile states how a **correct** stack behaves, not what this fleet happens to
 gateway answers an unknown model with a 400 where the API calls for a 404, declare `[404]` and let
 the case fail. The failure is a finding for the team to triage as a false positive, intended
 behaviour or a defect. Declaring the observed 400 would hide it.
+
+Keep four kinds of information distinct:
+
+- **Deployment facts:** model id, endpoint position, URL variable and configured parsers.
+- **Expected behavior:** the APIs and capabilities the deployment is meant to support.
+- **Observations:** probe results and run evidence, including failures against that expectation.
+- **Accepted deviations:** intentional exceptions with a rationale and an issue or tracking note.
+
+Do not disable a promised capability because its test fails. `known_failures` can annotate a
+tracked failure without changing its verdict. Use `unstructured_errors` only for an explicitly
+accepted envelope deviation: it reverses the assertion and requires the envelope to be absent.
+Optional fields omitted from the starter are coverage gaps to review in `plan`, not evidence of
+a working feature.
 
 Probe the fleet while you write, and record what you saw in a YAML comment beside the declaration:
 

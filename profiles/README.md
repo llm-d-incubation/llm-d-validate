@@ -12,6 +12,11 @@ tests, simply [add it as another ingress](#include-a-gateway-or-engine).
 For other model-serving stacks, `llmdv` also provides [example profiles](#your-own-stack) as a
 starting point, whether or not your deployment uses llm-d.
 
+For a first custom profile, copy [example-minimal.yaml](examples/example-minimal.yaml), set the
+model id and URL/key variables, then follow [the authoring walkthrough](../docs/writing-profiles.md).
+Use `llmdv profile explain <path>` to inspect overrides and `profile show <path> --yaml` to export
+the composed declarations.
+
 Find your starting point:
 
 | You have | Start here |
