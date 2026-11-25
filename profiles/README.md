@@ -60,14 +60,12 @@ give `llmdv` the EPP's URL, which needs no key:
 
 ```sh
 export LLMDV_EPP_URL=<your EPP's URL>
-llmdv verify --profile profiles/llm-d/optimized-baseline/vllm-qwen3-32b-parsers-standalone.yaml \
-  --identity accelerator=gpu --identity provider=gke
+llmdv verify --profile profiles/llm-d/optimized-baseline/vllm-qwen3-32b-parsers-standalone.yaml
 ```
 
-Each guide's folder holds a profile for every configuration llm-d's nightly lanes cover, and a
-README that maps each lane to its profile and `--identity` flags and says what is not tested, and
-why. [llm-d/README.md](llm-d/README.md) explains how to pick one, and has the
-[lane counts and the guides not covered](llm-d/README.md#coverage).
+Each guide's README says which profile matches the overlay you deployed, what it tests and what it
+does not. [llm-d/README.md](llm-d/README.md) explains the profile names and the optional
+`--identity` flags, and lists [what is not covered](llm-d/README.md#not-covered).
 
 ### Include a gateway or engine
 

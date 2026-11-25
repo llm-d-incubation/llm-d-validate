@@ -79,14 +79,13 @@ that extends the combination; `llmdv` then tests each layer and says which one a
 from. See
 [include a gateway or engine](../profiles/README.md#include-a-gateway-or-engine).
 
-Pass the lane's accelerator and provider with `--identity`: one combination covers several
-overlays, and identity keeps their runs apart. Each guide folder's README gives the exact flags
-per lane; [cli.md](cli.md#commands) lists every identity key.
+`--identity` flags are optional labels. One profile covers several overlays, and the labels keep
+their runs apart, so `llmdv compare` never compares two configurations. Each guide's README gives
+an example read off the overlay path; [cli.md](cli.md#commands) lists every identity key.
 
 A guide profile runs its `test_sets.default` by default: the router path, the overlay's parsers and
 window, and what the guide changes. `--full-suite` runs every case, including engine and model
-conformance. One lane per configuration needs it; the table in
-[profiles/llm-d/README.md](../profiles/llm-d/README.md#which-lane-runs-everything) names it.
+conformance.
 [test-suites.md](test-suites.md) lists every suite, what it checks, and how to run one on its own
 (`-m <suite>`).
 

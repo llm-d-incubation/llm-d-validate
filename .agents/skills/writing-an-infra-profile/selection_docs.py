@@ -105,7 +105,7 @@ def describe(result: dict) -> str:
     text = f"{result['total']} selected, {result['run']} run"
     if result["skip"]:
         classes = ", ".join(f"{n} {name}" for name, n in result["skips"].items())
-        text += f", {result['skip']} skip ({classes})"
+        text += f", {result['skip']} skip: {classes}"
     return text
 
 
@@ -131,46 +131,39 @@ def section(folder: Path, entries: dict[Path, dict]) -> str:
         sys.exit(f"{folder}: its profiles define different test sets; write the section by hand")
     if "default" not in sets:
         sys.exit(f"{folder}: a profile has no default test set; write the section by hand")
-    rel = lambda target: os.path.relpath(target, folder)  # noqa: E731
+
+    def rel(target: Path) -> str:
+        return os.path.relpath(target, folder)
+
     sources = {p: entries[p]["sources"]["default"] for p in names}
-    out = [HEADING, ""]
-    listed = ", ".join(f"`{p.name}`" for p in names)
-    out += [f"This applies to every runnable profile in this folder: {listed}.", ""]
-    others = sorted(set(sets) - {"default"})
-    other_text = (
-        "Its other profile-defined sets are " + ", ".join(f"`{n}`" for n in others) + "."
-        if others
-        else "There is no other profile-defined set."
-    )
     defining = set(sources.values())
     if len(defining) == 1 and next(iter(defining)) not in sources:
         src = rel(next(iter(defining)))
-        out.append(
-            "**Default.** A `plan`, `verify` or `job` with no scope flag runs the `default` test "
-            f"set. It is defined once, in [`{src}`]({src}), and every profile above inherits it "
-            f"unchanged; none redefines it. {other_text}"
-        )
+        where = f"defined once in [`{src}`]({src}) and used unchanged by every profile here"
     else:
-        own = [p for p, s in sources.items() if s == p]
-        inherited = {p: s for p, s in sources.items() if s != p}
-        text = (
-            "**Default.** A `plan`, `verify` or `job` with no scope flag runs the `default` test "
-            "set. "
+        own = sorted(p for p, s in sources.items() if s == p)
+        inherited = sorted((p, s) for p, s in sources.items() if s != p)
+        where = "defined in " + (
+            "each profile's own `test_sets:` (the copies are identical)"
+            if len(own) > 1
+            else f"`{own[0].name}`"
         )
-        if own:
-            text += (
-                ("Each of " if len(own) > 1 else "")
-                + ", ".join(f"`{p.name}`" for p in sorted(own))
-                + (" defines its own copy in its `test_sets:`, and the copies are identical"
-                   if len(own) > 1 else " defines it in its `test_sets:`")
-            )  # fmt: skip
-        if inherited:
-            text += ("; " if own else "") + "; ".join(
-                f"`{p.name}` inherits it from `{rel(s)}` through `extends`"
-                for p, s in sorted(inherited.items())
-            )
-        out.append(f"{text}. {other_text}")
-    out.append("")
+        where += "".join(f"; `{p.name}` inherits it from `{rel(s)}`" for p, s in inherited)
+    others = sorted(set(sets) - {"default"})
+    guide = rel(PROFILES / "README.md") + "#what-a-verification-command-selects"
+    out = [
+        HEADING,
+        "",
+        f"A plain `llmdv verify` runs the `default` test set, {where}. `--test-set smoke` runs the "
+        f"[built-in smoke checks]({guide}), and `--full-suite` runs every case in the library."
+        + (
+            " Other sets: " + ", ".join(f"`{n}`" for n in others) + "."
+            if others
+            else " There are no other sets, so `--all-test-sets` is the same as the default."
+        )
+        + " Filters such as `-k` only narrow the run, and `--identity` never changes it.",
+        "",
+    ]
     by_suite: dict[str, list[str]] = {}
     for pattern in sets["default"]:
         by_suite.setdefault(re.split(r"[.\[]", pattern, maxsplit=1)[0], []).append(pattern)
@@ -178,49 +171,38 @@ def section(folder: Path, entries: dict[Path, dict]) -> str:
     if planned != set(by_suite):
         sys.exit(f"{folder}: planned suites {sorted(planned)} differ from the default's patterns")
     out += [
-        f"**The `default` set's case-ID patterns, by the suite they select from** ({len(by_suite)} "
-        "suites, each confirmed by `llmdv plan`). A pattern ending in `.*` takes every case of "
-        "its suite; any other names one case, or one variant in brackets. The rest of each suite "
-        "is not selected:",
+        "<details>",
+        f"<summary>The default's case-ID patterns, in {len(by_suite)} suites</summary>",
+        "",
+        "`suite.*` takes the whole suite; any other pattern names one case. The rest of each "
+        "suite is not selected.",
         "",
         "| Suite | Patterns |",
         "| --- | --- |",
     ]
     for suite, patterns in by_suite.items():
         out.append(f"| `{suite}` | " + ", ".join(f"`{p}`" for p in patterns) + " |")
-    readme = rel(PROFILES / "README.md")
     out += [
         "",
-        "**Named sets:** "
-        + ", ".join(f"`{n}`" for n in sorted(sets))
-        + f" (above) and the built-in `smoke`, which every profile has ([its cases]({readme}"
-        "#what-a-verification-command-selects)). `--all-test-sets` combines the "
-        "profile-defined sets only"
-        + (", so here it selects exactly `default`" if not others else "")
-        + "; `smoke` is never included in it.",
+        "</details>",
         "",
-        "**What each scope selects**, as `llmdv plan` counts it offline. Counts are case "
-        "instances (one per ingress and variant). *Run* means the profile's declarations, "
-        "capabilities and fleet policy let the case run; a case can still skip during the run "
-        "(throttled, `requires_instrumentation`, or a declaration it reads). *Skip* names the "
-        "skip classes:",
+        "<details>",
+        "<summary>How many cases each scope selects, per profile</summary>",
+        "",
+        "Counted offline by `llmdv plan`, one per ingress and variant. *Run* cases can still skip "
+        "during a run (for example `throttled`); *skip* cases are ruled out by the profile's "
+        "declarations, with their skip class.",
         "",
     ]
-    plain_header = "no flag, or `--test-set default`" + (
-        ", or `--all-test-sets`" if not others else ""
-    )
-    columns = [plain_header] + ([] if not others else ["`--all-test-sets`"])
+    default_header = "Default" + ("" if others else " (= `--all-test-sets`)")
+    extra = [] if not others else ["`--all-test-sets`"]
     out += [
-        "| Profile | "
-        + " | ".join(columns)
-        + " | `--test-set smoke` | `--full-suite` (every case in the library) |",
-        "| --- | " + " | ".join("---" for _ in columns) + " | --- | --- |",
+        "| Profile | " + " | ".join([default_header, *extra]) + " | `smoke` | `--full-suite` |",
+        "| --- | " + " | ".join("---" for _ in [default_header, *extra]) + " | --- | --- |",
     ]
     for p in names:
         plans = entries[p]["plans"]
-        cells = [describe(plans["plain"])] + (
-            [] if not others else [describe(plans["all-test-sets"])]
-        )
+        cells = [describe(plans["plain"])] + ([describe(plans["all-test-sets"])] if others else [])
         out.append(
             f"| `{p.name}` | "
             + " | ".join(cells)
@@ -228,20 +210,11 @@ def section(folder: Path, entries: dict[Path, dict]) -> str:
         )
     out += [
         "",
-        "Other filters (`-k`, `-m`, `--surface`, `--client`, `--ingress`) only narrow the chosen "
-        "scope, and a filter that leaves no case exits 2. `--identity` flags label the run and "
-        "never change what it selects.",
+        "</details>",
         "",
-        "To inspect the definitions, the cases and every skip reason, offline:",
-        "",
-        "```sh",
-        f"P={names[0].relative_to(ROOT)}",
-        "llmdv profile show $P --test-sets        # every set and its patterns",
-        "llmdv plan --profile $P                  # the default: each case, and why one skips",
-        "llmdv plan --profile $P --test-set smoke",
-        "llmdv plan --profile $P --full-suite",
-        "llmdv plan --profile $P --json           # the same, as JSON",
-        "```",
+        "To see every case and why one skips: `llmdv plan --profile <profile>` (add "
+        "`--test-set smoke` or `--full-suite` for the other scopes), and "
+        "`llmdv profile show <profile> --test-sets` for the definitions.",
         "",
     ]
     return "\n".join(out)

@@ -1,8 +1,95 @@
 # optimized-baseline
 
-Profiles for llm-d's [optimized-baseline](https://github.com/llm-d/llm-d/tree/main/guides/optimized-baseline) guide. See [../README.md](../README.md) for how to run a combination, and the [profile skill](../../../.agents/skills/writing-an-infra-profile/SKILL.md#how-profilesllm-d-is-built) for the layout and provenance tags, and its [optimized-baseline coverage](../README.md#optimized-baseline-coverage) section for why the lanes group as they do.
+Profiles for testing a deployment of llm-d's [optimized-baseline](https://github.com/llm-d/llm-d/tree/main/guides/optimized-baseline) guide, in which a model server runs behind llm-d's router (the EPP), which places each request by prefix-cache affinity and token load.
 
-## Lanes
+[Pick your profile](#pick-your-profile) · [Run it](#run-it) · [What it tests](#what-it-tests) · [What `llmdv verify` selects](#what-llmdv-verify-selects) · [Not covered](#not-covered) · [For maintainers](#for-maintainers)
+
+## Pick your profile
+
+Pick the profile for the overlay you deployed (under `guides/optimized-baseline/modelserver/`, as `ACCELERATOR_TYPE/MODEL_SERVER/INFRA_PROVIDER`). A provider overlay changes only node, cache and NCCL settings, so overlays that differ only in provider share a profile.
+
+| Profile | Model a client sees | Overlays |
+| --- | --- | --- |
+| `vllm-qwen3-32b-parsers-standalone` | Qwen3-32B on vLLM, with reasoning and tool-call parsers | `gpu/vllm/base`, `gpu/vllm/gke`, `gpu/vllm/ocp` |
+| `vllm-qwen3-32b-inline-standalone` | Qwen3-32B on vLLM, reasoning inline, no tool parser | `amd/vllm/amd-ci`, `tpu/v5p/vllm` |
+| `vllm-qwen3-0.6b-inline-standalone` | Qwen3-0.6B on vLLM (an Intel XPU build), reasoning inline, no tool parser | `xpu/vllm` |
+| `sglang-qwen3-32b-parsers-standalone` | Qwen3-32B on SGLang, with parsers | `gpu/sglang/gke` |
+| `sglang-qwen3-32b-ctx16k-parsers-standalone` | Qwen3-32B on SGLang, 16k window, with parsers | `tpu/v5p/sglang` |
+| `sglang-qwen3-32b-inline-standalone` | Qwen3-32B on SGLang, reasoning inline, no tool parser | `amd/sglang/amd-ci` |
+| `atom-qwen3-32b-ctxunknown-inline-standalone` | Qwen3-32B on Atom, reasoning inline, no tool parser, window not yet known | `amd/atom/amd-ci` |
+| `sim-qwen3-32b-standalone` | the llm-d inference simulator answering as Qwen3-32B | none: simulator replicas in place of the model server |
+
+`sim-qwen3-32b-standalone` is for a cluster without accelerators, such as kind: it runs the guide's router in front of llm-d-inference-sim, so it tests the router, not an engine.
+
+## Run it
+
+The profiles test the guide's router (the EPP). Give `llmdv` its URL:
+
+```sh
+export LLMDV_EPP_URL=<your EPP's URL>
+llmdv verify --profile profiles/llm-d/optimized-baseline/<profile>.yaml
+```
+
+To test a gateway or the engine as well, [add it as another ingress](../../README.md#include-a-gateway-or-engine). `--identity` flags are optional: they label a run so `llmdv compare` never compares two configurations, for example `--identity accelerator=gpu --identity provider=gke`, read off your overlay path (`provider=base` if you applied the accelerator folder's own kustomization).
+
+## What it tests
+
+The base tests every guide gets: each API through the router, error handling, streaming pass-through, the parsers and the context window, and that the deployment serves exactly one model. The guide's own check, `/v1/completions` answering, also ten times with a shared prefix, is covered by the completions cases. For the Atom profile no source states the window, so its context-overflow and long-context cases skip as `undeclared` until a run supplies it.
+
+## What `llmdv verify` selects
+
+A plain `llmdv verify` runs the `default` test set, defined once in [`parts/common.yaml`](parts/common.yaml) and used unchanged by every profile here. `--test-set smoke` runs the [built-in smoke checks](../../README.md#what-a-verification-command-selects), and `--full-suite` runs every case in the library. There are no other sets, so `--all-test-sets` is the same as the default. Filters such as `-k` only narrow the run, and `--identity` never changes it.
+
+<details>
+<summary>The default's case-ID patterns, in 11 suites</summary>
+
+`suite.*` takes the whole suite; any other pattern names one case. The rest of each suite is not selected.
+
+| Suite | Patterns |
+| --- | --- |
+| `contract` | `contract.*` |
+| `discovery` | `discovery.models_lists_declared_model`, `discovery.unknown_model_no_fallback`, `discovery.models_parses_with_openai_sdk` |
+| `openai_chat` | `openai_chat.basic_non_streaming`, `openai_chat.streaming_sse`, `openai_chat.stop_reason`, `openai_chat.configured_reasoning` |
+| `openai_completions` | `openai_completions.basic_non_streaming`, `openai_completions.streaming_matches_json`, `openai_completions.stop_reason`, `openai_completions.prompt_forms` |
+| `anthropic_messages` | `anthropic_messages.basic_non_streaming`, `anthropic_messages.streaming_sse` |
+| `openai_responses` | `openai_responses.basic_non_streaming`, `openai_responses.streaming_sse` |
+| `streaming` | `streaming.sse_framing`, `streaming.*` |
+| `unhappy` | `unhappy.unknown_path`, `unhappy.malformed_json`, `unhappy.missing_model`, `unhappy.wrong_method`, `unhappy.error_envelope_fields`, `unhappy.context_overflow`, `unhappy.token_limit_over_context` |
+| `transport` | `transport.connection`, `transport.health_status` |
+| `tools` | `tools.auto_call`, `tools.auto_stream` |
+| `long_context` | `long_context.*` |
+
+</details>
+
+<details>
+<summary>How many cases each scope selects, per profile</summary>
+
+Counted offline by `llmdv plan`, one per ingress and variant. *Run* cases can still skip during a run (for example `throttled`); *skip* cases are ruled out by the profile's declarations, with their skip class.
+
+| Profile | Default (= `--all-test-sets`) | `smoke` | `--full-suite` |
+| --- | --- | --- | --- |
+| `atom-qwen3-32b-ctxunknown-inline-standalone.yaml` | 106 selected, 94 run, 12 skip: 12 undeclared | 9 selected, 9 run | 1082 selected, 677 run, 405 skip: 405 undeclared |
+| `sglang-qwen3-32b-ctx16k-parsers-standalone.yaml` | 106 selected, 100 run, 6 skip: 6 undeclared | 9 selected, 9 run | 1082 selected, 911 run, 171 skip: 171 undeclared |
+| `sglang-qwen3-32b-inline-standalone.yaml` | 106 selected, 94 run, 12 skip: 12 undeclared | 9 selected, 9 run | 1082 selected, 677 run, 405 skip: 405 undeclared |
+| `sglang-qwen3-32b-parsers-standalone.yaml` | 106 selected, 100 run, 6 skip: 6 undeclared | 9 selected, 9 run | 1082 selected, 911 run, 171 skip: 171 undeclared |
+| `sim-qwen3-32b-standalone.yaml` | 106 selected, 92 run, 14 skip: 14 undeclared | 9 selected, 9 run | 1082 selected, 647 run, 435 skip: 435 undeclared |
+| `vllm-qwen3-0.6b-inline-standalone.yaml` | 106 selected, 94 run, 12 skip: 12 undeclared | 9 selected, 9 run | 1082 selected, 677 run, 405 skip: 405 undeclared |
+| `vllm-qwen3-32b-inline-standalone.yaml` | 106 selected, 94 run, 12 skip: 12 undeclared | 9 selected, 9 run | 1082 selected, 677 run, 405 skip: 405 undeclared |
+| `vllm-qwen3-32b-parsers-standalone.yaml` | 106 selected, 100 run, 6 skip: 6 undeclared | 9 selected, 9 run | 1082 selected, 911 run, 171 skip: 171 undeclared |
+
+</details>
+
+To see every case and why one skips: `llmdv plan --profile <profile>` (add `--test-set smoke` or `--full-suite` for the other scopes), and `llmdv profile show <profile> --test-sets` for the definitions.
+## Not covered
+
+See [optimized-baseline details](../README.md#for-maintainers): the community overlays, gateway mode and agentgateway as the standalone sidecar proxy are configurations llm-d does not test nightly, so no profile here covers them.
+
+## For maintainers
+
+<details>
+<summary>llm-d's nightly lanes, and how each maps to a profile</summary>
+
+Why the lanes group as they do: [optimized-baseline details](../README.md#for-maintainers).
 
 Every lane runs standalone: the client calls the `<GUIDE_NAME>-epp` Service on port 80 (the lanes' `gateway_host`). Lanes that share a profile are told apart by `--identity`; the provider value is the overlay's `INFRA_PROVIDER` folder, and `base` for a lane that sets none, which applies the `base` overlay.
 
@@ -21,57 +108,6 @@ Every lane runs standalone: the client calls the `<GUIDE_NAME>-epp` Service on p
 
 `sim-qwen3-32b-standalone` is not a lane: it runs the guide's router in front of llm-d-inference-sim, for kind or CI without accelerators.
 
-These lanes run the guide's `test_sets.default` (`parts/common.yaml`). The lanes that run every case with `--full-suite`, one per configuration, are listed in [Which lane runs everything](../README.md#which-lane-runs-everything).
+These lanes run the guide's `test_sets.default` (`parts/common.yaml`). The lanes that run every case with `--full-suite`, one per configuration, are listed in [Which lane runs the full suite](../README.md#for-maintainers).
 
-## What `llmdv verify` selects
-
-This applies to every runnable profile in this folder: `atom-qwen3-32b-ctxunknown-inline-standalone.yaml`, `sglang-qwen3-32b-ctx16k-parsers-standalone.yaml`, `sglang-qwen3-32b-inline-standalone.yaml`, `sglang-qwen3-32b-parsers-standalone.yaml`, `sim-qwen3-32b-standalone.yaml`, `vllm-qwen3-0.6b-inline-standalone.yaml`, `vllm-qwen3-32b-inline-standalone.yaml`, `vllm-qwen3-32b-parsers-standalone.yaml`.
-
-**Default.** A `plan`, `verify` or `job` with no scope flag runs the `default` test set. It is defined once, in [`parts/common.yaml`](parts/common.yaml), and every profile above inherits it unchanged; none redefines it. There is no other profile-defined set.
-
-**The `default` set's case-ID patterns, by the suite they select from** (11 suites, each confirmed by `llmdv plan`). A pattern ending in `.*` takes every case of its suite; any other names one case, or one variant in brackets. The rest of each suite is not selected:
-
-| Suite | Patterns |
-| --- | --- |
-| `contract` | `contract.*` |
-| `discovery` | `discovery.models_lists_declared_model`, `discovery.unknown_model_no_fallback`, `discovery.models_parses_with_openai_sdk` |
-| `openai_chat` | `openai_chat.basic_non_streaming`, `openai_chat.streaming_sse`, `openai_chat.stop_reason`, `openai_chat.configured_reasoning` |
-| `openai_completions` | `openai_completions.basic_non_streaming`, `openai_completions.streaming_matches_json`, `openai_completions.stop_reason`, `openai_completions.prompt_forms` |
-| `anthropic_messages` | `anthropic_messages.basic_non_streaming`, `anthropic_messages.streaming_sse` |
-| `openai_responses` | `openai_responses.basic_non_streaming`, `openai_responses.streaming_sse` |
-| `streaming` | `streaming.sse_framing`, `streaming.*` |
-| `unhappy` | `unhappy.unknown_path`, `unhappy.malformed_json`, `unhappy.missing_model`, `unhappy.wrong_method`, `unhappy.error_envelope_fields`, `unhappy.context_overflow`, `unhappy.token_limit_over_context` |
-| `transport` | `transport.connection`, `transport.health_status` |
-| `tools` | `tools.auto_call`, `tools.auto_stream` |
-| `long_context` | `long_context.*` |
-
-**Named sets:** `default` (above) and the built-in `smoke`, which every profile has ([its cases](../../README.md#what-a-verification-command-selects)). `--all-test-sets` combines the profile-defined sets only, so here it selects exactly `default`; `smoke` is never included in it.
-
-**What each scope selects**, as `llmdv plan` counts it offline. Counts are case instances (one per ingress and variant). *Run* means the profile's declarations, capabilities and fleet policy let the case run; a case can still skip during the run (throttled, `requires_instrumentation`, or a declaration it reads). *Skip* names the skip classes:
-
-| Profile | no flag, or `--test-set default`, or `--all-test-sets` | `--test-set smoke` | `--full-suite` (every case in the library) |
-| --- | --- | --- | --- |
-| `atom-qwen3-32b-ctxunknown-inline-standalone.yaml` | 106 selected, 94 run, 12 skip (12 undeclared) | 9 selected, 9 run | 1082 selected, 677 run, 405 skip (405 undeclared) |
-| `sglang-qwen3-32b-ctx16k-parsers-standalone.yaml` | 106 selected, 100 run, 6 skip (6 undeclared) | 9 selected, 9 run | 1082 selected, 911 run, 171 skip (171 undeclared) |
-| `sglang-qwen3-32b-inline-standalone.yaml` | 106 selected, 94 run, 12 skip (12 undeclared) | 9 selected, 9 run | 1082 selected, 677 run, 405 skip (405 undeclared) |
-| `sglang-qwen3-32b-parsers-standalone.yaml` | 106 selected, 100 run, 6 skip (6 undeclared) | 9 selected, 9 run | 1082 selected, 911 run, 171 skip (171 undeclared) |
-| `sim-qwen3-32b-standalone.yaml` | 106 selected, 92 run, 14 skip (14 undeclared) | 9 selected, 9 run | 1082 selected, 647 run, 435 skip (435 undeclared) |
-| `vllm-qwen3-0.6b-inline-standalone.yaml` | 106 selected, 94 run, 12 skip (12 undeclared) | 9 selected, 9 run | 1082 selected, 677 run, 405 skip (405 undeclared) |
-| `vllm-qwen3-32b-inline-standalone.yaml` | 106 selected, 94 run, 12 skip (12 undeclared) | 9 selected, 9 run | 1082 selected, 677 run, 405 skip (405 undeclared) |
-| `vllm-qwen3-32b-parsers-standalone.yaml` | 106 selected, 100 run, 6 skip (6 undeclared) | 9 selected, 9 run | 1082 selected, 911 run, 171 skip (171 undeclared) |
-
-Other filters (`-k`, `-m`, `--surface`, `--client`, `--ingress`) only narrow the chosen scope, and a filter that leaves no case exits 2. `--identity` flags label the run and never change what it selects.
-
-To inspect the definitions, the cases and every skip reason, offline:
-
-```sh
-P=profiles/llm-d/optimized-baseline/atom-qwen3-32b-ctxunknown-inline-standalone.yaml
-llmdv profile show $P --test-sets        # every set and its patterns
-llmdv plan --profile $P                  # the default: each case, and why one skips
-llmdv plan --profile $P --test-set smoke
-llmdv plan --profile $P --full-suite
-llmdv plan --profile $P --json           # the same, as JSON
-```
-## Not covered, and why
-
-See [optimized-baseline coverage](../README.md#optimized-baseline-coverage): the community overlays, gateway mode and agentgateway as the standalone sidecar proxy are not run by any lane.
+</details>

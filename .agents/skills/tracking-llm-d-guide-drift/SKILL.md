@@ -5,7 +5,7 @@ description: Use when checking whether `profiles/llm-d/` has fallen behind llm-d
 
 # Tracking llm-d guide drift
 
-The guide profiles are built from llm-d at one commit, which `profiles/llm-d/README.md` states (`at llm-d <commit>`) and every provenance tag repeats. llm-d keeps moving: guides reach Tier 3, lanes are added and removed, overlays change models, windows, parsers and images. This skill finds what moved and turns each change into profile work. Building or changing the profiles themselves follows [writing-an-infra-profile](../writing-an-infra-profile/SKILL.md#profiles-for-an-llm-d-guide); this skill decides what needs it.
+The guide profiles are built from llm-d at one commit, which `profiles/llm-d/README.md` states (`llm-d commit <sha>`) and every provenance tag repeats. llm-d keeps moving: guides reach Tier 3, lanes are added and removed, overlays change models, windows, parsers and images. This skill finds what moved and turns each change into profile work. Building or changing the profiles themselves follows [writing-an-infra-profile](../writing-an-infra-profile/SKILL.md#profiles-for-an-llm-d-guide); this skill decides what needs it.
 
 **Tier 3** is llm-d's own term ([guides policy, §5](https://github.com/llm-d/llm-d/blob/main/guides/GUIDES-POLICY.md#5-production-readiness-tiers)): a guide with a `guide.yaml` and an end-to-end nightly job. A nightly lane is the evidence, so "a Tier 3 guide with no profile" and "a nightly lane no guide README names" are the same finding.
 
@@ -13,7 +13,7 @@ The guide profiles are built from llm-d at one commit, which `profiles/llm-d/REA
 
 - **Read-only, everywhere.** Clone llm-d into a scratch directory outside this repository. Render overlays locally (`kubectl kustomize <path>`), never against a cluster.
 - **Copy names, not values.** A nightly workflow passes namespaces, cluster names, zones, buckets and gateway hosts. None of those enter this repository, an issue or a PR body. Cite a lane by its workflow name and a fact by its file path.
-- **A lane is the source of truth,** as in the profile skill: profile what a lane deploys, and record a disagreement with `guide.yaml` or the README under the guide folder's "Upstream notes".
+- **A lane is the source of truth,** as in the profile skill: profile what a lane deploys, and record a disagreement with `guide.yaml` or the README under the guide folder's "Where llm-d's own sources disagree".
 
 ## Procedure
 
@@ -48,7 +48,7 @@ The guide profiles are built from llm-d at one commit, which `profiles/llm-d/REA
    | lanes (workflows, deploy scripts) | accelerator, engine, provider, gateway class, the overlay path, replicas | the guide README's lane table; a new or retired combination |
    | model-server overlays | render the lane's overlay at both commits and diff the output: model id, `--max-model-len`, reasoning and tool-call parsers, image, flags, per role | `parts/models/<m>.yaml`, `parts/engines/<e>.yaml`, the combination's parser names |
    | router configuration | plugins, flow control, scorers, headers the router adds or reads | `parts/topology/standalone.yaml` (header dispositions), the guide's `parts/common.yaml` (`selection`, claims) |
-   | statements (`guide.yaml`, README) | a claim added or dropped; a support table that now disagrees with the lanes | the guide's `selection` and its comments; "Upstream notes" |
+   | statements (`guide.yaml`, README) | a claim added or dropped; a support table that now disagrees with the lanes | the guide's `selection` and its comments; "Where llm-d's own sources disagree" |
    | shared recipes, `guides/env.sh` | which guides' overlays include the changed component (`grep -rl` in the rendered output) | every combination whose engine build or image changes |
 
    A file can change without changing anything a client sees (a comment, a resource limit, a benchmark setting). Say so and move on: not every change is profile work.

@@ -1,27 +1,42 @@
 # fast-model-actuation
 
-Profiles for llm-d's [fast-model-actuation](https://github.com/llm-d/llm-d/tree/main/guides/fast-model-actuation) guide. See [../README.md](../README.md) for how to run a combination, and the [profile skill](../../../.agents/skills/writing-an-infra-profile/SKILL.md#how-profilesllm-d-is-built) for the layout and provenance tags.
+Profiles for testing a deployment of llm-d's [fast-model-actuation](https://github.com/llm-d/llm-d/tree/main/guides/fast-model-actuation) guide, in which the vLLM instance runs inside an FMA launcher pod with sleep mode on, and the router reaches it through a requester Deployment's TCP proxy.
 
-## Lanes
+[Pick your profile](#pick-your-profile) · [Run it](#run-it) · [What it tests](#what-it-tests) · [What `llmdv verify` selects](#what-llmdv-verify-selects) · [Not covered](#not-covered) · [For maintainers](#for-maintainers)
 
-The guide has no support table; `guide.yaml` offers `INFRA_PROVIDER` `ocp` or `gke`. Both nightly lanes stand the guide up with `kubectl apply -k platform/<INFRA_PROVIDER>`: the FMA InferenceServerConfig, LauncherConfig and LauncherPopulationPolicy, and the requester Deployment. The vLLM instance runs inside an FMA launcher pod with `--model Qwen/Qwen3-0.6B --enable-sleep-mode --gpu-memory-utilization 0.9` and no parsers; the EPP reaches it through the requester's TCP proxy on port 8000. The two providers change only how the launcher reaches the node's GPUs, so one combination covers both.
+## Pick your profile
 
-| CI lane (`nightly-e2e-fast-model-actuation-<lane>`) | What it applies | Profile | Identity flags |
-| --- | --- | --- | --- |
-| `gke-acc-gpu-vllm-x` | `platform/gke` | `vllm-qwen3-0.6b-inline-standalone` | `--identity accelerator=gpu --identity provider=gke` |
-| `ibm-acc-gpu-vllm-x` | `platform/ocp` | `vllm-qwen3-0.6b-inline-standalone` | `--identity accelerator=gpu --identity provider=ocp` |
+Pick the profile for the platform you applied (`kubectl apply -k platform/<INFRA_PROVIDER>`). The two platforms change only how the launcher reaches the node's GPUs, so they share a profile.
 
-The combination reuses `../parts/models/qwen3-0.6b-inline.yaml` (the model id, the derived 40960-token window and the absence of parsers are the same as optimized-baseline's XPU overlay). The `modelserver/gpu/vllm/{base,gke,ocp}` overlays the benchmark harness renders are detection-only stubs (a `replicas: 0` Deployment that names the model) and are never applied.
+| Profile | Model a client sees | What you applied |
+| --- | --- | --- |
+| `vllm-qwen3-0.6b-inline-standalone` | Qwen3-0.6B on vLLM, the model's 40960-token window, no reasoning or tool-call parsers | `platform/gke`, `platform/ocp` |
 
-The client calls the `<GUIDE_NAME>-epp` Service on port 80, in standalone mode. Run `llmdv` after the requester Deployment's rollout completes (guide.yaml deploy.modelserver) and before the guide's sleep/wake step, so both requesters are bound to awake instances.
+## Run it
+
+The profiles test the guide's router (the EPP). Give `llmdv` its URL:
+
+```sh
+export LLMDV_EPP_URL=<your EPP's URL>
+llmdv verify --profile profiles/llm-d/fast-model-actuation/vllm-qwen3-0.6b-inline-standalone.yaml
+```
+
+Run it after the requester Deployment's rollout completes and before the guide's sleep/wake step, so both requesters are bound to awake instances.
+
+To test a gateway or the engine as well, [add it as another ingress](../../README.md#include-a-gateway-or-engine). `--identity` flags are optional: they label a run so `llmdv compare` never compares two configurations, for example `--identity accelerator=gpu --identity provider=gke`, with `provider` the platform you applied.
+
+## What it tests
+
+The base tests every guide gets (each API, error handling and the context window), plus every streaming case and a wider set of HTTP transport cases (chunked requests, body edges, long and differently cased headers, `Expect: 100-continue` and others). They are there for the requester's TCP proxy, which sits between the router and vLLM on every request. It should pass vLLM's responses through byte for byte, so the profile declares vLLM's behaviour; what the proxy does when its vLLM instance refuses or drops a connection, and any error it answers itself, have not been measured. A failure in the error-envelope or disconnect cases that optimized-baseline's vLLM profiles do not show points at the proxy.
 
 ## What `llmdv verify` selects
 
-This applies to every runnable profile in this folder: `vllm-qwen3-0.6b-inline-standalone.yaml`.
+A plain `llmdv verify` runs the `default` test set, defined once in [`parts/common.yaml`](parts/common.yaml) and used unchanged by every profile here. `--test-set smoke` runs the [built-in smoke checks](../../README.md#what-a-verification-command-selects), and `--full-suite` runs every case in the library. There are no other sets, so `--all-test-sets` is the same as the default. Filters such as `-k` only narrow the run, and `--identity` never changes it.
 
-**Default.** A `plan`, `verify` or `job` with no scope flag runs the `default` test set. It is defined once, in [`parts/common.yaml`](parts/common.yaml), and every profile above inherits it unchanged; none redefines it. There is no other profile-defined set.
+<details>
+<summary>The default's case-ID patterns, in 11 suites</summary>
 
-**The `default` set's case-ID patterns, by the suite they select from** (11 suites, each confirmed by `llmdv plan`). A pattern ending in `.*` takes every case of its suite; any other names one case, or one variant in brackets. The rest of each suite is not selected:
+`suite.*` takes the whole suite; any other pattern names one case. The rest of each suite is not selected.
 
 | Suite | Patterns |
 | --- | --- |
@@ -37,39 +52,52 @@ This applies to every runnable profile in this folder: `vllm-qwen3-0.6b-inline-s
 | `tools` | `tools.auto_call`, `tools.auto_stream` |
 | `long_context` | `long_context.*` |
 
-**Named sets:** `default` (above) and the built-in `smoke`, which every profile has ([its cases](../../README.md#what-a-verification-command-selects)). `--all-test-sets` combines the profile-defined sets only, so here it selects exactly `default`; `smoke` is never included in it.
+</details>
 
-**What each scope selects**, as `llmdv plan` counts it offline. Counts are case instances (one per ingress and variant). *Run* means the profile's declarations, capabilities and fleet policy let the case run; a case can still skip during the run (throttled, `requires_instrumentation`, or a declaration it reads). *Skip* names the skip classes:
+<details>
+<summary>How many cases each scope selects, per profile</summary>
 
-| Profile | no flag, or `--test-set default`, or `--all-test-sets` | `--test-set smoke` | `--full-suite` (every case in the library) |
+Counted offline by `llmdv plan`, one per ingress and variant. *Run* cases can still skip during a run (for example `throttled`); *skip* cases are ruled out by the profile's declarations, with their skip class.
+
+| Profile | Default (= `--all-test-sets`) | `smoke` | `--full-suite` |
 | --- | --- | --- | --- |
-| `vllm-qwen3-0.6b-inline-standalone.yaml` | 119 selected, 107 run, 12 skip (12 undeclared) | 9 selected, 9 run | 1082 selected, 683 run, 399 skip (399 undeclared) |
+| `vllm-qwen3-0.6b-inline-standalone.yaml` | 119 selected, 107 run, 12 skip: 12 undeclared | 9 selected, 9 run | 1082 selected, 683 run, 399 skip: 399 undeclared |
 
-Other filters (`-k`, `-m`, `--surface`, `--client`, `--ingress`) only narrow the chosen scope, and a filter that leaves no case exits 2. `--identity` flags label the run and never change what it selects.
+</details>
 
-To inspect the definitions, the cases and every skip reason, offline:
-
-```sh
-P=profiles/llm-d/fast-model-actuation/vllm-qwen3-0.6b-inline-standalone.yaml
-llmdv profile show $P --test-sets        # every set and its patterns
-llmdv plan --profile $P                  # the default: each case, and why one skips
-llmdv plan --profile $P --test-set smoke
-llmdv plan --profile $P --full-suite
-llmdv plan --profile $P --json           # the same, as JSON
-```
-## What the profile checks that is particular to this guide
-
-The requester's TCP proxy sits between the EPP and vLLM on every request. It should pass vLLM's responses through byte for byte, so the profile declares vLLM's behaviour; what the proxy does when its vLLM instance refuses or drops a connection, and any error it answers itself, have not been measured. A failure in the error-envelope or disconnect cases that the optimized-baseline vLLM lanes do not show points at the proxy.
-
-## Not covered, and why
+To see every case and why one skips: `llmdv plan --profile <profile>` (add `--test-set smoke` or `--full-suite` for the other scopes), and `llmdv profile show <profile> --test-sets` for the definitions.
+## Not covered
 
 - **Sleep and wake** (`verify.tests.sleep_wake`: scaling the requesters to zero puts vLLM to sleep, scaling back up wakes it): `llmdv` never scales a deployment, and the sleeping state is a pod label, which is cluster state.
 - **Hot and warm start times**: timing is a benchmark's measurement, not `llmdv`'s.
 - **The FMA controllers' lifecycle** (binding, LRU eviction of sleeping instances, launcher population): cluster state.
 - **The cache suite**: the vLLM options do not include `--enable-prompt-tokens-details`, and the router has no prefix-cache plugin, so `cache_reuse` is not declared (see `parts/common.yaml`).
-- **Gateway mode** and the other `GATEWAY_CLASS` values: no lane runs them.
+- **Gateway mode** and the other `GATEWAY_CLASS` values: llm-d does not test them nightly.
 - **fast-model-actuation-keda** (`fast-model-actuation/fast-model-actuation-keda/`, lanes `nightly-e2e-fast-model-actuation-keda-{gke,ibm}-acc-gpu-vllm-x`): deferred. It scales the requesters from zero on EPP flow-control metrics, so the first request waits for the scale-up (the EPP holds it up to `noEndpointRequestTTL: 300s`, `router/fast-model-actuation-keda.values.yaml`), and the pool returns to zero after about 60 s idle (`cooldownPeriod` 30 s plus the HPA's 30 s stabilization, `keda/base/kustomization.yaml`). A profile cannot express that without loosening every latency check, and a run with gaps between cases would keep paying the cold start.
 
-## Upstream notes
+## For maintainers
+
+See the [profile skill](../../../.agents/skills/writing-an-infra-profile/SKILL.md#how-profilesllm-d-is-built) for the layout and provenance tags.
+
+<details>
+<summary>llm-d's nightly lanes, and how each maps to a profile</summary>
+
+The guide has no support table; `guide.yaml` offers `INFRA_PROVIDER` `ocp` or `gke`. Both nightly lanes stand the guide up with `kubectl apply -k platform/<INFRA_PROVIDER>`: the FMA InferenceServerConfig, LauncherConfig and LauncherPopulationPolicy, and the requester Deployment. The vLLM instance runs inside an FMA launcher pod with `--model Qwen/Qwen3-0.6B --enable-sleep-mode --gpu-memory-utilization 0.9` and no parsers; the EPP reaches it through the requester's TCP proxy on port 8000. The two providers change only how the launcher reaches the node's GPUs, so one combination covers both.
+
+| CI lane (`nightly-e2e-fast-model-actuation-<lane>`) | What it applies | Profile | Identity flags |
+| --- | --- | --- | --- |
+| `gke-acc-gpu-vllm-x` | `platform/gke` | `vllm-qwen3-0.6b-inline-standalone` | `--identity accelerator=gpu --identity provider=gke` |
+| `ibm-acc-gpu-vllm-x` | `platform/ocp` | `vllm-qwen3-0.6b-inline-standalone` | `--identity accelerator=gpu --identity provider=ocp` |
+
+The combination reuses `../parts/models/qwen3-0.6b-inline.yaml` (the model id, the derived 40960-token window and the absence of parsers are the same as optimized-baseline's XPU overlay). The `modelserver/gpu/vllm/{base,gke,ocp}` overlays the benchmark harness renders are detection-only stubs (a `replicas: 0` Deployment that names the model) and are never applied.
+
+The client calls the `<GUIDE_NAME>-epp` Service on port 80, in standalone mode. Run `llmdv` after the requester Deployment's rollout completes (guide.yaml deploy.modelserver) and before the guide's sleep/wake step, so both requesters are bound to awake instances.
+
+</details>
+
+<details>
+<summary>Where llm-d's own sources disagree</summary>
 
 - The FMA launcher image (`ghcr.io/llm-d-incubation/llm-d-fast-model-actuation/launcher:v0.8.0`, `modelserver/launcherconfig.yaml`) is built on `vllm-openai:v0.26.0` (`llm-d-fast-model-actuation@v0.8.0:dockerfiles/Dockerfile.launcher.benchmark:1`); nothing in the guide pins a vLLM version, so a new launcher tag changes the engine. vLLM v0.26 serves `/v1/chat/completions/render` and `/v1/completions/render` without `--enable-scale-out` and has no Messages or Responses render route, so the combination declares `chat_render` and `completions_render`.
+
+</details>

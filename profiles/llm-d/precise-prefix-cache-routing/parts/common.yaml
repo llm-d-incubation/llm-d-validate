@@ -24,7 +24,7 @@
 #
 # Engine settings every lane shares (FROM values: G/modelserver/): --block-size=64 and
 # --kv-events-config, no KV connector; --enable-scale-out, which serves vLLM's render routes on
-# the inference port, on every lane except tpu/v5p (see README.md, "Upstream notes").
+# the inference port, on every lane except tpu/v5p (see README.md, "For maintainers").
 # The router's 64-token blocks match the engines' --block-size=64. Not declared as
 # cache_reuse.block_size, because cache_reuse is not declared (below).
 #
