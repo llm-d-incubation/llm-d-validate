@@ -47,11 +47,13 @@ pinpoints the layer that breaks, and flags what regressed since the last run.
 > read-only verb allowlist. You name credentials by
 > environment variable; `llmdv` keeps them out of every file and redacts them from every log.
 
-## Test an llm-d guide
+## Test a deployed llm-d guide
 
-The llm-d guides have [ready profiles](https://github.com/llm-d-incubation/llm-d-validate/blob/main/profiles/README.md#llm-d-guide-validation-profiles)
-for testing each one once deployed. They test the guide's router (the EPP) directly: give
-`llmdv` the EPP's URL and run. No key is needed.
+Each supported llm-d guide includes a ready-to-use
+[validation profile](https://github.com/llm-d-incubation/llm-d-validate/blob/main/profiles/README.md#llm-d-guide-validation-profiles).
+After deploying a guide, use its profile to verify that your deployment behaves as specified by
+the guide and its APIs. By default, the profiles target the guide's router (the EPP), so give
+`llmdv` the EPP's URL. No key is needed.
 
 ```sh
 ./install.sh && source .venv/bin/activate
@@ -60,16 +62,16 @@ llmdv verify --profile profiles/llm-d/optimized-baseline/vllm-qwen3-32b-parsers-
   --identity accelerator=gpu --identity provider=gke
 ```
 
-Pick the combination and `--identity` flags that match your deployment from the guide's folder.
+Pick the profile and `--identity` flags that match your configuration from the guide's folder.
 
-Already running a gateway in front of the router (Istio, agentgateway, LiteLLM)? Name its URL as
-one more ingress, and `llmdv` tests both layers. See
+To include a gateway (Istio, agentgateway, LiteLLM) or engine in your tests, add it as another
+ingress, and `llmdv` tests each layer on its own. See
 [test through your gateway](https://github.com/llm-d-incubation/llm-d-validate/blob/main/profiles/README.md#test-through-your-gateway).
 
 ## Test your own stack
 
-A custom llm-d, or a stack with no llm-d at all, gets a profile of its own. Copy the closest
-example, fill in its placeholders, and run it:
+For other model-serving stacks, whether or not they use llm-d, start from an example profile.
+Copy the closest one, fill in its placeholders, and run it:
 
 ```sh
 cp profiles/examples/example-gateway-only.yaml profiles/my-stack.local.yaml   # set base_url and model
@@ -80,8 +82,8 @@ llmdv verify --profile profiles/my-stack.local.yaml    # run it against your sta
 ```
 
 Git ignores `*.local.yaml` profiles, so your hosts stay out of the repository.
-[Your own stack](https://github.com/llm-d-incubation/llm-d-validate/blob/main/profiles/README.md#your-own-stack) walks through the other examples, `extends`
-and what to declare.
+[Writing a profile](https://github.com/llm-d-incubation/llm-d-validate/blob/main/docs/writing-profiles.md) walks through the other
+examples, `extends` and what to declare.
 
 ## What it tests
 

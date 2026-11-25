@@ -21,7 +21,7 @@ One profile per configuration a client can tell apart. Each lane is one of llm-d
 
 The workflows pass `infra_provider` and `connector` separately to llm-d-infra's reusable workflow (`amd-ci` with `nixl`, `amd-ci-1p1d-tp8` with `moriio`); the overlay paths above are the `nixl/amd-ci` and `moriio/amd-ci-1p1d-tp8` values guide.yaml lists for `INFRA_PROVIDER`, and the provider identity uses them so the AMD lanes never share an identity. Four lanes share the gpt-oss-120b vLLM profile: accelerator and provider tell their runs apart, and no `flavor` is needed.
 
-Run one, after the lane has deployed the guide:
+To test against the deployed guide:
 
 ```sh
 export LLMDV_EPP_URL=<the EPP's URL>

@@ -90,7 +90,7 @@ llmdv profile validate profiles/<system>/<model>.local.yaml
 llmdv verify --profile profiles/<system>/<model>.local.yaml -m contract
 ```
 
-Each other layer you can reach, such as a gateway in front of a router, is one more ingress in
+Each other layer you can reach, such as a gateway in front of a router, is another ingress in
 the same file ([step 3](../docs/writing-profiles.md#the-steps)). `*.local.yaml` files are
 gitignored, so your hosts stay out of the repository.
 [Writing a profile](../docs/writing-profiles.md) walks through every step, the

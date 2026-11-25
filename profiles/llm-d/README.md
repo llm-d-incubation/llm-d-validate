@@ -1,6 +1,6 @@
-# llm-d guide profiles
+# llm-d guide validation profiles
 
-Profiles for the [llm-d](https://github.com/llm-d/llm-d) guides (llm-d's docs also say "well-lit
+Validation profiles for the [llm-d](https://github.com/llm-d/llm-d) guides (llm-d's docs also say "well-lit
 paths"; this repository says guide). Each states what a correct stack does when a guide is
 deployed as shipped with one model-server overlay, for every configuration a nightly lane deploys
 at llm-d `9ca8ff0`.
@@ -10,10 +10,10 @@ described by its own profile ([profiles/README.md](../README.md)). How the folde
 where each value comes from:
 [the profile skill](../../.agents/skills/writing-an-infra-profile/SKILL.md#how-profilesllm-d-is-built).
 
-## Run one
+## Test against a deployed guide
 
-Deploy the guide with an overlay a combination covers (its header lists them), give `llmdv` the
-router's URL, and run:
+Run the combination that matches the overlay you deployed (its header lists the overlays it
+covers). By default it targets the guide's router, so give `llmdv` the EPP's URL:
 
 ```sh
 export LLMDV_EPP_URL=<your EPP's URL>
@@ -22,8 +22,8 @@ llmdv verify --profile profiles/llm-d/optimized-baseline/vllm-qwen3-32b-parsers-
   --identity accelerator=gpu --identity provider=gke
 ```
 
-The EPP needs no key. If a gateway already sits in front of it, name its URL as one more ingress in
-a local file that extends the combination: [test through your gateway](../README.md#test-through-your-gateway).
+The EPP needs no key. To include a gateway or engine in your tests, add it as another ingress in a
+local file that extends the combination: [test through your gateway](../README.md#test-through-your-gateway).
 
 A combination is `<engine>-<model-config>[-<variant>]-<topology>.yaml`, with a variant only where
 lanes of one configuration differ to a client (keda-epp's `queue` and `inflight`); files in a `parts/` folder never run

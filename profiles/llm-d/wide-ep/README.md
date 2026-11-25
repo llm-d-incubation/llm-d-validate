@@ -24,7 +24,7 @@ What each serves, read from the overlays rendered with `kubectl kustomize`:
 
 The router differs by accelerator (always-disaggregate on gpu and amd, one aggregated profile on xpu; see `parts/common.yaml`), but not in anything a client sees: the listener, APIs and header handling are the ones `../parts/topology/standalone.yaml` declares.
 
-Run one after deploying the guide in standalone mode:
+To test against the guide, deployed in standalone mode:
 
 ```sh
 export LLMDV_EPP_URL=<the EPP's URL>
