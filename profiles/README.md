@@ -17,11 +17,11 @@ against llm-d `9ca8ff0` and test the guide's router (`<GUIDE_NAME>-epp`, standal
 has been run against a real engine yet: each says `WRITTEN, NOT RUN`, and its first run is its
 measurement.
 
-Every guide's profiles test the router's baseline: each API a client uses, the errors it must
-return, the overlay's reasoning and tool parsers, and its context window. Each adds what its guide
+Every guide's profiles test each API a client uses, the errors the router must return, the
+overlay's reasoning and tool parsers, and its context window. Each also tests what its guide
 changes:
 
-| Guide | What it adds, and why | Profiles |
+| Guide | What else it tests, and why | Profiles |
 | --- | --- | --- |
 | [agentic-api](llm-d/agentic-api/README.md) | the Responses API in depth (input items, instructions, tool loops, no stored state), because agentic-api calls vLLM's stateless Responses API through the router | 1 |
 | [async-multitenant](llm-d/async-multitenant/README.md) | concurrent and cancelled requests still served, and flow control's queue header, because the router queues and evicts work | 1 |
@@ -31,7 +31,7 @@ changes:
 | [multimodal-serving](llm-d/multimodal-serving/README.md) | images on Chat, Messages and Responses, and bad images refused, because the guide serves a vision model, through an encode step on one lane | 1 |
 | [optimized-baseline](llm-d/optimized-baseline/README.md) | completions sharing a prefix, and streaming through the router: the guide's own claims | 7, plus a simulator profile |
 | [pd-disaggregation](llm-d/pd-disaggregation/README.md) | streaming, usage frames, `n` choices and error shapes, because every request passes the decode pod's routing sidecar, which splits `n` and rewrites usage frames | 5 |
-| [pod-snapshot](llm-d/pod-snapshot/README.md) | nothing: snapshot and restore are cluster state, which a client cannot see | 2 |
+| [pod-snapshot](llm-d/pod-snapshot/README.md) | nothing more: snapshot and restore are cluster state, which a client cannot see | 2 |
 | [precise-prefix-cache-routing](llm-d/precise-prefix-cache-routing/README.md) | token counts and rendered prompts that agree with the engine, because the router renders every prompt | 4 |
 | [predicted-latency-routing](llm-d/predicted-latency-routing/README.md) | streaming as well as non-streaming clients, at a 128k window on GPU and AMD | 2 |
 | [tiered-prefix-cache](llm-d/tiered-prefix-cache/README.md) | completions sharing a long prefix, the request the guide's own check sends | 5 |
