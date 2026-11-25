@@ -110,22 +110,33 @@ def check_upstream(relay, ingress: Ingress, name: str, since: int = 0) -> None:
     502 for the same reason, which the SDK also retries.
 
     A declared 429 is throttling rather than a fault, so it goes through `assert_not_throttled`
-    and skips the case; an undeclared one stays a failure. A refusal alone is not asserted here:
+    and skips the case only when no generation independently failed. A client's ordering of
+    failures and throttles must not change the verdict. An undeclared 429 stays a failure.
+    A refusal alone is not asserted here:
     the relay's own bounds legitimately refuse a request, and each case records and judges that
     itself.
     """
     generations = relay.generations[since:]
-    for exchange, _ in generations:
-        assert_not_throttled(exchange, ingress)
     statuses = Counter(
         "transport_error" if exchange.transport_error else exchange.status
         for exchange, _ in generations
     )
-    if any(status != 200 for status in statuses):
+    if any(status not in {200, 429} for status in statuses):
         observed: dict[str, Any] = {"statuses": dict(statuses)}
         if relay.rejected:
             observed["relay_refused"] = list(relay.rejected)
         fail(name, observed, "every generation served 200")
+    if 429 in statuses:
+        # Retain the whole session's status evidence even when the throttle helper exits
+        # early. It remains responsible for quota signals and the precise skip class.
+        journal.record(
+            name,
+            dict(statuses),
+            "every generation served 200 or declared throttling",
+            ok=ingress.rate_limited,
+        )
+    for exchange, _ in generations:
+        assert_not_throttled(exchange, ingress)
     journal.record(name, dict(statuses), "every generation served 200", ok=True)
 
 
