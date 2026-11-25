@@ -38,6 +38,8 @@ inputs:
 
 ## Coverage
 
+The guide profiles and coverage below are based on llm-d commit `9ca8ff0`.
+
 Every guide llm-d runs in a nightly lane, which llm-d's guide policy calls
 [Tier 3, Validated](https://github.com/llm-d/llm-d/blob/main/guides/GUIDES-POLICY.md#5-production-readiness-tiers) (`.github/workflows/nightly-e2e-*.yaml`; keda-epp's are `nightly-e2e-workload-autoscaling-keda-epp-*`), has a folder here,
 named as its `guide.yaml` names it, except those listed under [Not covered](#not-covered). Lanes that look the same to a
