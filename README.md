@@ -47,32 +47,37 @@ pinpoints the layer that breaks, and flags what regressed since the last run.
 > read-only verb allowlist. You name credentials by
 > environment variable; `llmdv` keeps them out of every file and redacts them from every log.
 
-## Test a deployed llm-d guide
+## Quick start: test a deployed llm-d guide
 
-Every llm-d guide at [Tier 3](https://github.com/llm-d/llm-d/blob/main/guides/GUIDES-POLICY.md#5-production-readiness-tiers) (Validated: run end to end every
-night) includes a ready-to-use
+Every llm-d guide at [Tier 3](https://github.com/llm-d/llm-d/blob/main/guides/GUIDES-POLICY.md#5-production-readiness-tiers)
+(Validated: run end to end every night) comes with a ready-to-use
 [validation profile](https://github.com/llm-d-incubation/llm-d-validate/blob/main/profiles/README.md#llm-d-guide-validation-profiles).
-After deploying a guide, use its profile to verify that your deployment behaves as specified by
-the guide and its APIs. By default, the profiles target the guide's router (the EPP), so give
-`llmdv` the EPP's URL.
+Pick the one for the overlay you deployed from the guide's README, point `llmdv` at the guide's
+router (the EPP), and run it:
 
 ```sh
 ./install.sh && source .venv/bin/activate
-export LLMDV_EPP_URL=<your EPP's URL>
-llmdv verify --profile profiles/llm-d/optimized-baseline/vllm-qwen3-32b-parsers-standalone.yaml \
-  --identity accelerator=gpu --identity provider=gke
+P=profiles/llm-d/optimized-baseline/vllm-qwen3-32b-parsers-standalone.yaml
+export LLMDV_EPP_URL=<your EPP's URL>          # the router needs no key
+
+llmdv profile show $P --test-sets             # what the profile's test sets hold, offline
+llmdv plan --profile $P                       # the cases a plain run selects, and why any skip
+llmdv verify --profile $P --test-set smoke    # quick: every API answers
+llmdv verify --profile $P                     # the guide's default test set
+llmdv verify --profile $P --full-suite        # every case in the library
 ```
 
-Pick the profile and `--identity` flags that match your configuration from the guide's folder.
-
-To include a gateway (Istio, agentgateway, LiteLLM) or engine in your tests, add it as another
-ingress, and `llmdv` tests each layer on its own. See
-[include a gateway or engine](https://github.com/llm-d-incubation/llm-d-validate/blob/main/profiles/README.md#include-a-gateway-or-engine).
+Narrow any run with `-m <suite>` or `-k <case>`;
+[choosing what runs](https://github.com/llm-d-incubation/llm-d-validate/blob/main/docs/cli.md#test-sets-and-coverage)
+explains test sets, suites and the full suite. To test a gateway (Istio, agentgateway, LiteLLM) or
+the engine as well, [add it as another ingress](https://github.com/llm-d-incubation/llm-d-validate/blob/main/profiles/README.md#include-a-gateway-or-engine),
+and `llmdv` tests each layer on its own.
 
 ## Test your own stack
 
 For other model-serving stacks, whether or not they use llm-d, start from an example profile.
-Copy the closest one, fill in its placeholders, and run it:
+Copy the closest one, fill in its placeholders, and run it. The quick start's commands work the
+same way on it:
 
 ```sh
 cp profiles/examples/example-gateway-only.yaml profiles/my-stack.local.yaml   # set base_url and model
@@ -82,18 +87,6 @@ llmdv plan --profile profiles/my-stack.local.yaml      # preview what runs and w
 llmdv verify --profile profiles/my-stack.local.yaml    # run it against your stack
 ```
 
-A plain `verify` runs the profile's `default` test set. Add `--test-set smoke` for a quick check
-that every API answers, or `--full-suite` for every case in the library, and narrow either with
-`-m <suite>` or `-k <case>`. To see what the default set holds before you run it:
-
-```sh
-llmdv profile show profiles/my-stack.local.yaml --test-sets   # each set and its case-ID patterns
-llmdv plan --profile profiles/my-stack.local.yaml             # the cases it selects, and why any skip
-```
-
-[Choosing what runs](https://github.com/llm-d-incubation/llm-d-validate/blob/main/docs/cli.md#test-sets-and-coverage)
-explains test sets, suites and the full suite.
-
 Git ignores `*.local.yaml` profiles, so your hosts stay out of the repository.
 [Writing a profile](https://github.com/llm-d-incubation/llm-d-validate/blob/main/docs/writing-profiles.md) walks through the other
 examples, `extends` and what to declare.
@@ -101,7 +94,7 @@ examples, `extends` and what to declare.
 ## What it tests
 
 19 suites and growing, from every API surface to failure paths and fleet invariants. Run any
-one on its own with `-m <marker>`; [test suites](https://github.com/llm-d-incubation/llm-d-validate/blob/main/docs/test-suites.md) describes each one and
+one on its own with `--full-suite -m <suite>`; [test suites](https://github.com/llm-d-incubation/llm-d-validate/blob/main/docs/test-suites.md) describes each one and
 what turns it on.
 
 <p align="center">
