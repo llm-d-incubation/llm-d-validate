@@ -6,7 +6,6 @@ cases that apply, and tests every layer against it. Find your starting point:
 | You have | Start here |
 | --- | --- |
 | a deployed llm-d guide | [Test your guide](#test-your-guide): ready profiles, give llmdv the EPP's URL |
-| an llm-d guide that already sits behind a gateway | [Test through your gateway](#test-through-your-gateway): one more URL |
 | any other OpenAI- or Anthropic-compatible stack | [Your own stack](#your-own-stack): write a profile |
 
 ## Supported llm-d guides
@@ -50,7 +49,7 @@ llmdv verify --profile profiles/llm-d/optimized-baseline/vllm-qwen3-32b-parsers-
 Each guide's folder names its combinations and their `--identity` flags;
 [llm-d/README.md](llm-d/README.md) explains how to pick one.
 
-## Test through your gateway
+### Test through your gateway
 
 If your guide already sits behind a gateway (Istio, agentgateway, LiteLLM or your own), llmdv can
 test through it too. Nothing in your stack changes: name the gateway's URL in a short local file
@@ -82,7 +81,9 @@ llmdv profile validate profiles/<system>/<model>.local.yaml
 llmdv verify --profile profiles/<system>/<model>.local.yaml -m contract
 ```
 
-`*.local.yaml` files are gitignored, so your hosts stay out of the repository.
+Each other layer you can reach, such as a gateway in front of a router, is one more ingress in
+the same file ([step 3](../docs/writing-profiles.md#the-steps)). `*.local.yaml` files are
+gitignored, so your hosts stay out of the repository.
 [Writing a profile](../docs/writing-profiles.md) walks through every step, the
 [examples](../docs/writing-profiles.md#start-from-the-closest-example) and `extends`;
 [REFERENCE.md](REFERENCE.md) lists every field.
