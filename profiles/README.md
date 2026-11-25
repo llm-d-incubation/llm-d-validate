@@ -40,8 +40,8 @@ tested on what makes it different:
 | [tiered-prefix-cache](llm-d/tiered-prefix-cache/README.md) | Completions sharing a long prefix, because the tiered-prefix-cache guide offloads that prefix's KV-cache blocks, and its own check sends these requests | 5 |
 | [wide-ep](llm-d/wide-ep/README.md) | What pd-disaggregation tests, plus concurrent requests, because the wide-ep guide uses the same routing sidecar and its own check sends requests at once | 3 |
 
-To test your guide, give `llmdv` its EPP's URL, which needs no key, and run the profile that
-matches your configuration:
+To test against a deployed guide, give `llmdv` its EPP's URL, which needs no key, and run the
+profile that matches your configuration:
 
 ```sh
 export LLMDV_EPP_URL=<your EPP's URL>
