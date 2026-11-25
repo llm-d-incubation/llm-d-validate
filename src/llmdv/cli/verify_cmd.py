@@ -32,7 +32,14 @@ from pathlib import Path
 from .. import __version__, identity, preflight
 from ..collect import KubectlLogCollector, NoopCollector
 from ..evidence import dashboard, reproduce
-from ..evidence.outcome import Outcome, connection_lost, environment_only, known_summary, now
+from ..evidence.outcome import (
+    Outcome,
+    connection_lost,
+    environment_only,
+    known_summary,
+    now,
+    read_results,
+)
 from ..evidence.stack import stack_from_run
 from ..kube import KubeContext
 from ..log import setup as log_setup
@@ -404,7 +411,8 @@ def _verify(args: argparse.Namespace, run: _Run) -> int:
     run.ran_pytest = True
     code = _run_pytest(pytest_argv, raw=args.raw_pytest, setup_commands=run.setup_commands)
 
-    records = _read_records(run_dir)
+    # Preserve the completed work before any supporting evidence or report can fail.
+    records = run.records = _read_records(run_dir)
     run.collected = _collect_logs(
         args,
         profile,
@@ -434,6 +442,14 @@ def _finish(args: argparse.Namespace, run: _Run, code: int) -> int:
     # A second signal must not cut publication short.
     signal.signal(signal.SIGTERM, signal.SIG_IGN)
     run_dir, outcome = run.run_dir, run.outcome
+    if run.ran_pytest and not run.records:
+        # pytest itself, or the strict normal read, may have stopped before handing records
+        # back. Recover complete readable rows as publish does for a killed run; a torn final
+        # line or an unsupported record must not hide the earlier cases or change the exit.
+        refused: list[str] = []
+        run.records = read_results(run_dir, refused)
+        for reason in refused:
+            log.warning("could not recover a result: %s", reason)
     if run.profile is not None:
         # Supporting files only. Failing to write one must never stop the run being published.
         try:
