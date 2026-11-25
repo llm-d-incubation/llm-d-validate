@@ -2,8 +2,7 @@
 
 Validation profiles for the [llm-d](https://github.com/llm-d/llm-d) guides (llm-d's docs also say "well-lit
 paths"; this repository says guide). Each states what a correct stack does when a guide is
-deployed as shipped with one model-server overlay, for every configuration a nightly lane deploys
-at llm-d `9ca8ff0`.
+deployed as shipped with one model-server overlay, for every configuration a nightly lane deploys.
 
 They are data on top of `llmdv`: nothing in `src/` knows about them, and any other stack is
 described by its own profile ([profiles/README.md](../README.md)). How the folders are built and
@@ -40,8 +39,7 @@ inputs:
 ## Coverage
 
 Every guide llm-d runs in a nightly lane, which llm-d's guide policy calls
-[Tier 3, Validated](https://github.com/llm-d/llm-d/blob/main/guides/GUIDES-POLICY.md#5-production-readiness-tiers) (`.github/workflows/nightly-e2e-*.yaml` at
-`9ca8ff0`; keda-epp's are `nightly-e2e-workload-autoscaling-keda-epp-*`), has a folder here,
+[Tier 3, Validated](https://github.com/llm-d/llm-d/blob/main/guides/GUIDES-POLICY.md#5-production-readiness-tiers) (`.github/workflows/nightly-e2e-*.yaml`; keda-epp's are `nightly-e2e-workload-autoscaling-keda-epp-*`), has a folder here,
 named as its `guide.yaml` names it, except those listed under [Not covered](#not-covered). Lanes that look the same to a
 client share a profile.
 
@@ -67,14 +65,14 @@ exposes the same way.
 ### Not covered
 
 - **fast-model-actuation-keda** (2 lanes, #130). The pool scales from zero on the router's
-  flow-control queue size only (`minReplicaCount: 0`, `cooldownPeriod: 30`; llm-d 9ca8ff0
+  flow-control queue size only (`minReplicaCount: 0`, `cooldownPeriod: 30`; llm-d
   `guides/fast-model-actuation/fast-model-actuation-keda/keda/base/kustomization.yaml`), and
   `llmdv`'s one-at-a-time requests never queue. So the pool can drop to zero mid-run and
   cold-start, holding a request up to the router's `noEndpointRequestTTL` of 300 s
   (`guides/fast-model-actuation/fast-model-actuation-keda/router/fast-model-actuation-keda.values.yaml`).
   `llmdv` has no warm-up; tolerating that means raising `stream_idle` and `stream_budget`
   ([parts/topology/standalone.yaml](parts/topology/standalone.yaml)) for every streaming check.
-- **ci-async-kind-e2e** runs on pull requests and by hand, never nightly (llm-d 9ca8ff0
+- **ci-async-kind-e2e** runs on pull requests and by hand, never nightly (llm-d
   `.github/workflows/ci-async-kind-e2e.yaml`). Its temporary kind cluster (optimized-baseline's
   router over a CPU vLLM serving `facebook/opt-125m` at `--max_model_len=2048`, plus Redis and
   llm-d-async v1.0.0; `guides/batch-serving/asynchronous-processing/test/kind-e2e.sh`) is deleted

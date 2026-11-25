@@ -1,6 +1,6 @@
 # flow-control
 
-Profiles for llm-d's [flow-control guide](https://github.com/llm-d/llm-d/tree/main/guides/flow-control) at llm-d `9ca8ff0`: the llm-d router with its `flowControl` feature gate on, priority bands 100, 0 and -10, round-robin fairness and FCFS ordering, in front of optimized-baseline's vLLM model servers.
+Profiles for llm-d's [flow-control guide](https://github.com/llm-d/llm-d/tree/main/guides/flow-control): the llm-d router with its `flowControl` feature gate on, priority bands 100, 0 and -10, round-robin fairness and FCFS ordering, in front of optimized-baseline's vLLM model servers.
 
 The profiles test the router (EPP) each lane exposes, in standalone mode, through `../parts/topology/standalone.yaml`. The helm release is `flow-control`, so the Service is `<GUIDE_NAME>-epp` on port 80 (the lanes' `gateway_host`).
 
