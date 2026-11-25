@@ -178,6 +178,7 @@ def cmd_job(args: argparse.Namespace) -> int:
         run_dir = create_run_dir(args.work_dir, output_profile_name(args.profile))
     except OSError as exc:
         log.error("could not create a fresh local run directory: %s", exc)
+        _notify(None, PREFLIGHT)
         return PREFLIGHT
     verify_code = _verify(args, run_dir, passthrough)
 
@@ -259,11 +260,7 @@ def cmd_job(args: argparse.Namespace) -> int:
         if changed:
             outcome.write_dict(run_dir, body)
 
-    notify_code = OK
-    if (os.environ.get(WEBHOOK_ENV) or "").strip():
-        notify_code = notify_run(run_dir, verify_code)
-    else:
-        log.warning("$%s is not set or is empty; notification skipped", WEBHOOK_ENV)
+    notify_code = _notify(run_dir, verify_code)
 
     # In the job log too: if publication failed, this copy outlives the pod's emptyDir.
     if body is not None:
@@ -275,6 +272,13 @@ def cmd_job(args: argparse.Namespace) -> int:
     if feed is not None:
         _print_alert_feed(run_dir, feed, code)
     return code
+
+
+def _notify(run_dir: Path | None, verify_code: int) -> int:
+    if (os.environ.get(WEBHOOK_ENV) or "").strip():
+        return notify_run(run_dir, verify_code)
+    log.warning("$%s is not set or is empty; notification skipped", WEBHOOK_ENV)
+    return OK
 
 
 # The alert feed is advisory, like the comparison. A failure to build, write or print it is

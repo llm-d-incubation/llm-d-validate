@@ -47,8 +47,11 @@ def cmd_notify(args: argparse.Namespace) -> int:
     return code
 
 
-def notify_run(run_dir: Path, exit_code: int | None) -> int:
-    """Post a run's outcome to the webhook in $LLMDV_NOTIFY_WEBHOOK; OK, NOT_DELIVERED or USAGE."""
+def notify_run(run_dir: Path | None, exit_code: int | None) -> int:
+    """Post an outcome; None explicitly means this invocation never created a run directory.
+
+    Returns OK, NOT_DELIVERED or USAGE. Never read a reusable output root as a failed run.
+    """
     url = os.environ.get(WEBHOOK_ENV)
     if not url:
         log.error("$%s is not set, so there is nowhere to send the notification", WEBHOOK_ENV)
@@ -59,11 +62,13 @@ def notify_run(run_dir: Path, exit_code: int | None) -> int:
     # The job writes either the comparison or its unavailability reason beside the results.
     # Absent when no comparison was requested.
     comparison = None
-    comparison_file = run_dir / COMPARISON_FILE
-    if comparison_file.is_file():
+    comparison_file = run_dir / COMPARISON_FILE if run_dir is not None else None
+    if comparison_file is not None and comparison_file.is_file():
         comparison = comparison_file.read_text(encoding="utf-8")
 
-    text = notify.message(outcome.read(run_dir), exit_code, comparison)
+    text = notify.message(
+        outcome.read(run_dir) if run_dir is not None else None, exit_code, comparison
+    )
     try:
         notify.post(url, text)
     except notify.NotifyError as exc:
