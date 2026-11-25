@@ -89,7 +89,7 @@ examples, `extends` and what to declare.
 
 ## What it tests
 
-Nineteen suites and growing, from every API surface to failure paths and fleet invariants. Run any
+19 suites and growing, from every API surface to failure paths and fleet invariants. Run any
 one on its own with `-m <marker>`; [test suites](https://github.com/llm-d-incubation/llm-d-validate/blob/main/docs/test-suites.md) describes each one and
 what turns it on.
 

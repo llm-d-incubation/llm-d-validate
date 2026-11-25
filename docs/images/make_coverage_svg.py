@@ -68,12 +68,6 @@ LAYERS = ("Gateway", "Router", "Engine")
 
 OUTPUT = Path(__file__).resolve().parent / "llmdv-coverage.svg"
 
-_NUMBER_WORDS = (
-    "Zero One Two Three Four Five Six Seven Eight Nine Ten Eleven Twelve Thirteen Fourteen "
-    "Fifteen Sixteen Seventeen Eighteen Nineteen Twenty Twenty-one Twenty-two Twenty-three "
-    "Twenty-four Twenty-five Twenty-six Twenty-seven Twenty-eight Twenty-nine Thirty"
-).split()
-
 W = 1440
 FONT = "-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif"
 MONO = "SFMono-Regular, Menlo, Consolas, 'Liberation Mono', monospace"
@@ -93,7 +87,6 @@ def _esc(text: str) -> str:
 def render() -> str:
     """The SVG text, exactly as committed."""
     count = len(markers())
-    word = _NUMBER_WORDS[count] if count < len(_NUMBER_WORDS) else str(count)
     ph = 66 + max(len(items) for _, _, items in GROUPS) * ROW_H + 12
     fy = TOP + ph + 62
     h = fy + 46
@@ -105,7 +98,7 @@ def render() -> str:
     )
     a('<title id="t">What llmdv tests</title>')
     a(
-        f'<desc id="d">{word} test suites and growing, in four groups, each with the pytest '
+        f'<desc id="d">{count} test suites and growing, in four groups, each with the pytest '
         "marker that runs it: API surfaces, model behaviour, failure and resilience, contract "
         "and change. Every case runs per layer: gateway, router, engine.</desc>"
     )
