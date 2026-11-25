@@ -28,6 +28,7 @@ from ..output.remote import (
     parse_remote_uri,
     sink_for,
 )
+from ..output.source import UnsafeSource, source_files, source_path
 from .exit_codes import NOT_DELIVERED, OK, PREFLIGHT, USAGE, class_of
 
 log = get_logger("cli.publish")
@@ -118,6 +119,24 @@ def _publish_run(
     if not run_dir.is_dir() or not any(run_dir.iterdir()):
         log.error("%s is empty or missing, so there is nothing to publish", run_dir)
         return USAGE, []
+    try:
+        # Recovery and dashboard generation read and rewrite evidence before the sinks run.
+        # Validate first: rewriting an external outcome link would hide its provenance.
+        source_files(run_dir)
+    except (UnsafeSource, OSError) as exc:
+        log.error("results were NOT published: %s", exc)
+        verified = exit_code
+        try:
+            # An unrelated bad artifact must not mask a safely recorded fleet failure.
+            # Never follow a rejected outcome link merely to recover its exit code.
+            if source_path(run_dir, outcome_file.FILENAME).is_file():
+                body = outcome_file.read(run_dir) or {}
+                recorded = (body.get("verification") or {}).get("exit_code")
+                if recorded is not None:
+                    verified = recorded
+        except (UnsafeSource, OSError):
+            pass
+        return _not_delivered(verified, NOT_DELIVERED), []
     unreadable: list[str] = []
     code = _publish(run_dir, remote_output, exit_code, primary, unreadable, analyze, check)
     return code, unreadable

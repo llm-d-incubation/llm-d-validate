@@ -22,6 +22,7 @@ from .remote import (
     UnsupportedRemote,
     publish_files,
 )
+from .source import source_path
 
 # Not "output.*": that would nest under the primary-output logger, printing to stdout.
 log = get_logger("sink.s3")
@@ -195,7 +196,7 @@ class S3Sink:
 
         def put(relpath: str) -> None:
             content_type = mimetypes.guess_type(relpath)[0] or "application/octet-stream"
-            with (run_dir / relpath).open("rb") as body:
+            with source_path(run_dir, relpath).open("rb") as body:
                 client.put_object(
                     Bucket=self.bucket,
                     Key=self._key(name, relpath),
