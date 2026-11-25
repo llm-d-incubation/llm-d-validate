@@ -6,12 +6,12 @@ Usage: live_summary.py <run_dir> --profile P --gateway G --channel C --event E [
 Shows the verdict, the totals, a pass/fail/skip table per suite and the largest failure groups
 (by first failing check, as `llmdv analyze` groups them).
 
-The summary is visible to anyone who can read the repository's Actions. It must never carry a
-secret, so the workflow runs this step with NO credentials in its environment: no AWS keys and
-no gateway key, which makes it unable to print one whatever the run files contain. It reads
-only the run directory, which llmdv has already redacted. As defence in depth, it also refuses
-to print anything that looks like a credential (`sk-...`, `Bearer ...`, `AKIA...`), and
-scrubs the endpoint hostnames, which are not secret but are cluster-identifying.
+The summary is visible to anyone who can read the repository's Actions, so it must never carry
+a secret. A workflow that calls this script must run it as its own step with NO credentials in
+that step's environment: no AWS keys and no gateway key, so it cannot print one whatever the run
+files contain. It reads only the run directory, which llmdv has already redacted. As defence in
+depth, it also refuses to print anything that looks like a credential (`sk-...`, `Bearer ...`,
+`AKIA...`), and scrubs the endpoint hostnames, which are not secret but are cluster-identifying.
 
 There is deliberately no link to the dashboard: a signed S3 link carries the access key ID and
 grants read access to anyone holding it. The dashboard is published with the run; pull it as

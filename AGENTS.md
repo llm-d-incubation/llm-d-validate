@@ -103,10 +103,11 @@ stay in sync. `ruff check` alone is not the whole gate: formatting is enforced b
 llmdv's own offline tests only: `llmdv verify` and `llmdv job` refuse `-n` and always run live
 cases one at a time, so never try to parallelize a run against a fleet.
 
-A live run needs a profile and, for in-cluster ingresses, port-forwards:
+A live run needs a profile and a URL for each ingress it names. A profile that declares local
+setup prints it with `--setup`:
 
 ```sh
-llmdv profile show <profile> --setup           # prints the forwards, pods resolved live
+llmdv profile show <profile> --setup           # any setup the profile declares, pods resolved live
 llmdv verify --profile <profile>
 ```
 
