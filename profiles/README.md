@@ -3,7 +3,7 @@
 A profile describes your stack and defines its expected behavior. `llmdv` uses it to select
 relevant test cases and verify that each layer of the stack meets those expectations.
 
-Each [supported llm-d guide](#testing-llm-d-guides) includes a ready-to-use profile. After
+Each [supported llm-d guide](#llm-d-guide-validation-profiles) includes a ready-to-use profile. After
 deploying a guide, use its profile to verify that your deployment behaves as specified by the
 guide and its APIs. By default, these profiles target the guide's router. To include a gateway or
 engine in your tests, simply [add it as another ingress](#test-through-your-gateway).
@@ -15,10 +15,10 @@ Find your starting point:
 
 | You have | Start here |
 | --- | --- |
-| a deployed llm-d guide | [Testing llm-d guides](#testing-llm-d-guides): the guide's ready profile, and its EPP's URL |
+| a deployed llm-d guide | [llm-d guide validation profiles](#llm-d-guide-validation-profiles): the guide's ready profile, and its EPP's URL |
 | any other OpenAI- or Anthropic-compatible stack | [Your own stack](#your-own-stack): write a profile |
 
-## Testing llm-d guides
+## llm-d guide validation profiles
 
 Every guide gets the same base tests: each API a client uses, the errors the router must return,
 the overlay's reasoning and tool parsers, and its context window. On top of those, each guide is
