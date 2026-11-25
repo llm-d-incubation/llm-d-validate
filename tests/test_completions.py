@@ -7,7 +7,7 @@ import json
 import pytest
 
 from llmdv.surfaces import get
-from tests.fakes import FakeFleet, run_llmdv
+from tests.fakes import FakeFleet, only_run, run_llmdv
 from tests.test_suites_against_fake import run_suites, write_profile
 
 COMPLETIONS = get("completions")
@@ -85,6 +85,7 @@ def test_completions_probe_cli_runs_completions_and_rejects_http_200_abort(tmp_p
             "--evidence",
             "all",
         )
+        run_dir = only_run(run_dir)
 
     assert result.returncode == (1 if aborted else 0), result.stdout + result.stderr
     records = [json.loads(line) for line in (run_dir / "results.jsonl").read_text().splitlines()]

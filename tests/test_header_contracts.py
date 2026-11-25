@@ -4,7 +4,7 @@ import pytest
 import yaml
 
 from llmdv.http.client import RecordingClient
-from tests.fakes import FakeFleet, run_llmdv
+from tests.fakes import FakeFleet, only_run, run_llmdv
 from tests.test_suites_against_fake import run_suites, write_profile
 
 
@@ -34,6 +34,7 @@ def test_missing_auth_cannot_hide_behind_a_valid_key(tmp_path, scheme, header, d
             "test_required_authentication",
             env={"LLMDV_HEADER_KEY": secret},
         )
+        run = only_run(run)
     assert result.returncode == (1 if defect else 0), result.stdout + result.stderr
     records = [json.loads(line) for line in (run / "results.jsonl").read_text().splitlines()]
     assert all(r["outcome"] == ("fail" if defect else "pass") for r in records)

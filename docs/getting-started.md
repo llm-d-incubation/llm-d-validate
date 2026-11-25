@@ -123,7 +123,9 @@ llmdv verify --profile $P
 
 ## Read the results
 
-A run lands in `runs/<utc-timestamp>/`, named in the banner and the summary. Start with:
+A run lands in `runs/<profile>-<utc-timestamp>-<unique-id>/`, named in the banner and the
+summary. `--local-output ROOT` changes the parent directory; every invocation creates its own
+child and preserves earlier runs. Start with:
 
 - `summary.md`: the per-ingress table and the attribution reading.
 - `failures/<ingress>/<case>/verdict.txt`: what was claimed and the observations behind it.

@@ -14,7 +14,7 @@ from llmdv.cli import verify_cmd
 from llmdv.cli.exit_codes import INTERNAL, INTERRUPTED
 from llmdv.evidence.outcome import Outcome, write_dict
 from llmdv.output.remote import PublicationStatus
-from tests.fakes import SRC, FakeFleet, profile_yaml, run_llmdv
+from tests.fakes import SRC, FakeFleet, only_run, profile_yaml, run_llmdv
 
 
 def write_profile(tmp_path, fleet, **kw):
@@ -49,6 +49,7 @@ def test_a_passing_run_records_its_outcome_labels_and_one_run_id(tmp_path):
             "--identity", "trigger=nightly", "--identity", "trigger=rollout",
             "--label", "rollout=r1",
         )  # fmt: skip
+        run_dir = only_run(run_dir)
 
     assert result.returncode == 0, result.stderr
     outcome = outcome_of(run_dir)
@@ -93,6 +94,7 @@ def test_a_flavor_identity_is_recorded_and_an_empty_one_is_refused(tmp_path):
             "verify", "--profile", str(profile), "--local-output", str(run_dir),
             "--pod-logs", "off", "-k", "discovery", "--identity", "flavor=lmcache-cpu",
         )  # fmt: skip
+        run_dir = only_run(run_dir)
         assert result.returncode == 0, result.stderr
         assert outcome_of(run_dir)["identity"]["flavor"] == "lmcache-cpu"
         refused = run_llmdv(
@@ -129,6 +131,7 @@ def test_a_fleet_failure_is_recorded_with_the_failing_case(tmp_path):
             "verify", "--profile", str(profile), "--local-output", str(run_dir),
             "--pod-logs", "off", "-k", "test_chat_basic and not sdk",
         )  # fmt: skip
+        run_dir = only_run(run_dir)
 
     assert result.returncode == 1
     verification = outcome_of(run_dir)["verification"]
@@ -145,6 +148,7 @@ def test_an_invalid_profile_still_leaves_a_bundle(tmp_path):
     )
     run_dir = tmp_path / "run"
     result = run_llmdv("verify", "--profile", str(profile), "--local-output", str(run_dir))
+    run_dir = only_run(run_dir)
 
     assert result.returncode == 2
     outcome = outcome_of(run_dir)
@@ -160,6 +164,7 @@ def test_an_unreadable_profile_still_leaves_a_bundle(tmp_path):
     profile.write_text("name: [unclosed\n")
     run_dir = tmp_path / "run"
     result = run_llmdv("verify", "--profile", str(profile), "--local-output", str(run_dir))
+    run_dir = only_run(run_dir)
 
     assert result.returncode == 2
     outcome = outcome_of(run_dir)
@@ -176,6 +181,7 @@ def test_a_malformed_label_is_a_usage_error_on_record(tmp_path):
             "verify", "--profile", str(profile), "--local-output", str(run_dir),
             "--label", "no-equals-sign",
         )  # fmt: skip
+        run_dir = only_run(run_dir)
 
     assert result.returncode == 2
     assert outcome_of(run_dir)["verification"]["class"] == "usage"
@@ -187,6 +193,7 @@ def test_a_failed_preflight_is_an_environment_outcome_with_its_problems(tmp_path
     profile.write_text(profile_yaml("http://127.0.0.1:1"))
     run_dir = tmp_path / "run"
     result = run_llmdv("verify", "--profile", str(profile), "--local-output", str(run_dir))
+    run_dir = only_run(run_dir)
 
     assert result.returncode == 3
     outcome = outcome_of(run_dir)
@@ -205,6 +212,7 @@ def test_a_model_the_fleet_does_not_offer_stops_the_run_in_preflight(tmp_path):
             "verify", "--profile", str(profile), "--local-output", str(run_dir),
             "--pod-logs", "off",
         )  # fmt: skip
+        run_dir = only_run(run_dir)
 
     assert result.returncode == 3, result.stderr
     outcome = outcome_of(run_dir)
@@ -235,6 +243,7 @@ def test_profile_deployment_mismatch_stops_before_testing(
         result = run_llmdv(
             "verify", "--profile", str(profile), "--local-output", str(run_dir), "--pod-logs", "off"
         )  # fmt: skip
+        run_dir = only_run(run_dir)
 
     assert result.returncode == 3, result.stderr
     outcome = outcome_of(run_dir)
@@ -258,14 +267,16 @@ def test_sigint_mid_run_is_an_interrupted_outcome_not_a_crash(tmp_path):
             stderr=subprocess.DEVNULL,
         )  # fmt: skip
         # Wait until a case has finished: results.jsonl is created at startup, so wait for a line.
-        results = run_dir / "results.jsonl"
         deadline = time.monotonic() + 60
-        while time.monotonic() < deadline and not (results.exists() and results.read_text()):
+        while time.monotonic() < deadline:
+            if any(path.read_text() for path in run_dir.glob("*/results.jsonl")):
+                break
             time.sleep(0.1)
         process.send_signal(signal.SIGINT)
         code = process.wait(timeout=60)
 
     assert code == INTERRUPTED
+    run_dir = only_run(run_dir)
     outcome = outcome_of(run_dir)
     assert outcome["verification"]["class"] == "interrupted"
     assert outcome["verification"]["counts"]
@@ -282,6 +293,7 @@ def test_a_broken_test_module_is_a_llmdv_defect_not_an_interrupt(tmp_path):
             "verify", "--profile", str(profile), "--local-output", str(run_dir),
             "--pod-logs", "off", "--", str(broken),
         )  # fmt: skip
+        run_dir = only_run(run_dir)
 
     assert result.returncode == INTERNAL
     assert outcome_of(run_dir)["verification"]["class"] == "internal"

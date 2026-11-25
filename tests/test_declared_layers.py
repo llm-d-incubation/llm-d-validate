@@ -14,7 +14,7 @@ import contextlib
 import yaml
 
 from llmdv.evidence import alerts, dashboard
-from tests.fakes import FakeFleet, profile_yaml, run_llmdv
+from tests.fakes import FakeFleet, only_run, profile_yaml, run_llmdv
 from tests.test_dashboard import payload
 
 LAYERS = (
@@ -49,6 +49,7 @@ def run_pd(tmp_path, broken: set[str], declare: bool = True):
             "verify", "--profile", str(profile), "--local-output", str(run_dir),
             "--pod-logs", "off", "-k", "test_chat_basic and not sdk",
         )  # fmt: skip
+        run_dir = only_run(run_dir)
     assert result.returncode == 1, result.stderr
     return run_dir
 

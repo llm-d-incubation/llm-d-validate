@@ -9,7 +9,7 @@ import subprocess
 import pytest
 import yaml
 
-from tests.fakes import FakeFleet, run_llmdv
+from tests.fakes import FakeFleet, only_run, run_llmdv
 from tests.transport_fakes import Redirector
 from tests.transport_helpers import declare, exchanges, outcomes, run
 
@@ -414,6 +414,7 @@ def verify_with_auth(tmp_path, fleet, select, transport=None):
         "verify", "--profile", str(profile), "--local-output", str(out), "--pod-logs", "off",
         "--skip-preflight", "-k", select, env={"LLMDV_TRANSPORT_KEY": SECRET},
     )  # fmt: skip
+    out = only_run(out)
     records = [json.loads(line) for line in (out / "results.jsonl").read_text().splitlines()]
     assert SECRET not in (out / "exchanges.jsonl").read_text()
     return result.returncode, {r["case_id"]: r for r in records}

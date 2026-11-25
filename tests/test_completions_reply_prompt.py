@@ -15,7 +15,7 @@ import yaml
 from llmdv.surfaces.base import OPEN_PROMPT
 from llmdv.surfaces.completions import COMPLETIONS
 from tests.evolution_helpers import failed, run_evolution
-from tests.fakes import FakeFleet, run_llmdv
+from tests.fakes import FakeFleet, only_run, run_llmdv
 from tests.test_suites_against_fake import write_profile
 
 CASES = (
@@ -149,6 +149,7 @@ def run_moved(tmp_path, authenticated: bool, **fake):
             select,
             env={"LLMDV_REPLY_KEY": SECRET},
         )
+        run = only_run(run)
     records = [json.loads(line) for line in (run / "results.jsonl").read_text().splitlines()]
     by_case: dict[str, list[dict]] = {}
     for record in records:

@@ -58,7 +58,7 @@ def _run(tmp_path, fleet, env, *, job=False):
         "--remote-output", URI, "--pod-logs", "off", "--log-level", "DEBUG",
         "-k", "models_lists", env=env,
     )  # fmt: skip
-    if job and run_dir.exists():
+    if run_dir.exists():
         run_dir = next(run_dir.iterdir())
     path = run_dir / "outcome.json"
     outcome = json.loads(path.read_text()) if path.exists() else None

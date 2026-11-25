@@ -1,7 +1,7 @@
 """Output sinks: local run directories and remote publication."""
 
 from .base import ObjectSink, OutputSink
-from .local import LocalDirSink, default_run_dir
+from .local import LocalDirSink, create_run_dir, default_run_dir
 from .offload import OFFLOAD, Offloader, reference, run_prefix, whole
 from .remote import RemoteTarget, UnsupportedRemote, parse_remote_uri, sink_for
 
@@ -14,6 +14,7 @@ __all__ = [
     "RemoteTarget",
     "UnsupportedRemote",
     "default_run_dir",
+    "create_run_dir",
     "parse_remote_uri",
     "sink_for",
     "reference",

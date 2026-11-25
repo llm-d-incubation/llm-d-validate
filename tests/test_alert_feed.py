@@ -365,7 +365,7 @@ def job_in_process(tmp_path, monkeypatch):
 
     def verify(args, run, passthrough):
         made = run_dir(tmp_path / "made", [router("a", "pass")], verification_class="ok")
-        run.parent.mkdir(parents=True)
+        assert run.is_dir()  # The job reserves its child's directory before launching verify.
         made.rename(run)
         return OK
 

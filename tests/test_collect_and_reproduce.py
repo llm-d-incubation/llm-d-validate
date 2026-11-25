@@ -320,6 +320,11 @@ def test_rewrite_argv_handles_the_equals_form():
     assert out == ["llmdv", "verify", "-q"]
 
 
+@pytest.mark.parametrize("option", [["--run-dir", "/tmp/reserved"], ["--run-dir=/tmp/reserved"]])
+def test_rewrite_argv_drops_the_job_directory_reservation(option):
+    assert reproduce.rewrite_argv(["llmdv", "verify", *option], "p.yaml") == ["llmdv", "verify"]
+
+
 def test_script_is_runnable_and_carries_no_credential(tmp_path):
     path = reproduce.write(
         tmp_path,

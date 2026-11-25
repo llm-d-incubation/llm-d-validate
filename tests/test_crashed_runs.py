@@ -10,7 +10,7 @@ import time
 
 import pytest
 
-from tests.fakes import SRC, FakeFleet, FakeS3, profile_yaml, run_llmdv, s3_env
+from tests.fakes import SRC, FakeFleet, FakeS3, only_run, profile_yaml, run_llmdv, s3_env
 
 pytest.importorskip("boto3", reason="the s3 extra is not installed")
 
@@ -31,11 +31,15 @@ def start_verify(tmp_path, fleet, store):
         stdout=subprocess.DEVNULL,
         stderr=subprocess.DEVNULL,
     )  # fmt: skip
-    results = run_dir / "results.jsonl"
     deadline = time.monotonic() + 60
-    while time.monotonic() < deadline and not (results.exists() and results.read_text()):
+    while time.monotonic() < deadline:
+        results = list(run_dir.glob("*/results.jsonl"))
+        if results and results[0].read_text():
+            return process, results[0].parent
         time.sleep(0.1)
-    return process, run_dir
+    process.kill()
+    process.wait(timeout=10)
+    pytest.fail("verification did not record a case before the deadline")
 
 
 def published_keys(store, run_dir):
@@ -94,6 +98,7 @@ def test_publishing_an_already_published_run_does_nothing(tmp_path):
             "--pod-logs", "off", "--remote-output", URI, "-k", "models_lists",
             env=s3_env(store),
         )  # fmt: skip
+        run_dir = only_run(run_dir)
         uploads = len(store.order)
         again = run_llmdv(
             "publish", str(run_dir), "--remote-output", URI, "--exit-code", "0",
@@ -114,6 +119,7 @@ def test_one_file_failing_does_not_stop_the_rest(tmp_path):
             "--pod-logs", "off", "--remote-output", URI, "-k", "models_lists",
             env=s3_env(store),
         )  # fmt: skip
+        run_dir = only_run(run_dir)
 
     assert result.returncode == 5
     prefix, keys = published_keys(store, run_dir)
@@ -142,6 +148,7 @@ def test_a_corrupt_outcome_still_publishes_and_notifies(tmp_path):
             "verify", "--profile", str(profile), "--local-output", str(run_dir),
             "--pod-logs", "off", "-k", "models_lists",
         )  # fmt: skip
+        run_dir = only_run(run_dir)
         run_id = json.loads((run_dir / "results.jsonl").read_text().splitlines()[0])["run_id"]
         (run_dir / "outcome.json").write_text('{"run_id": "trunc')
 

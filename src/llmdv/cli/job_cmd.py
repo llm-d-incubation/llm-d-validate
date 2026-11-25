@@ -12,24 +12,25 @@ import os
 import signal
 import subprocess
 import sys
-from datetime import datetime, timezone
 from pathlib import Path
 
 from ..compare.archive import publish_one
 from ..evidence import alerts, dashboard, outcome
 from ..log.setup import emit, get_logger
+from ..output.local import create_run_dir
 from ..output.remote import PublicationStatus, UnsupportedRemote, parse_remote_uri
 from ..output.s3 import missing_credentials_reason
 from .compare_cmd import compare_run
-from .exit_codes import NOT_DELIVERED, OK, TEST_FAILURES, USAGE
+from .exit_codes import NOT_DELIVERED, OK, PREFLIGHT, TEST_FAILURES, USAGE
 from .notify_cmd import WEBHOOK_ENV, notify_run
 from .publish_cmd import publish_run, record_verdict
+from .verify_cmd import output_profile_name
 
 log = get_logger("cli.job")
 
 # Verify options `llmdv job` sets itself; passing them through as well would let verify and the
 # fallback publish disagree.
-OWNED = ("--profile", "--local-output", "--remote-output")
+OWNED = ("--profile", "--local-output", "--remote-output", "--run-dir")
 
 
 def add_parser(subparsers, parents) -> None:
@@ -173,8 +174,11 @@ def cmd_job(args: argparse.Namespace) -> int:
                 "will exit 2"
             )
 
-    stamp = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H-%M-%SZ")
-    run_dir = (args.work_dir / stamp).resolve()
+    try:
+        run_dir = create_run_dir(args.work_dir, output_profile_name(args.profile))
+    except OSError as exc:
+        log.error("could not create a fresh local run directory: %s", exc)
+        return PREFLIGHT
     verify_code = _verify(args, run_dir, passthrough)
 
     # Compare BEFORE publishing, so comparison.md is part of the upload rather than a file
@@ -331,7 +335,8 @@ def _verify(args: argparse.Namespace, run_dir: Path, passthrough: list[str]) -> 
     command = [
         sys.executable, "-m", "llmdv.cli.main", "verify",
         "--profile", args.profile,
-        "--local-output", str(run_dir),
+        "--local-output", str(args.work_dir),
+        "--run-dir", str(run_dir),
         "--log-level", args.log_level,
         "--log-format", args.log_format,
         *(["--remote-output", args.remote_output] if args.remote_output else []),

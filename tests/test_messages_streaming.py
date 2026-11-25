@@ -13,7 +13,7 @@ from llmdv.evidence import journal
 from llmdv.http import redact, sse
 from llmdv.http.client import RecordingClient
 from llmdv.surfaces import get
-from tests.fakes import FakeFleet, message_events, named_sse, run_llmdv
+from tests.fakes import FakeFleet, message_events, named_sse, only_run, run_llmdv
 from tests.test_suites_against_fake import run_suites, write_profile
 
 MESSAGES = get("messages")
@@ -295,6 +295,7 @@ def test_agent_streams_through_both_ingresses_with_named_event_evidence(tmp_path
             "-k",
             "test_messages_streaming",
         )
+        run_dir = only_run(run_dir)
     assert result.returncode == 0, result.stdout + result.stderr
     records = [json.loads(line) for line in (run_dir / "results.jsonl").read_text().splitlines()]
     assert {r["ingress"] for r in records} == {"fake", "router"}

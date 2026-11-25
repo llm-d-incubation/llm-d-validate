@@ -39,12 +39,12 @@ from ..log import setup as log_setup
 from ..log.setup import emit, get_logger
 from ..log.writer import LoggerWriter
 from ..output import (
-    LocalDirSink,
     Offloader,
     UnsupportedRemote,
-    default_run_dir,
+    create_run_dir,
     run_prefix,
 )
+from ..output.local import claim_run_dir
 from ..output.remote import PublicationStatus, deliver, parse_remote_uri
 from ..profile import loader
 from ..profile.schema import Profile
@@ -80,8 +80,12 @@ def add_parser(subparsers, parents) -> None:
     verify.add_argument(
         "--local-output",
         default=None,
-        help="run directory for results and evidence (default: ./runs/<utc>)",
+        help="parent directory for runs (default: ./runs); each run creates a fresh "
+        "<profile>-<utc>-<unique-id> subdirectory",
     )
+    # The job parent reserves a fresh directory so it can recover a killed child's evidence.
+    # This is not an alternate public output mode and must never accept an existing run.
+    verify.add_argument("--run-dir", dest="_run_dir", type=Path, help=argparse.SUPPRESS)
     verify.add_argument(
         "--remote-output",
         default=None,
@@ -205,17 +209,38 @@ class _Run:
     preflight_report: preflight.Report = field(default_factory=preflight.Report)
 
 
+def output_profile_name(path: str | Path) -> str:
+    """Name the local folder, falling back to the filename for an invalid profile.
+
+    Verification still loads and diagnoses the profile after recording its initial outcome,
+    so invalid profiles leave evidence too. This lookup is offline and resolves no secrets.
+    """
+    try:
+        return loader.load(path).name
+    except loader.ProfileError:
+        return Path(path).stem
+
+
 def cmd_verify(args: argparse.Namespace) -> int:
     """Verify, then record and publish the run however it ended.
 
-    The run directory is created before the profile is read, so every ending leaves a bundle.
+    The run directory is created before verification, so every ending leaves a bundle.
     """
     # Resolved to an absolute path before anything is written. The banner and the summary both
     # print it, and a relative "runs/<ts>" is ambiguous the moment it is pasted into a ticket or
     # read from a different working directory. Evidence references inside results.jsonl stay
     # relative to this directory, so a copied bundle is still self-contained.
-    run_dir = (Path(args.local_output) if args.local_output else default_run_dir()).resolve()
-    LocalDirSink(run_dir).prepare()
+    try:
+        reserved = getattr(args, "_run_dir", None)
+        if reserved is not None:
+            run_dir = claim_run_dir(reserved)
+        else:
+            run_dir = create_run_dir(
+                Path(args.local_output or "runs"), output_profile_name(args.profile)
+            )
+    except OSError as exc:
+        log.error("could not create a fresh local run directory: %s", exc)
+        return PREFLIGHT
 
     # Re-point logging now that a run directory exists, so llmdv.log lands inside the bundle.
     log_setup.configure(

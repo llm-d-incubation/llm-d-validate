@@ -22,6 +22,7 @@ from tests.fakes import (
     FakeFleet,
     FakeResponsesConfig,
     named_sse,
+    only_run,
     response_body,
     response_events,
     run_llmdv,
@@ -402,6 +403,7 @@ def test_cli_streams_per_ingress_and_preserves_named_event_evidence(tmp_path):
             "-k",
             "test_responses_streaming",
         )
+        run_dir = only_run(run_dir)
     assert result.returncode == 0, result.stdout + result.stderr
     records = [json.loads(line) for line in (run_dir / "results.jsonl").read_text().splitlines()]
     assert {r["ingress"] for r in records} == {"fake", "router"}

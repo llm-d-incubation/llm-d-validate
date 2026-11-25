@@ -7,7 +7,7 @@ import json
 import pytest
 import yaml
 
-from tests.fakes import FakeFleet, leaked_answer, run_llmdv
+from tests.fakes import FakeFleet, leaked_answer, only_run, run_llmdv
 from tests.test_suites_against_fake import SUITES, run_pytest, run_suites, write_profile
 
 BUDGET = 37  # Deliberately different from budget_for's reasoning-model default.
@@ -47,6 +47,7 @@ def test_invalid_budget_is_a_profile_error_before_any_request(tmp_path, entry_po
                 "-k",
                 "answer_budget",
             )
+            run_dir = only_run(run_dir)
             expected_code = 2
         else:
             result = run_llmdv("profile", entry_point, str(profile))
@@ -331,6 +332,7 @@ def test_agent_cli_selects_both_cases_with_authentication_and_redacted_evidence(
             "answer_budget",
             env={"LLMDV_BUDGET_KEY": secret},
         )
+        run_dir = only_run(run_dir)
 
     assert result.returncode == 0, result.stdout + result.stderr
     assert {e["case_id"] for e in exchanges(run_dir)} == CASES

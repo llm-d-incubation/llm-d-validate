@@ -318,7 +318,9 @@ def test_a_killed_verify_is_recorded_and_notified_as_crashed_with_nowhere_to_pub
     assert "(exit 137)" in slack.received[0]["text"]
 
 
-@pytest.mark.parametrize("arg", ["--local-output=/tmp/x", "--local", "--remote=s3://b/p"])
+@pytest.mark.parametrize(
+    "arg", ["--local-output=/tmp/x", "--local", "--remote=s3://b/p", "--run-dir=/tmp/x"]
+)
 def test_options_the_job_owns_cannot_be_passed_through(tmp_path, arg):
     """One source per setting, so verify and the fallback publish can never disagree."""
     with FakeFleet() as fleet, FakeS3() as store, FakeSlack() as slack:

@@ -12,7 +12,7 @@ import pytest
 import yaml
 
 from llmdv.profile import compose, loader
-from tests.fakes import FakeFleet, profile_yaml, run_llmdv
+from tests.fakes import FakeFleet, only_run, profile_yaml, run_llmdv
 
 PARENT = {
     "schema": "llmdv.profile/1",
@@ -193,6 +193,7 @@ def test_verify_writes_the_composed_profile_into_the_run_directory(tmp_path):
     path = child_of(tmp_path, {"schema": "llmdv.profile/0"})
     run_dir = tmp_path / "run"
     result = run_llmdv("verify", "--profile", str(path), "--local-output", str(run_dir))
+    run_dir = only_run(run_dir)
     assert result.returncode == 2, result.stderr
     assert (run_dir / "profile.used.yaml").read_text() == loader.composed_text(path)
 
@@ -501,6 +502,7 @@ def test_a_run_from_the_composed_record_reports_the_same_profile(tmp_path):
     def records(*args):
         run_dir = tmp_path / f"run-{len(list(tmp_path.glob('run-*')))}"
         result = run_llmdv("verify", *args, "--local-output", str(run_dir), "-m", "discovery")
+        run_dir = only_run(run_dir)
         assert result.returncode == 0, result.stderr
         lines = next(run_dir.rglob("results.jsonl")).read_text().splitlines()
         used = next(run_dir.rglob("profile.used.yaml"))

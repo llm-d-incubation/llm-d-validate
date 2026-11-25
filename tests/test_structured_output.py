@@ -15,7 +15,7 @@ from llmdv.assertions.structured_output import (
 from llmdv.evidence import journal
 from llmdv.profile.schema import Model, Reasoning
 from llmdv.surfaces.base import Completion, Usage
-from tests.fakes import FakeFleet, reasoning_usage_payload, run_llmdv
+from tests.fakes import FakeFleet, only_run, reasoning_usage_payload, run_llmdv
 from tests.test_suites_against_fake import run_suites, write_profile
 
 CASE = "field_options.structured_output"
@@ -308,6 +308,7 @@ def test_cli_client_filter_selects_only_its_structured_surfaces(tmp_path):
             "--pod-logs",
             "off",
         )
+        run_dir = only_run(run_dir)
 
     assert result.returncode == 0, result.stdout + result.stderr
     records = [json.loads(line) for line in (run_dir / "results.jsonl").read_text().splitlines()]

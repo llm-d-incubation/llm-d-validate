@@ -7,7 +7,7 @@ import json
 import pytest
 import yaml
 
-from tests.fakes import COUNT_TOKENS_PATH, FakeFleet, run_llmdv
+from tests.fakes import COUNT_TOKENS_PATH, FakeFleet, only_run, run_llmdv
 from tests.test_suites_against_fake import run_suites, write_profile
 
 RAW_CASE = "anthropic_messages.count_tokens"
@@ -228,6 +228,7 @@ def test_agent_cli_counts_with_profile_auth_and_redacts_evidence(tmp_path, auth_
             "--local-output", str(run_dir), "--pod-logs", "off", "--evidence", "all",
             "-k", HAPPY, env={"LLMDV_COUNT_TOKENS_KEY": secret},
         )  # fmt: skip
+        run_dir = only_run(run_dir)
 
     assert result.returncode == 0, result.stdout + result.stderr
     traffic = exchanges(run_dir)
