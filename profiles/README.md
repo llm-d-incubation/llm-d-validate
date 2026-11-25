@@ -8,15 +8,16 @@ cases that apply, and tests every layer against it. Find your starting point:
 | a deployed llm-d guide | [Test your guide](#test-your-guide): ready profiles, give llmdv the EPP's URL |
 | any other OpenAI- or Anthropic-compatible stack | [Your own stack](#your-own-stack): write a profile |
 
-## Supported llm-d guides
+## Profiles for llm-d guides
 
-Each guide folder under [`llm-d/`](llm-d/) holds ready profiles for the configurations llm-d's
-nightly lanes deploy, and a README that maps every lane to its profile and `--identity` flags.
+Ready profiles for testing a guide you have already deployed. Each guide folder under
+[`llm-d/`](llm-d/) holds profiles for the configurations llm-d's nightly lanes cover, and a
+README that maps every lane to its profile and `--identity` flags.
 The profiles are written against llm-d `9ca8ff0` and test the guide's router (`<GUIDE_NAME>-epp`,
 standalone mode). None has been run against a real engine yet: each says `WRITTEN, NOT RUN`, and
 its first run is its measurement.
 
-| Guide | What it deploys | Profiles |
+| Guide | What the guide runs | Profiles |
 | --- | --- | --- |
 | [agentic-api](llm-d/agentic-api/README.md) | vLLM Agentic API, backed by PostgreSQL, in front of optimized-baseline's router and vLLM; the router only | 1 |
 | [async-multitenant](llm-d/async-multitenant/README.md) | llm-d-async dispatching queued work through a router with flow control and six priority bands; the router only | 1 |

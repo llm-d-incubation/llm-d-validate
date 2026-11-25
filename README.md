@@ -49,8 +49,8 @@ pinpoints the layer that breaks, and flags what regressed since the last run.
 
 ## Test an llm-d guide
 
-Every [supported llm-d guide](https://github.com/llm-d-incubation/llm-d-validate/blob/main/profiles/README.md#supported-llm-d-guides) comes with ready
-profiles. They test the guide's router (the EPP) directly: give `llmdv` the EPP's URL and run. No
+The llm-d guides have [ready profiles](https://github.com/llm-d-incubation/llm-d-validate/blob/main/profiles/README.md#profiles-for-llm-d-guides)
+for testing it once deployed. They test the guide's router (the EPP) directly: give `llmdv` the EPP's URL and run. No
 key is needed.
 
 ```sh
