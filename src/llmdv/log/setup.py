@@ -11,8 +11,8 @@ silence the answer and `llmdv profile show | yq` would break. So `llmdv.output` 
 logger with `propagate = False` and its own stdout handler, and `--log-level` governs
 diagnostics only -- which is what anyone setting it actually means.
 
-Third-party libraries (httpx, openai, anthropic, urllib3) all use `logging`, so configuring
-the tree captures them by propagation. httpx at DEBUG logs every request: valuable at -vv,
+Third-party libraries (httpx, openai, anthropic, urllib3) all use `logging`; a forwarding
+handler routes their records into our tree. httpx at DEBUG logs every request: valuable at -vv,
 intolerable by default, so it is held one notch quieter than the console level.
 
 Both console handlers keep the stream that was current when `configure()` ran. That binding
@@ -45,6 +45,31 @@ _output_log = logging.getLogger(OUTPUT)
 
 # The run directory's llmdv.log handler, kept so it can be closed before the bundle is hashed.
 _run_log_handler: logging.Handler | None = None
+
+
+class _ForwardToLlmdv(logging.Handler):
+    """Keep library names while routing records through llmdv's redacting handlers."""
+
+    def emit(self, record: logging.LogRecord) -> None:
+        logging.getLogger(ROOT).handle(record)
+
+
+class _LibraryLevelFilter(logging.Filter):
+    """Keep noisy libraries quiet outside the full-fidelity run log."""
+
+    def __init__(self, level: int) -> None:
+        super().__init__()
+        self.level = logging.DEBUG if level <= logging.DEBUG else max(level, logging.WARNING)
+
+    def filter(self, record: logging.LogRecord) -> bool:
+        library = any(record.name == name or record.name.startswith(f"{name}.") for name in NOISY)
+        return not library or record.levelno >= self.level
+
+
+def _clear_handlers(logger: logging.Logger) -> None:
+    for handler in logger.handlers[:]:
+        logger.removeHandler(handler)
+        handler.close()
 
 
 class _TextFormatter(logging.Formatter):
@@ -127,11 +152,12 @@ def configure(
 
     root = logging.getLogger(ROOT)
     root.setLevel(logging.DEBUG)  # handlers do the filtering, so a DEBUG file sink works
-    root.handlers.clear()
+    _clear_handlers(root)
     root.propagate = False
 
     console = _ConsoleHandler("stderr")
     console.setLevel(numeric)
+    console.addFilter(_LibraryLevelFilter(numeric))
     # Bare on the console, timestamped in the files. Twenty-two repetitions of
     # "22:00:53 INFO llmdv.plugin:" wrapped around the content is noise on a terminal and
     # essential in a log being read after the fact, so the two sinks are formatted differently.
@@ -148,6 +174,8 @@ def configure(
         handler.setLevel(sink_level)
         handler.setFormatter(_formatter(fmt))
         handler.addFilter(redactor)
+        if path is not run_log:
+            handler.addFilter(_LibraryLevelFilter(numeric))
         root.addHandler(handler)
         if path is run_log:
             _run_log_handler = handler
@@ -155,7 +183,7 @@ def configure(
     # Primary output: stdout, bare message, never filtered by --log-level.
     out = logging.getLogger(OUTPUT)
     out.setLevel(logging.INFO)
-    out.handlers.clear()
+    _clear_handlers(out)
     out.propagate = False
     stdout = _ConsoleHandler("stdout")
     stdout.setLevel(logging.INFO)
@@ -163,16 +191,17 @@ def configure(
     stdout.addFilter(redactor)
     out.addHandler(stdout)
 
-    # Third-party loggers propagate into our root; give them their own ceiling.
-    noisy_level = logging.DEBUG if numeric <= logging.DEBUG else max(numeric, logging.WARNING)
-    for name in NOISY:
+    # Python's unnamed root is not the named llmdv logger. Forward explicitly, and stop
+    # propagation so application root handlers cannot bypass our redacting handlers.
+    # Leave DEBUG enabled here: the run log needs it even when the console is quiet.
+    for name in (*NOISY, "py.warnings"):
         third = logging.getLogger(name)
-        third.setLevel(noisy_level)
+        third.setLevel(logging.DEBUG)
         third.handlers.clear()
-        third.propagate = True
+        third.addHandler(_ForwardToLlmdv())
+        third.propagate = False
 
     logging.captureWarnings(True)
-    logging.getLogger("py.warnings").propagate = True
 
 
 def close_run_log() -> None:
