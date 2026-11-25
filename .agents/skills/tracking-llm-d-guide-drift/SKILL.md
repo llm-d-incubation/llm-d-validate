@@ -1,6 +1,6 @@
 ---
 name: tracking-llm-d-guide-drift
-description: Use when checking whether `profiles/llm-d/` has fallen behind llm-d: a new Tier 3 guide or nightly lane with no profile, a lane llm-d removed, or a change to a covered guide's overlays, router values, guide.yaml, README or deploy scripts since the commit the profiles were built from; also before moving that commit forward, or when someone asks what changed upstream.
+description: Use when checking whether `profiles/llm-d/` has fallen behind llm-d, such as a new Tier 3 guide or nightly lane with no profile, a lane llm-d removed, or a change to a covered guide's overlays, router values, guide.yaml, README or deploy scripts since the commit the profiles were built from; also before moving that commit forward, or when someone asks what changed upstream.
 ---
 
 # Tracking llm-d guide drift

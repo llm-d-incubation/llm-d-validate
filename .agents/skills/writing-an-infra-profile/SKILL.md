@@ -1,6 +1,6 @@
 ---
 name: writing-an-infra-profile
-description: Use when writing, updating or reviewing an `llmdv` infra-profile; when choosing error_status, unstructured_errors, header dispositions, efforts, capabilities or change sentinels; when deciding which case families to leave out; when tempted to declare what a probe returned; before naming LiteLLM, an llm-d router or EPP, or vLLM behind an ingress; when one stack needs several profiles (models, engines, an llm-d guide's CI lanes); or when publishing a profile that was written against a private stack.
+description: Use when writing, updating or reviewing an `llmdv` infra-profile; when choosing error_status, unstructured_errors, header dispositions, efforts, capabilities or change sentinels; when deciding which case families to leave out; when tempted to declare what a probe returned; before naming LiteLLM, an llm-d router or EPP, or vLLM behind an ingress; when one stack needs several profiles (models, engines, an llm-d guide's CI lanes); when publishing a profile that was written against a private stack; or when a profile change must be reflected in its folder README's description of what a verification command selects.
 ---
 
 # Writing an infra-profile
@@ -101,6 +101,28 @@ an llm-d guide configuration still follows the lane coverage requirements below.
 Share custom names through `extends`; their lists replace, and `null` removes a name. Built-in
 names are reserved. See [test sets](../../../profiles/REFERENCE.md#test_sets)
 for the schema and the exact scope of smoke.
+
+### Keep each folder's "What `llmdv verify` selects" section current
+
+Every folder of runnable profiles has a README, and its "What `llmdv verify` selects" section
+says, for every profile in the folder: which set a plain run uses and the file that defines it,
+the `default` patterns by suite, the other named sets and `smoke`, and what the default, `smoke`,
+`--all-test-sets` and `--full-suite` select, as `llmdv plan` counts it. The section is generated,
+offline, so it cannot drift from the composed profiles:
+
+```sh
+python .agents/skills/writing-an-infra-profile/selection_docs.py            # rewrite every section
+python .agents/skills/writing-an-infra-profile/selection_docs.py --check    # exit 1 if any is stale
+```
+
+Rerun it, and commit the README changes with the profile change, whenever you add, remove or
+rename a runnable profile; change any `test_sets`, `extends` list, declaration or capability (each
+changes what runs or skips); or add, remove or rename a case. A new folder of runnable profiles
+needs a README first, with a title and a short introduction; the helper adds the section. It
+refuses folders whose profiles define different sets, or whose planned suites differ from the
+default's patterns: write that folder's section by hand, documenting each profile's differences,
+and keep the same headings. `profiles/README.md` links every folder's section; add a new folder
+there.
 
 ## More than one configuration: parts and combinations
 
@@ -261,3 +283,4 @@ comment beside the line and, if the declaration changes, cite the decision.
 | "The table or README lists it, so it needs a profile" | Only what a nightly lane deploys gets one; record the difference under "Upstream notes". |
 | "The guide has no support table, so nothing qualifies" | The lanes decide: profile what each one deploys. |
 | "One file per accelerator" | Name by what a client sees; lanes that look the same share a profile. |
+| "Only the test sets changed; the README can wait" | Rerun `selection_docs.py` in the same change, or the folder README describes a run that no longer happens. |
