@@ -142,8 +142,9 @@ Python package (`release.yaml`) and the container image (`image.yaml`):
 
 3. Approve the `pypi` deployment when the run asks for it.
 
-`release.yaml` fails before publishing if the tag does not match `__version__`, or if whoever
-pushed it is not an admin. Two repository settings back that up and must stay in place:
+`release.yaml` fails before publishing if the tagged commit is not on `main`, if the tag does
+not match `__version__`, or if whoever pushed it is not an admin. Older commits on `main` are
+allowed. Two repository settings back that up and must stay in place:
 
 - **The `pypi` environment** requires an admin's approval and accepts only `v*` tags. PyPI trusts
   only this environment and `release.yaml`, so renaming either breaks publishing until the

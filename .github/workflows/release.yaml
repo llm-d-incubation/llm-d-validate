@@ -67,6 +67,16 @@ jobs:
       - uses: actions/checkout@v4
         with:
           clean: true
+          # The ancestry check needs history, including older release commits on main.
+          fetch-depth: 0
+      - name: Tag commit is on main
+        if: startsWith(github.ref, 'refs/tags/')
+        run: |
+          git fetch --no-tags origin +refs/heads/main:refs/remotes/origin/main
+          if ! git merge-base --is-ancestor HEAD origin/main; then
+            echo "::error::tag $GITHUB_REF_NAME points to a commit that is not on main; merge the release changes before tagging"
+            exit 1
+          fi
       - uses: astral-sh/setup-uv@v6
       # Interpreters and uv's cache live under RUNNER_TEMP, which the runner empties after
       # every job.
