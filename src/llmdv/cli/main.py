@@ -38,7 +38,7 @@ from .exit_codes import INTERNAL, INTERRUPTED, USAGE
 log = get_logger("cli")
 
 
-def _global_parser() -> argparse.ArgumentParser:
+def _global_parser(*, defaults: bool = False) -> argparse.ArgumentParser:
     """Flags shared by every subcommand. add_help=False so it can be a parent."""
     parent = argparse.ArgumentParser(add_help=False)
     logging_group = parent.add_argument_group("logging")
@@ -88,6 +88,11 @@ def _global_parser() -> argparse.ArgumentParser:
     kube_group.add_argument(
         "--context", default=None, help="kubeconfig context; overrides the profile"
     )
+    if not defaults:
+        # argparse parses each subcommand into a fresh namespace, then copies it onto
+        # its parent. Only explicitly supplied options may replace the parent's values.
+        for action in parent._actions:
+            action.default = argparse.SUPPRESS
     return parent
 
 
@@ -95,7 +100,9 @@ def build_parser() -> argparse.ArgumentParser:
     parent = _global_parser()
     parser = argparse.ArgumentParser(
         prog="llmdv",
-        parents=[parent],
+        # Separate actions are essential: changing a shared action's default would
+        # also change it on every subcommand that inherited that action.
+        parents=[_global_parser(defaults=True)],
         description="Functional validation for deployed model serving stacks. "
         "Tests already-deployed stacks; never deploys or mutates anything.",
         epilog=exit_codes.epilog(),
