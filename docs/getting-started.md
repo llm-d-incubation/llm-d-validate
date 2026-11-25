@@ -47,13 +47,18 @@ llmdv plan --profile <profile> --test-set smoke
 llmdv verify --profile <profile> --test-set smoke
 ```
 
-This checks model discovery, basic generation and streaming for the supported APIs your profile
-declares. It is a quick check of those paths, not full validation; review which checks ran and
-which skipped. `--test-set smoke` replaces the profile's default subset. For broader testing,
-run without the flag to use a configured default (an absent default exits 2), or use
-`--full-suite` for every case. Repeat `--test-set` to combine sets; `--all-test-sets` runs all
-profile-defined sets.
-You can also [define test sets](cli.md#test-sets-and-coverage) for your workflow.
+`smoke` is a built-in *test set*: model discovery, plus one plain and one streaming request on each
+API your profile declares. It shows the stack answers, not that it is correct, so check which
+cases ran and which skipped. Then widen the run:
+
+| Command | Runs |
+| --- | --- |
+| `llmdv verify --profile <profile>` | the profile's `default` set, what it is meant to run (a profile without one exits 2) |
+| `llmdv verify --profile <profile> --full-suite` | every case in the library |
+| `llmdv verify --profile <profile> --full-suite -m <suite>` | one whole suite, such as `openai_chat` |
+
+[cli.md](cli.md#test-sets-and-coverage) explains test sets, suites and the full suite, and how to
+define your own sets.
 
 ## Test a deployed llm-d guide
 

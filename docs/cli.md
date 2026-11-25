@@ -62,7 +62,7 @@ llmdv verify --profile P --surface responses   # one API surface
 llmdv verify --profile P --ingress litellm     # one layer
 llmdv verify --profile P -m "not disruptive"   # leave the fleet alone
 llmdv verify --profile P -k discovery          # a pytest keyword expression
-llmdv verify --profile P --full-suite                 # run the full suite before applying other filters
+llmdv verify --profile P --full-suite          # every case in the library, before other filters narrow it
 ```
 
 Repeating `--ingress`, `--client` or `--surface` is a union; different selectors intersect. `-k` and `-m` narrow the chosen scope
@@ -80,8 +80,46 @@ everything and reporting `PASSED`.
 
 ### Test sets and coverage
 
-A profile's `test_sets` defines reusable subsets of case-ID patterns. A plain invocation uses
-`default` and exits 2 if no default is configured. Choose the scope explicitly with one of:
+Four words name what `llmdv` can run, and they are easy to mix up:
+
+| Word | What it is | How you pick it |
+| --- | --- | --- |
+| **case** | one check, named by its case ID, such as `openai_chat.stop_reason`. It runs once per ingress, and once per variant where it has them | `-k <name>` |
+| **suite** | a group of cases on one topic: one of the 19 folders under `src/llmdv/suites/`, such as `openai_chat` or `tools` ([test-suites.md](test-suites.md)) | `-m <suite>` |
+| **test set** | a named list of case IDs or patterns. A profile defines its own under `test_sets` (always `default`, plus any you add), and every profile also has the built-in `smoke` | `--test-set <name>` |
+| **full suite** | every case in every suite. Despite the name, it is the whole library, not one suite | `--full-suite` |
+
+**Two steps decide what runs.**
+
+1. **The scope** says which cases are candidates. It is exactly one of: the profile's `default`
+   set (no flag), one or more named sets (`--test-set`, repeatable), every set the profile defines
+   (`--all-test-sets`), or the full suite (`--full-suite`).
+2. **Filters** narrow the scope and never widen it: `-m`, `-k`, `--surface`, `--client` and
+   `--ingress`. `-m openai_chat` on its own keeps only the `openai_chat` cases the default set
+   already contains; to run that whole suite, widen the scope first with `--full-suite`.
+
+After that, the profile decides what can apply: a selected case whose surface, capability or
+fleet policy the profile does not allow skips, with its [skip class](#skip-classes). `plan` shows
+the result before anything is sent. `--identity` labels a run and never changes what it selects.
+
+| To run | Use |
+| --- | --- |
+| what the profile is meant to run | `llmdv verify --profile P` (its `default` set) |
+| a quick check that every API answers | `llmdv verify --profile P --test-set smoke` |
+| everything the library has | `llmdv verify --profile P --full-suite` |
+| one whole suite | `llmdv verify --profile P --full-suite -m openai_chat` |
+| only the default set's cases in one suite | `llmdv verify --profile P -m openai_chat` |
+| one case, whether or not a set lists it | `llmdv verify --profile P --full-suite -k <case>` |
+| the declarations against the live stack, in about a minute | `llmdv verify --profile P --full-suite -m contract` |
+| your own subset | add it under `test_sets`, then `--test-set <name>` |
+| several sets together | `--test-set default --test-set tools` |
+| every set the profile defines | `--all-test-sets` (never includes `smoke`) |
+
+Put `plan` in place of `verify` in any of these to see what would run and skip, offline. The same
+flags work on `job`. A plain invocation of a profile with no `default` set exits 2 and lists the
+choices; it never falls back to a larger run.
+
+The commands, in one place:
 
 ```sh
 llmdv profile show P --test-sets

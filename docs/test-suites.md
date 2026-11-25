@@ -9,17 +9,26 @@ missing. Each suite is a package under `src/llmdv/suites/`, and its name is also
 
 ## Run a suite
 
+A *suite* is a group of cases on one topic, and its name is the `-m` marker that picks it. It is
+not the same as a profile's *test set* (a named list of cases, such as `default` or `smoke`) or the
+*full suite* (every case in every suite); [cli.md](cli.md#test-sets-and-coverage) explains all
+four.
+
+A run first takes its scope (the profile's `default` set, unless you name another), then `-m`
+narrows it. So to run a whole suite, widen the scope with `--full-suite` and then pick the suite:
+
 ```sh
-llmdv verify --profile <profile> --full-suite -m openai_chat            # one suite
-llmdv verify --profile <profile> --full-suite -m "tools or streaming"   # several
-llmdv verify --profile <profile> --full-suite -k test_completions_stream_lifecycle   # one case, by test name
-llmdv plan --profile <profile> --full-suite -m openai_chat              # preview: what would run and skip, offline
-llmdv profile show <profile> --matrix                      # what this profile enables, per surface and ingress
+llmdv verify --profile <profile> --full-suite -m openai_chat            # the whole openai_chat suite
+llmdv verify --profile <profile> --full-suite -m "tools or streaming"   # two suites
+llmdv verify --profile <profile> --full-suite -k test_completions_stream_lifecycle   # one case
+llmdv verify --profile <profile> -m openai_chat                         # only the default set's openai_chat cases
+llmdv plan --profile <profile> --full-suite -m openai_chat              # preview any of these, offline
+llmdv profile show <profile> --matrix                                   # what the profile enables, per surface and ingress
 ```
 
-These commands select from the full library, then narrow to the requested suites or cases.
-Without an explicit scope, `-m` and `-k` narrow `test_sets.default`; if no default exists, the
-command exits 2. A case whose `case_id` starts with another suite's name carries that suite's marker too.
+The difference is real: on the flow-control guide's profile, `-m openai_chat` keeps the 6 cases its
+default set lists, and `--full-suite -m openai_chat` keeps 144. A case whose `case_id` starts with
+another suite's name carries that suite's marker too.
 [cli.md](cli.md#selecting-what-runs) has every selector, and
 [writing-tests.md](writing-tests.md) explains how to add a case or a suite. Case counts are not
 listed here because they drift: `llmdv plan` prints them, after parametrized variants (surface,
