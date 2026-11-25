@@ -25,6 +25,7 @@ from tests.fakes import SRC, FakeFleet, only_run, run_llmdv
 ROOT = SRC.parent
 FULL = ["deploy/overlays/example/profile.yaml", "profiles/examples/example-two-ingress.yaml"]
 BY_COUNT = [
+    "profiles/examples/example-minimal.yaml",
     "profiles/examples/example-gateway-only.yaml",
     "profiles/examples/example-three-ingress.yaml",
     "profiles/examples/example-two-ingress-staging.yaml",
@@ -61,7 +62,7 @@ def _pointed(example: str, tmp_path: Path) -> Path:
 
 
 def _plan(profile: Path, *extra: str, env: dict[str, str] | None = None) -> dict:
-    result = run_llmdv("plan", "--profile", str(profile), "--json", *extra, env=env)
+    result = run_llmdv("plan", "--profile", str(profile), "--full-suite", "--json", *extra, env=env)
     assert result.returncode == 0, result.stderr
     document = json.loads(result.stdout)
     assert document["schema"] == "llmdv.plan/1"
@@ -71,7 +72,7 @@ def _plan(profile: Path, *extra: str, env: dict[str, str] | None = None) -> dict
 def _verify(profile: Path, run_dir: Path, base_url: str, *extra: str) -> list[dict]:
     run_llmdv(
         "verify", "--profile", str(profile), "--local-output", str(run_dir),
-        "--skip-preflight", "--pod-logs", "off", *extra,
+        "--full-suite", "--skip-preflight", "--pod-logs", "off", *extra,
         env={URL_ENV: base_url, "KUBECONFIG": str(run_dir / "no-kubeconfig")},
     )  # fmt: skip
     run_dir = only_run(run_dir)
@@ -176,7 +177,7 @@ def test_the_document_carries_rows_and_counts(tmp_path):
     counts = document["counts"]
     assert counts["total"] == len(rows) == counts["run"] + counts["skip"]
     assert sum(sum(tally.values()) for tally in counts["by_suite"].values()) == counts["total"]
-    assert document["selection"]["marker"] == "discovery"
+    assert document["coverage"]["filters"]["marker"] == "discovery"
 
 
 def test_plan_reports_default_and_ingress_sample_counts(tmp_path):
@@ -202,7 +203,7 @@ def test_plan_reports_default_and_ingress_sample_counts(tmp_path):
         is None
     )
 
-    text = run_llmdv("plan", "--profile", str(profile), "--ingress", "vllm")
+    text = run_llmdv("plan", "--profile", str(profile), "--full-suite", "--ingress", "vllm")
     assert text.returncode == 0, text.stderr
     assert "openai_chat.greedy_repeat" in text.stdout
     assert "5 samples/group" in text.stdout

@@ -257,8 +257,9 @@ def finish(
         return
 
     failed = bool(failures)
-    headline = "FAILED" if failed else "PASSED"
-    colour = pal.red if failed else pal.green
+    all_skipped = bool(records) and all(r["outcome"] == "skip" for r in records)
+    headline = "FAILED" if failed else "NO CHECKS EXECUTED" if all_skipped else "PASSED"
+    colour = pal.red if failed else pal.yellow if all_skipped else pal.green
     # The count must say what it counts. "FAILED | 69 cases" reads as 69 failures when 69 is the
     # total and 7 of them failed, and "PASSED | 69 cases" reads as 69 passes when 28 skipped.
     # This line is the one people quote, so it carries its own breakdown rather than relying on

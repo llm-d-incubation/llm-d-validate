@@ -43,9 +43,9 @@ def as_record(
             "changes": list(delta.stack_changes),
             "mixed": list(delta.mixed_stack),
         },
-        "selection": {
-            "changes": list(delta.selection_changes),
-            "outside": list(delta.outside_selection),
+        "coverage": {
+            "changes": list(delta.coverage_changes),
+            "outside": list(delta.outside_coverage),
         },
         "regressed": delta.regressed,
         "transient": list(delta.transient),
@@ -121,12 +121,12 @@ def render(delta: Delta, profile: str, before_id: str, after_id: str) -> str:
         lines += [f"  `{line}`" for line in delta.mixed_stack]
         lines.append("")
 
-    if delta.selection_changes:
+    if delta.coverage_changes:
         lines.append(
-            "*The selection changed between these runs.* A case only one of them selected is "
+            "*The coverage changed between these runs.* A case only one of them selected is "
             "listed apart at the end, never as a regression:"
         )
-        lines += [f"  `{change}`" for change in delta.selection_changes]
+        lines += [f"  `{change}`" for change in delta.coverage_changes]
         lines.append("")
 
     if delta.digest_changed:
@@ -270,15 +270,15 @@ def render(delta: Delta, profile: str, before_id: str, after_id: str) -> str:
         elif not delta.vanished:
             lines.append("_That is us, not the fleet._")
 
-    if delta.outside_selection:
+    if delta.outside_coverage:
         lines += [
             "",
-            f"_Outside the selection ({len(delta.outside_selection)}): a run of the window held "
-            "them and a selection left them out of this run, or this run held them and every "
+            f"_Outside the coverage ({len(delta.outside_coverage)}): a run of the window held "
+            "them and a coverage left them out of this run, or this run held them and every "
             "run of the window left them out, so there is nothing to compare. Not "
             "regressions, not new cases._",
         ]
-        lines += _bullets(delta.outside_selection)
+        lines += _bullets(delta.outside_coverage)
 
     return "\n".join(lines)
 

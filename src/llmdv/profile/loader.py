@@ -38,7 +38,7 @@ import yaml
 from ..http.redact import SECRET_HEADERS
 from ..ingress.signals import Reveals, row_for, undeclarable
 from ..surfaces import base as surfaces
-from . import compose, evolution, parse
+from . import compose, evolution, parse, test_sets
 from . import transport as transport_contract
 from .errors import Diagnostic, ProfileError
 from .fleet import (
@@ -177,6 +177,10 @@ def _layers(path: str | Path) -> list[compose.Layer]:
 def _file_problems(layer: compose.Layer) -> list[str]:
     problems = []
     for key in layer.raw:
+        if key in {"selection", "selections"}:
+            replacement = "test_sets.default" if key == "selection" else "test_sets"
+            problems.append(f"{layer.path}: {key}: removed; use {replacement}")
+            continue
         if key not in TOP_LEVEL_KEYS:
             close = difflib.get_close_matches(str(key), TOP_LEVEL_KEYS, n=1)
             hint = f"did you mean {close[0]}?" if close else f"known: {', '.join(TOP_LEVEL_KEYS)}"
@@ -525,7 +529,7 @@ def _build(raw: dict[str, Any], path: Path, clients_dir: Path) -> Profile:
                 ),
                 fleet=lambda: parse_fleet(raw.get("fleet")),
                 known_failures=lambda: _known_failures(raw.get("known_failures")),
-                selection=lambda: _selection(raw.get("selection")),
+                test_sets=lambda: _test_sets(raw.get("test_sets")),
             ),
             source_path=path,
         )
@@ -639,19 +643,34 @@ def _refuse_renamed_cases(cases: tuple[str, ...], where: str) -> None:
                 )
 
 
-def _selection(raw: Any) -> tuple[str, ...]:
+def _case_patterns(raw: Any, where: str) -> tuple[str, ...]:
     if raw is None:
         return ()
-    globs = parse.strings(raw, "selection")
+    globs = parse.strings(raw, where)
     if not globs:
         raise ProfileError(
-            "selection: an empty list selects no case; leave the key out, or set it to null to "
+            f"{where}: an empty list selects no case; leave the key out, or set it to null to "
             "clear an inherited one"
         )
     for index, glob in enumerate(globs):
-        parse.string(glob, f"selection[{index}]", non_empty=True)
-    _refuse_renamed_cases(globs, "selection")
+        parse.string(glob, f"{where}[{index}]", non_empty=True)
+    _refuse_renamed_cases(globs, where)
     return globs
+
+
+def _test_sets(raw: Any) -> dict[str, tuple[str, ...]]:
+    found = {}
+    for name, cases in _block(raw, "test_sets").items():
+        if not isinstance(name, str) or not re.fullmatch(r"[a-z][a-z0-9_-]*", name):
+            raise ProfileError(
+                "test_sets: names must start with a lowercase letter and contain "
+                "only lowercase letters, digits, hyphens or underscores"
+            )
+        if name in test_sets.BUILTIN:
+            raise ProfileError(f"test_sets.{name}: reserved built-in name; choose another name")
+        if cases is not None:  # null removes an inherited test set
+            found[name] = _case_patterns(cases, f"test_sets.{name}")
+    return found
 
 
 def _block(value: Any, where: str) -> dict[str, Any]:
@@ -686,16 +705,17 @@ def _one_or_more(value: Any, where: str) -> tuple[str, ...]:
 
 
 # Top-level keys that never change what a run asserts, so they never move the digest.
-_UNDIGESTED = frozenset({"known_failures", "selection"})
+_UNDIGESTED = frozenset({"known_failures", "test_sets"})
 
 
 def contract_digest(path: str | Path) -> str | None:
     """A short digest of the declarations in a profile, or None when it cannot be read.
 
-    Hashes the parsed document rather than its bytes, with `known_failures` and `selection`
-    left out: comments carry probes, the known-failure list carries triage, and a selection
-    changes which cases run, never what a case asserts. A digest that moved with them would
-    drop every earlier run from a comparison window (`compare/diff.py`) each time a finding
+    Hashes the parsed document rather than its bytes, with `known_failures` and
+    `test_sets` left out: comments carry probes, the known-failure list carries triage, and
+    a test set changes which cases run, never what a case asserts. A digest that moved
+    with them would drop every earlier run from a comparison window (`compare/diff.py`)
+    each time a finding
     was filed, a comment updated or a lane narrowed; a comparison reads which cases each run
     selected from its `outcome.json` instead. Where a
     client binary sits on this machine is left out for the same reason: its `version` is the

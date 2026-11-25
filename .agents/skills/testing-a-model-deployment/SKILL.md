@@ -60,10 +60,10 @@ Record: the gateway version, the engine build (`system_fingerprint`), and which 
 | You have | Profile |
 |---|---|
 | A committed profile for this model and layer (under `profiles/<system>/`) | use it |
-| A deployment of an llm-d guide | the guide's combination under `profiles/llm-d/<guide>/`; its `README.md` names the combination for each CI lane, the URL variable to export (`LLMDV_EPP_URL`) and the exact `--identity` flags. It runs the guide's `selection`; add `--all` for every case |
+| A deployment of an llm-d guide | the guide's combination under `profiles/llm-d/<guide>/`; its `README.md` names the combination for each CI lane, the URL variable to export (`LLMDV_EPP_URL`) and the exact `--identity` flags. It runs the guide's `test_sets.default`; add `--full-suite` for every case |
 | One for the model through another layer | copy it to `<system>/<model>.local.yaml` and change what differs: `kind`, `auth`, `model.public_id`, `health_path`, `rate_limited`, the surfaces |
 | A gateway and the router for the same model | a two-ingress `.local.yaml`: the gateway profile plus a `kind: router` ingress (below); `llmdv` then reports each layer as a column and attributes differences |
-| Nothing for this model | writing-an-infra-profile |
+| Nothing for this model | [writing-an-infra-profile](../writing-an-infra-profile/SKILL.md); start with `examples/example-minimal.yaml` when no fuller profile matches |
 
 Every `.local.yaml` is gitignored and may write `base_url` inline. A committed profile names its URL and key by variable (`base_url_env`, `auth.key_env`) and never stores either. A profile argument is always a file path, not the profile's `name:`.
 
@@ -72,21 +72,22 @@ Every `.local.yaml` is gitignored and may write `base_url` inline. A committed p
 **Adding the router to a gateway profile.** The new ingress inherits the top-level `model`, `capabilities` and `known_failures`, so override what differs at the router:
 - `kind: router`, `auth: {type: none}`, `rate_limited: false`, `health_path: /health`;
 - `model: {public_id: <the id from the router's /v1/models>}` (the engine's served name, not the gateway's);
-- `error_status` and `unstructured_errors`: start from `examples/example-two-ingress.yaml`'s router ingress, and read [`.agents/GROUND-TRUTH.md`](../../GROUND-TRUTH.md) on the EPP's plain-text errors;
+- `error_status` and `unstructured_errors`: review the router example and [`.agents/GROUND-TRUTH.md`](../../GROUND-TRUTH.md), then declare the intended contract. Adopt an envelope deviation only after triage, with the decision recorded; an observed plain-text response alone is not acceptance;
 - `surfaces`: what the router serves (often the render routes too); the contract run checks them;
 - `transport` and `setup`: `setup` only for local setup the profile declares (`setup.requires`); none otherwise.
 
 ## 5. Point the profile at the endpoints
 
-Each profile chooses its own variable names, per ingress. Print the ones yours reads:
+Each profile chooses its own variable names, per ingress. Inspect its declarations without displaying values loaded from the environment:
 
 ```sh
-source .venv/bin/activate
-python -c "import sys
-from llmdv.profile import loader
-for i in loader.load(sys.argv[1]).ingresses:
-    print(i.id, i.kind.value, 'url:', i.base_url_env or 'inline', 'key:', i.auth.key_env or 'none')" <profile>
+llmdv profile explain <profile> --field ingresses
+# Narrow to an ingress's URL variable or auth block when needed; use its actual id:
+llmdv profile explain <profile> --field 'ingresses[gateway].base_url_env'
+llmdv profile explain <profile> --field 'ingresses[gateway].auth'
 ```
+
+These commands work before the variables are set and show inherited assignments too. Literal URLs already written in a profile remain visible.
 
 Then export each named variable: a gateway ingress's URL and key from wherever the user keeps them (step 1), a router ingress's URL from step 2.
 
@@ -95,17 +96,18 @@ export <url variable>="$GATEWAY_URL" <key variable>="$GATEWAY_KEY"   # a gateway
 export <url variable>='https://<router route host>'                 # a router ingress: no key
 ```
 
-For example, `examples/example-gateway-only.yaml` writes `base_url` inline and reads its key from `LLMDV_GATEWAY_KEY`.
+For example, `examples/example-minimal.yaml` reads its URL from `LLMDV_BASE_URL` and key from `LLMDV_API_KEY`.
 
 An unset variable fails preflight (exit 3) and names the variable, never a value. A `.local.yaml` with `base_url` written inline needs only the key variable. Then check it offline:
 
 ```sh
 llmdv profile validate <profile>
+llmdv profile explain <profile>           # confirm effective contracts and their sources
 llmdv profile show <profile> --matrix      # which surfaces run at which ingress
 llmdv plan --profile <profile> -q          # cases that would run and skip, by skip class (policy skips included)
 ```
 
-Use `fleet_policy: dedicated`: it runs every case, including the disruptive families (malformed input, token abuse, disconnects, long context), and in practice these have not disturbed the deployments they ran against. Switch to `shared` (which skips them as `excluded_by_policy`) only when the deployment's owner asks for it.
+Use `fleet_policy: dedicated`: it permits selected cases from the disruptive families (malformed input, token abuse, disconnects, long context), and in practice these have not disturbed the deployments they ran against. Switch to `shared` (which skips them as `excluded_by_policy`) only when the deployment's owner asks for it.
 
 ## 6. Prove the basics by hand
 
@@ -130,12 +132,25 @@ When a check fails on one deployment and passes on another with the same image a
 
 ## 7. Run
 
+When the user asks for a smoke check or a named subset, preview and run that scope:
+
+```sh
+llmdv profile show <profile> --test-sets
+llmdv plan --profile <profile> --test-set smoke
+llmdv verify --profile <profile> --test-set smoke
+```
+
+`--test-set NAME` replaces the profile's default `test_sets.default`; it cannot be combined with
+`--full-suite`. The built-in `smoke` checks discovery, basic generation and streaming. Report its
+run/skip counts as partial coverage, and do not follow it with the full suite unless requested.
+For custom names and full scope details, see [test sets](../../../docs/cli.md#test-sets-and-coverage).
+
 One live run per gateway at a time; never `-n`. From the repository root:
 
 ```sh
-llmdv verify --profile <profile> -m contract                 # about a minute: the declarations, live
-llmdv verify --profile <profile> --evidence all -k "<tests>"  # the cases you care about, if any; add --all for a case outside the selection
-llmdv verify --profile <profile> --analyze                    # the full suite, 15-60 min; runs/<timestamp>/
+llmdv verify --profile <profile> --full-suite -m contract                 # about a minute: the declarations, live
+llmdv verify --profile <profile> --evidence all -k "<tests>"  # the cases you care about, if any; add --full-suite for a case outside the default test set
+llmdv verify --profile <profile> --full-suite --analyze                    # the full suite, 15-60 min; runs/<timestamp>/
 ```
 
 Restrict a multi-ingress profile with `--ingress <id>`. Keep the machine awake for the full run, or run it unattended with `llmdv job` or as a cluster job ([deploy/README.md](../../../deploy/README.md); [`.agents/ENVIRONMENT.md`](../../ENVIRONMENT.md), "Long runs"). Exit `1` is test failures, `3` your environment rather than the fleet, `5` results not delivered, `6` interrupted; see [docs/cli.md](../../../docs/cli.md#exit-codes).

@@ -42,7 +42,7 @@ most of the common checks, so reuse them before you write your own.
 ### `case_id`
 
 `@pytest.mark.case_id("<suite>.<what_it_proves>")` is the case's stable key in results, the
-matrix, run comparisons and profile `selection:` lists. Renaming it breaks all of those, so choose
+matrix, run comparisons and profile `test_sets.default` lists. Renaming it breaks all of those, so choose
 it once. The prefix before the dot is the phase heading in the output, and must be the suite's
 package name (see [Add a new suite](#add-a-new-suite)).
 
@@ -168,16 +168,19 @@ python -m pytest tests/test_<area>.py -q
 Then against a real stack. `plan` shows what would run and skip, and sends nothing:
 
 ```sh
-llmdv plan --profile <profile> -k <case>
-llmdv verify --profile <profile> -k <case>
-llmdv verify --profile <profile> -k <case> --all   # when the profile's selection leaves it out
+llmdv plan --profile <profile> --full-suite -k <case>
+llmdv verify --profile <profile> --full-suite -k <case>
 ```
+
+These commands search the full library, so a new case does not need to be in
+`test_sets.default` yet. To check a saved subset instead, replace `--full-suite` with
+`--test-set NAME`.
 
 ## Add a new suite
 
 1. Create `src/llmdv/suites/<name>/` with an `__init__.py` (every suite has one; cases import
    shared helpers relatively, such as `from ..conftest import ...`) and at least one `test_*.py`.
-2. The directory name becomes the suite's pytest marker, so `llmdv verify -m <name>` selects it.
+2. The directory name becomes the suite's pytest marker, so `llmdv verify --profile <profile> --full-suite -m <name>` selects it.
    No registration is needed.
 3. Every `case_id` prefix must equal `<name>`. A prefix that differs from its package fails
    collection unless the pair is listed, with its reason, in `PREFIX_EXCEPTIONS` in
@@ -194,9 +197,9 @@ llmdv verify --profile <profile> -k <case> --all   # when the profile's selectio
 - [ ] Every skip is classified.
 - [ ] The suite's row in [test-suites.md](test-suites.md) says what it checks, what enables it,
       and its status. Close or edit a Gaps row if the case fills one.
-- [ ] The case is in the `selection:` of every llm-d guide whose claims it tests
-      (`profiles/llm-d/<guide>/parts/common.yaml`); guide lanes run only the cases a selection
-      names. Then plan every combination, since a selection naming a missing case id exits `2`:
+- [ ] The case is in the `test_sets.default` of every llm-d guide whose claims it tests
+      (`profiles/llm-d/<guide>/parts/common.yaml`); guide lanes run only the cases a test set
+      names. Then plan every combination, since a test set naming a missing case id exits `2`:
       `for p in profiles/llm-d/*/*.yaml; do llmdv plan --profile "$p" -q || echo "$p"; done`.
 - [ ] For a new suite, the coverage graphic is regenerated with
       `python docs/images/make_coverage_svg.py`. The offline tests check that it lists every

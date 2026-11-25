@@ -20,7 +20,7 @@ through writing one; every field is in [REFERENCE.md](../profiles/REFERENCE.md).
    ([declare intended behaviour](#declare-intended-behaviour)).
 6. **Check it offline** with `llmdv profile validate`, inspect overrides with
    `llmdv profile explain`, and preview what runs with `llmdv plan`.
-7. **Run the declarations first** with `llmdv verify -m contract`, then the full run
+7. **Run the declarations first** with `llmdv verify --full-suite -m contract`, then the full run
    ([validate, plan, verify](#validate-plan-verify)).
 
 ## Start from the closest example
@@ -162,13 +162,38 @@ ingresses:
       bad_credentials: [401]
 ```
 
-Everything else is optional. A capability you leave out makes its cases skip as `undeclared`, so
+Add `test_sets.default` to make plain `plan`, `verify` and `job` commands work. For example:
+
+```yaml
+test_sets:
+  default:
+    - contract.*
+    - discovery.models_lists_declared_model
+    - openai_chat.basic_non_streaming
+    - openai_chat.streaming_sse
+```
+
+Without a default, choose `--test-set smoke`, another named set, `--all-test-sets`, or
+`--full-suite`; a plain run exits 2. Other declarations are optional. A capability you leave out
+makes its selected cases skip as `undeclared`, so
 a short profile runs fewer cases rather than failing more. Add declarations as you learn what the
 fleet should do: reasoning and tool parsers under `model`, optional features under
 `capabilities`, per-layer differences under each ingress.
 
 If other people's traffic or dashboards depend on the fleet, set `fleet_policy: shared`.
-Disruptive cases then skip as `excluded_by_policy`. The default, `dedicated`, runs everything.
+Disruptive cases then skip as `excluded_by_policy`. The default, `dedicated`, permits those
+cases within the chosen test sets or full suite; it does not expand the scope.
+
+## Choose how much to run
+
+Use `llmdv verify --profile <file> --test-set smoke` for a small check of model discovery,
+generation and streaming. Preview it with the same flags on `llmdv plan`.
+
+Keep expected behavior in the profile while choosing coverage separately: `test_sets.default` is the
+default subset (required for a plain run); other entries in `test_sets` are named alternatives that run only when requested with
+`--test-set NAME`. An explicit name replaces the default. This lets you run a quick check
+without weakening capability declarations or copying the whole profile. See
+[smoke and custom test sets](cli.md#test-sets-and-coverage) for examples.
 
 ## Declarations are verified, not trusted
 
@@ -219,8 +244,8 @@ how to describe the layers behind an ingress without guessing.
 ```sh
 llmdv profile validate profiles/<system>/<model>.local.yaml           # offline: schema and consistency
 llmdv plan --profile profiles/<system>/<model>.local.yaml             # offline: what runs, what skips
-llmdv verify --profile profiles/<system>/<model>.local.yaml -m contract   # the declarations, live
-llmdv verify --profile profiles/<system>/<model>.local.yaml           # the full run
+llmdv verify --profile profiles/<system>/<model>.local.yaml --full-suite -m contract   # the declarations, live
+llmdv verify --profile profiles/<system>/<model>.local.yaml --full-suite # the full run
 ```
 
 `llmdv profile validate` is offline by design: no cluster, no credentials. That keeps "your
@@ -228,7 +253,7 @@ profile is wrong" (exit 2) apart from "your vantage point is wrong" (exit 3) and
 broken" (exit 1). `llmdv plan` lists the cases; `llmdv profile show <profile> --matrix` prints
 the surface matrix the profile implies, including what will skip.
 
-`-m contract` runs only the surface and header checks, in about a minute: the quickest way to find
+`--full-suite -m contract` runs only the surface and header checks, in about a minute: the quickest way to find
 a stale `surfaces` or `headers` line. Other declarations are judged by the cases that use them.
 Once it is clean, run the full suite. The [CLI reference](cli.md) covers exit codes,
 narrowing a run and what a run writes.

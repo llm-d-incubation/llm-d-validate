@@ -15,7 +15,7 @@ import argparse
 from ..kube import KubeContext, KubeError
 from ..log.setup import emit, get_logger
 from ..preflight import _command_for
-from ..profile import inspection, loader
+from ..profile import inspection, loader, test_sets
 from ..surfaces.base import SURFACE_PATHS
 from .contract_display import contract_lines
 from .exit_codes import OK, USAGE
@@ -53,6 +53,11 @@ def add_parser(subparsers, parents) -> None:
         "--yaml",
         action="store_true",
         help="export standalone YAML, preserving environment-variable names; no network access",
+    )
+    modes.add_argument(
+        "--test-sets",
+        action="store_true",
+        help="list built-in and profile-defined test sets and their case-id globs",
     )
     show.set_defaults(func=cmd_show)
 
@@ -92,6 +97,21 @@ def cmd_show(args: argparse.Namespace) -> int:
         log.error("%s", exc)
         return USAGE
 
+    if getattr(args, "test_sets", False):
+        emit(
+            "Default test set: "
+            + ("default" if "default" in profile.test_sets else "none (explicit choice required)")
+        )
+        for source, named in (("built-in", test_sets.BUILTIN), ("profile", profile.test_sets)):
+            for name, cases in sorted(named.items()):
+                emit(f"\n{name} ({source})")
+                for case in cases:
+                    emit(f"  {case}")
+        emit(
+            "\nUse --test-set NAME (repeatable), --all-test-sets or --full-suite "
+            "with plan, verify or job."
+        )
+        return OK
     if getattr(args, "yaml", False):
         emit(inspection.export_yaml(chain).rstrip())
         return OK

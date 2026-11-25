@@ -44,7 +44,7 @@ Return `Completion` from `parse_completion` and `assemble` so shared assertions 
 - A cross-surface switch takes `false`, `true`, or an explicit surface list (`structured_output: [chat_completions, responses]`). Follow that rule for new ones.
 - An API-specific value list (`chat_options`, `messages_thinking`, `responses_reasoning_efforts`) selects native option values, not surfaces. Each vocabulary lives once in `profile/schema.py` and is shared by parsing and case generation.
 - Structured configuration such as `cache_reuse` keeps its `surfaces` selector alongside its own settings.
-- Every capability may be overridden per ingress.
+- Every capability may be overridden per ingress. When adding one, check that `profile explain --field` reports its parsed effective value and source assignments, and that `profile show --yaml` reloads with the same contract. Extend `tests/test_profile_inspection.py` when the new field introduces a normalization or composition case not already covered; the authoring views use the existing loader and composer.
 - Parse it in `profile/loader.py`, add its row to [profiles/REFERENCE.md](../../../profiles/REFERENCE.md) (`tests/test_profile_reference.py` fails on an undocumented field), and add a closed vocabulary to `_DECLARED_VALUES` in `plugin.py` so `needs("<field>:<value>")` can use it.
 - Gate a capability on what the fleet can actually report: `reasoning_tokens` needs native reasoning accounting from a reasoning parser; inline `<think>` text alone does not qualify.
 

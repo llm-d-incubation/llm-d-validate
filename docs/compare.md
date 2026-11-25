@@ -39,11 +39,11 @@ and `native/cpu` offload. A run without a flavor matches only runs without one. 
 llm-d ref, `llmdv` version or profile digest is a note.
 
 **Digest.** Every result carries its `profile_digest`, a hash of the parsed declarations:
-comments, `known_failures` and `selection` do not move it. Runs under another digest are dropped
+comments, `known_failures` and `test_sets.default` do not move it. Runs under another digest are dropped
 from the window and counted. When the two runs differ, the report first says **the profile
 changed** and names the declarations that moved. Runs recorded before this rule hashed the file
 bytes, so the first comparison after it reports one change with nothing listed; so does a
-profile with a `selection`, once.
+profile with a `test_sets.default`, once.
 
 **Window.** `--window N` (`--compare-window N` on `llmdv job`) is how many earlier runs must
 agree; the default, `1`, is the run before. A case is newly failing only when every run of the
@@ -69,21 +69,20 @@ printed, except the *Existing passing* count.
 | **Started running and passing** | skipped before, passes now; a count |
 | **Failing new cases** | absent from the window, failing now; not regressions |
 | **Suite changed** | cases appeared or disappeared: a change to `llmdv`, not the fleet |
-| **Outside the selection** | cases a run of the window held and a selection left out of this run, or that this run held and every run of the window left out, so there is nothing to compare them with. Never regressions or new failures; a known failure among them is listed under known failures instead. `selection.outside` in `comparison.json` |
+| **Outside the coverage** | cases a run of the window held and the chosen scope left out of this run, or that this run held and every run of the window left out, so there is nothing to compare them with. Never regressions or new failures; a known failure among them is listed under known failures instead. `coverage.outside` in `comparison.json` |
 | **Known failures, fix pending** | failing in the window too and declared in `known_failures` with its issue. Transition `known`, under `known.failing` in `comparison.json` |
 | **Fix landed** | labelled a known failure by the newest run of the window that held it, passes now: remove the entry |
 | **Fix expected, still failing** | a known failure whose `until` build has answered and still fails; named, kept in its bucket |
 | **No longer covered** | a known failure in the newest run of the window that held it, a plain failure now (entry removed, or a different check fails); named with the old issue and both checks, kept in its bucket |
 
-## Selection changes
+## Coverage changes
 
-A run under a [`selection`](../profiles/REFERENCE.md#selection) holds only the cases it
-selected; the rest are deselected, not skipped, and have no record. A selection changes which
-cases run, never what they assert, so selected, full and differently selected runs share one
-window, and `--all` runs keep their history. `outcome.json` records the globs, whether `--all`
-was given, and `in_force`. When these differ between the baseline and the later run, the report
-says **the selection changed** and names the globs added and removed and any `--all` run
-(`selection.changes`).
+A run under [test sets](../profiles/REFERENCE.md#test_sets) holds only its chosen cases; the
+rest are excluded, not skipped. Coverage changes which cases run, never what they assert, so
+subset and full-suite runs can share a comparison window. `outcome.json` records `coverage`:
+mode, resolved sets and patterns, filters, and collected cases excluded by the scope or filters.
+When scope changes, the report identifies added/removed patterns and changed modes under
+`coverage.changes`. Excluded checks are listed under `coverage.outside`, not suite churn.
 
 Because each case is read against the newest run that holds it, a case a selected run left out
 is judged against, labelled from and seen to stop running by the full run before it. A known

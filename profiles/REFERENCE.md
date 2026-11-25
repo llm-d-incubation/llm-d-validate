@@ -32,7 +32,8 @@ Conventions:
 | `fleet_policy` | `dedicated` \| `shared` | `dedicated` | `shared` means other people depend on this fleet: cases marked `disruptive` skip as `excluded_by_policy`. Cheap well-formed refusals (a bad token limit, an unknown path, a bad credential) still run. Declared, never inferred. |
 | `fleet` | mapping | none | Configuration and metrics rules read from the cluster. See [fleet](#fleet). |
 | `known_failures` | list | none | Failures already filed and traced to a pending fix. Labels, never excuses. See [known_failures](#known_failures). |
-| `selection` | list of string | every case | Case-id globs: `verify`, `plan` and `job` run only the cases one matches, and `--all` runs everything. See [selection](#selection). |
+
+| `test_sets` | mapping of names to non-empty lists of strings | `{}` | Saved case-ID patterns. A plain run requires `default`; explicit flags choose other scopes. See [test_sets](#test_sets). |
 
 ## extends
 
@@ -560,7 +561,7 @@ What a run reports:
   stays `known`. Name a signal the failing response carries.
 - A pass is never labelled. An entry that labelled no failure although a case it covers ran is
   listed in the banner, `summary.md` and `outcome.json` (`verification.known.unmatched`): the fix
-  may have landed and the entry should go. An entry none of whose cases reached a verdict (the selection
+  may have landed and the entry should go. An entry none of whose cases reached a verdict (the chosen scope
   or a `-k` left them out, they skipped, they errored in setup or lost their local connection) is
   not listed, because the run says nothing about it. `llmdv compare` reports
   a fix landing when a case the previous run labelled passes now, and never calls a regression
@@ -571,24 +572,46 @@ What a run reports:
 Editing this block, a comment, or the path of a client `executable` does not change the profile digest. Only declarations do, so a
 comparison window is not dropped each time a finding is filed.
 
-## selection
+## test_sets
 
-The cases a profile runs, when it should not run them all: a guide's lane that only needs the cases exercising what the guide changes, say, while another lane runs the full suite against the same engine and model.
+Named lists of case-ID patterns determine coverage without changing the deployment contract.
 
 ```yaml
-selection:
-  - contract.*                                 # keep the contract suite, or a stale profile goes unnoticed
-  - discovery.*
-  - "openai_chat.request_field[logit_bias]"    # one variant of one case
+test_sets:
+  default: [contract.*, discovery.*]
+  quick-api: [openai_chat.basic_non_streaming, openai_chat.streaming_sse]
+  complete: ["*"]
 ```
 
-- Each entry is a glob over the case id or `id[variant]`, matched exactly as [`known_failures[].cases`](#known_failures) are: `*` and `?` are wild and brackets are literal. A case runs when any glob matches it.
-- `llmdv verify`, `llmdv plan` and `llmdv job` apply it; `--all` sets it aside and runs every case. `--ingress`, `--client`, `--surface`, `-k` and `-m` still narrow what it leaves.
-- A case it leaves out is deselected, not skipped: it appears in no `results.jsonl` record and in no skip class. `llmdv plan` reports how many were left out (`selection.profile.left_out` in `--json`).
-- It applies to every suite, the contract suite included, so a selection that should still check the profile's own declarations names `contract.*`. An item without a case id cannot be named short of `*`, so a selection leaves it out; every case under `suites/` has one.
-- A glob that matches no collected case is an invalid selection (exit 2), and the error names it, so a typo cannot quietly select nothing. `llmdv verify` checks this before preflight, so a typo sends no request. Globs are checked before `-k` and `-m` narrow, but after `--ingress`, which decides which ingresses are collected at all.
-- An empty list is an error. In a child profile, `selection: null` clears an inherited selection.
-- `outcome.json` records it under `selection`: the globs (`cases`), whether `--all` was given (`all`), and whether the selection applied (`in_force`: declared and not set aside by `--all`). A selection changes which cases run, never what a case asserts, so it is not part of the profile digest: editing it keeps a run's comparison history. `llmdv compare` reads each run's recorded selection instead, says when it changed, and lists a case only one run selected under *Outside the selection*, never as a regression or a new case. See [docs/compare.md](../docs/compare.md).
+- Names start with a lowercase letter and contain lowercase letters, digits, underscores or
+  hyphens. Built-in names (`smoke`) are reserved and cannot be redefined, even with null.
+- Each value is a non-empty list of case-ID globs. The matching and literal variant brackets
+  follow `known_failures[].cases`. `"*"` inside a set selects the whole library.
+- Through `extends`, names merge and each list replaces its inherited list. A name set to null
+  removes that set; `test_sets: null` clears all inherited definitions.
+- Without a coverage flag, run `default`; absent default is exit 2. Explicit `--test-set NAME`
+  flags combine only those sets. `--all-test-sets` combines all profile-defined sets, including
+  default; no profile-defined sets is exit 2. `--full-suite` selects every library case.
+- The three explicit modes are mutually exclusive. Existing CLI filters narrow their result.
+  A CLI wildcard such as `--test-set '*'` is invalid; use `--all-test-sets`.
+- Only chosen sets' patterns are checked against collected cases, after ingress collection and
+  before client/surface/keyword/marker filtering. An unmatched pattern is exit 2 before any
+  request. Unchosen stale patterns do not block a run. Empty definitions are always invalid.
+- Defaults should cover contract checks; planning warns based on resolved coverage if they do
+  not. A deliberately narrow default remains valid.
+- A case omitted by coverage is excluded, not skipped. Selected cases still have normal surface,
+  capability and policy gates. Zero selected cases is exit 2; all-skipped runs show no executed
+  checks and provide no evidence of deployment health.
+- The built-in `smoke` checks model discovery, basic generation and streaming. It is available
+  explicitly even in a profile with no sets, and is not included by `--all-test-sets`.
+- `profile show <path> --test-sets` lists names and patterns; `profile explain --field test_sets`
+  traces profile definitions to their source files.
+- `coverage` in outcomes records the mode, resolved sets, effective patterns, filters and
+  exclusions. Comparisons distinguish scope changes from suite changes. Test sets are excluded
+  from the contract digest.
+
+Old `selection` and `selections` keys are rejected. Move the former list to `test_sets.default`
+and the latter mapping to `test_sets`. See [CLI coverage](../docs/cli.md#test-sets-and-coverage).
 
 ## fleet
 

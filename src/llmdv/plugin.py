@@ -40,7 +40,7 @@ from .evidence import write as write_evidence
 from .ingress import client_for, served_by, version_signals
 from .log.setup import get_logger
 from .output import Offloader, reference, run_prefix, whole
-from .profile import known, loader
+from .profile import known, loader, test_sets
 from .profile.schema import (
     CHAT_OPTIONS,
     CHAT_REASONING_EFFORTS,
@@ -202,12 +202,9 @@ def pytest_addoption(parser: pytest.Parser) -> None:
         default=[],
         help="restrict to these surfaces (repeatable; a union)",
     )
-    group.addoption(
-        "--llmdv-all",
-        action="store_true",
-        default=False,
-        help="ignore the profile's selection and run every case",
-    )
+    group.addoption("--llmdv-test-set", action="append", default=[], help="named test set")
+    group.addoption("--llmdv-all-test-sets", action="store_true", help="all profile test sets")
+    group.addoption("--llmdv-full-suite", action="store_true", help="all library cases")
     group.addoption(
         "--llmdv-run-dir",
         action="store",
@@ -665,7 +662,7 @@ def pytest_collection_modifyitems(config: pytest.Config, items: list[pytest.Item
 
 
 def _apply_selection(config: pytest.Config, profile: Profile, items: list[pytest.Item]) -> None:
-    """Deselect every case the profile's `selection` names no glob for, unless --llmdv-all.
+    """Deselect cases outside the chosen named subset or profile default; --full-suite bypasses it.
 
     Deselected rather than skipped: a case left out appears in no result and no skip class, so
     the skip classes keep meaning what the fleet lacks. Runs before `-k` and `-m`, which pytest
@@ -675,25 +672,53 @@ def _apply_selection(config: pytest.Config, profile: Profile, items: list[pytest
     every case under `suites/` carries one, the contract suite's included.
     """
     config._llmdv_left_out = 0  # type: ignore[attr-defined]
-    if not profile.selection or config.getoption("--llmdv-all"):
+    config._llmdv_scope_inventory = [  # type: ignore[attr-defined]
+        [
+            (ingress.id if (ingress := _ingress_from_params(item, profile)) else "-"),
+            _case_id(item) or item.nodeid,
+            _variant(item) or surface_of(item) or "",
+        ]
+        for item in items
+    ]
+    config._llmdv_after_sets = len(items)  # type: ignore[attr-defined]
+    try:
+        selected = test_sets.resolve(
+            profile,
+            config.getoption("--llmdv-test-set"),
+            all_sets=config.getoption("--llmdv-all-test-sets"),
+            full_suite=config.getoption("--llmdv-full-suite"),
+        )
+    except loader.ProfileError as exc:
+        raise pytest.UsageError(str(exc)) from exc
+    config._llmdv_coverage = selected  # type: ignore[attr-defined]
+    if not selected.cases:
         return
     names = [(_case_id(item), _variant(item)) for item in items]
-    unmatched = [
-        glob
-        for glob in profile.selection
-        if not any(matches_case((glob,), case_id, variant) for case_id, variant in names)
-    ]
-    if unmatched:
-        raise pytest.UsageError(
-            f"selection: {', '.join(map(repr, unmatched))} matches no case collected for "
-            f"profile {profile.name!r}; `llmdv plan --all` lists the case ids"
-        )
+    for entry in selected.sets:
+        unmatched = [
+            glob
+            for glob in entry.cases
+            if not any(matches_case((glob,), case_id, variant) for case_id, variant in names)
+        ]
+        if unmatched:
+            raise pytest.UsageError(
+                f"test_sets.{entry.name}: {', '.join(map(repr, unmatched))} matches no case "
+                f"collected for profile {profile.name!r}; use plan --full-suite to list cases"
+            )
+    if selected.mode == "default" and any(
+        case_id
+        and case_id.startswith("contract.")
+        and not matches_case(selected.cases, case_id, variant)
+        for case_id, variant in names
+    ):
+        log.warning("Default test set omits contract checks; stale declarations may go unnoticed.")
     kept, deselected = [], []
     for item, (case_id, variant) in zip(items, names, strict=True):
-        (kept if matches_case(profile.selection, case_id, variant) else deselected).append(item)
+        (kept if matches_case(selected.cases, case_id, variant) else deselected).append(item)
     if deselected:
         config.hook.pytest_deselected(items=deselected)
         items[:] = kept
+    config._llmdv_after_sets = len(items)  # type: ignore[attr-defined]
     config._llmdv_left_out = len(deselected)  # type: ignore[attr-defined]
 
 
@@ -723,13 +748,16 @@ def pytest_collection_finish(session: pytest.Session) -> None:
     session.config._llmdv_phase_sizes = sizes  # type: ignore[attr-defined]
     session.config._llmdv_phase_seen = None  # type: ignore[attr-defined]
     left_out = getattr(session.config, "_llmdv_left_out", 0)
-    if left_out and not session.config.option.collectonly:
-        log.info("%d case(s) left out by the profile's selection (--all runs them)", left_out)
-    if not session.items:
-        log.warning(
-            "no cases collected -- check --ingress/--client/--surface, -k/-m and the "
-            "profile's selection (--all runs every case)"
+    selected = getattr(session.config, "_llmdv_coverage", None)
+    if selected and not session.config.option.collectonly:
+        log.info(
+            "Coverage: %s; %d included, %d excluded by test sets",
+            selected.label,
+            len(session.items),
+            left_out,
         )
+    if not session.items:
+        log.warning("No cases selected; check test sets and other filters.")
 
 
 def _phase_heading(config: pytest.Config, phase: str) -> None:

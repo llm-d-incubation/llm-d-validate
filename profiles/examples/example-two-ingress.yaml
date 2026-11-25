@@ -156,3 +156,17 @@ clients:
   - id: completions-probe
     surfaces: [completions]
     needs: []
+
+# A small default for first runs. Use --full-suite for broader verification.
+test_sets:
+  default:
+    - contract.*
+    - discovery.models_lists_declared_model
+    - openai_chat.basic_non_streaming
+    - openai_chat.streaming_sse
+    - openai_completions.basic_non_streaming
+    - streaming.completions_lifecycle[True]
+    - openai_responses.basic_non_streaming
+    - openai_responses.streaming_sse
+    - anthropic_messages.basic_non_streaming
+    - anthropic_messages.streaming_sse

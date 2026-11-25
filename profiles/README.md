@@ -17,6 +17,11 @@ model id and URL/key variables, then follow [the authoring walkthrough](../docs/
 Use `llmdv profile explain <path>` to inspect overrides and `profile show <path> --yaml` to export
 the composed declarations.
 
+Plain `plan`, `verify` and `job` commands use `test_sets.default`; a profile without one
+requires an explicit scope. The examples ship with small defaults. Use `--test-set NAME`
+(repeatable) for named subsets, `--all-test-sets` for all profile-defined sets, or `--full-suite`
+for the library. Other filters still narrow the scope. See [test sets](REFERENCE.md#test_sets).
+
 Find your starting point:
 
 | You have | Start here |
@@ -99,7 +104,7 @@ profile of its own. Copy the closest example, fill in its placeholders, and run 
 mkdir -p profiles/<system>
 cp profiles/examples/example-gateway-only.yaml profiles/<system>/<model>.local.yaml
 llmdv profile validate profiles/<system>/<model>.local.yaml
-llmdv verify --profile profiles/<system>/<model>.local.yaml -m contract
+llmdv verify --profile profiles/<system>/<model>.local.yaml --full-suite -m contract
 ```
 
 Each other layer you can reach, such as a gateway in front of a router, is another ingress in

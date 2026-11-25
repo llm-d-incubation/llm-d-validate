@@ -139,11 +139,11 @@ def test_all_complete_examples_can_be_explained_and_exported(tmp_path):
 
 
 def test_selection_and_clients_show_effective_values_after_clearing(tmp_path):
-    parent = {**PARENT, "selection": ["contract.*"], "clients": [{"id": "raw"}]}
-    path = child_of(tmp_path, {"selection": None, "clients": None}, parent)
+    parent = {**PARENT, "test_sets": {"default": ["contract.*"]}, "clients": [{"id": "raw"}]}
+    path = child_of(tmp_path, {"test_sets": None, "clients": None}, parent)
     result = rows(path)
-    assert result["selection"].value == []
-    assert result["selection"].assignments[-1].value is None
+    assert result["test_sets"].value == {}
+    assert result["test_sets"].assignments[-1].value is None
     assert result["clients"].value == []
 
 

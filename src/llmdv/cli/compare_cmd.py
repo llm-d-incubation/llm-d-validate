@@ -168,7 +168,7 @@ def _compare_run(
             if mismatch:
                 raise NoSuchRun("baseline identity differs in: " + ", ".join(mismatch))
     delta, before_id = _compare_baselines(
-        source, profile, chosen, after, (outcome.read(run_dir) or {}).get("selection")
+        source, profile, chosen, after, (outcome.read(run_dir) or {}).get("coverage")
     )
     local = run_dir / PROFILE_FILE
     before_profile = read_profile(source, profile, before_id)
@@ -209,11 +209,11 @@ def _compare_baselines(
     profile: str,
     chosen: list[str],
     after: list[dict],
-    selection: dict | None = None,
+    coverage: dict | None = None,
 ) -> tuple[Delta, str]:
     """Discard unusable archived runs whole; tonight's results remain strict.
 
-    `selection` is the later run's recorded selection. Each baseline's is read from its
+    `coverage` is the later run's recorded coverage. Each baseline's is read from its
     outcome, so a case one run did not select is not reported as the suite changing.
     """
     history, errors, unreadable = {}, {}, False
@@ -228,8 +228,8 @@ def _compare_baselines(
         # statement about the runs.
         kind = ArchiveUnreadable if unreadable else NoSuchRun
         raise kind("no usable baseline runs: " + "; ".join(errors.values()))
-    selections = [_selection(source, profile, run_id) for run_id in history]
-    delta = compare_window(list(history.values()), after, selections, selection)
+    coverages = [_coverage(source, profile, run_id) for run_id in history]
+    delta = compare_window(list(history.values()), after, coverages, coverage)
     delta.window_errors = errors
     delta.window_dropped += len(errors)
     # The run the verdicts were judged against, which after a reverted profile is not the
@@ -239,13 +239,13 @@ def _compare_baselines(
     return delta, before_id
 
 
-def _selection(source: str, profile: str, run_id: str) -> dict | None:
-    """A run's recorded `selection`, or None when it recorded none or its outcome is unreadable.
+def _coverage(source: str, profile: str, run_id: str) -> dict | None:
+    """A run's recorded `coverage`, or None when it recorded none or its outcome is unreadable.
 
     Advisory: without it a case the run left out reads as suite churn, never as a verdict.
     """
     try:
-        recorded = (read_outcome(source, profile, run_id) or {}).get("selection")
+        recorded = (read_outcome(source, profile, run_id) or {}).get("coverage")
     except ArchiveUnreadable:
         return None
     return recorded if isinstance(recorded, dict) else None
@@ -348,7 +348,7 @@ def run(args: argparse.Namespace) -> int:
             args.profile,
             chosen,
             after,
-            _selection(args.source, args.profile, after_id),
+            _coverage(args.source, args.profile, after_id),
         )
     except (NoSuchRun, EmptyRun, InvalidRun, UnsafeName) as exc:
         # Not having a comparison is a usage answer, never a passing one.

@@ -10,15 +10,16 @@ missing. Each suite is a package under `src/llmdv/suites/`, and its name is also
 ## Run a suite
 
 ```sh
-llmdv verify --profile <profile> -m openai_chat            # one suite
-llmdv verify --profile <profile> -m "tools or streaming"   # several
-llmdv verify --profile <profile> -k test_streaming_include_usage   # one case, by test name
-llmdv plan --profile <profile> -m openai_chat              # preview: what would run and skip, offline
+llmdv verify --profile <profile> --full-suite -m openai_chat            # one suite
+llmdv verify --profile <profile> --full-suite -m "tools or streaming"   # several
+llmdv verify --profile <profile> --full-suite -k test_completions_stream_lifecycle   # one case, by test name
+llmdv plan --profile <profile> --full-suite -m openai_chat              # preview: what would run and skip, offline
 llmdv profile show <profile> --matrix                      # what this profile enables, per surface and ingress
 ```
 
-A case whose `case_id` starts with another suite's name carries that suite's marker too. A profile
-with a `selection:` runs only the cases it names; add `--all` to run a suite past it.
+These commands select from the full library, then narrow to the requested suites or cases.
+Without an explicit scope, `-m` and `-k` narrow `test_sets.default`; if no default exists, the
+command exits 2. A case whose `case_id` starts with another suite's name carries that suite's marker too.
 [cli.md](cli.md#selecting-what-runs) has every selector, and
 [writing-tests.md](writing-tests.md) explains how to add a case or a suite. Case counts are not
 listed here because they drift: `llmdv plan` prints them, after parametrized variants (surface,

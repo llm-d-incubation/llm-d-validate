@@ -177,7 +177,7 @@ the Job's name, and returns:
 ```sh
 deploy/trigger.sh -n <namespace> --trigger manual --id "$RUN_ID" -- --compare
 deploy/trigger.sh -n <namespace> --id "$ROLLOUT_ID" -- --client agent --label deployment="$IMAGE_DIGEST"
-deploy/trigger.sh -n <namespace> --trigger manual --profile-file /secure/path/profile.yaml -- -m contract
+deploy/trigger.sh -n <namespace> --trigger manual --profile-file /secure/path/profile.yaml -- --full-suite -m contract
 ```
 
 | Option | Default | Meaning |
@@ -189,7 +189,7 @@ deploy/trigger.sh -n <namespace> --trigger manual --profile-file /secure/path/pr
 | `--cli` | `kubectl` | or `oc` |
 | `--profile-file` | none | a local in-cluster profile (top-level `vantage: in-cluster`) for this run only |
 
-Arguments after `--` replace the CronJob's `args:` entirely, so pass selection and comparison
+Arguments after `--` replace the CronJob's `args:` entirely, so pass test-set, filter and comparison
 options explicitly. The caller waits on the Job itself and needs the `llmdv-trigger` Role: get
 CronJobs, create Jobs and ConfigMaps (the last for `--profile-file`, whose ConfigMap goes with
 the Job). Label a rollout run with an immutable deployment reference.
@@ -213,7 +213,11 @@ llmdv job [llmdv verify arguments...]
      else 2 if --compare had no archive, else 5 if an enabled delivery failed, else 0
 ```
 
-Selection goes in the Job's `args:`; flags `llmdv job` does not know, such as `--artifact-sink`,
+An empty `args:` runs the profile's `test_sets.default`, or exits 2 if it has none.
+Use repeated `--test-set NAME` flags to combine named sets, `--all-test-sets` for all
+profile-defined sets, or `--full-suite` for the library. Filters still narrow that scope.
+
+Coverage flags and filters go in the Job's `args:`; flags `llmdv job` does not know, such as `--artifact-sink`,
 pass through to verify. `--analyze` builds `dashboard.html` after the comparison and publishes it
 with the run. The pod never calls the Kubernetes API, so it needs no token or Role. Verify runs as
 a separate process so that `llmdv job` outlives it:

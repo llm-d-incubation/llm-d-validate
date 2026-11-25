@@ -32,7 +32,7 @@ spec:
           containers:
             - name: llmdv
               image: llmdv
-              # `llmdv verify` selection arguments; empty runs everything the profile declares.
+              # Coverage arguments for verify; empty uses test_sets.default or exits 2 if absent.
               args: ["--identity", "trigger=nightly"]
               env:
                 - name: LLMDV_RUN_BUDGET
