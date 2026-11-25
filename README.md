@@ -52,7 +52,7 @@ pinpoints the layer that breaks, and flags what regressed since the last run.
 Every llm-d guide at [Tier 3](https://github.com/llm-d/llm-d/blob/main/guides/GUIDES-POLICY.md#5-production-readiness-tiers) (Validated: run end to end every
 night) includes a ready-to-use
 [validation profile](https://github.com/llm-d-incubation/llm-d-validate/blob/main/profiles/README.md#llm-d-guide-validation-profiles),
-written against llm-d `9ca8ff0` and not yet run against a real engine.
+built from the guide as of llm-d commit `9ca8ff0`.
 After deploying a guide, use its profile to verify that your deployment behaves as specified by
 the guide and its APIs. By default, the profiles target the guide's router (the EPP), so give
 `llmdv` the EPP's URL.
