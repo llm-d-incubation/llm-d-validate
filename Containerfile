@@ -3,7 +3,7 @@
 #
 #   podman build -f Containerfile --build-arg LLMDV_GIT_SHA="$(git rev-parse HEAD)" -t llmdv .
 #
-# Pins: the base image digest, requirements.lock and the native Claude Code checksums below.
+# Pins: the base digest, requirements.lock, pyproject.toml's build backend and Claude checksums.
 # See deploy/README.md for how it runs and refreshes.
 FROM registry.access.redhat.com/ubi9/python-311@sha256:a0bdb55576fc5b8d6704279307817828ef027e1065533ceba133fe9516003a6c
 

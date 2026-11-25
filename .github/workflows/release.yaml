@@ -27,6 +27,7 @@ on:
       - README.md
       - LICENSE
       - .github/workflows/release.yaml
+      - .github/scripts/check-release.sh
 
 permissions:
   contents: read
@@ -50,15 +51,13 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
-      - name: Tag pushed by an admin
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Authorize release tag
         env:
           GH_TOKEN: ${{ github.token }}
-        run: |
-          permission=$(gh api "repos/$GITHUB_REPOSITORY/collaborators/$GITHUB_ACTOR/permission" --jq .permission)
-          if [ "$permission" != "admin" ]; then
-            echo "::error::$GITHUB_ACTOR has $permission on this repository; only an admin can publish a release"
-            exit 1
-          fi
+        run: bash .github/scripts/check-release.sh
 
   build:
     runs-on: ubuntu-latest
@@ -67,16 +66,6 @@ jobs:
       - uses: actions/checkout@v4
         with:
           clean: true
-          # The ancestry check needs history, including older release commits on main.
-          fetch-depth: 0
-      - name: Tag commit is on main
-        if: startsWith(github.ref, 'refs/tags/')
-        run: |
-          git fetch --no-tags origin +refs/heads/main:refs/remotes/origin/main
-          if ! git merge-base --is-ancestor HEAD origin/main; then
-            echo "::error::tag $GITHUB_REF_NAME points to a commit that is not on main; merge the release changes before tagging"
-            exit 1
-          fi
       - uses: astral-sh/setup-uv@v6
       # Interpreters and uv's cache live under RUNNER_TEMP, which the runner empties after
       # every job.
@@ -86,15 +75,6 @@ jobs:
           echo "UV_CACHE_DIR=$RUNNER_TEMP/uv-cache" >> "$GITHUB_ENV"
           UV_PYTHON_INSTALL_DIR="$RUNNER_TEMP/uv-python" UV_CACHE_DIR="$RUNNER_TEMP/uv-cache" \
             uv python install 3.11
-      # A tag publishes the version src/llmdv/__init__.py states, so the two must agree.
-      - name: Tag matches the version
-        if: startsWith(github.ref, 'refs/tags/')
-        run: |
-          version=$(sed -n 's/^__version__ = "\(.*\)"$/\1/p' src/llmdv/__init__.py)
-          if [ "$GITHUB_REF_NAME" != "v$version" ]; then
-            echo "::error::tag $GITHUB_REF_NAME does not match __version__ $version in src/llmdv/__init__.py"
-            exit 1
-          fi
       - name: Build
         run: uv build --python 3.11 --out-dir dist
       - name: Check metadata

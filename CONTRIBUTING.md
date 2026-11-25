@@ -106,7 +106,7 @@ Every test is offline: cases run against fakes on local sockets.
 | Workflow (`.github/workflows/`) | What it does |
 | --- | --- |
 | `offline-tests.yaml` | on every PR and push to `main`: lint (`ruff check`, `ruff format --check`, with the pinned ruff), then the offline suite in parallel on Python 3.10 through 3.15. No secrets, cluster or gateway; live verification never runs here |
-| `image.yaml` | builds the runner image (amd64, arm64) and publishes it to `ghcr.io/llm-d-incubation/llm-d-validate`: `:main` and `:sha-<sha>` on every push to `main`, `:vX.Y.Z` and `:latest` on a release tag, signed with cosign; PRs build without pushing |
+| `image.yaml` | builds and smoke-tests the runner image (amd64, arm64), then publishes it to `ghcr.io/llm-d-incubation/llm-d-validate`: `:main` and `:sha-<sha>` on every push to `main`, `:vX.Y.Z` and `:latest` on an authorized release tag, signed with cosign; PRs build and smoke-test without pushing |
 | `release.yaml` | on a `vX.Y.Z` tag pushed by an admin: builds the package, checks its metadata, smoke-tests the wheel, publishes `llm-d-validate` to PyPI with trusted publishing, and creates the GitHub release with the files. PRs that touch packaging build and smoke-test without publishing |
 | `ci-signed-commits.yaml` | checks every commit in a PR carries a DCO sign-off |
 | `prow-github.yaml` | Prow commands in comments: `/lgtm`, `/approve`, `/assign`, `/kind`, `/priority`, `/close` and others |
@@ -142,9 +142,11 @@ Python package (`release.yaml`) and the container image (`image.yaml`):
 
 3. Approve the `pypi` deployment when the run asks for it.
 
-`release.yaml` fails before publishing if the tagged commit is not on `main`, if the tag does
-not match `__version__`, or if whoever pushed it is not an admin. Older commits on `main` are
-allowed. Two repository settings back that up and must stay in place:
+Both workflows use `.github/scripts/check-release.sh` to reject a release tag if its commit is
+not on `main`, if it does not match `__version__`, or if the actor is not an admin. This also
+applies to manual image runs on tags. Older commits on `main` are allowed. PyPI publication
+additionally waits for environment approval; the image publishes after its smoke tests pass.
+Two repository settings back that up and must stay in place:
 
 - **The `pypi` environment** requires an admin's approval and accepts only `v*` tags. PyPI trusts
   only this environment and `release.yaml`, so renaming either breaks publishing until the
