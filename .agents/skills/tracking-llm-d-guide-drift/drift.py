@@ -31,16 +31,16 @@ GUIDES = REPO / "profiles" / "llm-d"
 WORKFLOWS = ".github/workflows"
 LANE_PREFIX = "nightly-e2e-"
 # The commit the profiles were built from, as profiles/llm-d/README.md states it.
-PIN = re.compile(r"at llm-d `([0-9a-f]{7,40})`")
+PIN = re.compile(r"llm-d (?:commit )?`([0-9a-f]{7,40})`")
 UPSTREAM_DIR = re.compile(r"https://github\.com/llm-d/llm-d/tree/[^/]+/(guides/[^)\s#]+)")
 # Which profile fact each kind of upstream file owns (the profile skill's source table).
 OWNERS = (
     (re.compile(rf"^{WORKFLOWS}/"), "lanes: which configurations get a profile"),
     (re.compile(r"/scripts/|deploy.*\.sh$"), "lanes: the deploy scripts a lane calls"),
-    (re.compile(r"(^|/)guide\.yaml$"), "statements to check against the lanes (Upstream notes)"),
+    (re.compile(r"(^|/)guide\.yaml$"), "statements to check against the lanes (sources disagree)"),
     (
         re.compile(r"(^|/)README\.md$|\.md$"),
-        "statements to check against the lanes (Upstream notes)",
+        "statements to check against the lanes (sources disagree)",
     ),
     (
         re.compile(r"router|values\.ya?ml$|epp"),
@@ -70,7 +70,7 @@ def git(clone: Path, *args: str) -> str:
 def pinned_commit() -> str:
     match = PIN.search((GUIDES / "README.md").read_text())
     if not match:
-        sys.exit("profiles/llm-d/README.md names no `at llm-d <commit>`; pass --from")
+        sys.exit("profiles/llm-d/README.md names no `llm-d commit <sha>`; pass --from")
     return match.group(1)
 
 

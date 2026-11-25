@@ -20,7 +20,9 @@ the composed declarations.
 Plain `plan`, `verify` and `job` commands use `test_sets.default`; a profile without one
 requires an explicit scope. The examples ship with small defaults. Use `--test-set NAME`
 (repeatable) for named subsets, `--all-test-sets` for all profile-defined sets, or `--full-suite`
-for the library. Other filters still narrow the scope. See [test sets](REFERENCE.md#test_sets).
+for the library. Other filters still narrow the scope. See
+[what a verification command selects](#what-a-verification-command-selects), and
+[test sets](REFERENCE.md#test_sets) for the fields.
 
 Find your starting point:
 
@@ -58,16 +60,12 @@ give `llmdv` the EPP's URL, which needs no key:
 
 ```sh
 export LLMDV_EPP_URL=<your EPP's URL>
-llmdv verify --profile profiles/llm-d/optimized-baseline/vllm-qwen3-32b-parsers-standalone.yaml \
-  --identity accelerator=gpu --identity provider=gke
+llmdv verify --profile profiles/llm-d/optimized-baseline/vllm-qwen3-32b-parsers-standalone.yaml
 ```
 
-Each guide's folder holds a profile for every configuration llm-d's nightly lanes cover, and a
-README that maps each lane to its profile and `--identity` flags and says what is not tested, and
-why. [llm-d/README.md](llm-d/README.md) explains how to pick one, and has the
-[lane counts and the guides not covered](llm-d/README.md#coverage). The profiles are written
-against llm-d `9ca8ff0` and none has been run against a real engine yet: each says
-`WRITTEN, NOT RUN`, and its first run is its measurement.
+Each guide's README says which profile matches the overlay you deployed, what it tests and what it
+does not. [llm-d/README.md](llm-d/README.md) explains the profile names and the optional
+`--identity` flags, and lists [what is not covered](llm-d/README.md#not-covered).
 
 ### Include a gateway or engine
 
@@ -113,3 +111,57 @@ gitignored, so your hosts stay out of the repository.
 [Writing a profile](../docs/writing-profiles.md) walks through every step, the
 [examples](../docs/writing-profiles.md#start-from-the-closest-example) and `extends`;
 [REFERENCE.md](REFERENCE.md) lists every field.
+
+## What a verification command selects
+
+A profile's `test_sets` choose which cases `plan`, `verify` and `job` select. They never change
+what a case asserts, and the same flags work on all three commands:
+
+| Flags | Selects |
+| --- | --- |
+| none | the profile's `default` set; with no `default`, the command exits 2 and lists the choices |
+| `--test-set NAME`, repeatable | the named sets, combined; `--test-set default` names the default explicitly |
+| `--test-set smoke` | the built-in `smoke` set, below |
+| `--all-test-sets` | every profile-defined set, combined; never `smoke` |
+| `--full-suite` | every verification case in the library |
+
+**The built-in `smoke` set** is the same for every profile: `discovery.models_lists_declared_model`,
+`openai_chat.basic_non_streaming`, `openai_chat.streaming_sse`,
+`openai_completions.basic_non_streaming`, `streaming.completions_lifecycle[True]`,
+`openai_responses.basic_non_streaming`, `openai_responses.streaming_sse`,
+`anthropic_messages.basic_non_streaming`, `anthropic_messages.streaming_sse`.
+It is model discovery plus one plain and one streaming request on each API. A profile cannot
+redefine it.
+
+**Selected is not the same as executed.** Filters (`-k`, `-m`, `--surface`, `--client`,
+`--ingress`) narrow the chosen scope, and a filter that leaves no case exits 2. The profile's
+declarations, capabilities and fleet policy then skip selected cases that cannot apply, each with
+its [skip class](../docs/cli.md#skip-classes). A case that would run can still skip during the run
+(throttled, `requires_instrumentation`, or a declaration it reads). `--identity` flags label a run
+and never change what it selects. To see all of this for a profile, offline:
+
+```sh
+llmdv profile show <profile> --test-sets     # every set and its case-ID patterns
+llmdv plan --profile <profile>               # the default: each case, and why one skips
+llmdv plan --profile <profile> --test-set smoke
+llmdv plan --profile <profile> --full-suite
+```
+
+**Each folder's README says what its profiles select:** the default, where it is defined, the
+patterns by suite, and what each scope selects for each profile, counted by `llmdv plan`:
+
+- llm-d guides: [agentic-api](llm-d/agentic-api/README.md#what-llmdv-verify-selects),
+  [async-multitenant](llm-d/async-multitenant/README.md#what-llmdv-verify-selects),
+  [fast-model-actuation](llm-d/fast-model-actuation/README.md#what-llmdv-verify-selects),
+  [flow-control](llm-d/flow-control/README.md#what-llmdv-verify-selects),
+  [keda-epp](llm-d/keda-epp/README.md#what-llmdv-verify-selects),
+  [multimodal-serving](llm-d/multimodal-serving/README.md#what-llmdv-verify-selects),
+  [optimized-baseline](llm-d/optimized-baseline/README.md#what-llmdv-verify-selects),
+  [pd-disaggregation](llm-d/pd-disaggregation/README.md#what-llmdv-verify-selects),
+  [pod-snapshot](llm-d/pod-snapshot/README.md#what-llmdv-verify-selects),
+  [precise-prefix-cache-routing](llm-d/precise-prefix-cache-routing/README.md#what-llmdv-verify-selects),
+  [predicted-latency-routing](llm-d/predicted-latency-routing/README.md#what-llmdv-verify-selects),
+  [tiered-prefix-cache](llm-d/tiered-prefix-cache/README.md#what-llmdv-verify-selects),
+  [wide-ep](llm-d/wide-ep/README.md#what-llmdv-verify-selects)
+- [examples](examples/README.md#what-llmdv-verify-selects) and the
+  [custom llm-d deployment](examples/custom-llm-d/README.md#what-llmdv-verify-selects)

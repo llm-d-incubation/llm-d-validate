@@ -17,7 +17,7 @@
 #                                  latencyPredictor, maxTTFTPenaltyMs 5000), latency-scorer,
 #                                  weighted-random-picker in the `default` profile
 #   modelServers.matchLabels       llm-d.ai/guide=optimized-baseline: the overlays reuse
-#                                  optimized-baseline's model servers (README.md, "Upstream notes")
+#                                  optimized-baseline's model servers (README.md, "For maintainers")
 #   R/router/base.values.yaml for the rest, as in optimized-baseline
 # No admission plugin is configured, so the SLO headers have no effect and the topology part's
 # `ignored` declarations stand. The SLO-aware values (G/router/predicted-latency-slo.values.yaml)

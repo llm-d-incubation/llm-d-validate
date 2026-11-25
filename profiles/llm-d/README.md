@@ -1,53 +1,78 @@
 # llm-d guide validation profiles
 
-Validation profiles for the [llm-d](https://github.com/llm-d/llm-d) guides (llm-d's docs also say "well-lit
-paths"; this repository says guide). Each states what a correct stack does when a guide is
-deployed as shipped with one model-server overlay, for every configuration a nightly lane deploys
-at llm-d `9ca8ff0`.
+Ready-made profiles for testing a deployment of an [llm-d](https://github.com/llm-d/llm-d) guide. Deploy the guide your way, point `llmdv` at it, and it checks that the deployment behaves as the guide and its APIs say. Any other stack uses a profile of its own ([profiles/README.md](../README.md)).
 
-They are data on top of `llmdv`: nothing in `src/` knows about them, and any other stack is
-described by its own profile ([profiles/README.md](../README.md)). How the folders are built and
-where each value comes from:
-[the profile skill](../../.agents/skills/writing-an-infra-profile/SKILL.md#how-profilesllm-d-is-built).
+[Find your guide](#find-your-guide) · [Test your deployment](#test-your-deployment) · [Profile names and `--identity`](#profile-names-and---identity) · [Not covered](#not-covered) · [For maintainers](#for-maintainers)
 
-## Test against a deployed guide
+## Find your guide
 
-Run the combination that matches the overlay you deployed (its header lists the overlays it
-covers). By default it targets the guide's router, so give `llmdv` the EPP's URL:
+Each guide's README says which profile matches what you deployed, how to run it and what it tests.
+
+| Guide | Profiles |
+| --- | --- |
+| [optimized-baseline](optimized-baseline/README.md) | 7, plus a simulator profile |
+| [pd-disaggregation](pd-disaggregation/README.md) | 5 |
+| [wide-ep](wide-ep/README.md) | 3 |
+| [precise-prefix-cache-routing](precise-prefix-cache-routing/README.md) | 4 |
+| [predicted-latency-routing](predicted-latency-routing/README.md) | 2 |
+| [tiered-prefix-cache](tiered-prefix-cache/README.md) | 5 |
+| [multimodal-serving](multimodal-serving/README.md) | 1 |
+| [pod-snapshot](pod-snapshot/README.md) | 2 |
+| [fast-model-actuation](fast-model-actuation/README.md) | 1 |
+| [flow-control](flow-control/README.md) | 2 |
+| [agentic-api](agentic-api/README.md) | 1 |
+| [async-multitenant](async-multitenant/README.md) | 1 |
+| [keda-epp](keda-epp/README.md) | 3 |
+
+## Test your deployment
+
+Pick the profile for the overlay you deployed, from the guide's README. The profiles test the guide's router (the EPP), so give `llmdv` its URL; it needs no key:
 
 ```sh
 export LLMDV_EPP_URL=<your EPP's URL>
 llmdv profile validate profiles/llm-d/optimized-baseline/vllm-qwen3-32b-parsers-standalone.yaml
-llmdv verify --profile profiles/llm-d/optimized-baseline/vllm-qwen3-32b-parsers-standalone.yaml \
-  --identity accelerator=gpu --identity provider=gke
+llmdv verify --profile profiles/llm-d/optimized-baseline/vllm-qwen3-32b-parsers-standalone.yaml
 ```
 
-The EPP needs no key. To include a gateway or engine in your tests, add it as another ingress in a
-local file that extends the combination: [include a gateway or engine](../README.md#include-a-gateway-or-engine).
+To test a gateway or the engine as well, [add it as another ingress](../README.md#include-a-gateway-or-engine) in a local file that extends the profile.
 
-A combination is `<engine>-<model-config>[-<variant>]-<topology>.yaml`, with a variant only where
-lanes of one configuration differ to a client (keda-epp's `queue` and `inflight`); files in a `parts/` folder never run
-on their own. The guide folder's README maps each lane's overlay to its combination and gives the
-exact `--identity` flags, which keep apart lanes that share a profile. They follow llm-d's lane
-inputs:
+## Profile names and `--identity`
+
+A profile is `<engine>-<model configuration>[-<variant>]-<topology>.yaml`, named by what a client sees: `vllm-qwen3-32b-parsers-standalone` is Qwen3-32B on vLLM with reasoning and tool-call parsers, behind the standalone router. Files in a `parts/` folder are building blocks and never run on their own.
+
+Deployments that look the same to a client share a profile. `--identity` flags are optional labels that keep their runs apart, so `llmdv compare` never compares two different configurations. Read them off your overlay path:
 
 | Flag | Value |
 | --- | --- |
-| `accelerator` | the guide's `ACCELERATOR_TYPE` |
-| `provider` | the `INFRA_PROVIDER` folder the lane renders, with any connector the guide folds into it (`nixl/amd-ci`); `base` when the lane sets none |
-| `flavor` | every other variable the guide's lanes vary (connector, variant, topology, scaler), llm-d's values joined with `/` in overlay-path order (`lmcache-connector/cpu`), passed on every lane of that guide |
+| `accelerator` | the accelerator folder of your overlay (`gpu`, `amd`, `tpu/v5p`, `xpu`) |
+| `provider` | the provider folder it renders (`gke`, `ocp`, `amd-ci`), with any connector the guide folds into it (`nixl/amd-ci`); `base` when there is none |
+| `flavor` | anything else the guide lets you vary (connector, tier, topology, scaler), joined with `/` in overlay-path order (`lmcache-connector/cpu`) |
 
-## Coverage
+Each guide's README gives an example.
+
+## Not covered
+
+- **Layers other than the router**: agentic-api's stateful Responses server, the async coordinator and its queues, and the prefill/decode routing sidecar. Each needs its own ingress, placed with `fronts`, and measured behaviour.
+- **Claims that hold only under load or need cluster reads**: queueing, priority and fairness, eviction and shedding, scaling events, prefill/decode decisions, offload and cache counters, snapshot restore, prefix affinity (#23, #27).
+- **Guides without a profile yet**: fast-model-actuation-keda (#130), and the guides llm-d does not test nightly (coord-disaggregation, p2p-kv-cache-sharing, multi-model-routing, omni-serving, turn-priority-fairness, modelexpress-p2p, hyperconverged-cephfs, the per-model guides and the other workload-autoscaling variants). The details are under [For maintainers](#for-maintainers).
+
+## For maintainers
+
+How the folders are built and where each value comes from: [the profile skill](../../.agents/skills/writing-an-infra-profile/SKILL.md#how-profilesllm-d-is-built). To find what changed in llm-d since these profiles were written: [the drift skill](../../.agents/skills/tracking-llm-d-guide-drift/SKILL.md).
+
+<details>
+<summary>Coverage: which guides have profiles, and how many nightly lanes each covers</summary>
+
+The guide profiles and coverage below are based on llm-d commit `9ca8ff0`.
 
 Every guide llm-d runs in a nightly lane, which llm-d's guide policy calls
-[Tier 3, Validated](https://github.com/llm-d/llm-d/blob/main/guides/GUIDES-POLICY.md#5-production-readiness-tiers) (`.github/workflows/nightly-e2e-*.yaml` at
-`9ca8ff0`; keda-epp's are `nightly-e2e-workload-autoscaling-keda-epp-*`), has a folder here,
+[Tier 3, Validated](https://github.com/llm-d/llm-d/blob/main/guides/GUIDES-POLICY.md#5-production-readiness-tiers) (`.github/workflows/nightly-e2e-*.yaml`; keda-epp's are `nightly-e2e-workload-autoscaling-keda-epp-*`), has a folder here,
 named as its `guide.yaml` names it, except those listed under [Not covered](#not-covered). Lanes that look the same to a
 client share a profile.
 
 | Guide | Lanes | Profiles | Notes |
 | --- | --- | --- | --- |
-| [optimized-baseline](optimized-baseline/) | 10 | 7, plus a simulator profile | see [below](#optimized-baseline-coverage) |
+| [optimized-baseline](optimized-baseline/) | 10 | 7, plus a simulator profile | see the optimized-baseline details below |
 | [pd-disaggregation](pd-disaggregation/README.md) | 8 | 5 | requests pass the decode pod's routing sidecar |
 | [wide-ep](wide-ep/README.md) | 5 | 3 | the XPU lane runs aggregated, without prefill/decode |
 | [precise-prefix-cache-routing](precise-prefix-cache-routing/README.md) | 6 | 4 | |
@@ -61,20 +86,19 @@ client share a profile.
 | [async-multitenant](async-multitenant/README.md) | 2 | 1 | the router only; `flavor` names evictable or holdback |
 | [keda-epp](keda-epp/README.md) | 3 | 3 | `flavor` names the scaling signal; the router runs flow control on the queue lanes only |
 
-Every profile tests at the router (`<release>-epp`, standalone mode), the only layer every lane
-exposes the same way. None has run against a real engine: each says `WRITTEN, NOT RUN`.
+Every profile tests at the router (`<release>-epp`, standalone mode), the only layer every lane exposes the same way.
 
-### Not covered
+**Not covered, in detail:**
 
 - **fast-model-actuation-keda** (2 lanes, #130). The pool scales from zero on the router's
-  flow-control queue size only (`minReplicaCount: 0`, `cooldownPeriod: 30`; llm-d 9ca8ff0
+  flow-control queue size only (`minReplicaCount: 0`, `cooldownPeriod: 30`; llm-d
   `guides/fast-model-actuation/fast-model-actuation-keda/keda/base/kustomization.yaml`), and
   `llmdv`'s one-at-a-time requests never queue. So the pool can drop to zero mid-run and
   cold-start, holding a request up to the router's `noEndpointRequestTTL` of 300 s
   (`guides/fast-model-actuation/fast-model-actuation-keda/router/fast-model-actuation-keda.values.yaml`).
   `llmdv` has no warm-up; tolerating that means raising `stream_idle` and `stream_budget`
   ([parts/topology/standalone.yaml](parts/topology/standalone.yaml)) for every streaming check.
-- **ci-async-kind-e2e** runs on pull requests and by hand, never nightly (llm-d 9ca8ff0
+- **ci-async-kind-e2e** runs on pull requests and by hand, never nightly (llm-d
   `.github/workflows/ci-async-kind-e2e.yaml`). Its temporary kind cluster (optimized-baseline's
   router over a CPU vLLM serving `facebook/opt-125m` at `--max_model_len=2048`, plus Redis and
   llm-d-async v1.0.0; `guides/batch-serving/asynchronous-processing/test/kind-e2e.sh`) is deleted
@@ -91,7 +115,10 @@ exposes the same way. None has run against a real engine: each says `WRITTEN, NO
   hyperconverged-cephfs, the per-model guides under `guides/models/`, and the other
   workload-autoscaling variants. Each is added when a lane runs it.
 
-## Which lane runs everything
+</details>
+
+<details>
+<summary>Which lane runs the full suite</summary>
 
 A guide's `test_sets.default` (in its `parts/common.yaml`) is what its lanes run by default: the router
 path, the overlay's parsers and window, and what the guide changes. The rest of the suite is
@@ -134,7 +161,10 @@ engine build from the rest of their configuration, so each runs `--full-suite`: 
 `ibm-acc-gpu-vllm-x` (vLLM's floating `nightly` image). A lane whose engine image changes runs
 `--full-suite` once on the new build; `llmdv compare` reports the build change (`the stack changed`).
 
-## optimized-baseline coverage
+</details>
+
+<details>
+<summary>optimized-baseline: its lanes and what has been measured</summary>
 
 The guide's ten lanes (`nightly-e2e-optimized-baseline-<lane>.yaml` in llm-d, each in standalone
 mode) deploy seven configurations that differ to a client, one profile each:
@@ -168,10 +198,12 @@ and a few-line combination when a lane runs it.
 **What has been measured.** Only the router layer, standalone, on kind with a simulator engine
 (2026-11-16): the EPP's error envelopes, header and path handling and pass-through, recorded in
 `parts/topology/standalone.yaml`. Engine and model lines come from each lane's overlay and the
-API definitions. The first run of each profile is its measurement, and is expected to find
-errors.
+API definitions.
 
-## Known gaps
+</details>
+
+<details>
+<summary>Known gaps in the optimized-baseline profiles</summary>
 
 - **Reasoning field name**: declared `reasoning` for vLLM (seen on vLLM 0.32 elsewhere) and
   `reasoning_content` for SGLang (inferred); neither observed on this guide's builds.
@@ -199,3 +231,5 @@ errors.
   cluster access; a lane adds an `environment` block in its own local file.
 - **Load mode** (#23): the objective and fairness headers, the dropped-reason values and
   load-aware scoring show only under contention, so they skip as `requires_load`.
+
+</details>
