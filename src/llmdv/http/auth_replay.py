@@ -37,15 +37,21 @@ def capture(headers: Mapping[str, str], configured: Mapping[str, str] | None = N
             kind = "profile_key" if value in secrets else "replacement_key"
         elif value.lower() == "bearer":
             kind = "bearer_without_token"
+        elif value.lower() == "bearer ":
+            kind = "empty_bearer_token"
         elif value.lower().startswith("bearer "):
             kind = "profile_bearer" if value[7:] in secrets else "replacement_bearer"
+        elif value.lower() == "basic":
+            kind = "basic_without_token"
+        elif value.lower() == "basic ":
+            kind = "empty_basic_token"
         elif value.lower().startswith("basic "):
             try:
-                base64.b64decode(value[6:], validate=True)
+                credentials = base64.b64decode(value[6:], validate=True)
             except (binascii.Error, ValueError):
                 kind = "malformed_basic"
             else:
-                kind = "replacement_basic"
+                kind = "replacement_basic" if b":" in credentials else "basic_without_separator"
         elif " " not in value:
             kind = "profile_key" if value in secrets else "replacement_key"
         else:
@@ -63,6 +69,10 @@ def header_arguments(
     needs_key = False
     replacements = {
         "bearer_without_token": "Bearer",
+        "empty_bearer_token": "Bearer ",
+        "basic_without_token": "Basic",
+        "empty_basic_token": "Basic ",
+        "basic_without_separator": "Basic " + base64.b64encode(SYNTHETIC_KEY.encode()).decode(),
         "replacement_bearer": f"Bearer {SYNTHETIC_KEY}",
         "replacement_key": SYNTHETIC_KEY,
         "replacement_basic": "Basic "

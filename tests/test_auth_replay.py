@@ -42,6 +42,13 @@ def exchange_with(headers):
     ("headers", "expected"),
     [
         ({"Authorization": "Bearer"}, "Authorization: Bearer"),
+        ({"Authorization": "Bearer "}, "Authorization: Bearer "),
+        ({"Authorization": "Basic"}, "Authorization: Basic"),
+        ({"Authorization": "Basic "}, "Authorization: Basic "),
+        (
+            {"Authorization": "Basic bm8tc2VwYXJhdG9y"},
+            "Authorization: Basic bGxtZHYtaW52YWxpZA==",
+        ),
         ({"Authorization": "not-a-valid-key"}, "Authorization: llmdv-invalid"),
         ({"Authorization": "Bearer unknown-token"}, "Authorization: Bearer llmdv-invalid"),
         (
