@@ -40,7 +40,8 @@ import yaml
 from ..cli import exit_codes
 from ..cli.exit_codes import class_of
 from ..evidence.stack import version_headers_in
-from ..http import redact
+from ..http import auth_replay, redact
+from ..http.repro import _quote
 from ..ingress import signals
 from ..log.setup import get_logger
 from ..results import read as results_file
@@ -180,19 +181,18 @@ def curl_for(exchange: dict, key_env: str | None, body_cap: int) -> str:
     method = exchange.get("method") or "GET"
     url = exchange.get("url") or ""
     parts = ["curl", "-sS", "-i", "-X", method, shlex.quote(url)]
-    for name, value in (exchange.get("request_headers") or {}).items():
-        if name.lower() in ("authorization", "x-api-key", "api-key"):
-            if key_env:
-                value = (
-                    f"Bearer ${{{key_env}}}"
-                    if name.lower() == "authorization"
-                    else f"${{{key_env}}}"
-                )
-                parts += ["-H", f'"{name}: {value}"']
-            continue
-        if name.lower() in ("content-length", "host", "accept-encoding", "connection"):
-            continue
-        parts += ["-H", shlex.quote(f"{name}: {value}")]
+    headers = {
+        name: value
+        for name, value in (exchange.get("request_headers") or {}).items()
+        if name.lower() not in ("content-length", "host", "accept-encoding", "connection")
+    }
+    header_args, needs_key, unavailable = auth_replay.header_arguments(
+        headers, exchange.get("request_auth"), key_env
+    )
+    if unavailable:
+        return auth_replay.unavailable_script()
+    for header in header_args:
+        parts += ["-H", _quote(header)]
     body = exchange.get("request_body")
     script = " ".join(parts)
     if body is not None:
@@ -204,7 +204,7 @@ def curl_for(exchange: dict, key_env: str | None, body_cap: int) -> str:
                 + " use the bundle's request.json"
             )
         script += " --data-binary @- <<'BODY'\n" + text + "\nBODY"
-    guard = f': "${{{key_env}:?set {key_env} first}}"\n' if key_env else ""
+    guard = f': "${{{key_env}:?set {key_env} first}}"\n' if needs_key else ""
     return guard + script
 
 

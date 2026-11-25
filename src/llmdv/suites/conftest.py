@@ -281,18 +281,20 @@ def openai_client(request, ingress):
     from ..plugin import _correlation_headers, register_client
 
     timeout = httpx.Timeout(ingress.timeouts.request, connect=ingress.timeouts.connect)
+    secret = _sdk_secret(request, ingress)
     recorder = SdkRecorder(
         httpx.Client(
             timeout=timeout,
             trust_env=ingress.setup.proxy is ProxyMode.ALLOW,
             verify=ingress.tls.verify,
-        )
+        ),
+        auth_headers=ingress.auth.header(secret),
     )
     recorder.client.headers.update(_correlation_headers(request.config, request.node))
     register_client(request.node, ingress, recorder)
     client = openai.OpenAI(
         base_url=f"{ingress.base_url}/v1",
-        api_key=_sdk_secret(request, ingress),
+        api_key=secret,
         max_retries=0,  # a retry would mask the very failure under test
         timeout=timeout,
         http_client=recorder.client,
@@ -322,7 +324,8 @@ def anthropic_client(request, ingress, surface, monkeypatch):
             timeout=timeout,
             trust_env=ingress.setup.proxy is ProxyMode.ALLOW,
             verify=ingress.tls.verify,
-        )
+        ),
+        auth_headers=ingress.auth.header(secret),
     )
     recorder.client.headers.update(_correlation_headers(request.config, request.node))
     register_client(request.node, ingress, recorder)

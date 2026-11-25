@@ -34,7 +34,8 @@ def test_curl_is_a_runnable_script_with_the_body_as_a_heredoc():
 def test_curl_carries_no_credential_and_reads_the_env_var_instead():
     """A bundle has to be shareable, so the script must reference the variable, not the key."""
     exchange = an_exchange(
-        request_headers={"Authorization": redact.SENTINEL, "Content-Type": "application/json"}
+        request_headers={"Authorization": redact.SENTINEL, "Content-Type": "application/json"},
+        request_auth=[{"header": "authorization", "kind": "profile_bearer"}],
     )
     script = to_curl(exchange, auth=Auth(type=AuthType.BEARER, key_env="LLMDV_KEY"))
     assert redact.SENTINEL not in script
@@ -141,7 +142,8 @@ def _run_script(script: str, tmp_path, **env) -> str:
 def test_the_curl_script_really_sends_the_key_from_the_environment(tmp_path):
     """A string check passed while the script single-quoted the variable and sent it literally."""
     exchange = an_exchange(
-        request_headers={"Authorization": redact.SENTINEL, "Content-Type": "application/json"}
+        request_headers={"Authorization": redact.SENTINEL, "Content-Type": "application/json"},
+        request_auth=[{"header": "authorization", "kind": "profile_bearer"}],
     )
     script = to_curl(exchange, auth=Auth(type=AuthType.BEARER, key_env="LLMDV_KEY"))
     sent = _run_script(script, tmp_path, LLMDV_KEY="s3cret-value")
@@ -150,6 +152,9 @@ def test_the_curl_script_really_sends_the_key_from_the_environment(tmp_path):
 
 
 def test_the_curl_script_sends_an_api_key_header_from_the_environment(tmp_path):
-    exchange = an_exchange(request_headers={"x-api-key": redact.SENTINEL})
+    exchange = an_exchange(
+        request_headers={"x-api-key": redact.SENTINEL},
+        request_auth=[{"header": "x-api-key", "kind": "profile_key"}],
+    )
     script = to_curl(exchange, auth=Auth(type=AuthType.API_KEY, key_env="LLMDV_KEY"))
     assert "x-api-key: s3cret-value" in _run_script(script, tmp_path, LLMDV_KEY="s3cret-value")
