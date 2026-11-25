@@ -63,14 +63,14 @@ def write(
         lines.append("")
 
     lines += [
-        "# Results go to a FRESH directory, never back into this one: a rerun must not",
-        "# overwrite the evidence it is reproducing. Override with LLMDV_RERUN_OUT.",
+        "# Each invocation creates a fresh run directory under this output root.",
+        "# Override the root with LLMDV_RERUN_OUT; earlier runs are preserved.",
         'OUT="${LLMDV_RERUN_OUT:-$(mktemp -d -t llmdv-rerun)}"',
         "",
         "# The original invocation, with the profile repointed at the copy beside this script.",
         f'{shlex.join(argv)} --local-output "$OUT"',
         "",
-        'echo "rerun results: $OUT"',
+        'echo "rerun results under: $OUT"',
         "",
     ]
     path = run_dir / "reproduce.sh"
@@ -82,7 +82,7 @@ def write(
 def rewrite_argv(argv: list[str], profile_flag_value: str) -> list[str]:
     """The original argv with --profile repointed at the archived copy.
 
-    Also strips --local-output: re-running must not overwrite the evidence being reproduced.
+    Strip output locations, including the job parent's private directory reservation.
     """
     out: list[str] = []
     skip_next = False
@@ -94,10 +94,10 @@ def rewrite_argv(argv: list[str], profile_flag_value: str) -> list[str]:
             out += ["--profile", profile_flag_value]
             skip_next = True
             continue
-        if token == "--local-output":
+        if token in {"--local-output", "--run-dir"}:
             skip_next = True
             continue
-        if token.startswith("--local-output="):
+        if token.startswith(("--local-output=", "--run-dir=")):
             continue
         out.append(token)
     return out

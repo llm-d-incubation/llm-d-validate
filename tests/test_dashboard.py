@@ -19,7 +19,7 @@ import yaml
 from llmdv.evidence import dashboard
 from llmdv.http import redact
 from llmdv.ingress import signals
-from tests.fakes import FakeFleet, profile_yaml, run_llmdv
+from tests.fakes import FakeFleet, only_run, profile_yaml, run_llmdv
 
 PROFILE = textwrap.dedent(
     """
@@ -250,6 +250,7 @@ def _verify(tmp_path, fleet, *extra):
         "verify", "--profile", str(profile), "--local-output", str(run_dir),
         "--pod-logs", "off", "-k", "discovery", *extra,
     )  # fmt: skip
+    run_dir = only_run(run_dir)
     return result, run_dir
 
 

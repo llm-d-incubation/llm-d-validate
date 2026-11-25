@@ -11,7 +11,7 @@ from llmdv.assertions.responses import assert_response_contract
 from llmdv.evidence import journal
 from llmdv.http import redact
 from llmdv.surfaces import get
-from tests.fakes import FakeFleet, response_body, run_llmdv
+from tests.fakes import FakeFleet, only_run, response_body, run_llmdv
 from tests.test_suites_against_fake import run_suites, write_profile
 
 RESPONSES = get("responses")
@@ -285,6 +285,7 @@ def test_cli_surface_selector_runs_responses_and_rejects_http_200_abort(tmp_path
             "-k",
             "test_responses_basic",
         )
+        run_dir = only_run(run_dir)
     assert result.returncode == (1 if abort else 0), result.stdout + result.stderr
     (record,) = [json.loads(line) for line in (run_dir / "results.jsonl").read_text().splitlines()]
     assert record["case_id"] == CASE

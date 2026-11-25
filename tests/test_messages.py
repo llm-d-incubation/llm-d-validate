@@ -8,7 +8,7 @@ import pytest
 import yaml
 
 from llmdv.surfaces import get
-from tests.fakes import FakeFleet, run_llmdv
+from tests.fakes import FakeFleet, only_run, run_llmdv
 from tests.test_suites_against_fake import run_suites, write_profile
 
 MESSAGES = get("messages")
@@ -177,6 +177,7 @@ def test_agent_cli_uses_profile_auth_for_raw_and_sdk_and_redacts_evidence(tmp_pa
                 "ANTHROPIC_CUSTOM_HEADERS": "x-api-key: ambient-custom-key",
             },
         )
+        run_dir = only_run(run_dir)
 
     assert result.returncode == 0, result.stdout + result.stderr
     records = [json.loads(line) for line in (run_dir / "results.jsonl").read_text().splitlines()]
@@ -238,6 +239,7 @@ def test_missing_profile_secret_never_sends_ambient_sdk_credentials(tmp_path, au
                 "ANTHROPIC_CUSTOM_HEADERS": "x-api-key: ambient-custom-key",
             },
         )
+        run_dir = only_run(run_dir)
 
     assert result.returncode == 0, result.stdout + result.stderr
     # Check the actual wire headers too: redaction alone could hide a leaked credential.

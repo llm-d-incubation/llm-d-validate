@@ -20,7 +20,7 @@ import pytest
 import yaml
 
 from llmdv.profile import compose
-from tests.fakes import SRC, FakeFleet, run_llmdv
+from tests.fakes import SRC, FakeFleet, only_run, run_llmdv
 
 ROOT = SRC.parent
 FULL = ["deploy/overlays/example/profile.yaml", "profiles/examples/example-two-ingress.yaml"]
@@ -74,6 +74,7 @@ def _verify(profile: Path, run_dir: Path, base_url: str, *extra: str) -> list[di
         "--skip-preflight", "--pod-logs", "off", *extra,
         env={URL_ENV: base_url, "KUBECONFIG": str(run_dir / "no-kubeconfig")},
     )  # fmt: skip
+    run_dir = only_run(run_dir)
     results = run_dir / "results.jsonl"
     return [json.loads(line) for line in results.read_text().splitlines() if line.strip()]
 

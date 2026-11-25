@@ -10,7 +10,7 @@ import pytest
 from llmdv.http import redact
 from llmdv.output import sink_for
 from llmdv.output.s3 import _register_credentials, missing_credentials_reason
-from tests.fakes import FakeFleet, FakeS3, profile_yaml, run_llmdv, s3_env
+from tests.fakes import FakeFleet, FakeS3, only_run, profile_yaml, run_llmdv, s3_env
 
 pytest.importorskip("boto3", reason="the s3 extra is not installed")
 
@@ -97,6 +97,7 @@ def verify(tmp_path, fleet, store, *extra):
         "--pod-logs", "off", "--remote-output", "s3://results/nightly", *extra,
         env=s3_env(store),
     )  # fmt: skip
+    run_dir = only_run(run_dir)
     return result, run_dir, json.loads((run_dir / "outcome.json").read_text())
 
 
@@ -184,6 +185,7 @@ def test_artifact_sink_objects_are_not_manifest_files(tmp_path):
             "streaming_sse",
             env=s3_env(store),
         )
+        run_dir = only_run(run_dir)
         outcome = json.loads((run_dir / "outcome.json").read_text())
 
     assert result.returncode == 0, result.stderr
@@ -211,7 +213,7 @@ def test_unwritable_artifact_sink_is_an_artifact_preflight_problem(tmp_path):
             "s3://results/nightly",
             env=s3_env(store),
         )
-        outcome = json.loads((tmp_path / "run" / "outcome.json").read_text())
+        outcome = json.loads((only_run(tmp_path / "run") / "outcome.json").read_text())
 
     assert result.returncode == 3
     assert any("artifact_sink" in problem for problem in outcome["preflight_problems"])

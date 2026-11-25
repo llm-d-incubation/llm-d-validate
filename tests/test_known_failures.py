@@ -23,7 +23,7 @@ from llmdv.evidence.outcome import known_summary
 from llmdv.profile import loader
 from llmdv.profile.known import at_or_past, classify, unmatched
 from llmdv.profile.schema import KnownFailure
-from tests.fakes import FakeFleet, profile_yaml, run_llmdv
+from tests.fakes import FakeFleet, only_run, profile_yaml, run_llmdv
 
 ENTRY = KnownFailure(
     check="finish_reason", issue="#1", cases=("openai_chat.*",), ingresses=("fake",)
@@ -315,6 +315,7 @@ def run(tmp_path, fleet, block: str, keyword="test_chat_basic and not sdk"):
         "verify", "--profile", str(profile), "--local-output", str(run_dir),
         "--pod-logs", "off", "--no-color", "-k", keyword,
     )  # fmt: skip
+    run_dir = only_run(run_dir)
     records = [json.loads(line) for line in (run_dir / "results.jsonl").read_text().splitlines()]
     outcome = json.loads((run_dir / "outcome.json").read_text())
     return result, records, outcome, run_dir

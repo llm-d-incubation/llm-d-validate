@@ -16,7 +16,7 @@ from llmdv.cli.main import build_parser
 from llmdv.collect import KubectlLogCollector
 from llmdv.kube import NO_CLI_REASON, READ_VERBS, KubeContext, KubeError
 from llmdv.profile import loader
-from tests.fakes import FakeFleet, FakeSlack, profile_yaml, run_llmdv
+from tests.fakes import FakeFleet, FakeSlack, only_run, profile_yaml, run_llmdv
 
 
 def make_cli(tmp_path, name):
@@ -194,6 +194,7 @@ def test_verify_resolves_selectors_collects_logs_and_records_cli(tmp_path, both,
             "--pod-logs", "all", "-k", "models_lists", *override,
             env={"PATH": str(tmp_path)},
         )  # fmt: skip
+        out = only_run(out)
     assert result.returncode == 0, result.stderr
     assert f"kube CLI  {chosen}" in result.stdout
     env = json.loads((out / "env.json").read_text())
@@ -303,6 +304,7 @@ def test_unavailable_cli_is_reported_and_required_logs_still_fail(tmp_path, mode
             *(["--kube-cli", "oc"] if override else []),
             env={"PATH": str(tmp_path)},
         )  # fmt: skip
+        out = only_run(out)
     assert result.returncode == (3 if mode == "all" else 0), result.stderr
     assert "kube CLI  unavailable" in result.stdout
     reason = "requested cluster CLI 'oc'" if override else NO_CLI_REASON

@@ -12,7 +12,7 @@ import yaml
 
 from llmdv.cli import banner
 from llmdv.profile import loader
-from tests.fakes import FakeFleet, profile_yaml, run_llmdv
+from tests.fakes import FakeFleet, only_run, profile_yaml, run_llmdv
 from tests.test_suites_against_fake import SUITES, run_pytest, run_suites
 
 
@@ -276,6 +276,7 @@ def test_all_suites_use_each_ingress_model_including_sdk_and_header_probes(tmp_p
             "--pod-logs",
             "off",
         )
+        run_dir = only_run(run_dir)
     records = read_jsonl(run_dir / "results.jsonl")
     assert result.returncode == 0, result.stdout + result.stderr
     for record in records:
@@ -482,6 +483,7 @@ def test_selected_ingress_uses_its_contract_in_requests_and_metadata(tmp_path):
             "-k",
             "test_models_lists_declared_model or test_structured_output",
         )
+        run_dir = only_run(run_dir)
         assert not first.seen
     assert result.returncode == 0, result.stdout + result.stderr
     records = read_jsonl(run_dir / "results.jsonl")

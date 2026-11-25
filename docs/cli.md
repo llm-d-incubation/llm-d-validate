@@ -25,6 +25,12 @@ it off.
 
 Flags whose behaviour needs more than `--help`:
 
+- **`--local-output ROOT`** chooses the parent directory (default `runs/`). Each invocation
+  creates a fresh `<profile>-<utc-timestamp>-<unique-id>/` child. Reusing the root preserves
+  earlier runs; it never appends to them. Use the child path printed in the banner for
+  `analyze`, `publish`, `notify`, and reproduction scripts. `job --work-dir` uses the same
+  local layout. Recorded run IDs and the remote `<profile>/<run-id>/` layout are unchanged,
+  so existing comparison history remains usable.
 - **`-n` is refused.** `verify` exits `2` on `-n`, `--numprocesses`, `--maxprocesses`, `--dist`
   and `--tx`: live cases depend on order, and a rate-limited key must not be multiplied.
 - **`--evidence all`** writes a bundle for every case, not only failures, so a pass can be
@@ -203,7 +209,7 @@ flowchart TB
 Every case, passing or failing, records its observations and the HTTP traffic behind them.
 
 ```
-runs/<utc-timestamp>/            # echoed in the banner and the summary
+runs/<profile>-<utc-timestamp>-<unique-id>/  # echoed in the banner and the summary
   env.json                       # versions, run id, labels, the resolved setup
   outcome.json                   # how the run ended: class, counts, failures, publication, the
                                  # builds seen behind each ingress (system_fingerprint, versions)
@@ -226,8 +232,8 @@ runs/<utc-timestamp>/            # echoed in the banner and the summary
   MANIFEST.json                  # with --remote-output: every file's sha256, published last
 ```
 
-The directory is created before the profile is read, so an invalid profile, a failed preflight
-and an interrupted run leave the same bundle, with `outcome.json` saying which. Transcripts and
+The directory and initial outcome are created before verification, so an invalid profile, a
+failed preflight and an interrupted run leave the same bundle, with `outcome.json` saying which. Transcripts and
 pod logs too large to keep whole go to `--artifact-sink`; the capped local copy keeps a reference.
 
 `results.jsonl` is `llmdv.results/1`, which grows only by optional fields (a check's `observed`

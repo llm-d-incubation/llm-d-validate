@@ -27,7 +27,7 @@ from llmdv import plugin, preflight
 from llmdv.evidence import journal
 from llmdv.http.client import Exchange
 from llmdv.profile import loader
-from tests.fakes import SRC, FakeFleet, LocalForward, profile_yaml, run_llmdv
+from tests.fakes import SRC, FakeFleet, LocalForward, only_run, profile_yaml, run_llmdv
 
 SELECTION = ("-m", "openai_chat")
 PRECHECK_POSTS = 4  # one precheck probe per surface declared by profile_yaml
@@ -71,12 +71,12 @@ def _run_python(script: str, args: list[str]):
 
 
 def _records(tmp_path: Path) -> list[dict]:
-    lines = (tmp_path / "run" / "results.jsonl").read_text().splitlines()
+    lines = (only_run(tmp_path / "run") / "results.jsonl").read_text().splitlines()
     return [json.loads(line) for line in lines if line.strip()]
 
 
 def _outcome(tmp_path: Path) -> dict:
-    return json.loads((tmp_path / "run" / "outcome.json").read_text())
+    return json.loads((only_run(tmp_path / "run") / "outcome.json").read_text())
 
 
 def test_a_local_tunnel_lost_mid_run_exits_3_and_records_no_fleet_failure(tmp_path):
@@ -113,7 +113,7 @@ def test_a_local_tunnel_lost_mid_run_exits_3_and_records_no_fleet_failure(tmp_pa
             "cases_skipped": len(after),
         }
     ]
-    summary = (tmp_path / "run" / "summary.md").read_text()
+    summary = (only_run(tmp_path / "run") / "summary.md").read_text()
     assert "## local connection lost" in summary
     said = result.stdout + result.stderr
     assert f"the local connection to ingress 'fake' was lost after {index} case(s)" in said

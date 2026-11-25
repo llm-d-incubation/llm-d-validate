@@ -21,7 +21,7 @@ from llmdv.evidence.stack import (
     version_headers_in,
 )
 from llmdv.output import manifest
-from tests.fakes import FakeFleet, profile_yaml
+from tests.fakes import FakeFleet, only_run, profile_yaml
 
 OLD = "vllm-0.31.0+g5b2a143-tp8-dp4-ep-926de753"
 NEW = "vllm-0.31.0+g2107750-tp8-dp4-ep-926de753"
@@ -181,6 +181,7 @@ def test_a_finished_run_records_the_stack_it_saw(tmp_path):
             cwd=SRC.parent, env={"PYTHONPATH": str(SRC), "PATH": "/usr/bin:/bin"},
             capture_output=True, text=True,
         )  # fmt: skip
+        run_dir = only_run(run_dir)
     assert result.returncode == 0, result.stderr[-2000:]
     outcome = json.loads((run_dir / "outcome.json").read_text())
     stack = outcome["stack"]
@@ -278,6 +279,7 @@ def test_a_finished_run_publishes_a_declared_version_header(tmp_path):
             cwd=SRC.parent, env={"PYTHONPATH": str(SRC), "PATH": "/usr/bin:/bin"},
             capture_output=True, text=True,
         )  # fmt: skip
+        run_dir = only_run(run_dir)
     assert result.returncode == 0, result.stderr[-2000:]
     ((ingress, signals),) = json.loads((run_dir / "outcome.json").read_text())["stack"].items()
     assert signals["x-kong-version"] == {"3.9.1": sum(signals["server"].values())}

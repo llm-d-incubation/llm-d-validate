@@ -3277,6 +3277,12 @@ def ibm_cos_env(store: FakeS3, iam: FakeIAM) -> dict[str, str]:
     }
 
 
+def only_run(output_root: Path) -> Path:
+    """The single verification directory created under a test's output root."""
+    (outcome,) = output_root.glob("*/outcome.json")
+    return outcome.parent
+
+
 def run_llmdv(
     *args: str, env: dict[str, str] | None = None, **popen
 ) -> subprocess.CompletedProcess:

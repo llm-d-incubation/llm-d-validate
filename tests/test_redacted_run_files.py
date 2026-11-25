@@ -15,7 +15,7 @@ from http.server import BaseHTTPRequestHandler
 
 import yaml
 
-from tests.fakes import profile_yaml, run_llmdv
+from tests.fakes import only_run, profile_yaml, run_llmdv
 from tests.transport_fakes import QuietServer
 
 KEY = "sk-echoed-key-0123456789abcdef"
@@ -79,6 +79,7 @@ def test_an_echoed_key_reaches_no_run_file(tmp_path):
             "--pod-logs", "off", "--evidence", "all", "-k", "test_chat_basic and not sdk",
             env={"LLMDV_ECHO_KEY": KEY},
         )  # fmt: skip
+        run_dir = only_run(run_dir)
 
     # The case ran and failed on the 401, so every evidence file was written.
     assert result.returncode == 1, result.stdout + result.stderr

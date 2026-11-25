@@ -16,7 +16,7 @@ import yaml
 from llmdv.cli import job_cmd
 from llmdv.cli.main import build_parser
 from llmdv.profile import loader
-from tests.fakes import SRC, FakeFleet, profile_yaml, run_llmdv
+from tests.fakes import SRC, FakeFleet, only_run, profile_yaml, run_llmdv
 
 ROOT = SRC.parent
 COMMITTED = sorted(
@@ -47,6 +47,7 @@ def _verify(profile: Path, run_dir: Path, *extra: str):
         "verify", "--profile", str(profile), "--local-output", str(run_dir),
         "--pod-logs", "off", *extra,
     )  # fmt: skip
+    run_dir = only_run(run_dir)
     results = run_dir / "results.jsonl"
     records = (
         [json.loads(line) for line in results.read_text().splitlines() if line.strip()]
