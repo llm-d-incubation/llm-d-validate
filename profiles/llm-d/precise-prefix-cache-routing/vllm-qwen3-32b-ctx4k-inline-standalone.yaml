@@ -17,7 +17,7 @@
 # vLLM v0.30 and later register the render routes only with that flag (FROM docs:
 # vllm@v0.31.0:vllm/entrypoints/scale_out/factories.py), so every router render call answers
 # 404 and the router routes without cache information while client requests still answer 200
-# (README.md, "Upstream notes"). No render surface is declared here, unlike the other lanes'
+# (README.md, "For maintainers"). No render surface is declared here, unlike the other lanes'
 # combinations.
 #
 # How a lane runs it, after deploying the guide in standalone mode (guide.yaml deploy.standalone)

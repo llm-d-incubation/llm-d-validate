@@ -16,7 +16,7 @@
 # The router's token-producer modelName stays Qwen/Qwen3-32B (FROM values: router/
 # precise-prefix-cache-routing.values.yaml) while these pods serve Qwen/Qwen3-0.6B; the guide's
 # README asks the operator to edit it by hand. Unedited, every render call names a model the
-# pods do not serve and is refused (README.md, "Upstream notes").
+# pods do not serve and is refused (README.md, "For maintainers").
 #
 # How a lane runs it, after deploying the guide in standalone mode (guide.yaml deploy.standalone)
 # with one of the overlays above (GUIDE_NAME=precise-prefix-cache-routing):

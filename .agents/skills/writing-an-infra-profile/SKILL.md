@@ -1,6 +1,6 @@
 ---
 name: writing-an-infra-profile
-description: Use when writing, updating or reviewing an `llmdv` infra-profile; when choosing error_status, unstructured_errors, header dispositions, efforts, capabilities or change sentinels; when deciding which case families to leave out; when tempted to declare what a probe returned; before naming LiteLLM, an llm-d router or EPP, or vLLM behind an ingress; when one stack needs several profiles (models, engines, an llm-d guide's CI lanes); or when publishing a profile that was written against a private stack.
+description: Use when writing, updating or reviewing an `llmdv` infra-profile; when choosing error_status, unstructured_errors, header dispositions, efforts, capabilities or change sentinels; when deciding which case families to leave out; when tempted to declare what a probe returned; before naming LiteLLM, an llm-d router or EPP, or vLLM behind an ingress; when one stack needs several profiles (models, engines, an llm-d guide's CI lanes); when publishing a profile that was written against a private stack; or when a profile change must be reflected in its folder README's description of what a verification command selects.
 ---
 
 # Writing an infra-profile
@@ -102,6 +102,28 @@ Share custom names through `extends`; their lists replace, and `null` removes a 
 names are reserved. See [test sets](../../../profiles/REFERENCE.md#test_sets)
 for the schema and the exact scope of smoke.
 
+### Keep each folder's "What `llmdv verify` selects" section current
+
+Every folder of runnable profiles has a README, and its "What `llmdv verify` selects" section
+says, for every profile in the folder: which set a plain run uses and the file that defines it,
+the `default` patterns by suite, the other named sets and `smoke`, and what the default, `smoke`,
+`--all-test-sets` and `--full-suite` select, as `llmdv plan` counts it. The section is generated,
+offline, so it cannot drift from the composed profiles:
+
+```sh
+python .agents/skills/writing-an-infra-profile/selection_docs.py            # rewrite every section
+python .agents/skills/writing-an-infra-profile/selection_docs.py --check    # exit 1 if any is stale
+```
+
+Rerun it, and commit the README changes with the profile change, whenever you add, remove or
+rename a runnable profile; change any `test_sets`, `extends` list, declaration or capability (each
+changes what runs or skips); or add, remove or rename a case. A new folder of runnable profiles
+needs a README first, with a title and a short introduction; the helper adds the section. It
+refuses folders whose profiles define different sets, or whose planned suites differ from the
+default's patterns: write that folder's section by hand, documenting each profile's differences,
+and keep the same headings. `profiles/README.md` links every folder's section; add a new folder
+there.
+
 ## More than one configuration: parts and combinations
 
 When one stack needs several profiles, write each fact once in a **part** and list parts in a **combination**, the file you run. Worked examples: [`profiles/llm-d/`](../../../profiles/llm-d/README.md) and [`profiles/examples/custom-llm-d/`](../../../profiles/examples/custom-llm-d/).
@@ -125,11 +147,11 @@ Decide which configurations get a profile from the guide itself, and read all of
 - the guide's `guide.yaml`, including any `support:` table;
 - the guide's README, including any support or supported-accelerators section.
 
-Write a profile for each configuration a nightly lane deploys, as the rendered manifests show it, and none for any other. `guide.yaml` and the README are statements to check against the lanes and manifests, not the source of truth. Wherever they disagree (a lane deploying something the table or README does not list, a table cell no lane runs, a README naming a different model or flag than the manifest), profile what the lane deploys and record the disagreement under "Upstream notes" in the guide folder's README, citing paths. Say "guide", the word llm-d's own files use (`guides/`, `guide.yaml`, `GUIDE_NAME`), and name the folder exactly as llm-d names the guide; do not write "well-lit path" or any other term for it.
+Write a profile for each configuration a nightly lane deploys, as the rendered manifests show it, and none for any other. `guide.yaml` and the README are statements to check against the lanes and manifests, not the source of truth. Wherever they disagree (a lane deploying something the table or README does not list, a table cell no lane runs, a README naming a different model or flag than the manifest), profile what the lane deploys and record the disagreement under "Where llm-d's own sources disagree" in the guide folder's README (in its "For maintainers" section), citing paths. Say "guide", the word llm-d's own files use (`guides/`, `guide.yaml`, `GUIDE_NAME`), and name the folder exactly as llm-d names the guide; do not write "well-lit path" or any other term for it.
 
 1. List the guide's nightly workflows in llm-d and the deploy scripts they call. For each lane read its accelerator, engine, provider and gateway class.
 2. Render the overlay that lane applies, locally (`kubectl kustomize <path>`, never against a cluster). A lane that sets no provider applies the accelerator and engine folder's own kustomization. Read the model, context window, parsers, engine build and flags, for each role (prefill and decode can differ). Check what you read against `guide.yaml` and the README.
-3. Group lanes that look the same to a client. Each group is one combination; its header names its lanes, and the directory's README maps every lane to its profile with the exact `--identity` flags that keep lanes sharing a combination apart, lists what no lane runs, and records under "Upstream notes" every disagreement between the guide's sources.
+3. Group lanes that look the same to a client. Each group is one combination; its header names its lanes, and the directory's README maps every lane to its profile with the exact `--identity` flags that keep lanes sharing a combination apart, lists what no lane runs, and records under "Where llm-d's own sources disagree" every disagreement between the guide's sources. The README is for someone who deployed the guide, not for CI: it opens with "Pick your profile" (profile, the model a client sees, the overlays it covers), "Run it", "What it tests", the generated "What `llmdv verify` selects" and "Not covered", and keeps the lane table, the identity derivation and the disagreements between llm-d's sources in collapsed `<details>` blocks under "For maintainers". Keep lane and CI wording out of the sections above it, and keep each lane name in backticks: the drift skill's report matches them. [`tiered-prefix-cache/README.md`](../../../profiles/llm-d/tiered-prefix-cache/README.md) is the model.
 4. Give the guide's `parts/common.yaml` a `test_sets.default` of the cases the guide's claims touch, keeping `contract.*` (see [REFERENCE.md](../../../profiles/REFERENCE.md#test_sets)), and check every glob with `llmdv plan --profile <combination>`. Rule 3 still holds for the configuration: one lane per configuration runs `--full-suite`, recorded in `profiles/llm-d/README.md` under "Which lane runs everything", as does a lane whose engine build differs from the rest of its configuration.
 5. A layer the kinds cannot order (a routing sidecar between the router and the engines, two routers in series, a coordinator in front of the router) is placed with `fronts`; see [Declared layer edges](../../../profiles/REFERENCE.md#declared-layer-edges). An ingress may front only ingresses at its own position or deeper.
 
@@ -162,7 +184,7 @@ A combination is `extends: [../parts/base.yaml, ../parts/topology/<t>.yaml, ../p
 | Source | Owns |
 | --- | --- |
 | the guide's nightly lanes and the deploy scripts they call | which configurations get a profile |
-| the guide's `guide.yaml` and README | what the guide says exists and is supported, checked against the lanes and manifests (a disagreement goes under "Upstream notes"); how a client reaches the stack |
+| the guide's `guide.yaml` and README | what the guide says exists and is supported, checked against the lanes and manifests (a disagreement goes under "Where llm-d's own sources disagree"); how a client reaches the stack |
 | router values and model-server overlays | the deployed configuration: model id, window, parsers, router plugins, block sizes |
 | the APIs (OpenAI, Anthropic, the EPP reference) | behaviour: statuses, envelopes, fields, header handling |
 | a run | existence (surfaces served, the window an engine resolves) and the truth of every line above |
@@ -258,6 +280,7 @@ comment beside the line and, if the declaration changes, cite the decision.
 | "They need green for sign-off" | A sign-off lists failures and their triage. |
 | "It's a private repo, the namespace is fine" | It goes in `*.local.yaml`. |
 | "To publish it, I'll swap our values for sensible defaults" | Scrub comments, keep values, and prove it with `compare_profiles.py`. |
-| "The table or README lists it, so it needs a profile" | Only what a nightly lane deploys gets one; record the difference under "Upstream notes". |
+| "The table or README lists it, so it needs a profile" | Only what a nightly lane deploys gets one; record the difference under "Where llm-d's own sources disagree". |
 | "The guide has no support table, so nothing qualifies" | The lanes decide: profile what each one deploys. |
 | "One file per accelerator" | Name by what a client sees; lanes that look the same share a profile. |
+| "Only the test sets changed; the README can wait" | Rerun `selection_docs.py` in the same change, or the folder README describes a run that no longer happens. |
