@@ -14,7 +14,7 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/llm-d-incubation/llm-d-validate/blob/main/docs/getting-started.md">Getting started</a> ·
+  <a href="https://github.com/llm-d-incubation/llm-d-validate#quick-start-test-a-deployed-llm-d-guide">Quick start</a> ·
   <a href="https://github.com/llm-d-incubation/llm-d-validate/blob/main/profiles/README.md">Profiles</a> ·
   <a href="https://github.com/llm-d-incubation/llm-d-validate/blob/main/docs/cli.md">CLI reference</a> ·
   <a href="https://github.com/llm-d-incubation/llm-d-validate/blob/main/docs/test-suites.md">Test suites</a> ·
@@ -47,47 +47,46 @@ pinpoints the layer that breaks, and flags what regressed since the last run.
 > read-only verb allowlist. You name credentials by
 > environment variable; `llmdv` keeps them out of every file and redacts them from every log.
 
-## Test a deployed llm-d guide
+## Quick start: test a deployed llm-d guide
 
-Every llm-d guide at [Tier 3](https://github.com/llm-d/llm-d/blob/main/guides/GUIDES-POLICY.md#5-production-readiness-tiers) (Validated: run end to end every
-night) includes a ready-to-use
+Every llm-d guide at [Tier 3](https://github.com/llm-d/llm-d/blob/main/guides/GUIDES-POLICY.md#5-production-readiness-tiers)
+(Validated: run end to end every night) comes with a ready-to-use
 [validation profile](https://github.com/llm-d-incubation/llm-d-validate/blob/main/profiles/README.md#llm-d-guide-validation-profiles).
-After deploying a guide, use its profile to verify that your deployment behaves as specified by
-the guide and its APIs. By default, the profiles target the guide's router (the EPP), so give
-`llmdv` the EPP's URL.
+Pick the one for the overlay you deployed from the guide's README, point `llmdv` at the guide's
+router (the EPP), and run it:
 
-```sh
+```bash
 ./install.sh && source .venv/bin/activate
+P=profiles/llm-d/optimized-baseline/vllm-qwen3-32b-parsers-standalone.yaml
 export LLMDV_EPP_URL=<your EPP's URL>
-llmdv verify --profile profiles/llm-d/optimized-baseline/vllm-qwen3-32b-parsers-standalone.yaml \
-  --identity accelerator=gpu --identity provider=gke
+
+llmdv profile show $P --test-sets             # what the profile's test sets hold, offline
+llmdv plan --profile $P                       # the cases a plain run selects, and why any skip
+llmdv verify --profile $P --test-set smoke    # quick: every API answers
+llmdv verify --profile $P                     # the guide's default test set
+llmdv verify --profile $P --full-suite        # every case in the library
 ```
 
-Pick the profile and `--identity` flags that match your configuration from the guide's folder.
-
-To include a gateway (Istio, agentgateway, LiteLLM) or engine in your tests, add it as another
-ingress, and `llmdv` tests each layer on its own. See
-[include a gateway or engine](https://github.com/llm-d-incubation/llm-d-validate/blob/main/profiles/README.md#include-a-gateway-or-engine).
+Narrow any run with `-m <suite>` or `-k <case>`;
+[choosing what runs](https://github.com/llm-d-incubation/llm-d-validate/blob/main/docs/cli.md#test-sets-and-coverage)
+explains test sets, suites and the full suite. To test a gateway (Istio, agentgateway, LiteLLM) or
+the engine as well, [add it as another ingress](https://github.com/llm-d-incubation/llm-d-validate/blob/main/profiles/README.md#include-a-gateway-or-engine),
+and `llmdv` tests each layer on its own. [Getting started](https://github.com/llm-d-incubation/llm-d-validate/blob/main/docs/getting-started.md)
+has the details: reading the results, publishing and comparing runs, and running unattended.
 
 ## Test your own stack
 
 For other model-serving stacks, whether or not they use llm-d, start from an example profile.
-Copy the closest one, fill in its placeholders, and run it:
+Copy the closest one, fill in its placeholders, and run it. The quick start's commands work the
+same way on it:
 
-```sh
+```bash
 cp profiles/examples/example-gateway-only.yaml profiles/my-stack.local.yaml   # set base_url and model
 export LLMDV_GATEWAY_KEY='<gateway key>'
 llmdv profile validate profiles/my-stack.local.yaml    # check the profile, offline
 llmdv plan --profile profiles/my-stack.local.yaml      # preview what runs and what skips, offline
 llmdv verify --profile profiles/my-stack.local.yaml    # run it against your stack
 ```
-
-For a quick check of discovery, generation and streaming, use
-`llmdv verify --profile profiles/my-stack.local.yaml --test-set smoke`. Preview it with
-`llmdv plan` and the same flags. Plain runs use `test_sets.default` and exit 2 if it is absent.
-Repeat `--test-set NAME` to combine subsets, use `--all-test-sets` for all profile-defined sets,
-or `--full-suite` for the library. Other filters still narrow the scope.
-[Custom test sets](docs/cli.md#test-sets-and-coverage) let you save your own subsets.
 
 Git ignores `*.local.yaml` profiles, so your hosts stay out of the repository.
 [Writing a profile](https://github.com/llm-d-incubation/llm-d-validate/blob/main/docs/writing-profiles.md) walks through the other
@@ -96,7 +95,7 @@ examples, `extends` and what to declare.
 ## What it tests
 
 19 suites and growing, from every API surface to failure paths and fleet invariants. Run any
-one on its own with `-m <marker>`; [test suites](https://github.com/llm-d-incubation/llm-d-validate/blob/main/docs/test-suites.md) describes each one and
+one on its own with `--full-suite -m <suite>`; [test suites](https://github.com/llm-d-incubation/llm-d-validate/blob/main/docs/test-suites.md) describes each one and
 what turns it on.
 
 <p align="center">

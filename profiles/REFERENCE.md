@@ -575,6 +575,8 @@ comparison window is not dropped each time a finding is filed.
 ## test_sets
 
 Named lists of case-ID patterns determine coverage without changing the deployment contract.
+How test sets relate to suites, the full suite and filters, with examples:
+[cli.md](../docs/cli.md#test-sets-and-coverage).
 
 ```yaml
 test_sets:

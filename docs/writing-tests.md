@@ -172,9 +172,9 @@ llmdv plan --profile <profile> --full-suite -k <case>
 llmdv verify --profile <profile> --full-suite -k <case>
 ```
 
-These commands search the full library, so a new case does not need to be in
-`test_sets.default` yet. To check a saved subset instead, replace `--full-suite` with
-`--test-set NAME`.
+`--full-suite` widens the scope to every case in the library, so `-k` finds your new case even
+though no profile's test set lists it yet. Without it, `-k` would search only the profile's
+`default` set, find nothing and exit 2.
 
 ## Add a new suite
 

@@ -186,14 +186,17 @@ cases within the chosen test sets or full suite; it does not expand the scope.
 
 ## Choose how much to run
 
-Use `llmdv verify --profile <file> --test-set smoke` for a small check of model discovery,
-generation and streaming. Preview it with the same flags on `llmdv plan`.
+A profile's declarations say how a correct stack behaves; its `test_sets` only choose which cases
+run. Keep the two apart: to run less, pick a smaller set rather than removing declarations.
 
-Keep expected behavior in the profile while choosing coverage separately: `test_sets.default` is the
-default subset (required for a plain run); other entries in `test_sets` are named alternatives that run only when requested with
-`--test-set NAME`. An explicit name replaces the default. This lets you run a quick check
-without weakening capability declarations or copying the whole profile. See
-[smoke and custom test sets](cli.md#test-sets-and-coverage) for examples.
+- **`default`** is what a plain `verify` runs, and a profile needs one for a plain run to work.
+- **Other names under `test_sets`** are subsets you run on request, with `--test-set <name>`.
+  Naming a set replaces the default; name both to combine them.
+- **`smoke`** is built in: discovery plus one plain and one streaming request per API.
+- **`--full-suite`** runs every case in the library, whatever the sets say.
+
+`-m <suite>` and `-k <case>` then narrow whichever you chose. Preview any of these with `llmdv plan`
+and the same flags. [cli.md](cli.md#test-sets-and-coverage) has the details and examples.
 
 ## Declarations are verified, not trusted
 
