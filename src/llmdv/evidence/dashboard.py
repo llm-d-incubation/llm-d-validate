@@ -180,7 +180,7 @@ def bundle_dir(run: Path, rec: dict) -> Path | None:
 def curl_for(exchange: dict, key_env: str | None, body_cap: int) -> str:
     method = exchange.get("method") or "GET"
     url = exchange.get("url") or ""
-    parts = ["curl", "-sS", "-i", "-X", method, shlex.quote(url)]
+    parts = ["curl", "-sS", "-i", "-X", shlex.quote(method), shlex.quote(url)]
     headers = {
         name: value
         for name, value in (exchange.get("request_headers") or {}).items()
@@ -197,13 +197,17 @@ def curl_for(exchange: dict, key_env: str | None, body_cap: int) -> str:
     script = " ".join(parts)
     if body is not None:
         text = body if isinstance(body, str) else json.dumps(body, indent=2, ensure_ascii=False)
-        if len(text) > body_cap * 4:
-            return (
-                script
-                + f" --data-binary @request.json   # body is {len(text)} characters;"
-                + " use the bundle's request.json"
-            )
-        script += " --data-binary @- <<'BODY'\n" + text + "\nBODY"
+        # Display caps must not change replay contents. A bundle's request.json is a
+        # metadata wrapper for its final exchange, not this exchange's raw payload.
+        # Keep the command self-contained and stream literal bytes without the extra
+        # newline (or delimiter collisions) introduced by a shell here-document.
+        if "\x00" in text:
+            # Shell source cannot contain NUL. POSIX printf's octal escapes can emit it.
+            octets = "".join(f"\\0{byte:03o}" for byte in text.encode("utf-8"))
+            source = f"printf '%b' {shlex.quote(octets)}"
+        else:
+            source = f"printf '%s' {shlex.quote(text)}"
+        script = f"{source} | {script} --data-binary @-"
     guard = f': "${{{key_env}:?set {key_env} first}}"\n' if needs_key else ""
     return guard + script
 
