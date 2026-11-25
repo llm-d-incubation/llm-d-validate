@@ -87,6 +87,8 @@ When one stack needs several profiles, write each fact once in a **part** and li
 
 ### Profiles for an llm-d guide
 
+To find which guides and lanes need this after llm-d moves, use [tracking-llm-d-guide-drift](../tracking-llm-d-guide-drift/SKILL.md).
+
 Decide which configurations get a profile from the guide itself, and read all of its sources, checking each against the others:
 
 - the nightly lanes, `.github/workflows/nightly-e2e-<guide>-*.yaml`, and the deploy scripts they call;
