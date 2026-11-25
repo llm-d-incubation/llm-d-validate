@@ -1,7 +1,7 @@
 # Profiles
 
 A profile tells `llmdv` what your stack is and how a correct one behaves. `llmdv` reads it, picks the
-cases that apply, and tests every layer against it. Find your starting point:
+cases that apply, and tests every layer you defined against it. Find your starting point:
 
 | You have | Start here |
 | --- | --- |
