@@ -71,7 +71,7 @@ APIs. By default it targets the guide's router, so give `llmdv` the EPP's URL. T
 authenticates nothing, so no key is needed:
 
 ```sh
-P=profiles/llm-d/optimized-baseline/vllm-qwen3-32b-parsers-standalone.yaml
+export P=profiles/llm-d/optimized-baseline/vllm-qwen3-32b-parsers-standalone.yaml
 export LLMDV_EPP_URL=<your EPP's URL>
 llmdv profile validate $P                 # offline schema and consistency checks
 llmdv plan --profile $P                   # every case verify would run or skip; sends nothing
@@ -126,7 +126,7 @@ With only a gateway URL and a key, start from
 [`example-gateway-only.yaml`](../profiles/examples/example-gateway-only.yaml):
 
 ```sh
-P=profiles/<system>/<model>.local.yaml
+export P=profiles/<system>/<model>.local.yaml
 export LLMDV_GATEWAY_KEY='<gateway key>'
 llmdv profile validate $P
 llmdv verify --profile $P --full-suite -m contract
