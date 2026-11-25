@@ -38,7 +38,7 @@ keep the values. Never commit a credentials file, and never paste its values int
 issue or a chat. If your credentials file sets variables without `export`, load it with
 `set -a; source <file>; set +a`.
 
-## Run an llm-d guide profile
+## Test a deployed llm-d guide
 
 Each supported llm-d guide has ready profiles under [`profiles/llm-d/`](../profiles/llm-d/), one
 per combination of engine, model configuration and topology. They test the guide's router (the

@@ -5,7 +5,7 @@ cases that apply, and tests every layer against it. Find your starting point:
 
 | You have | Start here |
 | --- | --- |
-| a deployed llm-d guide | [Run a guide](#run-a-guide): ready profiles, give llmdv the EPP's URL |
+| a deployed llm-d guide | [Test your guide](#test-your-guide): ready profiles, give llmdv the EPP's URL |
 | an llm-d guide with a gateway in front | [Add your gateway](#add-your-gateway): one more ingress |
 | any other OpenAI- or Anthropic-compatible stack | [Your own stack](#your-own-stack): write a profile |
 
@@ -36,10 +36,10 @@ its first run is its measurement.
 [llm-d/README.md](llm-d/README.md#coverage) has the lane counts, the guides and layers not covered,
 and why.
 
-## Run a guide
+## Test your guide
 
-Give llmdv the EPP's URL, then run the combination that matches your deployment. The EPP needs no
-key:
+Your guide is already deployed: give llmdv its EPP's URL and verify it with the profile that
+matches your deployment. The EPP needs no key:
 
 ```sh
 export LLMDV_EPP_URL=<your EPP's URL>
