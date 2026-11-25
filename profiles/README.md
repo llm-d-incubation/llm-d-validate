@@ -1,12 +1,13 @@
 # Profiles
 
-A profile tells `llmdv` what your stack is and how a correct one behaves. `llmdv` reads it, picks the
-cases that apply, and tests every layer you defined against it.
+A profile describes your stack and defines what correct behavior looks like. `llmdv` reads the
+profile, selects the relevant test cases, and validates every layer you've defined against it.
 
-`llmdv` tests each [llm-d guide](#testing-llm-d-guides) with ready profiles. Once you have
-deployed a guide, point `llmdv` at its ingresses, and it checks that each one behaves as the guide
-and the APIs define. The ready profiles name the guide's router, as the guides deploy it by
-default. To test a gateway or an engine as well, [add it as one more ingress](#test-through-your-gateway).
+`llmdv` includes ready-to-use profiles for each [llm-d guide](#testing-llm-d-guides). Once you've
+deployed a guide, point `llmdv` at its ingresses to verify that each one behaves as specified by
+the guide and its APIs. By default, these profiles target the guide's router, which is deployed
+automatically with each guide. To test a gateway or engine as well, simply
+[add it as another ingress](#test-through-your-gateway).
 
 Find your starting point:
 
