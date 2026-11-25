@@ -5,23 +5,18 @@ cases that apply, and tests every layer against it. Find your starting point:
 
 | You have | Start here |
 | --- | --- |
-| a deployed llm-d guide | [Test your guide](#test-your-guide): ready profiles, give llmdv the EPP's URL |
+| a deployed llm-d guide | [Test your guide](#test-your-guide): the guide's ready profile, and its EPP's URL |
 | any other OpenAI- or Anthropic-compatible stack | [Your own stack](#your-own-stack): write a profile |
 
-## Profiles for llm-d guides
+## Testing llm-d guides
 
-Ready profiles for testing a guide you have already deployed. Each guide folder under
-[`llm-d/`](llm-d/) holds profiles for the configurations llm-d's nightly lanes cover, and a
-README that maps every lane to its profile and `--identity` flags. The profiles are written
-against llm-d `9ca8ff0` and test the guide's router (`<GUIDE_NAME>-epp`, standalone mode). None
-has been run against a real engine yet: each says `WRITTEN, NOT RUN`, and its first run is its
-measurement.
+llmdv tests each llm-d guide below with ready profiles. Once you have deployed a guide, point
+llmdv at its router (the EPP), and it tests that your deployment behaves as the guide and the
+APIs say. In every
+guide, llmdv tests each API a client uses, the errors the router must return, the overlay's
+reasoning and tool parsers, and its context window. It also tests what each guide changes:
 
-Every guide's profiles test each API a client uses, the errors the router must return, the
-overlay's reasoning and tool parsers, and its context window. Each also tests what its guide
-changes:
-
-| Guide | What else it tests, and why | Profiles |
+| Guide | What llmdv also tests in this guide, and why | Profiles |
 | --- | --- | --- |
 | [agentic-api](llm-d/agentic-api/README.md) | the Responses API in depth (input items, instructions, tool loops, no stored state), because agentic-api calls vLLM's stateless Responses API through the router | 1 |
 | [async-multitenant](llm-d/async-multitenant/README.md) | concurrent and cancelled requests still served, and flow control's queue header, because the router queues and evicts work | 1 |
@@ -37,8 +32,11 @@ changes:
 | [tiered-prefix-cache](llm-d/tiered-prefix-cache/README.md) | completions sharing a long prefix, the request the guide's own check sends | 5 |
 | [wide-ep](llm-d/wide-ep/README.md) | what pd-disaggregation tests, plus concurrent requests, because it uses the same sidecar and its check sends requests at once | 3 |
 
-Each guide's README says what it does not cover, and why; [llm-d/README.md](llm-d/README.md#coverage)
-has the lane counts and the guides not covered.
+Each guide's folder holds a profile for every configuration llm-d's nightly lanes cover, and a
+README that maps each lane to its profile and `--identity` flags and says what is not tested, and
+why. [llm-d/README.md](llm-d/README.md#coverage) has the lane counts and the guides not covered.
+The profiles are written against llm-d `9ca8ff0` and none has been run against a real engine
+yet: each says `WRITTEN, NOT RUN`, and its first run is its measurement.
 
 ## Test your guide
 
