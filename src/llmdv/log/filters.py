@@ -21,9 +21,20 @@ class RedactingFilter(logging.Filter):
         try:
             message = record.getMessage()
         except Exception:  # noqa: BLE001 -- a bad format string must not lose the record
-            return True
-        scrubbed = redact.scrub(message)
-        if scrubbed != message:
-            record.msg = scrubbed
-            record.args = ()
+            pass
+        else:
+            scrubbed = redact.scrub(message)
+            if scrubbed != message:
+                record.msg = scrubbed
+                record.args = ()
+        # Format once, then discard the raw exception reference from the record. Otherwise
+        # a later formatter can bypass the scrubbed cache by formatting exc_info itself.
+        # Do not mutate exception objects: they may still be used by the caller.
+        if record.exc_info and not record.exc_text:
+            record.exc_text = logging.Formatter().formatException(record.exc_info)
+        if record.exc_text:
+            record.exc_text = redact.scrub(record.exc_text)
+        record.exc_info = None
+        if record.stack_info:
+            record.stack_info = redact.scrub(record.stack_info)
         return True
