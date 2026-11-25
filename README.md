@@ -49,7 +49,7 @@ pinpoints the layer that breaks, and flags what regressed since the last run.
 
 ## Test an llm-d guide
 
-The llm-d guides have [ready profiles](https://github.com/llm-d-incubation/llm-d-validate/blob/main/profiles/README.md#testing-llm-d-guides)
+The llm-d guides have [ready profiles](https://github.com/llm-d-incubation/llm-d-validate/blob/main/profiles/README.md#what-each-guide-is-tested-on)
 for testing each one once deployed. They test the guide's router (the EPP) directly: give
 `llmdv` the EPP's URL and run. No key is needed.
 
@@ -80,8 +80,8 @@ llmdv verify --profile profiles/my-stack.local.yaml    # run it against your sta
 ```
 
 Git ignores `*.local.yaml` profiles, so your hosts stay out of the repository.
-[Your own stack](https://github.com/llm-d-incubation/llm-d-validate/blob/main/profiles/README.md#your-own-stack) walks through the other examples, `extends`
-and what to declare.
+[Writing a profile](https://github.com/llm-d-incubation/llm-d-validate/blob/main/docs/writing-profiles.md)
+walks through the other examples, `extends` and what to declare.
 
 ## What it tests
 
