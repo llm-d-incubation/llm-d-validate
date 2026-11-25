@@ -84,7 +84,13 @@ llmdv verify --profile profiles/my-stack.local.yaml    # run it against your sta
 
 A plain `verify` runs the profile's `default` test set. Add `--test-set smoke` for a quick check
 that every API answers, or `--full-suite` for every case in the library, and narrow either with
-`-m <suite>` or `-k <case>`.
+`-m <suite>` or `-k <case>`. To see what the default set holds before you run it:
+
+```sh
+llmdv profile show profiles/my-stack.local.yaml --test-sets   # each set and its case-ID patterns
+llmdv plan --profile profiles/my-stack.local.yaml             # the cases it selects, and why any skip
+```
+
 [Choosing what runs](https://github.com/llm-d-incubation/llm-d-validate/blob/main/docs/cli.md#test-sets-and-coverage)
 explains test sets, suites and the full suite.
 
