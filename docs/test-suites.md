@@ -1,6 +1,6 @@
 # Test suites
 
-The suites llmdv runs, what each one checks, the profile key that turns it on, and what is still
+The suites `llmdv` runs, what each one checks, the profile key that turns it on, and what is still
 missing. Each suite is a package under `src/llmdv/suites/`, and its name is also its pytest marker.
 
 <p align="center">
@@ -19,16 +19,17 @@ llmdv profile show <profile> --matrix                      # what this profile e
 
 A case whose `case_id` starts with another suite's name carries that suite's marker too. A profile
 with a `selection:` runs only the cases it names; add `--all` to run a suite past it.
-[cli.md](cli.md#selecting-what-runs) has every selector. Case counts are not listed here because
-they drift: `llmdv plan` prints them, after parametrized variants (surface, ingress, option) have
-multiplied them.
+[cli.md](cli.md#selecting-what-runs) has every selector, and
+[writing-tests.md](writing-tests.md) explains how to add a case or a suite. Case counts are not
+listed here because they drift: `llmdv plan` prints them, after parametrized variants (surface,
+ingress, option) have multiplied them.
 
 | Status | Meaning |
 | --- | --- |
 | built | implemented, with offline regressions that prove it can fail |
 | not built | no case exists yet; the gap has an issue |
 
-Status describes llmdv and the profiles in this repository, not one night's run. A suite's cases
+Status describes `llmdv` and the profiles in this repository, not one night's run. A suite's cases
 run once a profile declares what they need; `llmdv profile show <profile.yaml> --matrix` shows
 what runs and what skips for that profile.
 An offline regression pass says nothing about a live fleet: run the cases against it (see

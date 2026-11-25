@@ -58,7 +58,7 @@ The composed profile is what is validated, digested and written to `profile.used
 
 ## environment
 
-Optional. Without it, llmdv works against bare URLs and never contacts a cluster. All cluster access is read-only: a verb allowlist leaves no path to `apply`, `delete`, `scale` or `exec`.
+Optional. Without it, `llmdv` works against bare URLs and never contacts a cluster. All cluster access is read-only: a verb allowlist leaves no path to `apply`, `delete`, `scale` or `exec`.
 
 | Key | Type | Default | Meaning |
 | --- | --- | --- | --- |
@@ -115,7 +115,7 @@ One entry per addressable layer. One ingress is a complete profile; each further
 | `base_url_env` | string | none | Environment variable holding the URL. A committed profile uses it so no hostname enters the repository. Declaring both is an error; an unset variable fails preflight. |
 | `auth` | mapping | `{type: none}` | See [ingresses[].auth](#ingressesauth). |
 | `health_path` | string | `/health` | Used by preflight. A non-2xx still counts as reachable. |
-| `version_headers` | list of strings | `[]` | Response headers this layer's product sends that name its build and that llmdv's evidence table (`src/llmdv/ingress/signals.py`) does not know yet, such as an unknown gateway's version header. Recorded on every result, published in `outcome.json` and compared by `llmdv compare` like the table's own build signals. A header any backend row of the table matches, exactly or by prefix, is refused, since it would be published. A header the table already names is refused too, except one it publishes without calling a build, such as `server`, which then names the build at this ingress only. A header declared twice is refused. A credential or session header (`set-cookie`), a forwarded host or client address (`x-forwarded-*`, `forwarded`, `via`, `x-real-ip`, `true-client-ip`, `*-client-ip`, `x-envoy-external-address`), and a header whose value changes with every request (a request id such as `*-request-id` or `x-amzn-requestid`, a trace id such as `traceparent`, `b3`, `x-b3-*` or `x-trace-id`, `date`, `retry-after`, `x-envoy-upstream-service-time`, `x-ratelimit-*`, `ratelimit-*`, `anthropic-ratelimit-*`, llmdv's own `x-llmdv-*`) are refused too: the first two would be published, and the last would read as a rollout on every run. A build header under a prefix the table records, such as `x-envoy-build`, may still be declared. |
+| `version_headers` | list of strings | `[]` | Response headers this layer's product sends that name its build and that `llmdv`'s evidence table (`src/llmdv/ingress/signals.py`) does not know yet, such as an unknown gateway's version header. Recorded on every result, published in `outcome.json` and compared by `llmdv compare` like the table's own build signals. A header any backend row of the table matches, exactly or by prefix, is refused, since it would be published. A header the table already names is refused too, except one it publishes without calling a build, such as `server`, which then names the build at this ingress only. A header declared twice is refused. A credential or session header (`set-cookie`), a forwarded host or client address (`x-forwarded-*`, `forwarded`, `via`, `x-real-ip`, `true-client-ip`, `*-client-ip`, `x-envoy-external-address`), and a header whose value changes with every request (a request id such as `*-request-id` or `x-amzn-requestid`, a trace id such as `traceparent`, `b3`, `x-b3-*` or `x-trace-id`, `date`, `retry-after`, `x-envoy-upstream-service-time`, `x-ratelimit-*`, `ratelimit-*`, `anthropic-ratelimit-*`, `llmdv`'s own `x-llmdv-*`) are refused too: the first two would be published, and the last would read as a rollout on every run. A build header under a prefix the table records, such as `x-envoy-build`, may still be declared. |
 | `surfaces` | list | `[]` | Surfaces this ingress serves. Anything absent skips as `undeclared`. See [Surface names](#surface-names). |
 | `model` | mapping | inherited | Partial override of the top-level `model`. |
 | `capabilities` | mapping | inherited | Partial override of the top-level `capabilities`. |
@@ -151,7 +151,7 @@ One entry per addressable layer. One ingress is a complete profile; each further
 
 ### ingresses[].setup
 
-Non-executing. llmdv prints the commands and checks whether they are satisfied; it never starts or supervises a tunnel.
+Non-executing. `llmdv` prints the commands and checks whether they are satisfied; it never starts or supervises a tunnel.
 
 | Key | Type | Default | Meaning |
 | --- | --- | --- | --- |
@@ -172,7 +172,7 @@ Non-executing. llmdv prints the commands and checks whether they are satisfied; 
 
 ### ingresses[].logs[]
 
-Where this layer's own account of a request lives. Without `logs`, llmdv reads the `setup.requires` targets.
+Where this layer's own account of a request lives. Without `logs`, `llmdv` reads the `setup.requires` targets.
 
 | Key | Type | Default | Meaning |
 | --- | --- | --- | --- |
@@ -203,7 +203,7 @@ Every key is optional; a case whose key is absent skips as `undeclared`. Paths m
 | `stream_budget` | mapping | none | Streaming latency limits; see below. |
 | `max_body_bytes` | int | none | Request body limit; a larger body must get a fast 4xx. |
 
-`http_redirect` belongs on the client-facing ingress reached over TLS, usually the gateway: `transport.http_redirect` requests `http://<host of the base URL>` on the default port and requires a 301, 302, 307 or 308 whose `Location` is `https://`. An internal layer reached over plain HTTP, such as a port-forward to an EPP or an engine, should not declare it. The base URL, whether `base_url` or the value of `base_url_env`, must be `https://` on the default port (443, written or not). An explicit other port says nothing about where a plain listener would be, so llmdv does not guess one; declare `http_url` instead. A literal `base_url` that does not qualify is a profile error at load; a `base_url_env` value that does not qualify is a `base_url` preflight problem (exit 3) naming the variable, never its value. The derived address is a hostname: no message quotes it, and it appears only in `exchanges.jsonl`, as `base_url` does.
+`http_redirect` belongs on the client-facing ingress reached over TLS, usually the gateway: `transport.http_redirect` requests `http://<host of the base URL>` on the default port and requires a 301, 302, 307 or 308 whose `Location` is `https://`. An internal layer reached over plain HTTP, such as a port-forward to an EPP or an engine, should not declare it. The base URL, whether `base_url` or the value of `base_url_env`, must be `https://` on the default port (443, written or not). An explicit other port says nothing about where a plain listener would be, so `llmdv` does not guess one; declare `http_url` instead. A literal `base_url` that does not qualify is a profile error at load; a `base_url_env` value that does not qualify is a `base_url` preflight problem (exit 3) naming the variable, never its value. The derived address is a hostname: no message quotes it, and it appears only in `exchanges.jsonl`, as `base_url` does.
 
 ### ingresses[].transport.stream_budget
 
@@ -251,7 +251,7 @@ The graph is checked when the profile loads, and a bad one is an invalid profile
 
 ### Surface names
 
-`chat_completions`, `completions`, `messages`, `responses`, and the render surfaces `chat_render`, `completions_render`, `messages_render`, `responses_render`. Render surfaces run engine-input checks, not generations. A surface llmdv cannot drive yet is a validation warning, and its cases skip as `not_implemented`.
+`chat_completions`, `completions`, `messages`, `responses`, and the render surfaces `chat_render`, `completions_render`, `messages_render`, `responses_render`. Render surfaces run engine-input checks, not generations. A surface `llmdv` cannot drive yet is a validation warning, and its cases skip as `not_implemented`.
 
 ### Error classes
 
@@ -497,11 +497,11 @@ A real consumer and what it depends on. `--client <id>` selects the relevant cas
 
 ### Claude Code clients
 
-llmdv never installs a client. The runner image ships Claude Code 2.1.330 at `/usr/local/bin/claude`; elsewhere, install one and pin it. The harness drives Messages only and checks `--version` before sending anything. A missing binary skips as `requires_instrumentation`.
+`llmdv` never installs a client. The runner image ships Claude Code 2.1.330 at `/usr/local/bin/claude`; elsewhere, install one and pin it. The harness drives Messages only and checks `--version` before sending anything. A missing binary skips as `requires_instrumentation`.
 
 `client_sessions` runs real sessions with tools, project settings and hooks enabled, each capped at five minutes or `timeouts.request`, whichever is smaller. They need a tool-call parser. `hook` needs Claude Code 2.1.154 or newer, and `compaction` needs `model.max_model_len` declared; both skip rather than fail when unmet. A failing session keeps `session-trace.jsonl` and `session-project.txt` in its evidence.
 
-**Sessions execute model-generated code.** `multi_file_fix` runs `python3 -m unittest` on files the model edited, with llmdv's own interpreter. Writes are confined to the session's project; reads and the executed code are not. Run sessions only in a disposable pod or container.
+**Sessions execute model-generated code.** `multi_file_fix` runs `python3 -m unittest` on files the model edited, with `llmdv`'s own interpreter. Writes are confined to the session's project; reads and the executed code are not. Run sessions only in a disposable pod or container.
 
 `client_reuse: true` runs a three-turn case that resumes one session twice and reads native cache usage. It needs `cache_reuse` on `messages`.
 
@@ -650,7 +650,7 @@ Preflight sends one query; an unanswered source or unset token is exit 3. During
 
 ### logs
 
-A log source under `ingresses[].logs` with `forbid` entries gets one `logs.signatures` result. It runs last and scans the whole run window: every Running pod, and the previous instance of any container that restarted. `tail` does not cap the scan. Matching no pod or a failed read fails; a forbidden read skips as `requires_instrumentation`. A hit names the llmdv case whose request or response id is on the line.
+A log source under `ingresses[].logs` with `forbid` entries gets one `logs.signatures` result. It runs last and scans the whole run window: every Running pod, and the previous instance of any container that restarted. `tail` does not cap the scan. Matching no pod or a failed read fails; a forbidden read skips as `requires_instrumentation`. A hit names the `llmdv` case whose request or response id is on the line.
 
 ```yaml
 ingresses:

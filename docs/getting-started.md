@@ -19,7 +19,7 @@ read-only: every `kubectl` or `oc` call goes through a verb allowlist of `get`, 
 
 The script checks the Python floor, creates `.venv`, installs `llmdv` editable, and checks the
 entry point and the pytest plugin. Re-run it to pick up a dependency change; `--recreate` starts
-over. `--dev` adds the dev, `s3` and `ibm-cos` extras for working on llmdv itself: see
+over. `--dev` adds the dev, `s3` and `ibm-cos` extras for working on `llmdv` itself: see
 [CONTRIBUTING.md](../CONTRIBUTING.md). By hand, the equivalent of `--dev` is
 `python3 -m venv .venv && ./.venv/bin/pip install -e '.[dev,s3,ibm-cos]'`.
 
@@ -38,12 +38,15 @@ keep the values. Never commit a credentials file, and never paste its values int
 issue or a chat. If your credentials file sets variables without `export`, load it with
 `set -a; source <file>; set +a`.
 
-## Run an llm-d guide profile
+## Test a deployed llm-d guide
 
-Each supported llm-d guide has ready profiles under [`profiles/llm-d/`](../profiles/llm-d/), one
-per combination of engine, model configuration and topology. They test the guide's router (the
-EPP) directly: deploy the guide with an overlay the combination covers (its header lists them),
-then give llmdv the EPP's URL. The EPP authenticates nothing, so no key is needed:
+Every llm-d guide at [Tier 3](https://github.com/llm-d/llm-d/blob/main/guides/GUIDES-POLICY.md#5-production-readiness-tiers) (Validated: run end to end every
+night) includes ready-to-use validation profiles under [`profiles/llm-d/`](../profiles/llm-d/),
+one per combination of engine, model configuration and topology. They are written against llm-d
+`9ca8ff0` and not yet run against a real engine. After deploying a guide with an overlay a combination covers (its header lists them),
+use that combination to verify that your deployment behaves as specified by the guide and its
+APIs. By default it targets the guide's router, so give `llmdv` the EPP's URL. The EPP
+authenticates nothing, so no key is needed:
 
 ```sh
 P=profiles/llm-d/optimized-baseline/vllm-qwen3-32b-parsers-standalone.yaml
@@ -54,9 +57,10 @@ llmdv verify --profile $P -m contract     # about a minute: the profile against 
 llmdv verify --profile $P --identity accelerator=gpu --identity provider=gke
 ```
 
-A gateway in front of the router is one more ingress in a short local file that extends the
-combination; llmdv then tests both layers and says which one a failure came from. See
-[add your gateway](../profiles/README.md#add-your-gateway).
+To include a gateway or engine in your tests, add it as another ingress in a short local file
+that extends the combination; `llmdv` then tests each layer and says which one a failure came
+from. See
+[test through your gateway](../profiles/README.md#test-through-your-gateway).
 
 Pass the lane's accelerator and provider with `--identity`: one combination covers several
 overlays, and identity keeps their runs apart. Each guide folder's README gives the exact flags
@@ -92,7 +96,7 @@ the recorded checks under each case.
 
 Any OpenAI- or Anthropic-compatible gateway, router or engine works, with or without llm-d.
 Copy the closest example from [`profiles/examples/`](../profiles/examples/) to
-`profiles/<system>/<model>.local.yaml` and fill it in; [profiles/README.md](../profiles/README.md)
+`profiles/<system>/<model>.local.yaml` and fill it in; [writing-profiles.md](writing-profiles.md)
 explains the choice and the minimum, and [profiles/REFERENCE.md](../profiles/REFERENCE.md) every
 field. The `*.local.yaml` copy is gitignored, so cluster detail never enters the repository. A
 profile holds no secrets or hostnames, only the names of the variables that carry them.

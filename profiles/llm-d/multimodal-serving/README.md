@@ -26,9 +26,9 @@ The client calls the `<GUIDE_NAME>-epp` Service on port 80, in standalone mode.
 
 - **Multimodal prefix affinity** (the same prompt and image land on one pod, and `vllm:prefix_cache_hits_total` and `vllm:mm_cache_hits_total` grow): needs `routing.prefix_affinity` with per-pod counter deltas (#27) and cluster access.
 - **Encode-only routing in E/PD** (encode pods count only media requests): per-pod counters, same reasons.
-- **The EC transfer** between encode and decode pods: shown only by a DEBUG log line after a log-level change, which llmdv never makes. A decode pod that receives no encoder output encodes locally, so a client cannot tell.
+- **The EC transfer** between encode and decode pods: shown only by a DEBUG log line after a log-level change, which `llmdv` never makes. A decode pod that receives no encoder output encodes locally, so a client cannot tell.
 - **EPP disaggregation and prefix-indexer metrics** (`MONITORING=true`): fleet metrics need cluster access.
-- **Token estimation and video**: the router's per-image and per-video token estimate has no client-observable effect, and llmdv has no video input case (nor the `x-llm-d-video-*` headers).
+- **Token estimation and video**: the router's per-image and per-video token estimate has no client-observable effect, and `llmdv` has no video input case (nor the `x-llm-d-video-*` headers).
 - **Images by URL**: Messages `image_url` needs `image_url_fixture`, which no lane hosts, so it skips as `requires_instrumentation`.
 - **The cache suite**: no role passes `--enable-prompt-tokens-details`, so `cache_reuse` is not declared (see `parts/common.yaml`).
 - **Configurations no lane runs**: the E/P/D topology (not nightly), the `base` and `coreweave` providers, Intel XPU (community), the TPU v7 `gemma4` and `qwen3-5-397b` overlays, and SGLang's XPU-encode, GPU-PD profile.

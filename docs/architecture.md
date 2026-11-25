@@ -84,7 +84,7 @@ records it as `kube_cli`. With no CLI, URL-only testing proceeds unless `--pod-l
 logs.
 
 Each layer is reached at the URL its profile names. A profile whose layers need local setup
-declares it in `setup`, which llmdv checks but never starts, so a dead tunnel fails preflight as
+declares it in `setup`, which `llmdv` checks but never starts, so a dead tunnel fails preflight as
 your environment, not the fleet.
 
 Preflight checks the operator's side before any case runs: reachability, credentials and model
@@ -101,7 +101,7 @@ Each run records one identity (`identity.py`) in `outcome.json`, `alerts.json` a
 | --- | --- |
 | the profile | `guide`, `model`, `engine`, `gateway` (top-level fields naming the products) |
 | `--identity` | `accelerator`, `provider`, `llm_d_ref`, `trigger` (default `manual`), `flavor` |
-| llmdv | `llmdv_version`, `profile_digest` |
+| `llmdv` | `llmdv_version`, `profile_digest` |
 
 `--identity` also accepts `guide`, `engine`, `gateway` and `model` as assertions: a value that
 disagrees with the profile is an error. Automatic comparisons require matching configuration
@@ -168,7 +168,7 @@ The one place modules are described. Paths are under `src/llmdv/`.
 | `compare/` | Reading archived runs and diffing them over a window ([compare.md](compare.md)). |
 | `collect/` | Each layer's logs for the run window, through `kube.py`. |
 | `fleet/` | Configuration, metrics and log invariants; `prometheus.py` is the read-only metrics client. |
-| `instruments/` | Operator-run helpers llmdv never deploys, such as `header_echo.py`, a backend that echoes allowlisted headers. |
+| `instruments/` | Operator-run helpers `llmdv` never deploys, such as `header_echo.py`, a backend that echoes allowlisted headers. |
 | `output/` | The run directory and publication to `file://` or `s3://` (`ibm_cos.py` under `LLMDV_S3_AUTH=ibm-iam`); `MANIFEST.json` is written last. |
 | `results/` | `results.jsonl`; `read.py` is its one reader and refuses any schema but `llmdv.results/1`, which grows only by optional fields. |
 | `log/` | The logger tree: diagnostics to stderr, primary output to stdout, a redaction filter on every record. |
@@ -202,12 +202,13 @@ directory. `repro.sh` keeps its own `Bearer ${KEY}` so it stays replayable.
 **A verdict carries its evidence.** A pass with no recorded checks is indistinguishable from a
 test that checked nothing.
 
-## Extending llmdv
+## Extending `llmdv`
 
 A new surface, case, client or assertion is additive, and a new product at any layer needs no
 code. Preserve the invariants above and prove the new case can fail: add the defect to
 `tests/fakes.py` and assert the failure, including that a recorded check is marked not-ok. The
-steps are in the [`extending-llmdv`](../.agents/skills/extending-llmdv/SKILL.md) skill.
+steps are in the [`extending-llmdv`](../.agents/skills/extending-llmdv/SKILL.md) skill; for a
+new case or suite, start with [writing-tests.md](writing-tests.md).
 
 ## Testing your change
 

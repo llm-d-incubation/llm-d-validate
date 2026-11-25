@@ -1,6 +1,6 @@
 ---
 name: triaging-a-run
-description: Use when asked what broke in an llmdv run, why cases failed, whether failures are transient or already tracked by an issue, which layer (LiteLLM, the llm-d router or EPP, vLLM, the model, the deployment) is responsible, or how to reproduce a failure; when deep-diving a run directory, its failure bundles, logs or dashboard.
+description: Use when asked what broke in an `llmdv` run, why cases failed, whether failures are transient or already tracked by an issue, which layer (LiteLLM, the llm-d router or EPP, vLLM, the model, the deployment) is responsible, or how to reproduce a failure; when deep-diving a run directory, its failure bundles, logs or dashboard.
 ---
 
 # Triaging a run
@@ -22,11 +22,11 @@ The run directory alone answers most of this. The rest depends on what the perso
 | `reproduce.sh` | reruns the whole run as it was invoked |
 | `summary.md` | the case-by-ingress table; with several ingresses, an attribution reading |
 | `profile.used.yaml` | the declarations the verdicts were made against, with the MEASURED and TRIAGED notes beside each line |
-| `llmdv.log`, `env.json` | the full transcript; llmdv and SDK versions and the resolved setup |
+| `llmdv.log`, `env.json` | the full transcript; `llmdv` and SDK versions and the resolved setup |
 | `logs/` (`--pod-logs`) | pod logs, when the profile declares a log source |
 | `dashboard.html` (`--analyze`) | every case with its checks, exchanges and a replay curl (reporting-a-run) |
 
-Every request llmdv sends carries `x-request-id: llmdv-…`, `x-llmdv-run-id` and `x-llmdv-case-id`; they let you find a failing request in the router's and engine's own logs.
+Every request `llmdv` sends carries `x-request-id: llmdv-…`, `x-llmdv-run-id` and `x-llmdv-case-id`; they let you find a failing request in the router's and engine's own logs.
 
 The real hostname is in `repro.sh`, `verdict.txt`, `meta.json`, `reason` and `request_headers`: keep all of them out of anything shared.
 

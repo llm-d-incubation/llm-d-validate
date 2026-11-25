@@ -129,6 +129,9 @@ python .github/scripts/live_summary.py runs/<run> --profile <name> --gateway <na
 
 ## Adding a case
 
+[docs/writing-tests.md](docs/writing-tests.md) walks through writing a case, proving it can fail
+and running it. In short:
+
 - **Prove it can fail.** Add the defect to a fake (usually `tests/fakes.py`) and assert that the case fails
   against it, including that a recorded check is marked not-ok. A case that cannot fail checks
   nothing.
@@ -141,8 +144,8 @@ python .github/scripts/live_summary.py runs/<run> --profile <name> --gateway <na
 ## Adding a profile example
 
 Start from the closest file in [`profiles/examples/`](profiles/examples/) and follow
-[profiles/README.md](profiles/README.md). Declare what a correct stack does, and record what you
-measured in a comment beside the line.
+[docs/writing-profiles.md](docs/writing-profiles.md). Declare what a correct stack does, and
+record what you measured in a comment beside the line.
 
 **Never commit credentials, hostnames, namespaces or other cluster detail.** A committed profile
 names its URL and key by environment variable. Keep machine-specific copies as `*.local.yaml`,

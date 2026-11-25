@@ -1,6 +1,6 @@
 # wide-ep profiles
 
-Profiles for llm-d's `wide-ep` guide (wide expert parallelism with P/D disaggregation), written from llm-d 9ca8ff0. How the parts and combinations fit together, and the provenance tags, are in the [profile skill](../../../.agents/skills/writing-an-infra-profile/SKILL.md#how-profilesllm-d-is-built). Every profile here is **WRITTEN, NOT RUN**: no lane has run llmdv against this guide yet, and the first run of each is its measurement.
+Profiles for llm-d's `wide-ep` guide (wide expert parallelism with P/D disaggregation), written from llm-d 9ca8ff0. How the parts and combinations fit together, and the provenance tags, are in the [profile skill](../../../.agents/skills/writing-an-infra-profile/SKILL.md#how-profilesllm-d-is-built). Every profile here is **WRITTEN, NOT RUN**: no lane has run `llmdv` against this guide yet, and the first run of each is its measurement.
 
 ## Lanes and profiles
 
@@ -24,7 +24,7 @@ What each serves, read from the overlays rendered with `kubectl kustomize`:
 
 The router differs by accelerator (always-disaggregate on gpu and amd, one aggregated profile on xpu; see `parts/common.yaml`), but not in anything a client sees: the listener, APIs and header handling are the ones `../parts/topology/standalone.yaml` declares.
 
-Run one after deploying the guide in standalone mode:
+To test against the guide, deployed in standalone mode:
 
 ```sh
 export LLMDV_EPP_URL=<the EPP's URL>

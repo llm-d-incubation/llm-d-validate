@@ -47,11 +47,15 @@ pinpoints the layer that breaks, and flags what regressed since the last run.
 > read-only verb allowlist. You name credentials by
 > environment variable; `llmdv` keeps them out of every file and redacts them from every log.
 
-## Test an llm-d guide
+## Test a deployed llm-d guide
 
-Every [supported llm-d guide](https://github.com/llm-d-incubation/llm-d-validate/blob/main/profiles/README.md#supported-llm-d-guides) comes with ready
-profiles. They test the guide's router (the EPP) directly: give `llmdv` the EPP's URL and run. No
-key is needed.
+Every llm-d guide at [Tier 3](https://github.com/llm-d/llm-d/blob/main/guides/GUIDES-POLICY.md#5-production-readiness-tiers) (Validated: run end to end every
+night) includes a ready-to-use
+[validation profile](https://github.com/llm-d-incubation/llm-d-validate/blob/main/profiles/README.md#llm-d-guide-validation-profiles),
+written against llm-d `9ca8ff0` and not yet run against a real engine.
+After deploying a guide, use its profile to verify that your deployment behaves as specified by
+the guide and its APIs. By default, the profiles target the guide's router (the EPP), so give
+`llmdv` the EPP's URL. No key is needed.
 
 ```sh
 ./install.sh && source .venv/bin/activate
@@ -60,16 +64,16 @@ llmdv verify --profile profiles/llm-d/optimized-baseline/vllm-qwen3-32b-parsers-
   --identity accelerator=gpu --identity provider=gke
 ```
 
-Pick the combination and `--identity` flags that match your deployment from the guide's folder.
+Pick the profile and `--identity` flags that match your configuration from the guide's folder.
 
-Running a gateway in front of the router (Istio, agentgateway, LiteLLM)? Add it as one more
-ingress, and `llmdv` tests both layers. See
-[add your gateway](https://github.com/llm-d-incubation/llm-d-validate/blob/main/profiles/README.md#add-your-gateway).
+To include a gateway (Istio, agentgateway, LiteLLM) or engine in your tests, add it as another
+ingress, and `llmdv` tests each layer on its own. See
+[test through your gateway](https://github.com/llm-d-incubation/llm-d-validate/blob/main/profiles/README.md#test-through-your-gateway).
 
 ## Test your own stack
 
-A custom llm-d, or a stack with no llm-d at all, gets a profile of its own. Copy the closest
-example, fill in its placeholders, and run it:
+For other model-serving stacks, whether or not they use llm-d, start from an example profile.
+Copy the closest one, fill in its placeholders, and run it:
 
 ```sh
 cp profiles/examples/example-gateway-only.yaml profiles/my-stack.local.yaml   # set base_url and model
@@ -80,8 +84,8 @@ llmdv verify --profile profiles/my-stack.local.yaml    # run it against your sta
 ```
 
 Git ignores `*.local.yaml` profiles, so your hosts stay out of the repository.
-[Your own stack](https://github.com/llm-d-incubation/llm-d-validate/blob/main/profiles/README.md#your-own-stack) walks through the other examples, `extends`
-and what to declare.
+[Writing a profile](https://github.com/llm-d-incubation/llm-d-validate/blob/main/docs/writing-profiles.md) walks through the other
+examples, `extends` and what to declare.
 
 ## What it tests
 
@@ -97,10 +101,12 @@ what turns it on.
 
 - [Getting started](https://github.com/llm-d-incubation/llm-d-validate/blob/main/docs/getting-started.md): install, run, read the results, publish,
   compare and run unattended.
-- [Profiles](https://github.com/llm-d-incubation/llm-d-validate/blob/main/profiles/README.md) and the [field reference](https://github.com/llm-d-incubation/llm-d-validate/blob/main/profiles/REFERENCE.md).
+- [Profiles](https://github.com/llm-d-incubation/llm-d-validate/blob/main/profiles/README.md), [writing a profile](https://github.com/llm-d-incubation/llm-d-validate/blob/main/docs/writing-profiles.md) and the
+  [field reference](https://github.com/llm-d-incubation/llm-d-validate/blob/main/profiles/REFERENCE.md).
 - [CLI reference](https://github.com/llm-d-incubation/llm-d-validate/blob/main/docs/cli.md): every command, selecting cases, exit codes and output files.
 - [Test suites](https://github.com/llm-d-incubation/llm-d-validate/blob/main/docs/test-suites.md): what each suite checks, the profile key that turns it on,
   and how to run one.
 - [Architecture](https://github.com/llm-d-incubation/llm-d-validate/blob/main/docs/architecture.md): how the code fits together.
+- [Writing tests](https://github.com/llm-d-incubation/llm-d-validate/blob/main/docs/writing-tests.md): add a case or a suite, prove it can fail, and run it.
 - [Contributing](https://github.com/llm-d-incubation/llm-d-validate/blob/main/CONTRIBUTING.md): we welcome questions and ideas in the
   [llm-d Slack](https://llm-d.ai/slack) and in this repository's issues.

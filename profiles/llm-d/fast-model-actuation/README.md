@@ -13,7 +13,7 @@ The guide has no support table; `guide.yaml` offers `INFRA_PROVIDER` `ocp` or `g
 
 The combination reuses `../parts/models/qwen3-0.6b-inline.yaml` (the model id, the derived 40960-token window and the absence of parsers are the same as optimized-baseline's XPU overlay). The `modelserver/gpu/vllm/{base,gke,ocp}` overlays the benchmark harness renders are detection-only stubs (a `replicas: 0` Deployment that names the model) and are never applied.
 
-The client calls the `<GUIDE_NAME>-epp` Service on port 80, in standalone mode. Run llmdv after the requester Deployment's rollout completes (guide.yaml deploy.modelserver) and before the guide's sleep/wake step, so both requesters are bound to awake instances.
+The client calls the `<GUIDE_NAME>-epp` Service on port 80, in standalone mode. Run `llmdv` after the requester Deployment's rollout completes (guide.yaml deploy.modelserver) and before the guide's sleep/wake step, so both requesters are bound to awake instances.
 
 ## What the profile checks that is particular to this guide
 
@@ -21,8 +21,8 @@ The requester's TCP proxy sits between the EPP and vLLM on every request. It sho
 
 ## Not covered, and why
 
-- **Sleep and wake** (`verify.tests.sleep_wake`: scaling the requesters to zero puts vLLM to sleep, scaling back up wakes it): llmdv never scales a deployment, and the sleeping state is a pod label, which is cluster state.
-- **Hot and warm start times**: timing is a benchmark's measurement, not llmdv's.
+- **Sleep and wake** (`verify.tests.sleep_wake`: scaling the requesters to zero puts vLLM to sleep, scaling back up wakes it): `llmdv` never scales a deployment, and the sleeping state is a pod label, which is cluster state.
+- **Hot and warm start times**: timing is a benchmark's measurement, not `llmdv`'s.
 - **The FMA controllers' lifecycle** (binding, LRU eviction of sleeping instances, launcher population): cluster state.
 - **The cache suite**: the vLLM options do not include `--enable-prompt-tokens-details`, and the router has no prefix-cache plugin, so `cache_reuse` is not declared (see `parts/common.yaml`).
 - **Gateway mode** and the other `GATEWAY_CLASS` values: no lane runs them.

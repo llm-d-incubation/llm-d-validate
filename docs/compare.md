@@ -36,7 +36,7 @@ accelerator, engine, provider, gateway, model, trigger and flavor match
 can be named. `--identity trigger=nightly` marks a scheduled lane (default `manual`);
 `--identity flavor=<value>` separates lanes that share a profile, such as `lmcache-connector/cpu`
 and `native/cpu` offload. A run without a flavor matches only runs without one. A different
-llm-d ref, llmdv version or profile digest is a note.
+llm-d ref, `llmdv` version or profile digest is a note.
 
 **Digest.** Every result carries its `profile_digest`, a hash of the parsed declarations:
 comments, `known_failures` and `selection` do not move it. Runs under another digest are dropped
@@ -68,7 +68,7 @@ printed, except the *Existing passing* count.
 | **Now running and failing** | skipped before, fails now: new evidence, not new breakage |
 | **Started running and passing** | skipped before, passes now; a count |
 | **Failing new cases** | absent from the window, failing now; not regressions |
-| **Suite changed** | cases appeared or disappeared: a change to llmdv, not the fleet |
+| **Suite changed** | cases appeared or disappeared: a change to `llmdv`, not the fleet |
 | **Outside the selection** | cases a run of the window held and a selection left out of this run, or that this run held and every run of the window left out, so there is nothing to compare them with. Never regressions or new failures; a known failure among them is listed under known failures instead. `selection.outside` in `comparison.json` |
 | **Known failures, fix pending** | failing in the window too and declared in `known_failures` with its issue. Transition `known`, under `known.failing` in `comparison.json` |
 | **Fix landed** | labelled a known failure by the newest run of the window that held it, passes now: remove the entry |

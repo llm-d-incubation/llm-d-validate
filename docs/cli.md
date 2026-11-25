@@ -17,7 +17,7 @@ Lookup for every `llmdv` command. For a first run, read [getting-started.md](get
 | `analyze <run_dir>` | build `dashboard.html` for a run |
 
 Run `llmdv <command> --help` for its flags. Every command takes the logging flags (`-v` prints
-the recorded checks under each case, `-vv` adds DEBUG) and the read-only cluster flags; how llmdv
+the recorded checks under each case, `-vv` adds DEBUG) and the read-only cluster flags; how `llmdv`
 finds a cluster CLI is in [architecture.md](architecture.md#how-a-request-reaches-the-fleet).
 The report goes to stdout and diagnostics to stderr, so `llmdv verify > report.txt` keeps the
 report; colour follows whether each stream is a terminal, and `NO_COLOR` or `--no-color` turns
@@ -124,7 +124,7 @@ Separating environment problems from fleet problems is the point of having more 
 | `6` | `interrupted` | stopped by SIGINT or SIGTERM, e.g. a run budget or a pod being stopped; what finished is kept and published |
 
 The class is `verification.class` in `outcome.json`; `publication` says what happened to the
-results. A code llmdv never returns itself, such as `137` after an OOM kill, is class `crashed`.
+results. A code `llmdv` never returns itself, such as `137` after an OOM kill, is class `crashed`.
 A delivery failure never hides a verification failure: failed tests plus a failed upload exit
 `1`. Ctrl-C exits `6` in every command.
 
@@ -145,17 +145,17 @@ A delivery failure never hides a verification failure: failed tests plus a faile
 
 Mid-run, the environment is blamed on one piece of evidence only: the local port refuses
 connections. When a request to `localhost`, `127.0.0.1` or `[::1]` fails before any response and
-no check of that case had failed, llmdv tries a TCP connect to the port three times over one
+no check of that case had failed, `llmdv` tries a TCP connect to the port three times over one
 second. If all are refused, the tunnel is gone: the case is an `error` naming the lost
 connection, later cases on that ingress skip as `requires_instrumentation`, and the run exits
-`3`. The connect sends no request, so nothing is retried; llmdv does not restart the tunnel.
+`3`. The connect sends no request, so nothing is retried; `llmdv` does not restart the tunnel.
 Before each skip the port is tried again; if it accepts, the remaining cases run.
 
 Everything else stays a fleet result, exit `1`, with no case skipped:
 
 - **The port still accepts.** A reset, a cut-off response or a dead health path behind an
   accepting port is a crashing server, or a pod that died behind a live `kubectl port-forward`.
-  llmdv cannot tell them apart, so it reports the fleet; when every case after some point fails
+  `llmdv` cannot tell them apart, so it reports the fleet; when every case after some point fails
   the same way, check the forward first.
 - **A check failed first.** That failure stands, whatever a later request does.
 - **A real failure anywhere in the run**, because the fleet result must not be hidden.
@@ -168,12 +168,12 @@ found it and the counts before and after.
 ## Skip classes
 
 Every skip carries one of six classes, never collapsed: a matrix that merges "the fleet does not
-expose this" with "llmdv cannot test it yet" reads as coverage.
+expose this" with "`llmdv` cannot test it yet" reads as coverage.
 
 | Class | Meaning |
 | --- | --- |
 | `undeclared` | the fleet does not expose this; nothing is wrong |
-| `not_implemented` | llmdv cannot drive it yet; a gap in the tool |
+| `not_implemented` | `llmdv` cannot drive it yet; a gap in the tool |
 | `requires_instrumentation` | needs an instrumented backend to observe, or the ingress's local port (`localhost`, `127.0.0.1`, `[::1]`) stopped accepting connections mid-run and still refuses them |
 | `requires_load` | needs a load experiment, i.e. a system test |
 | `excluded_by_policy` | the profile declares the fleet shared, and this case is disruptive |
@@ -279,7 +279,7 @@ llmdv analyze runs/<run> --notes notes.json     # embed an analysis written else
 
 `dashboard.html` is one self-contained page: the system under test, failures grouped by their
 first failing check, the profile, and every test with its evidence and a replay `curl`. It shows
-only what llmdv recorded, labels notes as not recorded by llmdv, and refuses to write if its data
+only what `llmdv` recorded, labels notes as not recorded by `llmdv`, and refuses to write if its data
 holds a credential. For an agent-written analysis, use the
 [`reporting-a-run`](../.agents/skills/reporting-a-run/SKILL.md) skill.
 
@@ -290,8 +290,8 @@ holds a credential. For an agent-written analysis, use the
   the cluster job in [deploy/README.md](../deploy/README.md).
 - **Profiles:** [profiles/README.md](../profiles/README.md) and
   [profiles/REFERENCE.md](../profiles/REFERENCE.md).
-- **Extending llmdv:** a new surface, case or client is additive, and a new gateway, router or
+- **Extending `llmdv`:** a new surface, case or client is additive, and a new gateway, router or
   engine product needs no code
   ([architecture.md](architecture.md#extending-llmdv)).
 - **Test suites:** [test-suites.md](test-suites.md): what each suite checks and how to run one.
-- **llmdv's own tests:** no cluster needed; see [CONTRIBUTING.md](../CONTRIBUTING.md).
+- **`llmdv`'s own tests:** no cluster needed; see [CONTRIBUTING.md](../CONTRIBUTING.md).

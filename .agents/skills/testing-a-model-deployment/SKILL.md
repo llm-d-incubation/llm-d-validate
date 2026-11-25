@@ -1,6 +1,6 @@
 ---
 name: testing-a-model-deployment
-description: Use when asked to test, validate or check a model deployment with llmdv and handed a model plus one or more endpoints (a LiteLLM gateway URL and key, an llm-d router or EPP route, or both), or a profile to run against them; when someone says "use this profile against this endpoint", "test model X on staging", or "does this deployment work".
+description: Use when asked to test, validate or check a model deployment with `llmdv` and handed a model plus one or more endpoints (a LiteLLM gateway URL and key, an llm-d router or EPP route, or both), or a profile to run against them; when someone says "use this profile against this endpoint", "test model X on staging", or "does this deployment work".
 ---
 
 # Testing a model deployment
@@ -62,7 +62,7 @@ Record: the gateway version, the engine build (`system_fingerprint`), and which 
 | A committed profile for this model and layer (under `profiles/<system>/`) | use it |
 | A deployment of an llm-d guide | the guide's combination under `profiles/llm-d/<guide>/`; its `README.md` names the combination for each CI lane, the URL variable to export (`LLMDV_EPP_URL`) and the exact `--identity` flags. It runs the guide's `selection`; add `--all` for every case |
 | One for the model through another layer | copy it to `<system>/<model>.local.yaml` and change what differs: `kind`, `auth`, `model.public_id`, `health_path`, `rate_limited`, the surfaces |
-| A gateway and the router for the same model | a two-ingress `.local.yaml`: the gateway profile plus a `kind: router` ingress (below); llmdv then reports each layer as a column and attributes differences |
+| A gateway and the router for the same model | a two-ingress `.local.yaml`: the gateway profile plus a `kind: router` ingress (below); `llmdv` then reports each layer as a column and attributes differences |
 | Nothing for this model | writing-an-infra-profile |
 
 Every `.local.yaml` is gitignored and may write `base_url` inline. A committed profile names its URL and key by variable (`base_url_env`, `auth.key_env`) and never stores either. A profile argument is always a file path, not the profile's `name:`.
@@ -143,7 +143,7 @@ Restrict a multi-ingress profile with `--ingress <id>`. Keep the machine awake f
 ## 8. Compare and report
 
 - **Against an earlier run of the same profile:** running-and-comparing-live-runs.
-- **Against the same model elsewhere** (prod vs staging, gateway vs router): `llmdv compare` only compares runs of one profile, so join two `results.jsonl` files on `nodeid` (with the ingress id taken out of the brackets; a multi-ingress run filtered to the matching column), and split the differences into pass → fail, fail → pass and skip changes. When the other deployment already has published runs, use its latest complete one (running-and-comparing-live-runs, "Pull a run back") rather than starting one; note when its llmdv version differs from yours. A group of new failures sharing one first-failing check is one cause.
+- **Against the same model elsewhere** (prod vs staging, gateway vs router): `llmdv compare` only compares runs of one profile, so join two `results.jsonl` files on `nodeid` (with the ingress id taken out of the brackets; a multi-ingress run filtered to the matching column), and split the differences into pass → fail, fail → pass and skip changes. When the other deployment already has published runs, use its latest complete one (running-and-comparing-live-runs, "Pull a run back") rather than starting one; note when its `llmdv` version differs from yours. A group of new failures sharing one first-failing check is one cause.
 - **Read the failures:** triaging-a-run (causes, tracking issues, layer, repro), then reporting-a-run for the dashboard. A failure shared with other models' profiles (vLLM API layers, fleet-wide flags) is not this deployment's defect.
 - **File what is new:** filing-a-fleet-finding.
 

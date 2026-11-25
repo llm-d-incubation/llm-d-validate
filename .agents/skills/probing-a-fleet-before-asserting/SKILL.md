@@ -1,6 +1,6 @@
 ---
 name: probing-a-fleet-before-asserting
-description: Use when writing or changing an llmdv assertion about a response from deployed serving infrastructure (vLLM, an llm-d router or EPP, LiteLLM), when a live case fails and you are tempted to adjust the assertion, or when you are about to rely on a spec or SDK for a status, field or stream shape you have not seen.
+description: Use when writing or changing an `llmdv` assertion about a response from deployed serving infrastructure (vLLM, an llm-d router or EPP, LiteLLM), when a live case fails and you are tempted to adjust the assertion, or when you are about to rely on a spec or SDK for a status, field or stream shape you have not seen.
 ---
 
 # Probing a fleet before asserting

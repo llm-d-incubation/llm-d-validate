@@ -1,16 +1,16 @@
 ---
 name: reporting-a-run
-description: Use when an llmdv run has finished, was killed, or is still running and someone wants to review, triage, share or debug its results, asks for a dashboard, report or analysis of a run directory, or names a run published to S3 or a file:// location.
+description: Use when an `llmdv` run has finished, was killed, or is still running and someone wants to review, triage, share or debug its results, asks for a dashboard, report or analysis of a run directory, or names a run published to S3 or a file:// location.
 ---
 
 # Reporting a run
 
-llmdv renders any run directory into one self-contained `dashboard.html`: the system under test, the verdict with failures grouped by first failing check, where the results are, the profile, and every test with its rerun command, checks, traceback, transcript and replay curl. Two ways to fill it, one renderer:
+`llmdv` renders any run directory into one self-contained `dashboard.html`: the system under test, the verdict with failures grouped by first failing check, where the results are, the profile, and every test with its rerun command, checks, traceback, transcript and replay curl. Two ways to fill it, one renderer:
 
 | | Static | Agent-assisted (this skill's job) |
 |---|---|---|
 | Command | `llmdv verify --analyze`, or `llmdv analyze <run_dir>` | `llmdv analyze <run_dir> --notes <notes.json>` after you write the notes |
-| Content | Only what llmdv recorded | Plus your analysis, shown labelled "Agent analysis" and "agent note, not recorded by llmdv" |
+| Content | Only what `llmdv` recorded | Plus your analysis, shown labelled "Agent analysis" and "agent note, not recorded by llmdv" |
 
 The static page draws no conclusions. That is your job, and it must stay visibly separate from the evidence.
 
@@ -49,9 +49,9 @@ The static page draws no conclusions. That is your job, and it must stay visibly
 
 - **Note every failure group.** Write a case note only where a case differs from its group.
 - **Join groups with one cause.** When several groups share a root (a broken stream fails `terminal_done`, `chunk_ids` and `terminal_event`), say so in the summary and in each group note.
-- **Separate llmdv defects from fleet findings, and allow for both.** A Python error as the reason (`TypeError`, `KeyError`, `IndexError`, `NotImplementedError`) is always an llmdv defect, but can hide a fleet finding: a stream frame with no `choices`, or a choice with no `index`, surfaces as a `KeyError` or `IndexError`. Read the traceback and the transcript (`transcript.sse`, `exchanges.json`) before labelling it:
-  - **The frame that raised it breaks the protocol:** label it as both a fleet finding (the malformed frame) and an llmdv defect (unguarded parsing).
-  - **The input was valid:** label it "llmdv defect" only.
+- **Separate `llmdv` defects from fleet findings, and allow for both.** A Python error as the reason (`TypeError`, `KeyError`, `IndexError`, `NotImplementedError`) is always an `llmdv` defect, but can hide a fleet finding: a stream frame with no `choices`, or a choice with no `index`, surfaces as a `KeyError` or `IndexError`. Read the traceback and the transcript (`transcript.sse`, `exchanges.json`) before labelling it:
+  - **The frame that raised it breaks the protocol:** label it as both a fleet finding (the malformed frame) and an `llmdv` defect (unguarded parsing).
+  - **The input was valid:** label it "`llmdv` defect" only.
 - **Flag transient failures.** 5xx answers clustered within seconds (a 503 "not ready") are likely a moment in the fleet. Recommend a rerun of those cases before triage.
 - **Flag profile claims the evidence contradicts.** If the run's `profile.used.yaml` asserts something the evidence disputes, such as a stack claim, say so in the summary as a lead for the profile's owner. Never edit the profile.
 

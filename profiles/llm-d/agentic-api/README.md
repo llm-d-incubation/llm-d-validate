@@ -27,8 +27,8 @@ The guide's own subject is not covered: health and `/v1/models` on agentic-api, 
 To cover agentic-api, a profile declares a second ingress in the gateway position (`kind: gateway`) for the `agentic-api` Service on port 9000, in front of the router, with `fronts: [epp]` naming the router it sends to (#24, A5). That ingress then needs:
 
 - its own surfaces and error statuses, measured: which paths agentic-api serves (at least `responses`, and whether it passes chat completions and completions through), what it answers for an unknown model, path or method, and whether its errors carry the OpenAI envelope;
-- stateful Responses cases (`store`, `previous_response_id`, a tool loop continued by `function_call_output`) that llmdv's Responses suite can run against a stateful ingress;
-- a WebSocket transport for `ws://…/v1/responses`, which llmdv does not have.
+- stateful Responses cases (`store`, `previous_response_id`, a tool loop continued by `function_call_output`) that `llmdv`'s Responses suite can run against a stateful ingress;
+- a WebSocket transport for `ws://…/v1/responses`, which `llmdv` does not have.
 
 Until a run measures agentic-api's behaviour, nothing about it is declared.
 

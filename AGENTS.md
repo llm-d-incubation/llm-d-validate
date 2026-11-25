@@ -19,7 +19,8 @@ Each lives at `.agents/skills/<name>/SKILL.md`. Load the one that matches before
 |---|---|
 | [writing-an-infra-profile](.agents/skills/writing-an-infra-profile/SKILL.md) | writing, updating or reviewing a profile; choosing any declaration; naming a component behind an ingress; several profiles for one stack or an llm-d guide; publishing a profile written against a private stack |
 | [probing-a-fleet-before-asserting](.agents/skills/probing-a-fleet-before-asserting/SKILL.md) | writing or changing an assertion about a live response, or a live case fails |
-| [extending-llmdv](.agents/skills/extending-llmdv/SKILL.md) | adding a surface, case, client, assertion or capability, or supporting another gateway, router or engine product |
+| [writing-a-test-case](.agents/skills/writing-a-test-case/SKILL.md) | adding or changing a test case or a test suite: markers, fixtures, proving it can fail, a new suite, the follow-ups |
+| [extending-llmdv](.agents/skills/extending-llmdv/SKILL.md) | adding a surface, client, assertion or capability, or supporting another gateway, router or engine product |
 | [testing-a-model-deployment](.agents/skills/testing-a-model-deployment/SKILL.md) | testing a model you were handed endpoints for (a LiteLLM gateway, a router or EPP route, or both): picking and pointing a profile, first checks, the run, the comparison |
 | [running-and-comparing-live-runs](.agents/skills/running-and-comparing-live-runs/SKILL.md) | starting a live run (PC, unattended or cluster job), publishing one, pulling one back, comparing runs |
 | [reporting-a-run](.agents/skills/reporting-a-run/SKILL.md) | sharing a run directory; building the annotated HTML dashboard and its notes |
@@ -72,7 +73,7 @@ missing instrument, `excluded_by_policy` is a choice not to run on a shared flee
 **Exit codes separate blame** (`EXITS` in `cli/exit_codes.py`). `0` ok, `1` test failures (the
 fleet), `2` usage or invalid profile, `3` the operator's environment (preflight unsatisfied, a
 local port that refuses connections mid-run with no fleet failure, or a results store that cannot
-be used), `4` a llmdv defect, `5` verification passed but results or the notification were not
+be used), `4` a `llmdv` defect, `5` verification passed but results or the notification were not
 delivered, `6` interrupted. Never
 widen `1` to cover an environment problem, and never let `5` mask a verification failure: the
 verification code takes precedence.
@@ -100,7 +101,7 @@ The repo pins `ruff` exactly, in `pyproject.toml` and in `.pre-commit-config.yam
 stay in sync. `ruff check` alone is not the whole gate: formatting is enforced by a
 `ruff-format` pre-commit hook, so a change that lints clean can still be rejected on commit.
 `./install.sh --dev` installs both tools, and `pytest-xdist` for `-n auto`. Parallel is for
-llmdv's own offline tests only: `llmdv verify` and `llmdv job` refuse `-n` and always run live
+`llmdv`'s own offline tests only: `llmdv verify` and `llmdv job` refuse `-n` and always run live
 cases one at a time, so never try to parallelize a run against a fleet.
 
 A live run needs a profile and a URL for each ingress it names. A profile that declares local

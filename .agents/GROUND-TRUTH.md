@@ -49,7 +49,7 @@ documents stop as unsupported on reasoning models such as o3 and o4-mini. vLLM p
 [#52486](https://github.com/vllm-project/vllm/pull/52486) and
 [#38533](https://github.com/vllm-project/vllm/pull/38533), discussed in
 [#52393](https://github.com/vllm-project/vllm/issues/52393), remain unmerged as of 2026-10-15.
-llmdv checks stopping in answer text, not reasoning-channel isolation. A prompt that does not
+`llmdv` checks stopping in answer text, not reasoning-channel isolation. A prompt that does not
 quote the stop string still cannot guarantee the model will never reason with that string.
 
 **Greedy sampling permits only one choice in vLLM.** Chat requests with `temperature: 0`
@@ -204,7 +204,7 @@ ports on separate pods. Declare them as separate ingresses if you want both test
 
 **A Namespace cannot be read under a namespaced Role.** Namespaces are cluster-scoped, so a
 Role — what a scheduled job typically gets — can never grant `get namespace`, even when every
-read llmdv needs is allowed. *Check access with a namespaced read* (llmdv lists pods with a field
+read `llmdv` needs is allowed. *Check access with a namespaced read* (`llmdv` lists pods with a field
 selector that matches nothing).
 
 **A Service is the bridge from an ingress to its pods.** Log collection resolves a Service to

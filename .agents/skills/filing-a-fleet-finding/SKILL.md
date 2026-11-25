@@ -1,11 +1,11 @@
 ---
 name: filing-a-fleet-finding
-description: Use when an llmdv run failure needs to be reported, filed or written up as a GitHub issue, when someone asks to "open an issue" for a failure group, check, or finding, or asks for an issue draft they can paste.
+description: Use when an `llmdv` run failure needs to be reported, filed or written up as a GitHub issue, when someone asks to "open an issue" for a failure group, check, or finding, or asks for an issue draft they can paste.
 ---
 
 # Filing a fleet finding
 
-A fleet finding is a defect an llmdv run caught in the deployed serving stack. Each is filed in the issue tracker of the project that owns the failing layer (for example llm-d/llm-d, or the gateway's or engine's own repository), or in llm-d-incubation/llm-d-validate for a defect in llmdv itself, from [template.md](template.md): Summary, Issue, Fix, Repro (curl, then the library), Additional information, Tracking. A finding is one root cause, not one failing test: a single defect can fail dozens of cases.
+A fleet finding is a defect an `llmdv` run caught in the deployed serving stack. Each is filed in the issue tracker of the project that owns the failing layer (for example llm-d/llm-d, or the gateway's or engine's own repository), or in llm-d-incubation/llm-d-validate for a defect in `llmdv` itself, from [template.md](template.md): Summary, Issue, Fix, Repro (curl, then the library), Additional information, Tracking. A finding is one root cause, not one failing test: a single defect can fail dozens of cases.
 
 ## Steps
 
