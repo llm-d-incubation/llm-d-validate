@@ -234,7 +234,9 @@ def test_unobservable_dispositions_skip_with_the_right_class(tmp_path):
               x-request-id: {{fake: ignored}}
             """)
         )
-        code, records = run_suites(profile, tmp_path / "run", "-k", "header_disposition")
+        code, records = run_suites(
+            profile, tmp_path / "run", "--llmdv-full-suite", "-k", "header_disposition"
+        )
 
     assert code == 0, "skips are not failures"
     by_header = {
@@ -1028,7 +1030,9 @@ def test_ingresses_that_differ_on_responses_each_pass_their_own_declaration(tmp_
                 surfaces: [chat_completions, completions, messages]
             """)
         )
-        code, records = run_suites(profile, tmp_path / "run", "-m", "contract", "-k", "surfaces")
+        code, records = run_suites(
+            profile, tmp_path / "run", "--llmdv-full-suite", "-m", "contract", "-k", "surfaces"
+        )
 
     by_row = {(r["case_id"], r["ingress"]): r["outcome"] for r in records}
     assert by_row == {

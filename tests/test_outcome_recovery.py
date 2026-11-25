@@ -11,7 +11,7 @@ from llmdv.cli import verify_cmd
 from llmdv.cli.exit_codes import INTERNAL, INTERRUPTED
 from llmdv.cli.main import build_parser
 from llmdv.results.record import ResultRecord, ResultsWriter
-from tests.fakes import profile_yaml
+from tests.fakes import only_run, profile_yaml
 
 
 @pytest.mark.parametrize("stage", ["pytest", "collection", "summary"])
@@ -71,7 +71,8 @@ def test_finalization_keeps_finished_cases_when_a_later_step_fails(
         monkeypatch.setattr(verify_cmd, "_summarise", fail)
 
     assert verify_cmd.cmd_verify(args) == expected
-    outcome_path = root / "outcome.json"
+    # --local-output is a parent; finalization must keep evidence in this run's child.
+    outcome_path = only_run(root) / "outcome.json"
     outcome = json.loads(outcome_path.read_text())
     verification = outcome["verification"]
     assert verification["exit_code"] == expected

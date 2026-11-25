@@ -444,7 +444,9 @@ def test_defaults_without_an_ingress(profile):
         model={"reasoning": {"parser": None, "field": None}, "tools": {"parser": None}},
         capabilities={"stateful_responses": False},
     )
-    result, records = run_pytest(suite, write(tmp_path, config), tmp_path / "run")
+    result, records = run_pytest(
+        suite, write(tmp_path, config), tmp_path / "run", "--llmdv-full-suite"
+    )
     assert result.returncode == 0, result.stdout + result.stderr
     assert len(records) == 7
     assert sum(r["ingress"] is None for r in records) == 1
