@@ -1,5 +1,5 @@
-# An example overlay with placeholders only. Real overlays carry cluster detail, so they live
-# with the fleet's own manifests, not in this repository.
+# An example overlay with placeholders for deployment settings. Real overlays carry cluster
+# detail, so they live with the fleet's own manifests, not in this repository.
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 namespace: fleet-namespace
@@ -7,8 +7,9 @@ resources:
   - ../../base
 images:
   - name: llmdv
-    newName: registry.example.com/org/llmdv
-    newTag: replace-with-git-sha
+    newName: ghcr.io/llm-d-incubation/llm-d-validate
+    # Select an existing CI tag: vX.Y.Z for a release, or sha-<short sha> for a main build.
+    newTag: replace-with-published-tag
 configMapGenerator:
   # Mounted at /etc/llmdv/profile.yaml.
   - name: llmdv-profile

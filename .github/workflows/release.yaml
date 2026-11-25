@@ -1,0 +1,132 @@
+# Builds the Python package and publishes it to PyPI as llm-d-validate:
+#
+#   tag vX.Y.Z        build, check, smoke-test, publish to PyPI, then a GitHub release with the files
+#   pull request      build, check and smoke-test only, when packaging could have changed
+#
+# Only an admin can publish, enforced three ways: the `authorize` job fails unless whoever
+# pushed the tag is an admin of this repository; the repository's tag ruleset lets only admins
+# create `v*` tags; and the `pypi` environment requires an admin's approval and accepts only `v*`
+# tags. The last two are repository settings, described in CONTRIBUTING.md under "Releasing".
+# There is no workflow_dispatch: a manual run on a tag would otherwise publish without a push.
+#
+# Publishing uses PyPI trusted publishing: PyPI trusts this workflow file in the `pypi`
+# environment, and the job exchanges its OIDC token for a short-lived upload token, so no PyPI
+# secret is stored. Rename this file or the environment only together with the publisher on
+# PyPI. The upload also carries a signed attestation of the files, made with the same identity.
+#
+# The container image is published from the same tag by image.yaml.
+name: release
+
+on:
+  push:
+    tags: ["v*"]
+  pull_request:
+    paths:
+      - pyproject.toml
+      - src/**
+      - README.md
+      - LICENSE
+      - .github/workflows/release.yaml
+      - .github/scripts/check-release.sh
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: ${{ !startsWith(github.ref, 'refs/tags/') }}
+
+env:
+  UV_PYTHON_PREFERENCE: only-managed
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  # The person who pushed the tag must be an admin of this repository. GITHUB_TOKEN can read a
+  # collaborator's permission with the metadata access every token has.
+  authorize:
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Authorize release tag
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: bash .github/scripts/check-release.sh
+
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          clean: true
+      - uses: astral-sh/setup-uv@v6
+      # Interpreters and uv's cache live under RUNNER_TEMP, which the runner empties after
+      # every job.
+      - name: Python
+        run: |
+          echo "UV_PYTHON_INSTALL_DIR=$RUNNER_TEMP/uv-python" >> "$GITHUB_ENV"
+          echo "UV_CACHE_DIR=$RUNNER_TEMP/uv-cache" >> "$GITHUB_ENV"
+          UV_PYTHON_INSTALL_DIR="$RUNNER_TEMP/uv-python" UV_CACHE_DIR="$RUNNER_TEMP/uv-cache" \
+            uv python install 3.11
+      - name: Build
+        run: uv build --python 3.11 --out-dir dist
+      - name: Check metadata
+        run: uvx twine check --strict dist/*
+      # Install the wheel alone, outside the checkout's sources, and run the CLI offline: the
+      # command, the pytest plugin and the packaged suites must all load from the wheel.
+      - name: Smoke-test the wheel
+        run: |
+          uv venv --python 3.11 "$RUNNER_TEMP/smoke"
+          uv pip install --python "$RUNNER_TEMP/smoke/bin/python" dist/*.whl
+          cp -r profiles/examples "$RUNNER_TEMP/examples"
+          cd "$RUNNER_TEMP"
+          smoke/bin/llmdv --version
+          smoke/bin/llmdv profile validate examples/example-gateway-only.yaml
+          smoke/bin/llmdv plan --profile examples/example-gateway-only.yaml -q
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dist
+          path: dist/
+          if-no-files-found: error
+
+  pypi:
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
+    needs: [authorize, build]
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment:
+      name: pypi
+      url: https://pypi.org/project/llm-d-validate/
+    permissions:
+      id-token: write    # trusted publishing and the upload's attestation
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist/
+      - uses: pypa/gh-action-pypi-publish@release/v1
+
+  github-release:
+    needs: pypi
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write    # create the release
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist/
+      - name: GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: >-
+          gh release create "$GITHUB_REF_NAME" dist/*
+          --repo "$GITHUB_REPOSITORY" --verify-tag --generate-notes --title "$GITHUB_REF_NAME"

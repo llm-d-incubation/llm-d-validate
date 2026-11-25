@@ -19,12 +19,10 @@ Real overlays carry cluster detail: keep them with the fleet's manifests or in a
 
 ## Deploying
 
-1. Build and push the image, from the repository root:
-   ```sh
-   podman build -f Containerfile --build-arg LLMDV_GIT_SHA="$(git rev-parse HEAD)" \
-       -t <registry>/<org>/llmdv:"$(git rev-parse --short HEAD)" .
-   podman push <registry>/<org>/llmdv:"$(git rev-parse --short HEAD)"
-   ```
+1. Choose an existing CI-published image from
+   `ghcr.io/llm-d-incubation/llm-d-validate`: a `vX.Y.Z` release tag or a `sha-<short sha>`
+   tag from a successful main build. Set the example overlay's `newTag` to that exact tag;
+   `replace-with-published-tag` is a placeholder. New releases do not update your overlay.
 2. Write an overlay from [`overlays/example/`](overlays/example/): namespace, image tag, an
    in-cluster profile (Service DNS, empty `setup`; check it with `llmdv profile validate`),
    `LLMDV_RESULTS_URI`, and the schedule.
@@ -36,6 +34,15 @@ Real overlays carry cluster detail: keep them with the fleet's manifests or in a
    job="$(deploy/trigger.sh -n <namespace> --trigger manual --id first-run)" &&
    kubectl -n <namespace> logs -f "job/$job"
    ```
+
+For a custom image, build and push from the repository root, then set both `newName` and
+`newTag` in your overlay to match:
+
+```sh
+podman build -f Containerfile --build-arg LLMDV_GIT_SHA="$(git rev-parse HEAD)" \
+    -t <registry>/<org>/llmdv:"$(git rev-parse --short HEAD)" .
+podman push <registry>/<org>/llmdv:"$(git rev-parse --short HEAD)"
+```
 
 ### Infrastructure smoke test
 
@@ -241,6 +248,17 @@ run.
   its URL. Everything published is redacted at capture, in the logging layer and in every run-file
   writer.
 
+## Offline image checks
+
+Image CI tests both architectures before publishing. The offline smoke test checks `llmdv`
+startup, suite collection, both publishing SDKs, dependency consistency, writable storage, and
+Claude startup as UID 10001 with a read-only root filesystem and no network. To repeat it with
+a locally built Docker image:
+
+```sh
+bash .github/scripts/smoke-image.sh <image> linux/amd64   # or linux/arm64
+```
+
 ## Claude Code in the runner
 
 The image includes the native Claude Code binary at `/usr/local/bin/claude` (amd64 and arm64),
@@ -283,9 +301,11 @@ version in profiles and docs together. Rebuild and repeat the check above per ar
 
 ## Refreshing the image's pins
 
-The base image is pinned by digest, every Python package by hash, and Claude Code by version and
-checksum ([above](#claude-code-in-the-runner)). To update the base or Python packages, from the
-repository root:
+The base image is pinned by digest, Python runtime dependencies by hash, the setuptools build
+backend by exact version in `pyproject.toml`, and Claude Code by version and checksum
+([above](#claude-code-in-the-runner)). Update the setuptools pin deliberately and verify both
+the wheel and image builds when changing it. To update the base or runtime dependencies, from
+the repository root:
 
 ```sh
 uv pip compile pyproject.toml --extra s3 --extra ibm-cos --universal --generate-hashes \

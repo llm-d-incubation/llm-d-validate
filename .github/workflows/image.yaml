@@ -3,7 +3,8 @@
 #
 #   push to main      :main and :sha-<short sha>
 #   tag vX.Y.Z        :vX.Y.Z and :latest
-#   pull request      builds both architectures to catch a broken Containerfile; pushes nothing
+#   pull request      builds and smoke-tests both architectures; pushes nothing
+# Release tags use the same admin, main ancestry and package-version checks as PyPI.
 #
 # It logs in with the workflow's own GITHUB_TOKEN, scoped by `packages: write` to this
 # repository's package for this run only, so no long-lived registry secret is involved.
@@ -25,8 +26,15 @@ on:
       - Containerfile
       - pyproject.toml
       - requirements.lock
+      - README.md
+      - LICENSE
+      - .dockerignore
+      - .containerignore
+      - profiles/examples/**
       - src/**
       - .github/workflows/image.yaml
+      - .github/scripts/check-release.sh
+      - .github/scripts/smoke-image.sh
   workflow_dispatch:
 
 permissions:
@@ -43,15 +51,49 @@ env:
 jobs:
   image:
     runs-on: ubuntu-latest
+    timeout-minutes: 45
     permissions:
       contents: read
       packages: write    # push to this repository's package
       id-token: write    # keyless cosign signing
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Authorize release tag
+        if: startsWith(github.ref, 'refs/tags/')
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: bash .github/scripts/check-release.sh
 
       - uses: docker/setup-qemu-action@v3
       - uses: docker/setup-buildx-action@v3
+
+      # Load each platform separately for Docker's local image store. The final
+      # multi-platform build reuses this builder's layers after both tests pass.
+      - name: Build amd64 for smoke test
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: Containerfile
+          platforms: linux/amd64
+          build-args: LLMDV_GIT_SHA=${{ github.sha }}
+          load: true
+          tags: llmdv-smoke:amd64
+      - name: Build arm64 for smoke test
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: Containerfile
+          platforms: linux/arm64
+          build-args: LLMDV_GIT_SHA=${{ github.sha }}
+          load: true
+          tags: llmdv-smoke:arm64
+      - name: Smoke-test both platforms offline
+        run: |
+          bash .github/scripts/smoke-image.sh llmdv-smoke:amd64 linux/amd64
+          bash .github/scripts/smoke-image.sh llmdv-smoke:arm64 linux/arm64
 
       - name: Log in to GitHub Container Registry
         if: github.event_name != 'pull_request'
