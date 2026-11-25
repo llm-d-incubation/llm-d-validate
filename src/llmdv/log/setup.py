@@ -61,8 +61,8 @@ class _ConsoleFormatter(logging.Formatter):
         message = record.getMessage()
         if record.levelno >= logging.WARNING:
             return f"{record.levelname.lower()}: {message}"
-        if record.exc_info:
-            return f"{message}\n{self.formatException(record.exc_info)}"
+        if record.exc_text:
+            return f"{message}\n{record.exc_text}"
         return message
 
 
@@ -76,8 +76,10 @@ class _JsonFormatter(logging.Formatter):
             "logger": record.name,
             "msg": record.getMessage(),
         }
-        if record.exc_info:
-            payload["exc"] = self.formatException(record.exc_info)
+        if record.exc_text:
+            payload["exc"] = record.exc_text
+        if record.stack_info:
+            payload["stack"] = record.stack_info
         return json.dumps(payload)
 
 
