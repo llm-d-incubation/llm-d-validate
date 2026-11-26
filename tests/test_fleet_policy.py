@@ -95,5 +95,5 @@ def test_the_happy_path_suites_are_untouched_by_policy(tmp_path):
     assert "fail" not in by_case.values(), by_case
     # `openai_chat` also selects openai_chat.disconnect_recovery, a disruptive case that lives in
     # streaming/; it is the only row the policy may exclude.
-    excluded = [r["nodeid"] for r in records if r.get("skip_class") == "excluded_by_policy"]
-    assert all("/suites/streaming/test_disconnect.py::" in nodeid for nodeid in excluded), excluded
+    excluded = {r["case_id"] for r in records if r.get("skip_class") == "excluded_by_policy"}
+    assert excluded == {"openai_chat.disconnect_recovery"}
