@@ -159,6 +159,33 @@ def _with_exchange_body(run, body):
     path.write_text(json.dumps(exchange) + "\n")
 
 
+# An opaque id such as a gateway's Responses id: base64url text that can hold "sk-" anywhere.
+OPAQUE_ID = "resp_" + "QmFzZTY0dXJsIGJsb2I" * 3 + "-bCKcxf5N3_zARS3c-sk-s5lAbCdEfGhIjKlMnOp" * 2
+
+
+def test_sk_inside_an_opaque_id_is_not_a_credential(tmp_path):
+    """A `sk-` in the middle of a longer token is part of that token, not a key on its own."""
+    run = make_run(tmp_path)
+    _with_exchange_body(run, {"id": OPAQUE_ID, "object": "response"})
+    dashboard.write(run)
+    assert (run / "dashboard.html").exists()
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "Bearer sk-live-abcdefghijklmnopqrstu",
+        '{"key": "sk-live-abcdefghijklmnopqrstu"}',
+        "api_key=sk-live-abcdefghijklmnopqrstu",
+        "sk-live-abcdefghijklmnopqrstu",
+    ],
+)
+def test_a_standalone_sk_key_still_refuses_the_page(tmp_path, text):
+    run = make_run(tmp_path, reason=f"AssertionError: server echoed {text}")
+    with pytest.raises(dashboard.CredentialFound, match="credential-shaped"):
+        dashboard.write(run)
+
+
 @pytest.mark.parametrize(
     "body",
     [
