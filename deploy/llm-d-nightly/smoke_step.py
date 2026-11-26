@@ -310,6 +310,9 @@ class SmokeStep:
         return False
 
     def stop(self):
+        # A completion can race the timeout/cancellation. Do not signal a reaped PID.
+        if self.rc is not None or self.wait(1, cancellable=False):
+            return
         self.kube(
             "exec",
             self.pod,
@@ -377,6 +380,8 @@ class SmokeStep:
             if self.setup():
                 if self.wait(self.timeout):
                     self.status = "completed"
+                    if self.rc not in (0, 1):
+                        self.note(f"verification exited {self.rc}; not a guide failure", True)
                 else:
                     self.status = "interrupted" if self.cancelled else "timed_out"
                     self.note(f"verification {self.status}; requesting finalization", True)

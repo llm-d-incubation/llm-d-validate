@@ -249,3 +249,18 @@ def test_pod_runner_forwards_stop_and_preserves_exit_before_collection(tmp_path)
         if process.poll() is None:
             process.kill()
             process.wait()
+
+
+def test_timeout_racing_completion_does_not_signal_reaped_pid(step, monkeypatch):
+    def wait(*args, **kwargs):
+        step.rc = 1
+        return True
+
+    monkeypatch.setattr(step, "wait", wait)
+
+    def unexpected(*args, **kwargs):
+        pytest.fail("must not signal a completed verification process")
+
+    monkeypatch.setattr(step, "kube", unexpected)
+    step.stop()
+    assert step.rc == 1
