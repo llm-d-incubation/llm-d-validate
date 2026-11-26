@@ -34,12 +34,13 @@ The router's rendering, on top of the base tests every guide gets (each API, err
 
 ## What `llmdv verify` selects
 
-A plain `llmdv verify` runs the `default` test set, defined once in [`parts/common.yaml`](parts/common.yaml) and used unchanged by every profile here. `--test-set smoke` runs the [built-in smoke checks](../../README.md#what-a-verification-command-selects), and `--full-suite` runs every case in the library. There are no other sets, so `--all-test-sets` is the same as the default. Filters such as `-k` only narrow the run, and `--identity` never changes it.
+The default is defined once in [`parts/common.yaml`](parts/common.yaml) and used unchanged by every profile here.
+See [selection rules](../../../docs/cli.md#test-sets-and-coverage) for smoke, full-library coverage and filters.
 
 <details>
-<summary>The default's case-ID patterns, in 13 suites</summary>
+<summary>The default's case-ID patterns</summary>
 
-`suite.*` takes the whole suite; any other pattern names one case. The rest of each suite is not selected.
+`*` selects the whole library; `suite.*` selects a suite. Other patterns select matching cases.
 
 | Suite | Patterns |
 | --- | --- |
@@ -66,14 +67,15 @@ Counted offline by `llmdv plan`, one per ingress and variant. *Run* cases can st
 
 | Profile | Default (= `--all-test-sets`) | `smoke` | `--full-suite` |
 | --- | --- | --- | --- |
-| `vllm-qwen3-0.6b-inline-standalone.yaml` | 107 selected, 91 run, 16 skip: 16 undeclared | 9 selected, 9 run | 1082 selected, 691 run, 391 skip: 391 undeclared |
-| `vllm-qwen3-32b-ctx4k-inline-standalone.yaml` | 107 selected, 81 run, 26 skip: 26 undeclared | 9 selected, 9 run | 1082 selected, 677 run, 405 skip: 405 undeclared |
-| `vllm-qwen3-32b-inline-standalone.yaml` | 107 selected, 91 run, 16 skip: 16 undeclared | 9 selected, 9 run | 1082 selected, 691 run, 391 skip: 391 undeclared |
-| `vllm-qwen3-32b-parsers-standalone.yaml` | 107 selected, 100 run, 7 skip: 7 undeclared | 9 selected, 9 run | 1082 selected, 929 run, 153 skip: 153 undeclared |
+| `vllm-qwen3-0.6b-inline-standalone.yaml` | 107 selected, 91 run, 16 skip: 16 undeclared | 9 selected, 9 run | 1092 selected, 692 run, 400 skip: 400 undeclared |
+| `vllm-qwen3-32b-ctx4k-inline-standalone.yaml` | 107 selected, 81 run, 26 skip: 26 undeclared | 9 selected, 9 run | 1092 selected, 678 run, 414 skip: 414 undeclared |
+| `vllm-qwen3-32b-inline-standalone.yaml` | 107 selected, 91 run, 16 skip: 16 undeclared | 9 selected, 9 run | 1092 selected, 692 run, 400 skip: 400 undeclared |
+| `vllm-qwen3-32b-parsers-standalone.yaml` | 107 selected, 100 run, 7 skip: 7 undeclared | 9 selected, 9 run | 1092 selected, 938 run, 154 skip: 154 undeclared |
 
 </details>
 
-To see every case and why one skips: `llmdv plan --profile <profile>` (add `--test-set smoke` or `--full-suite` for the other scopes), and `llmdv profile show <profile> --test-sets` for the definitions.
+Preview individual cases and skip reasons with `llmdv plan --profile <profile>`.
+
 ## Not covered
 
 - **Configurations llm-d does not test nightly:** SGLang on NVIDIA GPU and Intel XPU (with their render pools), TPU v6e and v7, and CPU, all `community` in `guide.yaml`; gateway mode.

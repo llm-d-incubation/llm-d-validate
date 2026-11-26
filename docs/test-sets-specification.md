@@ -1,6 +1,9 @@
 # Test sets specification
 
-This is the revised specification for the breaking migration to `test_sets`.
+Implementation/design record for the migration to `test_sets`. For current user instructions,
+read [Selection and coverage](cli.md#test-sets-and-coverage); field semantics live in
+[the profile reference](../profiles/REFERENCE.md#test_sets). The migration and acceptance sections
+below describe the implementation work, not additional steps for a new user.
 
 ## Core model
 

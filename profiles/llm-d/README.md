@@ -72,7 +72,7 @@ client share a profile.
 
 | Guide | Lanes | Profiles | Notes |
 | --- | --- | --- | --- |
-| [optimized-baseline](optimized-baseline/) | 10 | 7, plus a simulator profile | see the optimized-baseline details below |
+| [optimized-baseline](optimized-baseline/) | 10 | 7, plus a simulator profile | see [optimized-baseline coverage](optimized-baseline/README.md#for-maintainers) |
 | [pd-disaggregation](pd-disaggregation/README.md) | 8 | 5 | requests pass the decode pod's routing sidecar |
 | [wide-ep](wide-ep/README.md) | 5 | 3 | the XPU lane runs aggregated, without prefill/decode |
 | [precise-prefix-cache-routing](precise-prefix-cache-routing/README.md) | 6 | 4 | |
@@ -163,44 +163,10 @@ engine build from the rest of their configuration, so each runs `--full-suite`: 
 
 </details>
 
-<details>
-<summary>optimized-baseline: its lanes and what has been measured</summary>
-
-The guide's ten lanes (`nightly-e2e-optimized-baseline-<lane>.yaml` in llm-d, each in standalone
-mode) deploy seven configurations that differ to a client, one profile each:
-
-| CI lane | Overlay it deploys (`ACCELERATOR_TYPE/MODEL_SERVER/INFRA_PROVIDER`) | Profile (`optimized-baseline/`) |
-| --- | --- | --- |
-| `cks-acc-gpu-vllm-x` | `gpu/vllm/base` | `vllm-qwen3-32b-parsers-standalone` |
-| `gke-acc-gpu-vllm-x` | `gpu/vllm/gke` | `vllm-qwen3-32b-parsers-standalone` |
-| `ibm-acc-gpu-vllm-x` | `gpu/vllm/ocp` | `vllm-qwen3-32b-parsers-standalone` |
-| `amd-acc-rocm-vllm-x` | `amd/vllm/amd-ci` | `vllm-qwen3-32b-inline-standalone` |
-| `gke-acc-tpu-vllm-x` | `tpu/v5p/vllm` | `vllm-qwen3-32b-inline-standalone` |
-| `intel-acc-xpu-vllm-x` | `xpu/vllm` | `vllm-qwen3-0.6b-inline-standalone` |
-| `gke-acc-gpu-sglang-x` | `gpu/sglang/gke` | `sglang-qwen3-32b-parsers-standalone` |
-| `gke-acc-tpu-sglang-x` | `tpu/v5p/sglang` | `sglang-qwen3-32b-ctx16k-parsers-standalone` |
-| `amd-acc-rocm-sglang-x` | `amd/sglang/amd-ci` | `sglang-qwen3-32b-inline-standalone` |
-| `amd-acc-rocm-atom-x` | `amd/atom/amd-ci` | `atom-qwen3-32b-ctxunknown-inline-standalone` |
-
-Three lanes set no provider. They apply the accelerator and engine folder's own kustomization,
-which includes only `base`, so they deploy what the `base` overlay does.
-
-Lanes share a profile when their overlays give a client the same model, context window, parsers
-and engine; a provider overlay changes only node, cache and NCCL settings. These lanes pass no
-`flavor`. `sim-qwen3-32b-standalone` is not a lane: it puts the guide's router in front of
-llm-d-inference-sim, for kind or CI without accelerators.
-
-**No lane runs, so not covered:** the community overlays (TPU v6e and v7, TPU v7 dynamic slicing,
-Rebellions NPU, CPU, Iluvatar, MetaX, Biren, Enflame, Moore Threads, TensorRT-LLM, and SGLang on
-Intel XPU), gateway mode, and agentgateway as the standalone sidecar proxy. Each is a model part
-and a few-line combination when a lane runs it.
-
-**What has been measured.** Only the router layer, standalone, on kind with a simulator engine
-(2026-11-16): the EPP's error envelopes, header and path handling and pass-through, recorded in
-`parts/topology/standalone.yaml`. Engine and model lines come from each lane's overlay and the
-API definitions.
-
-</details>
+The [optimized-baseline guide page](optimized-baseline/README.md#for-maintainers) owns its
+lane-to-profile mapping. The shared router declarations were measured on a simulator-backed
+router; engine and model declarations come from the documented lane configurations and API
+contracts. Preserve that distinction when interpreting a pass.
 
 <details>
 <summary>Known gaps in the optimized-baseline profiles</summary>

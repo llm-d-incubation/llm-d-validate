@@ -150,46 +150,40 @@ def section(folder: Path, entries: dict[Path, dict]) -> str:
         )
         where += "".join(f"; `{p.name}` inherits it from `{rel(s)}`" for p, s in inherited)
     others = sorted(set(sets) - {"default"})
-    guide = rel(PROFILES / "README.md") + "#what-a-verification-command-selects"
+    guide = rel(ROOT / "docs/cli.md") + "#test-sets-and-coverage"
     out = [
         HEADING,
         "",
-        f"A plain `llmdv verify` runs the `default` test set, {where}. `--test-set smoke` runs the "
-        f"[built-in smoke checks]({guide}), and `--full-suite` runs every case in the library."
-        + (
-            " Other sets: " + ", ".join(f"`{n}`" for n in others) + "."
-            if others
-            else " There are no other sets, so `--all-test-sets` is the same as the default."
-        )
-        + " Filters such as `-k` only narrow the run, and `--identity` never changes it.",
+        f"The default is {where}."
+        + (" Other sets: " + ", ".join(f"`{n}`" for n in others) + "." if others else ""),
+        f"See [selection rules]({guide}) for smoke, full-library coverage and filters.",
         "",
     ]
-    if "*" in sets["default"]:
-        # Every case: there are no patterns to list, and the default is the full suite.
-        out += ["The default is `*`: every case in the library, as `--full-suite` selects.", ""]
-    else:
-        by_suite: dict[str, list[str]] = {}
-        for pattern in sets["default"]:
-            by_suite.setdefault(re.split(r"[.\[]", pattern, maxsplit=1)[0], []).append(pattern)
-        planned = set(entries[names[0]]["plans"]["plain"].get("suites", ()))
-        if planned != set(by_suite):
-            sys.exit(
-                f"{folder}: planned suites {sorted(planned)} differ from the default's patterns"
-            )
-        out += [
-            "<details>",
-            f"<summary>The default's case-ID patterns, in {len(by_suite)} suites</summary>",
-            "",
-            "`suite.*` takes the whole suite; any other pattern names one case. The rest of each "
-            "suite is not selected.",
-            "",
-            "| Suite | Patterns |",
-            "| --- | --- |",
-        ]
-        for suite, patterns in by_suite.items():
-            out.append(f"| `{suite}` | " + ", ".join(f"`{p}`" for p in patterns) + " |")
-        out += ["", "</details>", ""]
+    by_suite: dict[str, list[str]] = {}
+    for pattern in sets["default"]:
+        by_suite.setdefault(re.split(r"[.\[]", pattern, maxsplit=1)[0], []).append(pattern)
+    planned = set(entries[names[0]]["plans"]["plain"].get("suites", ()))
+    if "*" not in sets["default"] and planned != set(by_suite):
+        sys.exit(f"{folder}: planned suites {sorted(planned)} differ from the default's patterns")
     out += [
+        "<details>",
+        "<summary>The default's case-ID patterns</summary>",
+        "",
+        "`*` selects the whole library; `suite.*` selects a suite. Other patterns select matching cases.",
+        "",
+        "| Suite | Patterns |",
+        "| --- | --- |",
+    ]
+    for suite, patterns in by_suite.items():
+        out.append(
+            f"| {'All suites' if suite == '*' else f'`{suite}`'} | "
+            + ", ".join(f"`{p}`" for p in patterns)
+            + " |"
+        )
+    out += [
+        "",
+        "</details>",
+        "",
         "<details>",
         "<summary>How many cases each scope selects, per profile</summary>",
         "",
@@ -216,9 +210,7 @@ def section(folder: Path, entries: dict[Path, dict]) -> str:
         "",
         "</details>",
         "",
-        "To see every case and why one skips: `llmdv plan --profile <profile>` (add "
-        "`--test-set smoke` or `--full-suite` for the other scopes), and "
-        "`llmdv profile show <profile> --test-sets` for the definitions.",
+        "Preview individual cases and skip reasons with `llmdv plan --profile <profile>`.",
         "",
     ]
     return "\n".join(out)
@@ -230,7 +222,7 @@ def updated(readme: Path, text: str) -> str:
     if HEADING in doc:
         start = doc.index(HEADING)
         end = doc.find("\n## ", start + 1)
-        return doc[:start] + text + (doc[end + 1 :] if end != -1 else "")
+        return doc[:start] + text + ("\n" + doc[end + 1 :] if end != -1 else "")
     heads = [m.start() for m in re.finditer(r"^## ", doc, re.M)]
     at = heads[1] if len(heads) > 1 else len(doc)
     return doc[:at] + text + ("\n" if at < len(doc) else "") + doc[at:]
