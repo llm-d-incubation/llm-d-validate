@@ -2,8 +2,8 @@
 
 Starting points for your own stack, one per shape of stack. [Writing a profile](../../docs/writing-profiles.md#start-from-the-closest-example)
 says which to start from; copy it to a gitignored `profiles/<system>/<model>.local.yaml` before
-filling it in. [`custom-llm-d/`](custom-llm-d/README.md) is a complete profile for a custom llm-d
-deployment, built from parts.
+filling it in. [`custom-llm-d/`](custom-llm-d/README.md) holds complete, measured profiles for three models
+on a custom llm-d deployment, built from parts.
 
 ## What `llmdv verify` selects
 
@@ -33,12 +33,12 @@ Counted offline by `llmdv plan`, one per ingress and variant. *Run* cases can st
 
 | Profile | Default (= `--all-test-sets`) | `smoke` | `--full-suite` |
 | --- | --- | --- | --- |
-| `example-engine-only.yaml` | 13 selected, 13 run | 9 selected, 9 run | 1066 selected, 537 run, 529 skip: 529 undeclared |
-| `example-gateway-only.yaml` | 13 selected, 7 run, 6 skip: 6 undeclared | 9 selected, 3 run, 6 skip: 6 undeclared | 1066 selected, 217 run, 849 skip: 849 undeclared |
-| `example-minimal.yaml` | 13 selected, 5 run, 8 skip: 2 unclassified, 6 undeclared | 9 selected, 3 run, 6 skip: 6 undeclared | 1066 selected, 215 run, 851 skip: 2 unclassified, 849 undeclared |
-| `example-three-ingress.yaml` | 53 selected, 43 run, 10 skip: 10 undeclared | 27 selected, 17 run, 10 skip: 10 undeclared | 3192 selected, 1486 run, 1706 skip: 1706 undeclared |
-| `example-two-ingress-staging.yaml` | 34 selected, 34 run | 18 selected, 18 run | 2130 selected, 1120 run, 1010 skip: 1010 undeclared |
-| `example-two-ingress.yaml` | 34 selected, 34 run | 18 selected, 18 run | 2130 selected, 1120 run, 1010 skip: 1010 undeclared |
+| `example-engine-only.yaml` | 13 selected, 13 run | 9 selected, 9 run | 1076 selected, 538 run, 538 skip: 538 undeclared |
+| `example-gateway-only.yaml` | 13 selected, 7 run, 6 skip: 6 undeclared | 9 selected, 3 run, 6 skip: 6 undeclared | 1076 selected, 217 run, 859 skip: 859 undeclared |
+| `example-minimal.yaml` | 13 selected, 5 run, 8 skip: 2 unclassified, 6 undeclared | 9 selected, 3 run, 6 skip: 6 undeclared | 1076 selected, 215 run, 861 skip: 2 unclassified, 859 undeclared |
+| `example-three-ingress.yaml` | 53 selected, 43 run, 10 skip: 10 undeclared | 27 selected, 17 run, 10 skip: 10 undeclared | 3222 selected, 1502 run, 1720 skip: 1720 undeclared |
+| `example-two-ingress-staging.yaml` | 34 selected, 34 run | 18 selected, 18 run | 2150 selected, 1122 run, 1028 skip: 1028 undeclared |
+| `example-two-ingress.yaml` | 34 selected, 34 run | 18 selected, 18 run | 2150 selected, 1122 run, 1028 skip: 1028 undeclared |
 
 </details>
 

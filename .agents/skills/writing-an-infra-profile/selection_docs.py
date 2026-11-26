@@ -164,28 +164,32 @@ def section(folder: Path, entries: dict[Path, dict]) -> str:
         + " Filters such as `-k` only narrow the run, and `--identity` never changes it.",
         "",
     ]
-    by_suite: dict[str, list[str]] = {}
-    for pattern in sets["default"]:
-        by_suite.setdefault(re.split(r"[.\[]", pattern, maxsplit=1)[0], []).append(pattern)
-    planned = set(entries[names[0]]["plans"]["plain"].get("suites", ()))
-    if planned != set(by_suite):
-        sys.exit(f"{folder}: planned suites {sorted(planned)} differ from the default's patterns")
+    if "*" in sets["default"]:
+        # Every case: there are no patterns to list, and the default is the full suite.
+        out += ["The default is `*`: every case in the library, as `--full-suite` selects.", ""]
+    else:
+        by_suite: dict[str, list[str]] = {}
+        for pattern in sets["default"]:
+            by_suite.setdefault(re.split(r"[.\[]", pattern, maxsplit=1)[0], []).append(pattern)
+        planned = set(entries[names[0]]["plans"]["plain"].get("suites", ()))
+        if planned != set(by_suite):
+            sys.exit(
+                f"{folder}: planned suites {sorted(planned)} differ from the default's patterns"
+            )
+        out += [
+            "<details>",
+            f"<summary>The default's case-ID patterns, in {len(by_suite)} suites</summary>",
+            "",
+            "`suite.*` takes the whole suite; any other pattern names one case. The rest of each "
+            "suite is not selected.",
+            "",
+            "| Suite | Patterns |",
+            "| --- | --- |",
+        ]
+        for suite, patterns in by_suite.items():
+            out.append(f"| `{suite}` | " + ", ".join(f"`{p}`" for p in patterns) + " |")
+        out += ["", "</details>", ""]
     out += [
-        "<details>",
-        f"<summary>The default's case-ID patterns, in {len(by_suite)} suites</summary>",
-        "",
-        "`suite.*` takes the whole suite; any other pattern names one case. The rest of each "
-        "suite is not selected.",
-        "",
-        "| Suite | Patterns |",
-        "| --- | --- |",
-    ]
-    for suite, patterns in by_suite.items():
-        out.append(f"| `{suite}` | " + ", ".join(f"`{p}`" for p in patterns) + " |")
-    out += [
-        "",
-        "</details>",
-        "",
         "<details>",
         "<summary>How many cases each scope selects, per profile</summary>",
         "",

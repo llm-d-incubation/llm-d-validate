@@ -1,0 +1,62 @@
+# deepseek-ai/DeepSeek-V4.1-Flash-1017: the model as a client sees it (id, window, parsers,
+# reasoning, tools) and the capabilities that differ from the other stacks in this folder.
+# MEASURED on one deployment. A part, never run on its own.
+model:
+  public_id: deepseek-ai/DeepSeek-V4.1-Flash-1017
+  aliases: []
+  max_model_len: 1048576
+  reasoning: {parser: deepseek_v41, field: reasoning_content, default_on: true}
+  tools:
+    parser: deepseek_v41
+    auto_choice: true
+    markup: [<｜DSML｜]
+    strict_level: auto
+  answer_max_tokens: 128
+capabilities:
+  chat_reasoning_efforts: [minimal, low, medium, high, xhigh, max]
+  chat_quiet_efforts: [none]
+  effort_rendering:
+    pattern: 'Reasoning Effort: (\d+)'
+    efforts:
+      unset: '75'
+      none: null
+      minimal: '50'
+      low: '50'
+      medium: '50'
+      high: '75'
+      xhigh: '75'
+      max: '100'
+  chat_fields: {role_function: rejected}
+  completions_fields: {suffix: accepted}
+  messages_features: {image_url: rejected}
+  vision: [chat_completions, messages, responses]
+  client_sessions:
+  - skill
+  - hook
+  - parallel_reads
+  - nested_subagent
+  - compaction
+  - image_read
+  responses_reasoning_efforts: [none, minimal, low, medium, high, xhigh, max]
+  responses_features: {encrypted_reasoning: accepted}
+  extension_options:
+  - ignore_eos
+  - min_tokens
+  - truncate_prompt_tokens
+  - cache_salt
+  - include_stop_str_in_output
+  - continue_final_message
+  - echo
+  - continuous_usage_stats
+  - structured_outputs
+  - return_tokens_as_token_ids
+  - prompt_logprobs
+  - allowed_token_ids
+  - bad_words
+  - include_reasoning
+  - stop_reason
+  - chat_template_kwargs
+  - return_token_ids
+  - logit_bias
+  - enable_thinking
+  messages_thinking: [enabled, adaptive, disabled]

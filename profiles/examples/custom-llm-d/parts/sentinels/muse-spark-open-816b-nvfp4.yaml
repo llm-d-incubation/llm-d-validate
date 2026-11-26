@@ -1,0 +1,60 @@
+# meta-models/Muse-Spark-Open-816B-A42B-NVFP4: the change sentinels, values only a run of this
+# exact stack supplies. The pins are the prompt sizes and render digests measured on it; the
+# contract_baseline is the response shape measured there, except that it is not seeded yet: each
+# part holds the llmdv_seed placeholder, so the contract-drift cases compare against nothing until
+# a run of a healthy deployment seeds them (see README.md). A part, never run on its own.
+capabilities:
+  prompt_pins:
+    chat_completions: {conversation: 179, tools: 671}
+    completions: {conversation: 31}
+    messages: {conversation: 179, tools: 671}
+    responses: {conversation: 179, tools: 671}
+  contract_baseline:
+    chat_completions:
+      response:
+        llmdv_seed: [absent]
+      stream:
+        llmdv_seed: [absent]
+      error:
+        llmdv_seed: [absent]
+      invalid:
+        llmdv_seed: [absent]
+      tool_response:
+        llmdv_seed: [absent]
+      tool_stream:
+        llmdv_seed: [absent]
+    completions:
+      response:
+        llmdv_seed: [absent]
+      stream:
+        llmdv_seed: [absent]
+      error:
+        llmdv_seed: [absent]
+      invalid:
+        llmdv_seed: [absent]
+    messages:
+      response:
+        llmdv_seed: [absent]
+      stream:
+        llmdv_seed: [absent]
+      error:
+        llmdv_seed: [absent]
+      invalid:
+        llmdv_seed: [absent]
+      tool_response:
+        llmdv_seed: [absent]
+      tool_stream:
+        llmdv_seed: [absent]
+    responses:
+      response:
+        llmdv_seed: [absent]
+      stream:
+        llmdv_seed: [absent]
+      error:
+        llmdv_seed: [absent]
+      invalid:
+        llmdv_seed: [absent]
+      tool_response:
+        llmdv_seed: [absent]
+      tool_stream:
+        llmdv_seed: [absent]

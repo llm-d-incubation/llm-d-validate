@@ -35,16 +35,16 @@ The examples are templates with placeholders. Each validates offline; none runs 
 | [example-two-ingress.yaml](../profiles/examples/example-two-ingress.yaml) | An llm-d fleet without LiteLLM: a vLLM `engine` and the llm-d `router`. Measured on a live stack; environment and Service names are placeholders. |
 | [example-three-ingress.yaml](../profiles/examples/example-three-ingress.yaml) | LiteLLM in front of the router and engine, including header dispositions. Replace deployment facts with yours; choose behavior from the intended API contract. |
 | [example-two-ingress-staging.yaml](../profiles/examples/example-two-ingress-staging.yaml) | The two-ingress stack in a second namespace, written with [`extends`](#reuse-a-profile-with-extends) as only its changes. |
-| [custom-llm-d/](../profiles/examples/custom-llm-d/) | A deployment that follows none of llm-d's guides (LiteLLM, the llm-d router, vLLM), for two models, built from parts. |
-| [measured/](../profiles/examples/measured/README.md) | Complete profiles for GLM-5.3, DeepSeek-V4.1-Flash-1017 and Muse-Spark-Open, measured on real deployments. One file per model declares each layer (a LiteLLM gateway, the llm-d router); point it at any deployment with variables and pick layers with `--ingress`. A plain run selects every case. |
+| [custom-llm-d/](../profiles/examples/custom-llm-d/README.md) | A deployment that follows none of llm-d's guides (a LiteLLM gateway, the llm-d router, vLLM), measured for GLM-5.3, DeepSeek-V4.1-Flash-1017 and Muse-Spark-Open and built from parts. Point a profile at any deployment with variables and pick layers with `--ingress`; a plain run selects every case. |
 
-In `custom-llm-d/`, run [glm-5.3.yaml](../profiles/examples/custom-llm-d/glm-5.3.yaml) (a text-only reasoning
-model on prefill/decode vLLM) or [deepseek-v4.1-flash.yaml](../profiles/examples/custom-llm-d/deepseek-v4.1-flash.yaml)
-(a multimodal model, with the engine's render routes served at the router). `parts/` holds what
-both list: what the APIs promise (`base.yaml`), the LiteLLM layer, the router layer and one file
-per model; parts never run on their own. Its values were measured on one deployment and say so
-beside each line; compare yours and triage differences before adopting those expectations. Put
-your URLs, keys and the model ids your gateway serves in a gitignored `*.local.yaml` that extends one of the two files.
+In `custom-llm-d/`, run [glm-5.3.yaml](../profiles/examples/custom-llm-d/glm-5.3.yaml) or
+[muse-spark-open-816b-nvfp4.yaml](../profiles/examples/custom-llm-d/muse-spark-open-816b-nvfp4.yaml)
+(the gateway and the router) or [deepseek-v4.1-flash-1017.yaml](../profiles/examples/custom-llm-d/deepseek-v4.1-flash-1017.yaml)
+(the gateway only). `parts/` holds what they list: what all three share (`base.yaml`), the LiteLLM
+layer, the router layer, and per model its model part, known failures and change sentinels; parts
+never run on their own. Its values were measured on one deployment of each stack; compare yours
+and triage differences before adopting those expectations. Put your URLs, keys and the model ids
+your gateway serves in variables, or in a gitignored `*.local.yaml` that extends one of the three.
 
 For a first profile, copy the minimal starter under a `.local.yaml` name so git ignores it.
 Use a fuller example when you need its setup, routing or model-specific declarations:

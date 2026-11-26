@@ -1,0 +1,227 @@
+# meta-models/Muse-Spark-Open-816B-A42B-NVFP4: the failures this stack is known to have, each
+# citing the public issue it waits on. A known failure still counts as failed; the report names
+# its issue. A part, never run on its own.
+known_failures:
+- check: error_envelope
+  cases:
+  - anthropic_messages.count_tokens_invalid_messages*
+  - anthropic_messages.error_type[invalid_thinking_type]
+  - anthropic_messages.error_type[missing_max_tokens]
+  - anthropic_messages.error_type[thinking_budget_too_small]
+  - anthropic_messages.invalid_effort
+  - tools.server_tool*
+  - unhappy.invalid_role[messages]
+  - unhappy.invalid_thinking_type
+  - unhappy.invalid_token_limit[messages]
+  - unhappy.invalid_tool_schema[messages]
+  - unhappy.missing_token_limit
+  - unhappy.server_tool
+  ingress: litellm
+  issue: vllm-project/vllm#57997
+  fix: vllm-project/vllm#57997, vllm-project/vllm#58023
+- check: tool_result_error_rendered
+  cases: [anthropic_messages.tool_result_error_rendered]
+  ingress: litellm
+  issue: vllm-project/vllm#58700
+  fix: vllm-project/vllm#58700
+- check: prefill_continued
+  cases: ['anthropic_messages.request_feature[assistant_prefill]']
+  ingress: litellm
+  issue: vllm-project/vllm#61857
+  fix: vllm-project/vllm#61857
+- check: orphan_tool_result_status
+  cases: [tools.result_unknown_id*]
+  ingress: litellm
+  issue: vllm-project/vllm#66383
+  fix: vllm-project/vllm#66383, vllm-project/vllm#47877
+- check: invalid_role_status
+  cases: ['unhappy.invalid_role[chat_completions]']
+  ingress: litellm
+  issue: vllm-project/vllm#59090
+  fix: vllm-project/vllm#59090, vllm-project/vllm#59108
+- check: invalid_tool_choice_status
+  cases: ['unhappy.invalid_tool_choice[messages]']
+  ingress: litellm
+  issue: vllm-project/vllm#59718
+  fix: vllm-project/vllm#59718
+- check: completed_at
+  cases: [openai_responses.completed_at]
+  ingress: litellm
+  issue: vllm-project/vllm#63183
+  fix: vllm-project/vllm#63183, vllm-project/vllm#63448, vllm-project/vllm#63783
+- check: feature_summary
+  cases: ['openai_responses.request_feature[reasoning_summary]']
+  ingress: litellm
+  issue: vllm-project/vllm#63184
+  fix: vllm-project/vllm#63184, vllm-project/vllm#63238
+- check: legacy_function_call
+  cases: [tools.legacy_functions]
+  ingress: litellm
+  issue: vllm-project/vllm#66098
+  fix: vllm-project/vllm#66098
+- check: is_error_input_tokens
+  cases: [tools.result_is_error]
+  ingress: litellm
+  issue: vllm-project/vllm#58700
+  fix: vllm-project/vllm#58700
+- {check: choice_index, ingress: litellm, issue: BerriAI/litellm#47109, fix: BerriAI/litellm#47109}
+- check: usage_chunk_choices
+  cases: ['openai_chat.stream_chunk_fields[usage]']
+  ingress: litellm
+  issue: BerriAI/litellm#47109
+  fix: BerriAI/litellm#47109
+- check: terminal_usage_frames
+  cases: [openai_chat.streaming_include_usage]
+  ingress: litellm
+  issue: BerriAI/litellm#47109
+  fix: BerriAI/litellm#47109
+- {check: responses_event_name, ingress: litellm, issue: BerriAI/litellm#47944, fix: BerriAI/litellm#47944}
+- check: model_echo
+  cases:
+  - openai_responses.sdk_parse[sse]
+  - cache.sdk_stream_session[responses]
+  ingress: litellm
+  issue: BerriAI/litellm#46662
+  fix: BerriAI/litellm#46662
+- check: chunk_text
+  cases:
+  - evolution.stream_contract[completions]
+  - openai_completions.request_field[stream_interval]
+  - openai_completions.stream_chunk_fields
+  - streaming.completions_lifecycle*
+  - streaming.steady_flow[completions]
+  ingress: litellm
+  issue: BerriAI/litellm#45343
+  fix: BerriAI/litellm#45343
+- check: error_envelope
+  cases:
+  - headers.required_authentication[messages]
+  - unhappy.bad_credentials[messages]
+  - unhappy.malformed_json[messages]
+  ingress: litellm
+  issue: BerriAI/litellm#47948
+  fix: BerriAI/litellm#47948
+- check: error_envelope
+  cases: [discovery.model_retrieve*]
+  ingress: litellm
+  issue: BerriAI/litellm#37271
+  fix: BerriAI/litellm#37271, BerriAI/litellm#37810, BerriAI/litellm#37275, BerriAI/litellm#37940
+- check: probe_status
+  cases: ['evolution.unknown_block[chat_completions]']
+  ingress: litellm
+  issue: BerriAI/litellm#47950
+  fix: BerriAI/litellm#47950
+- check: wrong_field_type_status
+  cases: ['unhappy.wrong_field_type[completions]']
+  ingress: litellm
+  issue: BerriAI/litellm#47950
+  fix: BerriAI/litellm#47950
+- check: field_status
+  cases:
+  - openai_completions.request_field[response_format_json_object]
+  ingress: litellm
+  issue: BerriAI/litellm#47951
+  fix: BerriAI/litellm#47951
+- check: http_status
+  cases: ['openai_completions.prompt_forms[token_id*]']
+  ingress: litellm
+  issue: BerriAI/litellm#45253
+  fix: BerriAI/litellm#45253, BerriAI/litellm#45278
+- check: openai_error_fields
+  cases: ['unhappy.error_envelope_fields[completions]']
+  ingress: litellm
+  issue: BerriAI/litellm#47949
+  fix: BerriAI/litellm#47949
+- check: stop_reason
+  cases: [openai_chat.stop_reason]
+  ingress: litellm
+  issue: BerriAI/litellm#47945
+  fix: BerriAI/litellm#47945
+- check: token_ids
+  cases:
+  - field_options.extension_observable[chat_completions/return_token_ids]
+  ingress: litellm
+  issue: BerriAI/litellm#47945
+  fix: BerriAI/litellm#47945
+- check: continuous_usage
+  cases: [openai_chat.continuous_usage]
+  ingress: litellm
+  issue: BerriAI/litellm#45359
+  fix: BerriAI/litellm#45359, BerriAI/litellm#46075
+- check: message_stop_sequence
+  cases: [anthropic_messages.response_shape]
+  ingress: litellm
+  issue: BerriAI/litellm#47946
+  fix: BerriAI/litellm#47946
+- check: input_tokens_integer_vs_float
+  cases: [evolution.big_integer*]
+  ingress: litellm
+  issue: BerriAI/litellm#47947
+  fix: BerriAI/litellm#47947
+- check: tool_markup_in_answer
+  cases: ['tools.allowed[auto]', 'tools.allowed[required]']
+  ingress: litellm
+  issue: vllm-project/vllm#60585
+  fix: vllm-project/vllm#60585
+- check: error_envelope
+  cases:
+  - anthropic_messages.count_tokens_invalid_messages*
+  - anthropic_messages.error_type[invalid_thinking_type]
+  - anthropic_messages.error_type[missing_max_tokens]
+  - anthropic_messages.error_type[thinking_budget_too_small]
+  - anthropic_messages.invalid_effort
+  - tools.server_tool*
+  - unhappy.invalid_role[messages]
+  - unhappy.invalid_thinking_type
+  - unhappy.invalid_token_limit[messages]
+  - unhappy.invalid_tool_schema[messages]
+  - unhappy.missing_token_limit
+  - unhappy.server_tool
+  ingress: router
+  issue: vllm-project/vllm#57997
+  fix: vllm-project/vllm#57997, vllm-project/vllm#58023
+- check: tool_result_error_rendered
+  cases: [anthropic_messages.tool_result_error_rendered]
+  ingress: router
+  issue: vllm-project/vllm#58700
+  fix: vllm-project/vllm#58700
+- check: prefill_continued
+  cases: ['anthropic_messages.request_feature[assistant_prefill]']
+  ingress: router
+  issue: vllm-project/vllm#61857
+  fix: vllm-project/vllm#61857
+- check: orphan_tool_result_status
+  cases: [tools.result_unknown_id*]
+  ingress: router
+  issue: vllm-project/vllm#66383
+  fix: vllm-project/vllm#66383, vllm-project/vllm#47877
+- check: invalid_role_status
+  cases: ['unhappy.invalid_role[chat_completions]']
+  ingress: router
+  issue: vllm-project/vllm#59090
+  fix: vllm-project/vllm#59090, vllm-project/vllm#59108
+- check: invalid_tool_choice_status
+  cases: ['unhappy.invalid_tool_choice[messages]']
+  ingress: router
+  issue: vllm-project/vllm#59718
+  fix: vllm-project/vllm#59718
+- check: completed_at
+  cases: [openai_responses.completed_at]
+  ingress: router
+  issue: vllm-project/vllm#63183
+  fix: vllm-project/vllm#63183, vllm-project/vllm#63448, vllm-project/vllm#63783
+- check: feature_summary
+  cases: ['openai_responses.request_feature[reasoning_summary]']
+  ingress: router
+  issue: vllm-project/vllm#63184
+  fix: vllm-project/vllm#63184, vllm-project/vllm#63238
+- check: legacy_function_call
+  cases: [tools.legacy_functions]
+  ingress: router
+  issue: vllm-project/vllm#66098
+  fix: vllm-project/vllm#66098
+- check: is_error_input_tokens
+  cases: [tools.result_is_error]
+  ingress: router
+  issue: vllm-project/vllm#58700
+  fix: vllm-project/vllm#58700

@@ -1,0 +1,65 @@
+# meta-models/Muse-Spark-Open-816B-A42B-NVFP4 on a custom llm-d stack: a LiteLLM gateway
+# (`litellm`) in front of the llm-d router (`router`) in front of vLLM. MEASURED on one deployment
+# of each layer: every surface, error status, capability and header the parts below declare is
+# what that layer served, and so are the change sentinels in
+# parts/sentinels/muse-spark-open-816b-nvfp4.yaml, except its contract_baseline, which is not
+# seeded yet (the llmdv_seed placeholder; see README.md).
+#
+# A plain run selects every case (test_sets.default is "*"). Point it at a deployment with
+# variables; nothing else changes:
+#
+#   export LLMDV_GATEWAY_URL=<the gateway's base URL> LLMDV_GATEWAY_KEY=<a key>
+#   export LLMDV_GATEWAY_MODEL=<the id the gateway serves>   # optional
+#   export LLMDV_ROUTER_URL=<the router's base URL>
+#   export LLMDV_ROUTER_MODEL=<the id the router serves>     # optional
+#   llmdv verify --profile <this file> --ingress litellm   # one layer; omit for both
+#
+# The client cases drive the runner image's Claude Code, 2.1.330 at /usr/local/bin/claude; these
+# layers were measured with 2.1.289. Elsewhere, install 2.1.330 there or add -m
+# "not real_clients".
+#
+# This file holds only what is this stack's own: its cache settings (block size, the settings that
+# render alike) and what each layer serves differently from the shared layer parts.
+extends:
+  - parts/base.yaml
+  - parts/proxy-litellm.yaml
+  - parts/router-llm-d.yaml
+  - parts/models/muse-spark-open-816b-nvfp4.yaml
+  - parts/known-failures/muse-spark-open-816b-nvfp4.yaml
+  - parts/sentinels/muse-spark-open-816b-nvfp4.yaml
+name: custom-llm-d-muse-spark-open-816b-nvfp4
+capabilities:
+  cache_reuse:
+    min_ratio: 0.9
+    cold_max_ratio: 0.1
+    prefix_words: 2048
+    surfaces: [chat_completions, responses, messages]
+    affinity: routed
+ingresses:
+- id: litellm
+  error_status:
+    unknown_model: [400, 403, 404]
+  transport:
+    present_paths: [/v1/models, /openapi.json, /metrics/]
+    absent_paths: [/docs, /tokenize, /detokenize, /version]
+- id: router
+  surfaces:
+  - chat_completions
+  - completions
+  - messages
+  - responses
+  - chat_render
+  - completions_render
+  - messages_render
+  - responses_render
+  model:
+    reasoning: {field: reasoning}
+  capabilities:
+    model_retrieval: true
+    prefix_stability:
+    - chat_render
+    - completions_render
+    - messages_render
+    - responses_render
+    render_pins:
+      completions_render: {conversation: 7e400f5aaa2ba61ec4a75b53611ef2de7ba34337202a1f07542ee634ba72eda7}
