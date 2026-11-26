@@ -1,0 +1,17 @@
+# Read by llm-d's nightly CI to pick a profile for the overlay a lane deployed. To choose a
+# profile yourself, see the guide's README.md, "Pick your profile".
+#
+# <guide>: {<overlay under guides/<guide>/modelserver/>: <profile file name, without .yaml>}
+# An overlay that is not listed has no profile, and llm-d's nightly skips llm-d-validate for it.
+# tests/test_llmd_overlays.py keeps this file equal to each listed guide's "Pick your profile".
+optimized-baseline:
+  gpu/vllm/base: vllm-qwen3-32b-parsers-standalone
+  gpu/vllm/gke: vllm-qwen3-32b-parsers-standalone
+  gpu/vllm/ocp: vllm-qwen3-32b-parsers-standalone
+  amd/vllm/amd-ci: vllm-qwen3-32b-inline-standalone
+  tpu/v5p/vllm: vllm-qwen3-32b-inline-standalone
+  xpu/vllm: vllm-qwen3-0.6b-inline-standalone
+  gpu/sglang/gke: sglang-qwen3-32b-parsers-standalone
+  tpu/v5p/sglang: sglang-qwen3-32b-ctx16k-parsers-standalone
+  amd/sglang/amd-ci: sglang-qwen3-32b-inline-standalone
+  amd/atom/amd-ci: atom-qwen3-32b-ctxunknown-inline-standalone

@@ -71,6 +71,8 @@ qualification work across shared configurations. They do not restrict what you c
 
 How the folders are built and where each value comes from: [profile evidence and provenance](../../docs/profile-provenance.md#how-profilesllm-d-is-built). To find what changed in llm-d since these profiles were written: [the drift skill](../../.agents/skills/tracking-llm-d-guide-drift/SKILL.md).
 
+[`.overlays.yaml`](.overlays.yaml) is for llm-d's nightly CI, not for choosing a profile: for each listed guide it maps every overlay (the path under `guides/<guide>/modelserver/` a workflow deploys) to the profile that workflow runs, and an overlay it does not list is skipped. It says exactly what the guide's "Pick your profile" table says, which [`tests/test_llmd_overlays.py`](../../tests/test_llmd_overlays.py) enforces, so a change to that table changes this file in the same commit. Listing a guide here is how it starts running in llm-d's nightly; only guides whose table has an "Overlay" or "Overlays" column can be listed. The CI side is [#230](https://github.com/llm-d-incubation/llm-d-validate/issues/230).
+
 <details>
 <summary>Coverage: which guides have profiles, and how many nightly workflows each covers</summary>
 

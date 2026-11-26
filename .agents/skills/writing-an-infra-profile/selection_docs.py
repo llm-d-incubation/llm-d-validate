@@ -45,7 +45,9 @@ def runnable() -> list[Path]:
     return sorted(
         p
         for p in PROFILES.rglob("*.yaml")
-        if "parts" not in p.relative_to(PROFILES).parts and not p.name.endswith(".local.yaml")
+        if "parts" not in p.relative_to(PROFILES).parts
+        and not p.name.endswith(".local.yaml")
+        and not p.name.startswith(".")
     )
 
 
