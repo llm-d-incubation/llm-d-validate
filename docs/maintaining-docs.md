@@ -14,6 +14,7 @@ limitations beside the action they affect.
 | Writing profiles | Creating and adapting a profile through examples |
 | Profile reference | Field semantics, defaults, inheritance and validation |
 | Command reference | CLI selection rules, exit codes and output artifacts |
+| Publishing and running unattended | Archive setup, retrieval, job operation and delivery troubleshooting |
 | Comparing runs | Baseline matching and interpretation of changes |
 | Deployment README | Installing and operating the validation runner in a cluster |
 | Writing tests | Implementing and proving a case, including evidence and gates |

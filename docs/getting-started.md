@@ -112,6 +112,31 @@ recorded checks. A green result applies only to checks that actually executed.
 The [command reference](cli.md#exit-codes) defines every exit code and
 [skip class](cli.md#skip-classes). [Output files](cli.md#output) lists all artifacts.
 
+### Follow one failure
+
+For example, suppose a generation case records `http_status = 401`, expected `200`. This is an
+illustrative failure, not a result from a particular deployment.
+
+1. Open the case in the dashboard and read its request, response and first failing check.
+   Confirm the selected ingress and API path. A 401 on a case deliberately testing bad
+   credentials can be expected; a 401 on ordinary generation is different.
+2. Check that the profile names the correct URL and authentication variable, and that the
+   credential is loaded. Never paste the credential into a report. If preflight stopped the
+   run with exit 3, resolve that environment problem before interpreting fleet behavior.
+3. If the profile describes the intended endpoint and valid authentication, keep the failing
+   expectation and investigate the serving stack. Do not change the expected status to 401
+   merely to make the case pass.
+4. After correcting the cause, load the required endpoint and credential variables and replay
+   the failing exchange with the script in that case's bundle:
+
+   ```sh
+   bash "$RUN/failures/<ingress>/<case>/repro.sh"
+   ```
+
+A replay sends a live request. Use the actual bundle path shown by the dashboard; the
+[reproduction reference](cli.md#reproducing-a-run) also explains rerunning the whole selection.
+Compare the new evidence with the original, and retain the original run for the report.
+
 ## Widen coverage
 
 Once smoke completes, run the profile's default selection:
@@ -136,83 +161,23 @@ layer; an explicit selector restricts the run to the named IDs.
 
 ## Publish a run
 
-To store a run where others can pull and list it, add `--remote-output` with the bucket
-credentials loaded. `--evidence all` keeps a bundle for passing cases too, so a pass can be
-audited:
-
-```sh
-llmdv verify --profile $P --analyze --evidence all \
-  --remote-output "s3://$AWS_BUCKET/<prefix>" \
-  --identity trigger=manual --label "actor=$USER"
-```
-
-Labels are free-form `key=value` pairs recorded in `outcome.json` and on the dashboard. For an
-S3-compatible store, set `AWS_ENDPOINT_URL_S3` (or `AWS_ENDPOINT_URL`, read when the first is unset). IBM Cloud Object Storage with an IAM API key uses
-`LLMDV_S3_AUTH=ibm-iam` and the `ibm-cos` extra. A run is published to
-`<prefix>/<profile name>/<run id>/` and is complete once its `MANIFEST.json` is there.
-
-To pull a published run back:
-
-```sh
-PREFIX="s3://$AWS_BUCKET/<prefix>"
-llmdv compare --from "$PREFIX" --profile <profile name> --list
-RUN=<run id from the list>
-aws s3 cp --recursive "$PREFIX/<profile name>/$RUN/" "runs/$RUN/"   # add --endpoint-url for an S3-compatible store
-llmdv analyze runs/$RUN && open runs/$RUN/dashboard.html
-```
-
-The profile name is the profile's `name:` field, not its path. Run ids start with a UTC
-timestamp, so they sort oldest first. `llmdv analyze` prints the counts and every failure group,
-and rebuilds `dashboard.html`.
+Follow [Publishing and running unattended](running.md#publish-a-run) for storage credentials,
+archive layout and pulling results back.
 
 ## Compare runs
 
-`llmdv compare` reads two runs of the same profile back from the archive and reports which cases
-changed their answer. Automatic baselines must have matching configuration identity, including trigger and flavor. See
-[compare.md](compare.md).
+[Comparing runs](compare.md) explains baseline matching and how to interpret changes.
 
 ## Run unattended
 
-`llmdv job` runs `llmdv verify` as a child process, then publishes, optionally notifies Slack, and
-prints `outcome.json`, however verify ended. That suits a Kubernetes CronJob or a CI step; the
-[`Containerfile`](../Containerfile) builds a runner image.
-
-```sh
-llmdv job --profile /etc/llmdv/profile.yaml --remote-output "s3://$AWS_BUCKET/<prefix>" --full-suite -- -m contract
-```
-
-- **Settings** come from flags or the environment: `LLMDV_PROFILE`, `LLMDV_RESULTS_URI`,
-  `LLMDV_NOTIFY_WEBHOOK`, and the rest in `llmdv job --help`.
-- **Flags the job does not know** go to `llmdv verify`, such as `--full-suite` or `--evidence all`.
-  Arguments after `--` reach pytest unparsed, such as `-- -m contract`. `--analyze` and
-  `--compare` are the job's own: a dashboard in the run, and a comparison after publishing.
-- **If publishing fails** and a fallback is configured (`--fallback-output` or
-  `LLMDV_FALLBACK_URI`), the run is kept there; `outcome.json` says where.
-
-When the fleet is reachable only from inside its cluster, `llmdv job` runs there as a CronJob,
-and `deploy/trigger.sh` starts a one-off run from it. The image, the overlay, the Secret, every
-`trigger.sh` option and where results land are in [deploy/README.md](../deploy/README.md). A
-cluster job publishes to the cluster's own `LLMDV_RESULTS_URI`, which may be a different bucket
-or prefix from your other runs.
+Use [the job workflow](running.md#run-unattended) for CI and notifications, or
+[cluster jobs](../deploy/README.md) for the runner deployment.
 
 ## Rules for every live run
 
-- **One live run at a time per gateway.** Cache and session cases depend on what earlier requests
-  left behind, and a key is usually rate-limited.
-- **Never pass `-n`.** Live runs are always one case at a time; `llmdv verify` refuses it.
-- **Keep comparison lanes distinct.** Set `--identity trigger=nightly` for scheduled runs;
-  manual runs default to `trigger=manual`. Free-form labels do not isolate baselines.
-- **Keep the machine awake.** A sleeping laptop stalls requests, and the cases in flight fail on
-  the stream-idle timeout.
+The [operational checklist](running.md#rules-for-every-live-run) covers concurrency, scope and
+comparison identity.
 
 ## Troubleshooting
 
-| Symptom | Cause |
-| --- | --- |
-| `aws` asks for credentials, or says access denied | the credentials file was sourced without `set -a`, so nothing was exported |
-| `InvalidAccessKeyId` or `NoSuchBucket` | the store is S3-compatible and `--endpoint-url` (or `AWS_ENDPOINT_URL_S3`) is missing |
-| `llmdv compare --list` finds no runs | wrong prefix, or the profile *path* was given instead of its name; or the run has not finished publishing |
-| exit `3` | the gateway, a key or the bucket was unreachable at preflight, so nothing was tested; or a local port-forward died mid-run, and the summary says what ran before it |
-| a run is not in the bucket after exit `0` | look for exit `5`: the upload failed, and the log says why |
-| `trigger.sh` is refused | the caller lacks the `llmdv-trigger` Role, or `--profile-file` is not an in-cluster profile (`vantage: in-cluster`) |
-| many timeouts in a run from your machine | the machine slept, or another live run hit the same gateway at the same time |
+Use [the troubleshooting table](running.md#troubleshooting) for endpoint, storage and job errors.
