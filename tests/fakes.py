@@ -2645,6 +2645,10 @@ class FakeFleet:
         ):
             # A render that leaves the tools out when the client's choice is none.
             body = {key: value for key, value in body.items() if key != "tools"}
+        if defect == "found_tools_in_head":
+            body = found_tools_in_head(body)
+        elif defect == "references_expanded_last":
+            body = expand_last_references(body)
         tokens = cache_tokens(
             canonical_body(body, defect),
             canonical_tools=defect != "key_order_sensitive",
@@ -3680,6 +3684,53 @@ def canonical_body(body: dict, defect: str | None) -> dict:
         messages.insert(0, {"role": "hints", "content": hints})
     rest = {k: v for k, v in body.items() if k not in ("system", "instructions", "input")}
     return {**rest, "messages": messages}
+
+
+def found_references(body: dict) -> list[str]:
+    """The tool names the tool_reference blocks in a Messages history's results point at."""
+    names = []
+    for message in body.get("messages") or []:
+        for block in message.get("content") if isinstance(message.get("content"), list) else []:
+            inner = block.get("content") if isinstance(block, dict) else None
+            for part in inner if isinstance(inner, list) else []:
+                if isinstance(part, dict) and part.get("type") == "tool_reference":
+                    names.append(part.get("tool_name"))
+    return names
+
+
+def found_tools_in_head(body: dict) -> dict:
+    """The tools in effect at the end of the conversation, as a render that lists them at the
+    head does: deferred tools are left out until a search finds them, then listed as offered."""
+    found = set(found_references(body))
+    tools = [
+        {key: value for key, value in tool.items() if key != "defer_loading"}
+        for tool in body.get("tools") or []
+        if not tool.get("defer_loading") or tool.get("name") in found
+    ]
+    return {**body, "tools": tools}
+
+
+def expand_last_references(body: dict) -> dict:
+    """References in the last message expanded into the tools they name, and earlier ones left
+    bare, as a render that expands only the latest search's result does."""
+    messages = list(body.get("messages") or [])
+    if not messages or not isinstance(messages[-1].get("content"), list):
+        return body
+    offered = {tool.get("name"): tool for tool in body.get("tools") or []}
+    content = []
+    for block in messages[-1]["content"]:
+        inner = block.get("content") if isinstance(block, dict) else None
+        if isinstance(inner, list):
+            inner = [
+                offered.get(part.get("tool_name"), part)
+                if isinstance(part, dict) and part.get("type") == "tool_reference"
+                else part
+                for part in inner
+            ]
+            block = {**block, "content": inner}
+        content.append(block)
+    messages[-1] = {**messages[-1], "content": content}
+    return {**body, "messages": messages}
 
 
 def split_inline_system(body: dict) -> tuple[list[dict], dict]:

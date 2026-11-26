@@ -19,8 +19,10 @@ from ...evidence import journal
 from ...profile.schema import CacheReuse, Ingress, Model
 from ...surfaces.base import Surface, ToolSpec
 from ...surfaces.conversation import Conversation
-from ..conftest import budget_for
+from ...surfaces.tool_wire import tool_wire
+from ..conftest import budget_for, nonce_document
 from .helpers import cache_config, check_cold, check_replicas, check_warm, observe, probe_prompt
+from .sessions import check_turn
 
 pytestmark = [
     pytest.mark.surface_generic("cache_usage", "tools"),
@@ -127,3 +129,80 @@ def test_large_toolset_cache_reuse(client, surface, model, ingress):
     check_replicas([first, repeat], config)
     check_cold(first, config)
     check_warm(first, repeat, config)
+
+
+SEARCH_PROMPT = (
+    "Find a tool that reports the weather with tool_search, then use the tool it found to get "
+    "the weather in Paris."
+)
+
+
+@pytest.mark.surface("messages")
+@pytest.mark.case_id("cache.tool_search_reuse")
+def test_tool_search_cache_reuse(client, surface, model, ingress):
+    """A tool search that finds a tool keeps the session's prefix: each turn reads the last.
+
+    Claude Code offers its search tool and defers the rest (`defer_loading`). The search
+    answers with a `tool_reference`, rendered where the result sits in the history, so the
+    head of the prompt never changes. A render that lists a found tool with the offered tools
+    at the head instead changes the head the turn a search finds one, and the session
+    recomputes everything from there; one that renders a reference differently once it is no
+    longer the last turn loses the turn after.
+    """
+    config = tool_config(ingress, surface, model)
+    if ingress.capabilities.messages_features.get("tool_reference") != "accepted":
+        pytest.skip(
+            f"[undeclared] ingress {ingress.id!r} does not declare Messages feature "
+            "'tool_reference' accepted"
+        )
+    probe = uuid.uuid4().hex
+    search = ToolSpec(
+        "tool_search",
+        f"Probe {probe}. Search the available tools by keyword. Returns a reference to each "
+        "matching tool.",
+        {"type": "object", "properties": {"query": {"type": "string"}}, "required": ["query"]},
+    )
+    weather = ToolSpec("get_weather", f"Probe {probe}. Current weather for a city.", city_schema())
+    prompt = f"{nonce_document(config.prefix_words)}\n\n{SEARCH_PROMPT}"
+    body = offering(surface, model, probe, prompt, [search, weather])
+    for tool in body["tools"]:
+        if tool["name"] == weather.name:
+            tool["defer_loading"] = True
+    search_id, weather_id = f"toolu_{probe[:12]}", f"toolu_{probe[12:24]}"
+    reference = tool_wire(surface).tool_reference(weather.name)
+    journal.record("tool_search_session", {"deferred": [weather.name], "referenced": weather.name})
+
+    def exchange(call_id: str, name: str, arguments: dict, result: object) -> list[dict]:
+        return [
+            {
+                "role": "assistant",
+                "content": [{"type": "tool_use", "id": call_id, "name": name, "input": arguments}],
+            },
+            {
+                "role": "user",
+                "content": [{"type": "tool_result", "tool_use_id": call_id, "content": result}],
+            },
+        ]
+
+    found = {
+        **body,
+        "messages": body["messages"]
+        + exchange(search_id, search.name, {"query": "weather"}, [reference]),
+    }
+    called = {
+        **found,
+        "messages": found["messages"]
+        + exchange(weather_id, weather.name, {"city": "Paris"}, "Paris: sunny, 21 C."),
+    }
+    observations = [
+        observe(client, surface, model, ingress, request, label)
+        for request, label in (
+            (body, "before the search"),
+            (found, "search found a tool"),
+            (called, "found tool called"),
+        )
+    ]
+    check_replicas(observations, config)
+    check_cold(observations[0], config)
+    for previous, current in zip(observations, observations[1:], strict=False):
+        check_turn(previous, current, config)

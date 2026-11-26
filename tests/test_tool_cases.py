@@ -25,6 +25,7 @@ def run_case(
     structured=False,
     strict_level=None,
     warm_cache=False,
+    features=None,
 ):
     """Run one tools-suite test function on every tool surface; outcome per surface."""
     with FakeFleet(
@@ -47,6 +48,8 @@ def run_case(
         }
         if strict_level:
             raw["model"]["tools"]["strict_level"] = strict_level
+        if features is not None:
+            raw["capabilities"]["messages_features"] = features
         path.write_text(yaml.safe_dump(raw))
         code, records = run_suites(path, tmp_path / "run", "-k", test)
     rows = {r["surface"]: r for r in records if r.get("surface") in ALL}
@@ -309,6 +312,9 @@ def test_reading_a_result_image_is_skipped_where_images_are_undeclared(tmp_path)
         ("test_name_charset", "truncates_names", ALL, "tool_call_names"),
         ("test_name_outside_spec", None, (), None),
         ("test_name_outside_spec", "renames_dotted", ALL, "tool_call_names"),
+        ("test_offered_names", None, (), None),
+        # Bash.command, Read.file_path: a name the client never offered.
+        ("test_offered_names", "suffixes_names", ALL, "tool_call_name"),
         ("test_long_description", None, (), None),
         ("test_long_description", "truncates_description", ALL, "description_tail_used"),
         ("test_duplicate_names", None, (), None),
@@ -440,6 +446,42 @@ def test_additional_tools_declared(tmp_path, disposition, defect, outcome, check
 )
 def test_limit_and_history_cases(tmp_path, test, defect, expected):
     assert outcomes(tmp_path, test, defect) == expected
+
+
+@pytest.mark.parametrize(
+    "defect,features,expected,check",
+    [
+        (None, {"tool_reference": "accepted"}, "pass", None),
+        # A template that renders a tool search's reference as nothing.
+        ("drops_tool_reference", {"tool_reference": "accepted"}, "fail", "tool_reference_rendered"),
+        # Undeclared, or declared refused (the feature case checks the refusal), it is not sent.
+        (None, {}, "skip", None),
+        (None, {"tool_reference": "rejected"}, "skip", None),
+    ],
+)
+def test_result_tool_reference_case(tmp_path, defect, features, expected, check):
+    _, got, rows = run_case(tmp_path, "test_result_tool_reference", defect, features=features)
+    assert got == {"messages": expected}
+    if check:
+        assert failed_check(rows, "messages") == check
+
+
+@pytest.mark.parametrize(
+    "defect,features,expected,check",
+    [
+        (None, {"tool_reference": "accepted"}, "pass", None),
+        # The tool is deferred, so the model knows it only through the reference.
+        ("drops_deferred_tools", {"tool_reference": "accepted"}, "fail", "tool_call_count"),
+        ("drops_tool_reference", {"tool_reference": "accepted"}, "fail", "tool_call_count"),
+        (None, {}, "skip", None),
+        (None, {"tool_reference": "rejected"}, "skip", None),
+    ],
+)
+def test_deferred_tool_call_case(tmp_path, defect, features, expected, check):
+    _, got, rows = run_case(tmp_path, "test_deferred_tool_call", defect, features=features)
+    assert got == {"messages": expected}
+    if check:
+        assert failed_check(rows, "messages") == check
 
 
 def test_max_tool_calls_allows_multiple_function_calls(tmp_path):
