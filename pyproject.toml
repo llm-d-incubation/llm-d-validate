@@ -78,7 +78,7 @@ version = { attr = "llmdv.__version__" }
 where = ["src"]
 
 [tool.setuptools.package-data]
-llmdv = ["suites/**/*.py", "evidence/*.html"]
+llmdv = ["suites/**/*.py", "suites/pytest.ini", "evidence/*.html"]
 
 [tool.ruff]
 line-length = 100

@@ -21,7 +21,6 @@ from ..log.setup import emit, get_logger
 from ..profile import loader
 from .exit_codes import OK, USAGE
 from .verify_cmd import (
-    SUITES_DIR,
     _map_pytest_exit,
     _plugin_is_registered,
     _run_pytest,
@@ -30,6 +29,7 @@ from .verify_cmd import (
     coverage_record,
     resolve_coverage,
     selection_argv,
+    suite_pytest_args,
 )
 
 log = get_logger("cli.plan")
@@ -104,7 +104,7 @@ def cmd_plan(args: argparse.Namespace) -> int:
     if bad:
         return USAGE
 
-    argv = [str(SUITES_DIR), "--llmdv-profile", args.profile, "--collect-only", "-q"]
+    argv = suite_pytest_args() + ["--llmdv-profile", args.profile, "--collect-only", "-q"]
     argv += ["--no-header", "-p", "no:xdist", "-p", "no:cacheprovider"]
     if not _plugin_is_registered():
         argv[1:1] = ["-p", "llmdv.plugin"]
