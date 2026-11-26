@@ -42,8 +42,9 @@ Flags whose behaviour needs more than `--help`:
   stops its peers and keeps the evidence already recorded. With pytest's `-x` or
   `--maxfail`, cases already in flight can finish. Interrupted and fail-fast runs list
   unfinished parametrized pytest node IDs in `outcome.json` under `execution.unfinished`
-  in concurrent mode. The job also restores plan order and unfinished coverage if its
-  verification process is killed. Concurrency above 1 requires POSIX process groups.
+  in concurrent mode. If preflight fails or is interrupted, that list contains every
+  planned case. The job also restores plan order and unfinished coverage if its verification
+  process is killed. Concurrency above 1 requires POSIX process groups.
   For pytest JUnit XML, debug output, or a pytest log file, use `--concurrency 1` so
   one pytest session owns the output file. The `llmdv --log-file` option works in both modes.
 - **`-n` is refused.** `verify` exits `2` on `-n`, `--numprocesses`, `--maxprocesses`, `--dist`,

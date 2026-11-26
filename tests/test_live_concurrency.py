@@ -15,7 +15,7 @@ import pytest
 import yaml
 
 from llmdv import execution
-from llmdv.cli import concurrent
+from llmdv.cli import concurrent, verify_cmd
 from llmdv.cli.main import build_parser
 from llmdv.compare.diff import compare_window
 from llmdv.http import redact
@@ -83,15 +83,24 @@ def test_positive_integer_required(command, value):
     assert exc.value.code == 2
 
 
-@pytest.mark.parametrize("option", ["--junitxml", "--junit-xml", "log_file", "--debug"])
-def test_shared_pytest_output_is_refused_before_preflight(tmp_path, option):
+@pytest.mark.parametrize(
+    ("option", "via_env"),
+    [
+        ("--junitxml", False),
+        ("--junit-xml", True),
+        ("log_file", False),
+        ("--debug", False),
+        ("--debug", True),
+    ],
+)
+def test_shared_pytest_output_is_refused_before_preflight(tmp_path, option, via_env):
     output = tmp_path / "ci-output"
     output.write_text("previous report")
     # Exercise the parsed pytest configuration, including aliases and environment options.
     env = {}
     extra = []
-    if option == "--junit-xml":
-        env["PYTEST_ADDOPTS"] = f'--junit-xml "{output}"'
+    if via_env:
+        env["PYTEST_ADDOPTS"] = f'{option} "{output}"'
     elif option == "log_file":
         extra = ["-o", f"log_file={output}"]
     else:
@@ -102,8 +111,7 @@ def test_shared_pytest_output_is_refused_before_preflight(tmp_path, option):
         assert result.returncode == 2, result.stderr
         assert "--concurrency 1" in result.stderr
         assert fleet.seen == []
-    if option != "--debug":  # pytest starts its own debug trace during argument parsing.
-        assert output.read_text() == "previous report"
+    assert output.read_text() == "previous report"
 
 
 def test_serial_junit_keeps_every_case_and_failure(tmp_path):
@@ -183,7 +191,7 @@ def test_shard_boundaries_and_unique_evidence_paths():
 def test_public_ids_remain_distinct_after_redaction(monkeypatch):
     monkeypatch.setattr(redact, "_SECRETS", {"first-key", "second-key"})
     nodes = ["case[first-key]", "case[second-key]", "case[second-key]#1"]
-    public = concurrent._public_nodes([{"nodeid": node} for node in nodes])
+    public = concurrent.public_nodes([{"nodeid": node} for node in nodes])
     assert list(public) == nodes
     assert len(set(public.values())) == len(nodes)
     assert all(redact.SENTINEL in value and "-key" not in value for value in public.values())
@@ -218,6 +226,35 @@ def test_short_bearer_key_keeps_assignments_evidence_and_verbose_output(tmp_path
         lines = [line for line in result.stderr.splitlines() if f"[{node}]" in line]
         assert any("basic_non_streaming" in line.split(f"[{node}]")[1] for line in lines)
         assert any(f"ok: {record['checks'][0]['name']}=" in line for line in lines)
+
+
+@pytest.mark.parametrize(("exit_code", "verdict"), [(6, "interrupted"), (3, "environment")])
+def test_preflight_stop_keeps_every_planned_case(tmp_path, monkeypatch, exit_code, verdict):
+    root = tmp_path / "runs"
+    with FakeFleet(serve_chat=False) as fleet:
+        path = profile(tmp_path, fleet, ELIGIBLE[:2])
+        plan = run_llmdv("plan", "--profile", str(path), "--json", env={"TMPDIR": str(tmp_path)})
+        assert plan.returncode == 0, plan.stderr
+        expected = [case["nodeid"] for case in json.loads(plan.stdout)["cases"]]
+        assert len(expected) == 2
+
+        def interrupt(*args, **kwargs):
+            snapshot = json.loads((only_run(root) / "outcome.json").read_text())
+            assert snapshot["execution"]["pending_plan"] == expected
+            raise KeyboardInterrupt
+
+        args = build_parser().parse_args(
+            ["verify", "--profile", str(path), "--local-output", str(root), "--concurrency", "2"]
+        )
+        if exit_code == 6:
+            monkeypatch.setattr(verify_cmd.preflight, "run", interrupt)
+        monkeypatch.setattr(verify_cmd.signal, "signal", lambda *args: None)
+        monkeypatch.setattr(verify_cmd.log_setup, "configure", lambda **kwargs: None)
+        monkeypatch.setattr(verify_cmd.log_setup, "close_run_log", lambda: None)
+        assert verify_cmd.cmd_verify(args) == exit_code
+    outcome = json.loads((only_run(root) / "outcome.json").read_text())
+    assert outcome["verification"]["class"] == verdict
+    assert outcome["execution"] == {"concurrency": 2, "planned": 2, "unfinished": expected}
 
 
 def test_real_overlap_preflight_barriers_and_evidence(tmp_path):

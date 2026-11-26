@@ -443,7 +443,13 @@ def _verify(args: argparse.Namespace, run: _Run) -> int:
         log.error("%s", message)
         return code
     run.outcome.coverage = planned["coverage"]
-    run.outcome.execution = {"concurrency": args.concurrency, "planned": len(planned["cases"])}
+    cases = planned["cases"]
+    run.outcome.execution = {"concurrency": args.concurrency, "planned": len(cases)}
+    if args.concurrency > 1:
+        from . import concurrent
+
+        nodes = concurrent.public_nodes(cases)
+        run.outcome.execution["pending_plan"] = list(nodes.values())
     run.outcome.write(run_dir)
     run.profile = profile
 
@@ -511,10 +517,8 @@ def _verify(args: argparse.Namespace, run: _Run) -> int:
     if args.concurrency == 1:
         code = _run_pytest(pytest_argv, raw=args.raw_pytest, setup_commands=run.setup_commands)
     else:
-        from . import concurrent
-
         code = concurrent.run(
-            args, run, pytest_argv, planned["cases"], compose.resolved(chain, standalone=True)
+            args, run, pytest_argv, cases, nodes, compose.resolved(chain, standalone=True)
         )
 
     # Preserve the completed work before any supporting evidence or report can fail.
@@ -553,6 +557,9 @@ def _finish(args: argparse.Namespace, run: _Run, code: int) -> int:
     # A second signal must not cut publication short.
     signal.signal(signal.SIGTERM, signal.SIG_IGN)
     run_dir, outcome = run.run_dir, run.outcome
+    # A preflight interrupt can reach finalization before the scheduler reconciles the plan.
+    if "pending_plan" in outcome.execution:
+        outcome.execution["unfinished"] = outcome.execution.pop("pending_plan")
     if run.ran_pytest and not run.records:
         # pytest itself, or the strict normal read, may have stopped before handing records
         # back. Recover complete readable rows as publish does for a killed run; a torn final

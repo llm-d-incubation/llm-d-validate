@@ -72,15 +72,17 @@ class _Planner:
         self.filtered = 0
 
     @pytest.hookimpl(tryfirst=True)
-    def pytest_configure(self, config):
+    def pytest_load_initial_conftests(self, early_config):
         if self.concurrency == 1:
             return
-        if config.getoption("xmlpath", default=None):
+        # Includes addopts from the environment and ini, before pytest opens its debug trace.
+        options = early_config.known_args_namespace
+        if getattr(options, "xmlpath", None):
             raise pytest.UsageError("--junitxml needs a single pytest session; use --concurrency 1")
-        log_file = config.pluginmanager.hasplugin("logging") and (
-            config.getoption("log_file") or config.getini("log_file")
+        log_file = early_config.pluginmanager.hasplugin("logging") and (
+            options.log_file or early_config.getini("log_file")
         )
-        if config.getoption("debug", default=None) or log_file:
+        if options.debug or log_file:
             raise pytest.UsageError(
                 "pytest output files need a single session; use --concurrency 1"
             )

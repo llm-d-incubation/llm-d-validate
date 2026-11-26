@@ -36,7 +36,7 @@ def assignments(cases, concurrency):
             yield stage, [rows[i::width] for i in range(width)]
 
 
-def _public_nodes(cases):
+def public_nodes(cases):
     """Keep redacted evidence identities unique even when two names scrub to the same text."""
     nodes = {}
     used = set()
@@ -206,8 +206,7 @@ def recover(run_dir, execution):
         _reconcile(run_dir, execution, db)
 
 
-def run(args, run, argv, cases, profile):
-    nodes = _public_nodes(cases)
+def run(args, run, argv, cases, nodes, profile):
     if len(nodes) != len(cases) or any(row["stage"] not in STAGES for row in cases):
         raise ValueError("invalid or duplicate case in the verification plan")
     slugs = _slugs(cases)
@@ -242,8 +241,6 @@ def run(args, run, argv, cases, profile):
             CREATE TABLE failures (node TEXT, phase TEXT, reason TEXT);
             CREATE TABLE stopped (stop INTEGER PRIMARY KEY);
         """)
-        run.outcome.execution["pending_plan"] = list(nodes.values())
-        run.outcome.write(run.run_dir)
         read_fd, write_fd = os.pipe()
         stack.callback(os.close, write_fd)
         stack.callback(os.close, read_fd)
