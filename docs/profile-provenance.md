@@ -60,12 +60,108 @@ the placeholders `llmdv profile validate` accepts:
 | `render_pins` | 64 zeros under each declared render surface and pin: `{chat_render: {conversation: "000…0", tools: "000…0"}}` |
 | `contract_baseline` part | `{llmdv_seed: [absent]}` |
 
-Run `llmdv verify --profile <profile> --evidence all --full-suite` against a known-good build
-(`--full-suite`, because a profile's `test_sets.default` may leave the pin cases out). Each pin
-fails with the observed value in its `canonical_input_tokens` or `canonical_render_digest`
-check; each contract part passes with its exchange in `exchanges.jsonl`, which
-`llmdv.assertions.contract` (`shape`, `stream_shape`, `baseline`) turns into a baseline. Replace
-the placeholders.
+These are authoring placeholders, not measured expectations. An undeclared pin skips; an
+ordinary run does not populate it. Use a known-good build and select only the sentinel cases
+you need with `--full-suite -k <test_function>`: `--full-suite` makes them available even when
+the profile's default subset omits them, and `-k` narrows the run again.
+
+For a conversation prompt pin, select `test_canonical_conversation_keeps_its_size`; for a
+render pin, select `test_canonical_conversation_keeps_its_tokens`. Set the placeholder first
+(use 64 literal zeros for a render digest), then read the `canonical_input_tokens` or
+`canonical_render_digest` check's `observed` value in `results.jsonl`. A placeholder pin
+normally fails; review that observation before replacing it. Tool pins are separate cases
+and require the corresponding tool capabilities.
+
+<details>
+<summary>Worked example: seed one Chat Completions response contract</summary>
+
+Start with a configured, gitignored local profile and its reachable ingress. This example
+uses ingress ID `gateway`; substitute your own ID in both commands and the extraction step.
+Add this declaration to that ingress's existing capabilities, preserving its other settings:
+
+```yaml
+contract_baseline:
+  chat_completions:
+    response: {llmdv_seed: [absent]}
+```
+
+Validate and collect the selected case's evidence from a known-good deployment:
+
+```sh
+P=profiles/examples/my-stack.local.yaml
+llmdv profile validate "$P"
+llmdv plan --profile "$P" --ingress gateway --surface chat_completions \
+  --full-suite -k test_response_keeps_its_contract
+llmdv verify --profile "$P" --ingress gateway --surface chat_completions \
+  --full-suite -k test_response_keeps_its_contract --evidence all
+RUN='<paste the full run directory path printed by verify>'
+```
+
+The placeholder allows the contract case to record a healthy response, but establishes no
+meaningful drift protection yet. With the same Python environment used to install `llmdv`,
+extract a proposed baseline offline. This requires one passing case and one successful JSON
+response for that case; it refuses ambiguous or failed evidence. It creates a new snippet
+file inside the run directory and refuses to overwrite one:
+
+```sh
+python - "$RUN" gateway <<'PY'
+import json
+import sys
+from pathlib import Path
+
+import yaml
+from llmdv.assertions.contract import baseline, shape
+
+run = Path(sys.argv[1])
+ingress = sys.argv[2]
+
+
+def rows(name):
+    return [json.loads(line) for line in (run / name).read_text().splitlines() if line.strip()]
+
+
+def matches(row):
+    return (
+        row.get("case_id") == "evolution.response_contract"
+        and row.get("ingress") == ingress
+        and row.get("surface") == "chat_completions"
+    )
+
+
+results = [row for row in rows("results.jsonl") if matches(row)]
+if len(results) != 1 or results[0].get("outcome") != "pass":
+    raise SystemExit("Expected exactly one passing response-contract case; inspect the run.")
+exchanges = [
+    row for row in rows("exchanges.jsonl")
+    if matches(row) and row.get("nodeid") == results[0]["nodeid"]
+]
+if len(exchanges) != 1:
+    raise SystemExit("Expected exactly one exchange; inspect the run.")
+exchange = exchanges[0]
+status = exchange.get("status")
+body = exchange.get("response_body")
+if (
+    not isinstance(status, int) or not 200 <= status < 300
+    or exchange.get("transport_error") or not isinstance(body, dict) or not body
+):
+    raise SystemExit("Expected a successful JSON object response; inspect the run.")
+snippet = {"contract_baseline": {"chat_completions": {"response": baseline(shape(body))}}}
+with (run / "response-baseline.yaml").open("x") as output:
+    yaml.safe_dump(snippet, output, sort_keys=False)
+PY
+```
+
+Review `response-baseline.yaml`, including which paths or types may legitimately vary.
+**Replace** the placeholder `response` mapping in the local profile with the generated
+mapping; do not overwrite the entire profile or leave `llmdv_seed` alongside the real paths.
+Keep the run and build provenance locally. Validate the profile and rerun the same selected
+case to check the seeded expectation.
+
+Repeat separately for each ingress, surface and contract part. A response-body shape cannot
+seed a stream: stream parts need parsed frames and `stream_shape`, followed by `baseline`.
+Do not mix evidence from different configurations or seed from an unexplained failure.
+
+</details>
 
 **Render.** The render cases run only on the `*_render` surfaces an ingress declares: `render.stability` and `render.unknown_model` on each, `render.synthetic_prefix` only with `prefix_stability`, and a render pin only under a declared render surface. `contract` checks surfaces both ways, so declare a render surface only where the stack is meant to serve it; otherwise leave it out with a comment saying so, and those cases skip as `undeclared`. The cache keys that depend on rendering (`render_equivalent`, `stripped_system_prefix`, `equivalent_settings`, `canonical_tool_keys`) are in [REFERENCE.md](../profiles/REFERENCE.md#cache_reuse).
 
@@ -109,7 +205,7 @@ path" or any other term for it.
 
 1. List the guide's nightly workflows in llm-d and the deploy scripts they call. For each lane read its accelerator, engine, provider and gateway class.
 2. Render the overlay that lane applies, locally (`kubectl kustomize <path>`, never against a cluster). A lane that sets no provider applies the accelerator and engine folder's own kustomization. Read the model, context window, parsers, engine build and flags, for each role (prefill and decode can differ). Check what you read against `guide.yaml` and the README.
-3. Group lanes that look the same to a client. Each group is one combination; its header names its lanes, and the directory's README maps every lane to its profile with the exact `--identity` flags that keep lanes sharing a combination apart, lists what no lane runs, and records under "Where llm-d's own sources disagree" every disagreement between the guide's sources. The README is for someone who deployed the guide, not for CI: it opens with "Pick your profile" (profile, the model a client sees, the overlays it covers), "Run it", "What it tests", the generated "What `llmdv verify` selects" and "Not covered", and keeps the lane table, the identity derivation and the disagreements between llm-d's sources in collapsed `<details>` blocks under "For maintainers". Keep lane and CI wording out of the sections above it, and keep each lane name in backticks: the drift skill's report matches them. [`tiered-prefix-cache/README.md`](../profiles/llm-d/tiered-prefix-cache/README.md) is the model.
+3. Group lanes that look the same to a client. Each group is one combination; its header names its lanes, and the directory's README maps every lane to its profile with the exact `--identity` flags that keep lanes sharing a combination apart, lists what no lane runs, and records under "Where llm-d's own sources disagree" every disagreement between the guide's sources. The README is for someone who deployed the guide, not for CI: it opens with "What it tests", "Pick your profile" (model/configuration, overlays, linked profile), "Run it", the generated "What `llmdv verify` selects" and "Not covered", and keeps the lane table, the identity derivation and the disagreements between llm-d's sources in collapsed `<details>` blocks under "For maintainers". Keep lane and CI wording out of the sections above it, and keep each lane name in backticks: the drift skill's report matches them. [`tiered-prefix-cache/README.md`](../profiles/llm-d/tiered-prefix-cache/README.md) is the model.
 4. Give the guide's `parts/common.yaml` a `test_sets.default` of the cases the guide's claims touch, keeping `contract.*` (see [REFERENCE.md](../profiles/REFERENCE.md#test_sets)), and check every glob with `llmdv plan --profile <combination>`. The [coverage rule](#coverage-and-known-failures) still holds for the configuration: one lane per configuration runs `--full-suite`, recorded in `profiles/llm-d/README.md` under "Which lane runs everything", as does a lane whose engine build differs from the rest of its configuration.
 5. A layer the kinds cannot order (a routing sidecar between the router and the engines, two routers in series, a coordinator in front of the router) is placed with `fronts`; see [Declared layer edges](../profiles/REFERENCE.md#declared-layer-edges). An ingress may front only ingresses at its own position or deeper.
 

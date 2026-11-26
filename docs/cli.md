@@ -151,7 +151,7 @@ Separating environment problems from fleet problems is the point of having more 
 
 | Code | Class | Meaning |
 | --- | --- | --- |
-| `0` | `ok` | every selected case passed (skips do not fail a run) |
+| `0` | `ok` | no executed case failed; an all-skipped run can also exit 0 |
 | `1` | `fleet` | test failures: the fleet did not behave as the profile declares |
 | `2` | `usage` | bad usage, or an invalid profile; nothing was verified |
 | `3` | `environment` | your environment, not the fleet: preflight unsatisfied (nothing was tested), a local connection lost mid-run with no fleet failure, or a results store that cannot be used as configured |

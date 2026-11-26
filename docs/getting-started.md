@@ -84,8 +84,9 @@ discovery and basic non-streaming/streaming generation for the declared APIs. Ca
 apply are skipped. A smoke pass establishes only those checks, not tools, caching, long context
 or every API behavior.
 
-Verification runs one case at a time. Do not add pytest's `-n`, and avoid competing live runs
-against the same endpoint. Keep a laptop awake until the run finishes.
+Verification runs cases sequentially. Individual cases can send concurrent requests, such as
+a cancellation burst. Do not add pytest's `-n`, and avoid competing live runs against the same
+endpoint. Keep a laptop awake until the run finishes.
 
 ## Read the results
 

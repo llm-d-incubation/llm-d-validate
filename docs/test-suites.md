@@ -289,7 +289,7 @@ as `undeclared` without sending a request.
 | `chat_template_kwargs` effects, cache metric fallback | Not built: needs a template fixture and a metric contract |
 | Other Responses request options | Partly built: metadata echo, output logprobs, reasoning effort and structured output exist |
 | Valid `output_config.effort` reaching the model | Partly built: invalid-value rejection, an output-size effect probe (`messages_checks: [effort_effect]`) and `field_options.messages_effort_rendered` exist; the last needs prompt logprobs on Messages, which the LiteLLM gateway does not return |
-| Render pins measured on a real build | Not yet measured: precise-prefix-cache-routing (GPU, AMD, XPU) and fast-model-actuation declare render surfaces; their first runs supply the pins |
+| Render pins measured on a real build | Not yet seeded: the relevant guide profiles declare render surfaces but omit render pins. [Declare placeholders and seed the pins](profile-provenance.md#seed-change-sentinels); an ordinary run skips undeclared pins |
 | Sanitized production-shaped prefix fixtures, cross-ingress render parity | Not built |
 | HTTP/2 framing | Not built: needs the `h2` package |
 | 429, 5xx and errors after a stream opens | Needs load or fault injection |

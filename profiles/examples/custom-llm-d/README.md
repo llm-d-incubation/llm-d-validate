@@ -1,6 +1,6 @@
 # Measured profiles for three models
 
-Complete profiles for three models served by llm-d, measured on real deployments of each layer,
+Broad profiles for three models served by llm-d, based on measurements from real deployments,
 with every identifying detail removed. Each declares what each layer served (surfaces, error
 statuses, capabilities, headers and change sentinels) and how a correct stack
 behaves, so a plain run selects every case in the library.
@@ -11,22 +11,31 @@ behaves, so a plain run selects every case in the library.
 | [`deepseek-v4.1-flash-1017.yaml`](deepseek-v4.1-flash-1017.yaml) | `deepseek-ai/DeepSeek-V4.1-Flash-1017` | `litellm` |
 | [`muse-spark-open-816b-nvfp4.yaml`](muse-spark-open-816b-nvfp4.yaml) | `meta-models/Muse-Spark-Open-816B-A42B-NVFP4` | `litellm`, `router` |
 
-Point a profile at any deployment of its model, production or staging, with variables, and pick
-the layers you can reach with `--ingress`:
+## Start with smoke
 
-```bash
-export LLMDV_GATEWAY_URL=<the gateway's base URL> LLMDV_GATEWAY_KEY=<a key>
-export LLMDV_GATEWAY_MODEL=<the id the gateway serves the model as>   # optional: the public id by default
-export LLMDV_ROUTER_URL=<the router's base URL>
-llmdv verify --profile profiles/examples/custom-llm-d/glm-5.3.yaml --ingress litellm   # the gateway
-llmdv verify --profile profiles/examples/custom-llm-d/glm-5.3.yaml --ingress router    # the router
-llmdv verify --profile profiles/examples/custom-llm-d/glm-5.3.yaml                     # both
+Choose a profile whose declarations match your intended model configuration. After
+[installation](../../../docs/getting-started.md#install), load the endpoint and credential
+variables from your environment or credential store. For GLM at the gateway:
+
+```sh
+export P=profiles/examples/custom-llm-d/glm-5.3.yaml
+export LLMDV_GATEWAY_URL='https://your-gateway.example'
+# Load LLMDV_GATEWAY_KEY from your credential store.
+# Optionally set LLMDV_GATEWAY_MODEL to the model ID your gateway serves.
+llmdv plan --profile "$P" --ingress litellm --test-set smoke
+llmdv verify --profile "$P" --ingress litellm --test-set smoke --analyze
 ```
 
-`LLMDV_ROUTER_MODEL` does the same for the router. A gateway often serves the model under its own
+For a direct router check, set `LLMDV_ROUTER_URL`, select `--ingress router`, and use
+`LLMDV_ROUTER_MODEL` if its model ID differs. Omitting `--ingress` selects all declared ingresses,
+so configure each one before doing so. Smoke does not run the real-client cases.
+
+`LLMDV_GATEWAY_MODEL` and `LLMDV_ROUTER_MODEL` default to the public model ID when unset. A gateway often serves the model under its own
 name, such as a provider prefix or a staging suffix; preflight refuses a run whose model id the
-endpoint does not serve, and says so. A deployment that differs in a measured setting (another
-error status, another path) is a short file that `extends` the profile and changes only that.
+endpoint does not serve, and says so. Use a local file with `extends` for intended configuration differences. Change behavior
+expectations only after triage; do not copy a failing response into the expected contract.
+
+## Before broader coverage
 
 **Claude Code.** The client cases drive Claude Code 2.1.289, the version these layers were measured
 with, and the profiles expect it at `/opt/claude-code/2.1.289/claude`. The runner image installs
@@ -47,6 +56,18 @@ leave the client cases out with `-m "not real_clients"`.
 the response shapes measured on their deployments; Muse's holds the `llmdv_seed` placeholder in
 each part, so its contract-drift cases compare against nothing. Seed it from a run of a healthy
 deployment using [the seeding procedure](../../../docs/profile-provenance.md#seed-change-sentinels).
+
+After reviewing the declarations and client prerequisite, preview broader coverage:
+
+```sh
+llmdv plan --profile "$P" --ingress litellm
+llmdv verify --profile "$P" --ingress litellm --analyze
+```
+
+These profiles' defaults select the whole library before applicability gates. Add
+`-m "not real_clients"` to both commands if you have not installed the pinned client. Check
+executed and skipped counts; a broad selection does not guarantee complete API coverage.
+See [growing coverage toward production](../../../docs/getting-started.md#widen-coverage).
 
 ## What `llmdv verify` selects
 

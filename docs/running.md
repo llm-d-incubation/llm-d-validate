@@ -114,7 +114,8 @@ or prefix from your other runs.
 
 - **One live run at a time per gateway.** Cache and session cases depend on what earlier requests
   left behind, and a key is usually rate-limited.
-- **Never pass `-n`.** Live runs are always one case at a time; `llmdv verify` refuses it.
+- **Never pass `-n`.** Cases run sequentially; an individual case can send concurrent requests.
+  `llmdv verify` refuses parallel pytest workers.
 - **Keep comparison lanes distinct.** Set `--identity trigger=nightly` for scheduled runs;
   manual runs default to `trigger=manual`. Free-form labels do not isolate baselines.
 - **Keep the machine awake.** A sleeping laptop stalls requests, and the cases in flight fail on

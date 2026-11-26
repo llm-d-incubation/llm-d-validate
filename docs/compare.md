@@ -9,7 +9,7 @@ llmdv compare --from s3://bucket/llmdv --profile qwen-router --list             
 llmdv compare --from s3://bucket/llmdv --profile qwen-router                       # latest run against the preceding matching run
 llmdv compare --from s3://bucket/llmdv --profile qwen-router --baseline <run-id>   # against a specific run, e.g. before a rollout
 llmdv compare --from s3://bucket/llmdv --profile qwen-router --window 5            # a change counts only if the last 5 runs agreed
-llmdv compare --from file:///var/llmdv-runs --profile qwen-router --no-fail        # a local archive; report but exit 0
+llmdv compare --from file:///var/llmdv-runs --profile qwen-router --no-fail        # a local archive; suppress the regression exit
 ```
 
 `--profile` is the profile's `name:`, not its path. Output reads the same in a terminal and in
@@ -110,11 +110,12 @@ so. Backend-naming headers never reach `outcome.json`. `comparison.json` has thi
 
 | Code | Meaning |
 | --- | --- |
-| `0` | no regression, or `--no-fail` |
+| `0` | comparison completed without regressions, or `--no-fail` suppressed its regression exit |
 | `1` | a case that passed now fails |
 | `2` | nothing to compare: no usable baseline, a single run, empty or malformed latest results, a profile name or run id that is not one path segment, or a `--from` that can never work |
 | `3` | the archive cannot be read: no credentials, the store refuses or cannot be reached, or results are unreadable |
 
+`--no-fail` changes only a regression exit to `0`; usage and archive errors still exit `2` or `3`.
 A first run or a mistyped profile name exits `2`, never `0`. All codes:
 [cli.md](cli.md#exit-codes).
 
