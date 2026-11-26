@@ -155,6 +155,9 @@ Two repository settings back that up and must stay in place:
 
 ## Adding a case
 
+For documentation changes, follow [Maintaining the documentation](docs/maintaining-docs.md):
+each topic has an authoritative home, and generated coverage sections keep their source.
+
 [docs/writing-tests.md](docs/writing-tests.md) walks through writing a case, proving it can fail
 and running it. In short:
 
