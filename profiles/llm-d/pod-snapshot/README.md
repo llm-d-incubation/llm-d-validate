@@ -97,7 +97,7 @@ The client calls the `<GUIDE_NAME>-epp` Service on port 80 (the lanes' `gateway_
 <details>
 <summary>How these profiles are built</summary>
 
-See [../README.md](../README.md) for how to run a combination, and the [profile skill](../../../.agents/skills/writing-an-infra-profile/SKILL.md#how-profilesllm-d-is-built) for the layout and provenance tags.
+See [../README.md](../README.md) for how to run a combination, and the [profile provenance guide](../../../docs/profile-provenance.md#how-profilesllm-d-is-built) for the layout and provenance tags.
 
 </details>
 

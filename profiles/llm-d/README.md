@@ -58,7 +58,7 @@ Each guide's README gives an example.
 
 ## For maintainers
 
-How the folders are built and where each value comes from: [the profile skill](../../.agents/skills/writing-an-infra-profile/SKILL.md#how-profilesllm-d-is-built). To find what changed in llm-d since these profiles were written: [the drift skill](../../.agents/skills/tracking-llm-d-guide-drift/SKILL.md).
+How the folders are built and where each value comes from: [profile evidence and provenance](../../docs/profile-provenance.md#how-profilesllm-d-is-built). To find what changed in llm-d since these profiles were written: [the drift skill](../../.agents/skills/tracking-llm-d-guide-drift/SKILL.md).
 
 <details>
 <summary>Coverage: which guides have profiles, and how many nightly lanes each covers</summary>

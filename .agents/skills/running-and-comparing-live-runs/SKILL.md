@@ -5,94 +5,55 @@ description: Use when starting a live `llmdv` run against a real gateway (from a
 
 # Running and comparing live runs
 
-Every path writes the same run directory, so reading and comparing work the same way afterwards. Human version: [docs/getting-started.md](../../../docs/getting-started.md). Cluster job and secrets: [deploy/README.md](../../../deploy/README.md). Comparison semantics: [docs/compare.md](../../../docs/compare.md).
+Use [Getting started](../../../docs/getting-started.md) for a first check,
+[Publishing and running unattended](../../../docs/running.md) for operations, and
+[Comparing runs](../../../docs/compare.md) for baseline semantics.
 
 ## Before any live run
 
-Before the first live step, check what the person has and ask only for what is missing: [`.agents/ENVIRONMENT.md`](../../ENVIRONMENT.md).
-
-1. **Check nobody else is running against this gateway.** One live run per gateway at a time: cache and session cases depend on what earlier requests left behind, and the key is rate-limited.
-2. **Never pass `-n`.** `llmdv verify` refuses parallel workers; live cases run one at a time.
-3. **Run the contract first.** `--full-suite -m contract` takes about a minute and proves the gateway, the key and (when publishing) the bucket before an hour-long full run. A preflight failure exits `3`: nothing was tested.
+1. Read [ENVIRONMENT.md](../../ENVIRONMENT.md) and establish tools, access and credential sources.
+   Ask only for missing information. Never print credentials or cluster-identifying values.
+2. Check for competing live runs. Run one case at a time; never pass `-n` or retry test requests.
+3. Validate and preview the requested selection. For a newly authored profile, check its
+   declarations with `--full-suite -m contract` before broader verification. A first-user smoke
+   check has the narrower purpose described in Getting started.
+4. Respect requested scope and keep the machine awake. Do not silently widen to the full suite.
+   A guide's full-validation lane requirements remain in its profile documentation.
 
 ## Credentials, without echoing them
 
-The profile names its variables in `base_url_env` and `auth.key_env` (every ingress's, in a multi-ingress profile). Each profile reads its own names; a CI pipeline maps its secrets onto them the same way. Where the values live differs per person: ask, have them load the values, and map them onto the profile's names. Never type, paste or print a value. A router (EPP) ingress reached directly needs only its URL.
-
-A `*.local.yaml` copy may write `base_url` inline instead of `base_url_env` (never both); it is gitignored. Testing a model you were handed endpoints for is the testing-a-model-deployment skill.
-
-Publishing and pulling runs need the bucket variables exported ([`.agents/ENVIRONMENT.md`](../../ENVIRONMENT.md) lists them); without them, work from local run directories. Check a variable with `[ -n "$VAR" ] && echo set`, never `echo $VAR`.
+Map the available secrets onto each ingress's declared variables. Check presence without
+printing values. Publishing uses the selected storage credential chain; use
+[storage prerequisites](../../../docs/running.md#publish-a-run). Direct router access still
+follows the profile's authentication declaration.
 
 ## Start a run
 
-**From a PC** (at the repository root, with `.venv` active):
-
-```sh
-llmdv verify --profile <profile> --full-suite -m contract
-llmdv verify --profile <profile> --analyze        # the profile's default test set; lands in runs/<timestamp>/
-llmdv verify --profile <profile> --analyze --full-suite  # every case, whatever the profile selects
-```
-
-To publish it, add:
-
-```sh
---evidence all --remote-output "s3://$AWS_BUCKET/<prefix>" \
---identity trigger=manual --label "actor=$USER"
-```
-
-A plain run requires `test_sets.default` (every llm-d guide profile has one) and runs only the cases it names; `llmdv plan --profile <profile>` says how many it leaves out. One lane per configuration runs `--full-suite` (`profiles/llm-d/README.md`, "Which lane runs everything"), as does a lane whose engine build changed. Use a `*.local.yaml` copy for machine-specific changes, and keep the machine awake. A multi-ingress profile runs every ingress; `--ingress <id>` (comma-separated or repeated, such as `--ingress litellm,router`) restricts it, and `llmdv profile show <profile> --setup` prints any port-forwards it needs.
-
-**Unattended** (`llmdv job`, e.g. as a CronJob or a CI step):
-
-```sh
-llmdv job --profile <profile> --remote-output "s3://$AWS_BUCKET/<prefix>" --full-suite -- -m contract
-```
-
-Flags the job does not know go to `llmdv verify` (`llmdv job --profile <profile> --full-suite`); arguments after `--` reach pytest unparsed, so put verify's own flags such as `--full-suite` or `--evidence all` before it. Results go to `--remote-output`, or `LLMDV_RESULTS_URI` when it is not given; `outcome.json` in the job log says where.
-
-**From a cluster job** (`deploy/trigger.sh`, needs the `llmdv-trigger` Role):
-
-```sh
-job="$(deploy/trigger.sh -n <namespace> --trigger manual --id <id> -- --full-suite -m contract)"
-kubectl -n <namespace> logs -f "job/$job"
-```
-
-Arguments after `--` replace the CronJob's args. Use `--cli oc` for OpenShift and `--profile-file` for a one-off in-cluster profile. Results go to the cluster's `LLMDV_RESULTS_URI`, which may differ from where your other runs publish; `outcome.json` in the job log says where.
+Follow the [local walkthrough](../../../docs/getting-started.md#start-with-a-smoke-check) or
+[job workflow](../../../docs/running.md#run-unattended). Use the printed child directory for
+analysis and reproduction. Keep endpoint variables in the environment and local details in
+ignored `*.local.yaml` files. Cluster runner operation is in [deploy/README.md](../../../deploy/README.md).
 
 ## Prefixes and triggers
 
-A scheduled run, including a scheduled cluster job, passes `--identity trigger=nightly`; manual runs default to `trigger=manual`. Both job and standalone compare select only matching configuration identities, including trigger and flavor.
+Set configuration identity explicitly when required by the profile's lane instructions.
+Scheduled runs use `trigger=nightly`; manual runs default to `trigger=manual`. Labels do not
+separate baselines. Standalone compare judges the latest profile run; a job judges its own run.
 
 ## Pull a run back
 
-A published run sits at `s3://$AWS_BUCKET/<prefix>/<profile name>/<run id>/`. The profile name is its `name:` field, not its path. Run ids start with a UTC timestamp and sort oldest first.
-
-```sh
-PREFIX="s3://$AWS_BUCKET/<prefix>"   # the prefix it was published under, or a cluster's LLMDV_RESULTS_URI
-llmdv compare --from "$PREFIX" --profile <profile name> --list
-# if --list fails, list the folder directly:
-aws s3 ls "$PREFIX/<profile name>/" --endpoint-url "$AWS_ENDPOINT_URL_S3"
-RUN=<run id>
-aws s3 cp --recursive "$PREFIX/<profile name>/$RUN/" "runs/$RUN/" --endpoint-url "$AWS_ENDPOINT_URL_S3"
-```
-
-`--endpoint-url` is required for an S3-compatible store that is not AWS: without it you get `InvalidAccessKeyId` or `NoSuchBucket`. A run is completely published only when its `MANIFEST.json` is there.
+Use [archive retrieval](../../../docs/running.md#pull-a-run-back). Confirm profile name,
+archive prefix, authentication mode and `MANIFEST.json`; a working directory is not an archive.
 
 ## Compare runs
 
-```sh
-llmdv compare --from "$PREFIX" --profile <profile name>                     # latest vs the run before
-llmdv compare --from "$PREFIX" --profile <profile name> --baseline <run id> # latest vs a named run
-llmdv compare --from "$PREFIX" --profile <profile name> --window 3          # three runs must agree
-# (llmdv job spells these --compare-baseline and --compare-window)
-```
-
-Exit `1` is a regression, `2` nothing to compare, and `3` a store that could not be read, which is your environment, not the runs: check that the credentials file was sourced with `set -a`. [docs/compare.md](../../../docs/compare.md#exit-codes) has the full table.
-
-Runs published to a local directory (`--remote-output file:///<dir>`) compare the same way with `--from file:///<dir>`. A plain local run (`runs/<timestamp>/`) has neither that layout nor a `MANIFEST.json`, so compare two of those case by case from their `results.jsonl`, keyed on `nodeid`.
-
-Read the declaration-drift warning first: a changed profile can explain the whole delta. Then `verdict → skip` is lost evidence, not a failure, and `skip → fail` is new evidence, not new breakage.
+Follow [comparison commands and interpretation](../../../docs/compare.md). Read declaration and
+stack drift first. A skip is missing evidence; newly exercised failures are not regressions.
+Do not report comparison exit 2 or 3 as a passing result. Inspect delivery status separately
+from the verification verdict.
 
 ## Then
 
-Build and annotate the dashboard with reporting-a-run. Turn a failure group into an issue with filing-a-fleet-finding. Exit codes for every command: [docs/cli.md](../../../docs/cli.md#exit-codes).
+Use [reporting-a-run](../reporting-a-run/SKILL.md) for an annotated dashboard,
+[triaging-a-run](../triaging-a-run/SKILL.md) for investigation and
+[filing-a-fleet-finding](../filing-a-fleet-finding/SKILL.md) for an authorized issue report.

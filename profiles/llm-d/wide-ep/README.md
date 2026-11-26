@@ -110,7 +110,7 @@ No two lanes share an identity, so none needs `--identity flavor`.
 <details>
 <summary>How these profiles are built</summary>
 
-How the parts and combinations fit together, and the provenance tags, are in the [profile skill](../../../.agents/skills/writing-an-infra-profile/SKILL.md#how-profilesllm-d-is-built).
+How the parts and combinations fit together, and the provenance tags, are in the [profile provenance guide](../../../docs/profile-provenance.md#how-profilesllm-d-is-built).
 
 </details>
 

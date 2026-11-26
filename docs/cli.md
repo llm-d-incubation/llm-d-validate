@@ -71,7 +71,7 @@ Choose a scope, then narrow it with filters. These rules apply to `plan`, `verif
 | --- | --- |
 | The profile's default coverage | `llmdv verify --profile P` |
 | Basic discovery and generation | `llmdv verify --profile P --test-set smoke` |
-| Named sets, combined | `llmdv verify --profile P --test-set default --test-set tools` |
+| Named sets, combined (if defined by the profile) | `llmdv verify --profile P --test-set default --test-set tools` |
 | All profile-defined sets | `llmdv verify --profile P --all-test-sets` |
 | Every library case | `llmdv verify --profile P --full-suite` |
 | One whole suite | `llmdv verify --profile P --full-suite -m openai_chat` |

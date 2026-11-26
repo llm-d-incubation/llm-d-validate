@@ -153,10 +153,12 @@ Two repository settings back that up and must stay in place:
   trusted publisher on PyPI is changed to match.
 - **A tag ruleset** on `refs/tags/v*` lets only admins create, update or delete release tags.
 
-## Adding a case
+## Documentation
 
 For documentation changes, follow [Maintaining the documentation](docs/maintaining-docs.md):
 each topic has an authoritative home, and generated coverage sections keep their source.
+
+## Adding a case
 
 [docs/writing-tests.md](docs/writing-tests.md) walks through writing a case, proving it can fail
 and running it. In short:
