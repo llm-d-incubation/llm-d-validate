@@ -9,3 +9,178 @@ known_failures:
   ingress: litellm
   issue: vllm-project/vllm#61219
   fix: vllm-project/vllm#61219, vllm-project/vllm#44727
+- {check: choice_index, ingress: litellm, issue: BerriAI/litellm#47109, fix: BerriAI/litellm#47109}
+- check: usage_chunk_choices
+  cases: ['openai_chat.stream_chunk_fields[usage]']
+  ingress: litellm
+  issue: BerriAI/litellm#47109
+  fix: BerriAI/litellm#47109
+- check: terminal_usage_frames
+  cases: [openai_chat.streaming_include_usage]
+  ingress: litellm
+  issue: BerriAI/litellm#47109
+  fix: BerriAI/litellm#47109
+- {check: responses_event_name, ingress: litellm, issue: BerriAI/litellm#47944, fix: BerriAI/litellm#47944}
+- check: model_echo
+  cases:
+  - openai_responses.sdk_parse[sse]
+  - cache.sdk_stream_session[responses]
+  ingress: litellm
+  issue: BerriAI/litellm#46662
+  fix: BerriAI/litellm#46662
+- check: chunk_text
+  cases:
+  - evolution.stream_contract[completions]
+  - openai_completions.request_field[stream_interval]
+  - openai_completions.stream_chunk_fields
+  - streaming.completions_lifecycle*
+  - streaming.steady_flow[completions]
+  ingress: litellm
+  issue: BerriAI/litellm#45343
+  fix: BerriAI/litellm#45343
+- check: error_envelope
+  cases:
+  - anthropic_messages.error_type[unknown_model]
+  - discovery.unknown_model_no_fallback[messages]
+  - headers.required_authentication[messages]
+  - scenarios.client_model_names[messages]
+  - unhappy.bad_credentials[messages]
+  - unhappy.malformed_json[messages]
+  ingress: litellm
+  issue: BerriAI/litellm#47948
+  fix: BerriAI/litellm#47948
+- check: error_envelope
+  cases: [discovery.model_retrieve*]
+  ingress: litellm
+  issue: BerriAI/litellm#37271
+  fix: BerriAI/litellm#37271, BerriAI/litellm#37810, BerriAI/litellm#37275, BerriAI/litellm#37940
+- check: wrong_field_type_status
+  cases: ['unhappy.wrong_field_type[completions]']
+  ingress: litellm
+  issue: BerriAI/litellm#47950
+  fix: BerriAI/litellm#47950
+- check: probe_status
+  cases: ['evolution.unknown_block[chat_completions]']
+  ingress: litellm
+  issue: BerriAI/litellm#47950
+  fix: BerriAI/litellm#47950
+- check: field_status
+  cases:
+  - openai_completions.request_field[response_format_json_object]
+  ingress: litellm
+  issue: BerriAI/litellm#47951
+  fix: BerriAI/litellm#47951
+- check: http_status
+  cases: ['openai_completions.prompt_forms[token_id*]']
+  ingress: litellm
+  issue: BerriAI/litellm#45253
+  fix: BerriAI/litellm#45253, BerriAI/litellm#45278
+- check: openai_error_fields
+  cases: ['unhappy.error_envelope_fields[completions]']
+  ingress: litellm
+  issue: BerriAI/litellm#47949
+  fix: BerriAI/litellm#47949
+- check: stop_reason
+  cases: [openai_chat.stop_reason]
+  ingress: litellm
+  issue: BerriAI/litellm#47945
+  fix: BerriAI/litellm#47945
+- check: token_ids
+  cases:
+  - field_options.extension_observable[chat_completions/return_token_ids]
+  ingress: litellm
+  issue: BerriAI/litellm#47945
+  fix: BerriAI/litellm#47945
+- check: continuous_usage
+  cases: [openai_chat.continuous_usage]
+  ingress: litellm
+  issue: BerriAI/litellm#45359
+  fix: BerriAI/litellm#45359, BerriAI/litellm#46075
+- check: message_stop_sequence
+  cases: [anthropic_messages.response_shape]
+  ingress: litellm
+  issue: BerriAI/litellm#47946
+  fix: BerriAI/litellm#47946
+- check: input_tokens_integer_vs_float
+  cases: [evolution.big_integer*]
+  ingress: litellm
+  issue: BerriAI/litellm#47947
+  fix: BerriAI/litellm#47947
+- check: completed_at
+  cases: [openai_responses.completed_at]
+  ingress: litellm
+  issue: vllm-project/vllm#63183
+  fix: vllm-project/vllm#63183
+- check: feature_summary
+  cases: ['openai_responses.request_feature[reasoning_summary]']
+  ingress: litellm
+  issue: vllm-project/vllm#63184
+  fix: vllm-project/vllm#63184
+- check: feature_encrypted_content
+  cases: ['openai_responses.request_feature[encrypted_reasoning]']
+  ingress: litellm
+  issue: vllm-project/vllm#57323
+  fix: vllm-project/vllm#57323
+- check: http_status
+  cases: ['openai_responses.request_feature[include_web_search_sources]']
+  ingress: litellm
+  issue: vllm-project/vllm#63185
+  fix: vllm-project/vllm#63185
+- check: is_error_input_tokens
+  cases: [tools.result_is_error]
+  ingress: litellm
+  issue: vllm-project/vllm#58700
+  fix: vllm-project/vllm#58700
+- check: tool_result_error_rendered
+  cases: [anthropic_messages.tool_result_error_rendered]
+  ingress: litellm
+  issue: vllm-project/vllm#58700
+  fix: vllm-project/vllm#58700
+- check: orphan_tool_result_status
+  cases: ['tools.result_missing_id[messages]']
+  ingress: litellm
+  issue: vllm-project/vllm#47877
+  fix: vllm-project/vllm#47877
+- check: invalid_tool_choice_status
+  cases: ['unhappy.invalid_tool_choice[messages]']
+  ingress: litellm
+  issue: vllm-project/vllm#59718
+  fix: vllm-project/vllm#59718
+- check: tool_markup_in_answer
+  cases: ['tools.allowed[auto]']
+  ingress: litellm
+  issue: vllm-project/vllm#60585
+  fix: vllm-project/vllm#60585
+- check: orphan_tool_result_status
+  cases: [tools.result_unknown_id*]
+  ingress: litellm
+  issue: vllm-project/vllm#66383
+  fix: vllm-project/vllm#66383, vllm-project/vllm#47877
+- check: completed_at
+  cases: [openai_responses.completed_at]
+  ingress: litellm
+  issue: vllm-project/vllm#63183
+  fix: vllm-project/vllm#63183, vllm-project/vllm#63448, vllm-project/vllm#63783
+- check: feature_summary
+  cases: ['openai_responses.request_feature[reasoning_summary]']
+  ingress: litellm
+  issue: vllm-project/vllm#63184
+  fix: vllm-project/vllm#63184, vllm-project/vllm#63238
+- check: legacy_function_call
+  cases: [tools.legacy_functions]
+  ingress: litellm
+  issue: vllm-project/vllm#66098
+  fix: vllm-project/vllm#66098
+- check: error_envelope
+  cases:
+  - headers.required_authentication[messages]
+  - unhappy.bad_credentials[messages]
+  - unhappy.malformed_json[messages]
+  ingress: litellm
+  issue: BerriAI/litellm#47948
+  fix: BerriAI/litellm#47948
+- check: tool_markup_in_answer
+  cases: ['tools.allowed[auto]', 'tools.allowed[required]']
+  ingress: litellm
+  issue: vllm-project/vllm#60585
+  fix: vllm-project/vllm#60585

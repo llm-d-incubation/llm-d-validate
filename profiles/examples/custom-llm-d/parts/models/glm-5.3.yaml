@@ -1,6 +1,11 @@
 # zai-org/GLM-5.3: the model as a client sees it (id, window, parsers, reasoning, tools) and the
 # capabilities that differ from the other stacks in this folder. MEASURED on one deployment. A
 # part, never run on its own.
+# The model is text-only and its completions rendering has no fill-in-the-middle support, so
+# image input (Messages image blocks and tool-result images, Responses input_image, Chat image_url
+# content parts) and the completions suffix are rejected at every layer: MEASURED, the engine
+# answers "not a multimodal model" and "suffix is only supported for models with FIM completion
+# rendering".
 model:
   public_id: zai-org/GLM-5.3
   aliases: []
@@ -26,13 +31,27 @@ capabilities:
       high: High
       xhigh: Max
       max: Max
-  chat_fields: {role_function: accepted}
-  completions_fields: {suffix: accepted}
+  chat_fields: {role_function: accepted, content_image_url: rejected}
+  completions_fields: {suffix: rejected}
   image_url_fixture: https://www.python.org/static/img/python-logo.png
-  messages_features: {image_url: accepted}
+  messages_features:
+    image_url: rejected
+    document_citations: accepted
+    document_content: accepted
+    document_pdf: accepted
+    document_text: accepted
+    search_result: accepted
+    max_tokens_zero: accepted
+    image_base64: rejected
+    tool_result_image: rejected
   client_sessions: [skill, hook, parallel_reads, nested_subagent, compaction]
   responses_reasoning_efforts: [minimal, low, medium, high, xhigh, max]
-  responses_features: {encrypted_reasoning: accepted}
+  responses_features:
+    encrypted_reasoning: accepted
+    input_file: accepted
+    input_image: rejected
+    item_reference: ignored
+    prompt_template: ignored
   extension_options:
   - ignore_eos
   - min_tokens

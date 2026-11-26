@@ -1,6 +1,10 @@
 # deepseek-ai/DeepSeek-V4.1-Flash-1017: the model as a client sees it (id, window, parsers,
 # reasoning, tools) and the capabilities that differ from the other stacks in this folder.
 # MEASURED on one deployment. A part, never run on its own.
+# MEASURED on the production gateway, which forwards Messages and Responses to the engine's
+# own endpoints: Messages document and search-result blocks and max_tokens 0, and Responses
+# input_file, item_reference and prompt templates, are refused with a 400 naming the
+# unsupported block, item or value, so they are declared rejected.
 model:
   public_id: deepseek-ai/DeepSeek-V4.1-Flash-1017
   aliases: []
@@ -26,9 +30,18 @@ capabilities:
       high: '75'
       xhigh: '75'
       max: '100'
-  chat_fields: {role_function: rejected}
+  chat_fields: {role_function: rejected, content_image_url: accepted}
   completions_fields: {suffix: accepted}
-  messages_features: {image_url: rejected}
+  messages_features:
+    image_url: rejected
+    document_citations: rejected
+    document_content: rejected
+    document_pdf: rejected
+    document_text: rejected
+    search_result: rejected
+    max_tokens_zero: rejected
+    image_base64: accepted
+    tool_result_image: accepted
   vision: [chat_completions, messages, responses]
   client_sessions:
   - skill
@@ -38,7 +51,12 @@ capabilities:
   - compaction
   - image_read
   responses_reasoning_efforts: [none, minimal, low, medium, high, xhigh, max]
-  responses_features: {encrypted_reasoning: accepted}
+  responses_features:
+    encrypted_reasoning: accepted
+    input_file: rejected
+    input_image: accepted
+    item_reference: rejected
+    prompt_template: rejected
   extension_options:
   - ignore_eos
   - min_tokens

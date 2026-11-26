@@ -29,7 +29,6 @@ capabilities:
     chat_template_kwargs: accepted
     consecutive_users: accepted
     content_file: rejected
-    content_image_url: accepted
     content_input_audio: rejected
     continuous_usage_stats: accepted
     documents: accepted
@@ -157,20 +156,13 @@ capabilities:
     consecutive_user_turns: accepted
     container: accepted
     diagnostics: accepted
-    document_citations: accepted
-    document_content: accepted
-    document_pdf: accepted
-    document_text: accepted
-    image_base64: accepted
     inference_geo: accepted
     leading_assistant: accepted
     max_tokens_large: accepted
     max_tokens_over_window: accepted
-    max_tokens_zero: accepted
     mcp_servers: accepted
     metadata_user_id: accepted
     redacted_thinking_passback: accepted
-    search_result: accepted
     server_tool_history: accepted
     service_tier: accepted
     speed_fast: accepted
@@ -180,7 +172,6 @@ capabilities:
     thinking_display_omitted: accepted
     thinking_display_updates: accepted
     tool_result_blocks: accepted
-    tool_result_image: accepted
     top_k: accepted
     top_level_cache_control: accepted
     top_p: accepted
@@ -199,9 +190,6 @@ capabilities:
     image_generation: ignored
     include_tool_outputs: accepted
     include_web_search_sources: accepted
-    input_file: accepted
-    input_image: accepted
-    item_reference: ignored
     local_shell: ignored
     max_tool_calls: accepted
     mcp: ignored
@@ -212,7 +200,6 @@ capabilities:
     prompt_cache_key: accepted
     prompt_cache_options: accepted
     prompt_cache_retention: accepted
-    prompt_template: ignored
     reasoning_context: accepted
     reasoning_generate_summary: accepted
     reasoning_mode: accepted

@@ -27,9 +27,19 @@ capabilities:
       high: '256'
       xhigh: '512'
       max: '512'
-  chat_fields: {role_function: accepted}
+  chat_fields: {role_function: accepted, content_image_url: accepted}
   completions_fields: {suffix: rejected}
-  messages_features: {tool_reference: accepted, image_url: rejected}
+  messages_features:
+    tool_reference: accepted
+    image_url: rejected
+    document_citations: accepted
+    document_content: accepted
+    document_pdf: accepted
+    document_text: accepted
+    search_result: accepted
+    max_tokens_zero: accepted
+    image_base64: accepted
+    tool_result_image: accepted
   vision: [chat_completions, messages, responses]
   client_sessions:
   - skill
@@ -39,7 +49,12 @@ capabilities:
   - compaction
   - image_read
   responses_reasoning_efforts: [minimal, low, medium, high, xhigh, max]
-  responses_features: {encrypted_reasoning: ignored}
+  responses_features:
+    encrypted_reasoning: ignored
+    input_file: accepted
+    input_image: accepted
+    item_reference: ignored
+    prompt_template: ignored
   extension_options:
   - ignore_eos
   - min_tokens
