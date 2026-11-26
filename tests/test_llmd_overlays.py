@@ -1,9 +1,10 @@
-"""`deploy/llm-d-nightly/overlays.yaml`: the profile llm-d's nightly runs for each overlay.
+"""`deploy/llm-d-nightly/overlays.yaml`: the profile llm-d's nightly runs on each lane.
 
-The file is read by `deploy/llm-d-nightly/smoke-step.sh`. Each guide it lists must say
-exactly what that guide's README says under "Pick your profile", in both directions, so a row can
-never point at another profile than a reader would choose, and an overlay the README covers is
-never silently left out. An overlay that is not listed has no profile; the nightly skips it.
+The file is read by `deploy/llm-d-nightly/smoke-step.sh`, which looks a lane up by its scenario
+and overlay. Each row must say what the guide README's maintainers' table says for that lane
+(profile and identity flags), and every lane a README lists must be either a row or under
+`not_run`, so a lane can neither run another profile than the README names nor be silently left
+out.
 """
 
 from __future__ import annotations
@@ -18,65 +19,76 @@ from llmdv.profile import loader
 
 ROOT = Path(__file__).resolve().parents[1]
 LLMD = ROOT / "profiles" / "llm-d"
-OVERLAYS = ROOT / "deploy" / "llm-d-nightly" / "overlays.yaml"
-# An overlay is a path under guides/<guide>/modelserver/: segments with no empty one, no slash at
-# either end and no whitespace (`gpu/vllm/gke`, `tpu/v5p/vllm`, `xpu/vllm`).
-OVERLAY = re.compile(r"[A-Za-z0-9._-]+(?:/[A-Za-z0-9._-]+)+")
+MAP = ROOT / "deploy" / "llm-d-nightly" / "overlays.yaml"
+# A scenario is a guide folder, optionally with a sub-path (`multimodal-serving/aggregation`); an
+# overlay is at least two path segments (`xpu/vllm`, `gpu/vllm/lmcache-connector/cpu/gke`).
+SEGMENT = r"[A-Za-z0-9._-]+"
+SCENARIO = re.compile(rf"{SEGMENT}(?:/{SEGMENT})*")
+OVERLAY = re.compile(rf"{SEGMENT}(?:/{SEGMENT})+")
 
 
-def _overlays() -> dict[str, dict[str, str]]:
-    return yaml.safe_load(OVERLAYS.read_text()) or {}
+def _map() -> dict:
+    return yaml.safe_load(MAP.read_text())
 
 
-def _readme_map(guide: str) -> dict[str, str]:
-    """Overlay to profile, read from the guide README's "Pick your profile" table."""
-    text = (LLMD / guide / "README.md").read_text()
-    table = text.split("## Pick your profile", 1)[1].split("\n## ", 1)[0]
-    rows = [
-        [cell.strip() for cell in line.strip().strip("|").split("|")]
-        for line in table.splitlines()
-        if line.startswith("|")
+def _rows() -> list[tuple[str, str, dict]]:
+    return [
+        (scenario, overlay, row)
+        for scenario, overlays in sorted(_map()["lanes"].items())
+        for overlay, row in sorted(overlays.items())
     ]
-    header, body = rows[0], rows[2:]
-    assert header[1] in ("Overlay", "Overlays"), (
-        f"{guide}: 'Pick your profile' column 2 is {header[1]!r}, not the overlays a lane deploys; "
-        "a guide whose profiles are not chosen by overlay cannot be listed in overlays.yaml"
+
+
+def _readme_lanes() -> dict[str, tuple[str, str | None, list[str]]]:
+    """Every lane the guide READMEs' maintainers' tables list: workflow name to (guide, profile,
+    identity flags). A table names its lanes by suffix after `nightly-e2e-<prefix>-`."""
+    lanes = {}
+    for readme in sorted(LLMD.glob("*/README.md")):
+        guide = readme.parent.name
+        section = readme.read_text().split("## For maintainers", 1)[-1]
+        named = re.search(r"nightly-e2e-([a-z0-9-]+)-<workflow-suffix>", section)
+        prefix = named.group(1) if named else guide
+        for line in section.splitlines():
+            if not line.startswith("| `"):
+                continue
+            cells = [cell.strip() for cell in line.strip().strip("|").split("|")]
+            suffix = cells[0].strip("`")
+            lane = suffix if suffix.startswith(prefix) else f"{prefix}-{suffix}"
+            profile = re.search(r"`([a-z0-9.-]+?-standalone)(?:\.yaml)?`", line)
+            identity = re.findall(r"--identity ([^ `]+)", cells[-1])
+            lanes[lane] = (guide, profile.group(1) if profile else None, identity)
+    return lanes
+
+
+def test_every_readme_lane_is_a_row_or_not_run_and_never_both():
+    readme = set(_readme_lanes())
+    rows = [row["lane"] for _, _, row in _rows()]
+    not_run = set(_map().get("not_run") or {})
+    assert len(rows) == len(set(rows)), "a lane is listed in two rows"
+    assert not set(rows) & not_run, f"listed as both a row and not_run: {set(rows) & not_run}"
+    assert set(rows) | not_run == readme, (
+        f"missing from overlays.yaml: {sorted(readme - set(rows) - not_run)}; "
+        f"not in any guide README: {sorted((set(rows) | not_run) - readme)}"
     )
-    found: dict[str, str] = {}
-    for cells in body:
-        link = re.match(r"\[([^\]]+)\]\(([^)]+)\)", cells[2])
-        assert link, f"{guide}: a 'Pick your profile' row has no profile link: {cells}"
-        for overlay in re.findall(r"`([^`]+)`", cells[1]):
-            assert overlay not in found, f"{guide}: overlay {overlay} is in two rows"
-            found[overlay] = link.group(1)
-    return found
 
 
-def test_the_file_is_a_mapping_of_guides_to_overlays_to_profile_names():
-    data = _overlays()
-    assert data, "overlays.yaml lists no guide"
-    for guide, rows in data.items():
-        assert (LLMD / guide).is_dir(), f"{guide}: no such guide folder under profiles/llm-d/"
-        assert isinstance(rows, dict) and rows, f"{guide}: expected overlay: profile rows"
-        for overlay, profile in rows.items():
-            assert OVERLAY.fullmatch(overlay), f"{guide}: {overlay!r} is not an overlay path"
-            assert isinstance(profile, str) and not profile.endswith(".yaml"), (
-                f"{guide}/{overlay}: name the profile file without .yaml, got {profile!r}"
-            )
+@pytest.mark.parametrize(("scenario", "overlay", "row"), _rows(), ids=lambda v: str(v)[:60])
+def test_each_row_says_what_its_lanes_readme_row_says(scenario, overlay, row):
+    assert SCENARIO.fullmatch(scenario), f"{scenario!r} is not a scenario path"
+    assert OVERLAY.fullmatch(overlay), f"{scenario}: {overlay!r} is not an overlay path"
+    assert set(row) == {"lane", "profile", "identity"}, f"{scenario}/{overlay}: {sorted(row)}"
+    guide, profile, identity = _readme_lanes()[row["lane"]]
+    assert scenario.split("/")[0] == guide, f"{row['lane']}: scenario {scenario} is not in {guide}/"
+    assert row["profile"] == f"{guide}/{profile}", row["lane"]
+    assert row["identity"] == identity, row["lane"]
 
 
-@pytest.mark.parametrize("guide", sorted(_overlays()))
-def test_each_guide_matches_its_readme_pick_your_profile_table(guide):
-    assert _overlays()[guide] == _readme_map(guide)
-
-
-@pytest.mark.parametrize(
-    ("guide", "overlay", "profile"),
-    [(g, o, p) for g, rows in sorted(_overlays().items()) for o, p in rows.items()],
-)
-def test_each_listed_profile_exists_and_loads(guide, overlay, profile, monkeypatch):
-    path = LLMD / guide / f"{profile}.yaml"
-    assert path.is_file(), f"{guide}/{overlay}: no profile {path.relative_to(ROOT)}"
-    for name in ("LLMDV_ROUTER_URL", "LLMDV_GATEWAY_URL"):
-        monkeypatch.setenv(name, "http://example.invalid")
-    loader.load(path)
+@pytest.mark.parametrize("profile", sorted({row["profile"] for _, _, row in _rows()}))
+def test_each_profile_exists_loads_and_reads_the_router_url(profile, monkeypatch):
+    path = LLMD / f"{profile}.yaml"
+    assert path.is_file(), f"no profile {path.relative_to(ROOT)}"
+    monkeypatch.setenv("LLMDV_ROUTER_URL", "http://example.invalid")
+    routers = [i for i in loader.load(path).ingresses if i.id == "router"]
+    assert routers and routers[0].base_url_env == "LLMDV_ROUTER_URL", (
+        f"{profile}: smoke-step.sh sets LLMDV_ROUTER_URL for a `router` ingress"
+    )

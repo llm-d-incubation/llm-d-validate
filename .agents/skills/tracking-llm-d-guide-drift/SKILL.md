@@ -36,10 +36,10 @@ The guide profiles are built from llm-d at one commit, which `profiles/llm-d/REA
 
 3. **Workflows with no profile.**
    - **Under `(no guide folder)`:** a new Tier 3 guide. Confirm the guide has a `guide.yaml` and that the workflow is scheduled (`on: schedule` in the workflow), then build its folder with the profile skill at the new commit. One issue per new guide, titled with the guide's name.
-   - **Under a guide:** a new workflow of a covered guide. Render the overlay it applies at the new commit. If a client sees the same model, window, parsers and engine as an existing combination, add the workflow to the guide README's workflow table with its `--identity` flags. Otherwise it is a new combination. Either way, a new overlay goes into the guide's "Pick your profile" table and, when the guide is listed there, into `deploy/llm-d-nightly/overlays.yaml` in the same commit (`tests/test_llmd_overlays.py` holds the two equal).
+   - **Under a guide:** a new workflow of a covered guide. Render the overlay it applies at the new commit. If a client sees the same model, window, parsers and engine as an existing combination, add the workflow to the guide README's workflow table with its `--identity` flags. Otherwise it is a new combination. Either way, the new workflow also goes into `deploy/llm-d-nightly/overlays.yaml` in the same commit: under `lanes`, keyed by its scenario and overlay, with the profile and `--identity` flags of its README row, or under `not_run` when it does not use llm-d-infra's reusable nightly workflow (`tests/test_llmd_overlays.py` holds the map equal to the README tables).
    - **Already listed under "Not covered"** in `profiles/llm-d/README.md` (fast-model-actuation-keda, #130): leave it. The report lists it every time, by design, until it is covered.
 
-4. **Workflows removed.** Drop the workflow's row from the guide README. Delete a combination no workflow uses any more, and update the workflow counts in `profiles/llm-d/README.md`'s coverage table. An overlay no workflow deploys any more leaves "Pick your profile" and `deploy/llm-d-nightly/overlays.yaml` together.
+4. **Workflows removed.** Drop the workflow's row from the guide README. Delete a combination no workflow uses any more, and update the workflow counts in `profiles/llm-d/README.md`'s coverage table. Drop it from `deploy/llm-d-nightly/overlays.yaml` in the same commit.
 
 5. **Changed sources.** Read each file's diff (`git -C "$D" diff <old> <new> -- <path>`). By owner:
 
