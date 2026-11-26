@@ -59,11 +59,11 @@ Clone the release tag for its profiles and shared parts, then install the matchi
 [PyPI](https://pypi.org/project/llm-d-validate/). From a clean machine:
 
 ```bash
-git clone --branch v0.1.1 https://github.com/llm-d-incubation/llm-d-validate.git
+git clone --branch v0.1.2 https://github.com/llm-d-incubation/llm-d-validate.git
 cd llm-d-validate
 python3 -m venv .venv
 source .venv/bin/activate
-python -m pip install 'llm-d-validate==0.1.1'
+python -m pip install 'llm-d-validate==0.1.2'
 ```
 
 For the [released container](deploy/README.md#use-the-released-image-locally) or a
