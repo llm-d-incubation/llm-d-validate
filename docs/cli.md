@@ -47,8 +47,9 @@ Flags whose behaviour needs more than `--help`:
   process is killed. Concurrency above 1 requires POSIX process groups.
   For pytest JUnit XML, debug output, or a pytest log file, use `--concurrency 1` so
   one pytest session owns the output file. The `llmdv --log-file` option works in both modes.
-  Pytest's `--setup-only`, `--setup-plan`, and `--collect-only` diagnostics run in a
-  single session at any supported concurrency.
+  Pytest runs collection, setup and fixture inspections in a single session at any supported
+  concurrency, including `--collect-only`, `--setup-only`, `--setup-plan`, `--fixtures` and
+  `--fixtures-per-test`.
 - **`-n` is refused.** `verify` exits `2` on `-n`, `--numprocesses`, `--maxprocesses`, `--dist`,
   `--tx`, `--px` and `-d`. The live scheduler controls case isolation and evidence collection.
 - **`--evidence all`** writes a bundle for every case, not only failures, so a pass can be

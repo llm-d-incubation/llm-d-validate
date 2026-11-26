@@ -136,16 +136,20 @@ def test_serial_junit_keeps_every_case_and_failure(tmp_path):
     assert len(report.findall(".//failure")) == sum(r["outcome"] == "fail" for r in records)
 
 
-@pytest.mark.parametrize("option", ["--setup-only", "--setupplan", "--co"])
+@pytest.mark.parametrize(
+    "option", ["--setup-only", "--setupplan", "--co", "--fixtures-per-test", "--fixtures"]
+)
 def test_diagnostic_modes_match_the_serial_session(tmp_path, option):
     with FakeFleet() as fleet:
         path = profile(tmp_path, fleet, [*ELIGIBLE[:2], "logs.signatures"])
         skips = []
         for width in (1, 2):
-            extra = ["--", option] if option == "--setup-only" else []
+            extra = ["--", option] if option in ("--setup-only", "--fixtures-per-test") else []
             env = {} if extra else {"PYTEST_ADDOPTS": option}
             result, run = verify(tmp_path, path, width, "--skip-preflight", *extra, env=env)
             assert result.returncode == 0, result.stderr
+            if option.startswith("--fixtures"):
+                assert "fleet_kube" in (run / "llmdv.log").read_text()
             assert "unfinished" not in json.loads((run / "outcome.json").read_text())["execution"]
             skips.append([(r["nodeid"], r["outcome"], r["skip_class"]) for r in rows(run)])
         assert not fleet.seen
@@ -720,6 +724,39 @@ def test_log_scan_redacts_preflight_credentials_in_publication(tmp_path):
         token.encode() not in body and storage_key.encode() not in body
         for body in store.objects.values()
     )
+
+
+def test_log_scan_redacts_metrics_token_without_preflight(tmp_path):
+    token = "test-metrics-secret"
+    published = tmp_path / "published"
+    with FakeFleet() as fleet, FakePrometheus({"ready": [({}, 1)]}, token=token) as prom:
+        path = profile(tmp_path, fleet, ["metrics.bounds", "logs.signatures"])
+        raw = yaml.safe_load(path.read_text())
+        raw.update(yaml.safe_load(metrics_environment(prom.base_url, "METRICS_KEY")))
+        raw["environment"]["namespace"] = "fleet"
+        raw["fleet"] = {"metrics": [{"id": "ready", "check": "bounds", "query": "ready", "min": 1}]}
+        raw["ingresses"][0].update(yaml.safe_load(LOGS_INGRESS_YAML))
+        path.write_text(yaml.safe_dump(raw))
+        state = fleet_state()
+        for source in state["logs"]:
+            state["logs"][source] += f"INFO x-api-key={token}\n"
+        result, run = verify(
+            tmp_path,
+            path,
+            2,
+            "--skip-preflight",
+            "--remote-output",
+            published.as_uri(),
+            env={**fake_kubectl(tmp_path / "bin", state), "METRICS_KEY": token},
+        )
+    assert result.returncode == 0, result.stderr
+    assert prom.requests == [("GET", "/api/v1/query", "ready")]
+    for root in (run, published):
+        logs = list(root.rglob("log-scan/*.log"))
+        assert len(logs) == 3
+        for path in logs:
+            body = path.read_text()
+            assert token not in body and f"x-api-key={redact.SENTINEL}" in body
 
 
 def test_cross_ingress_evidence_and_log_window(tmp_path):

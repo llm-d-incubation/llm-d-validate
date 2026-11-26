@@ -45,6 +45,7 @@ from ..evidence.outcome import (
     read_results,
 )
 from ..evidence.stack import stack_from_run
+from ..fleet.prometheus import token_for
 from ..http import redact
 from ..kube import KubeContext
 from ..log import setup as log_setup
@@ -387,6 +388,9 @@ def _verify(args: argparse.Namespace, run: _Run) -> int:
         log.error("%s", exc)
         return USAGE
     redact.install_secrets(list(loader.resolve_all_secrets(profile).values()))
+    if profile.environment.metrics is not None:
+        # Register the declared token before workers inherit the coordinator's redactions.
+        token_for(profile.environment.metrics)
     run.outcome.profile["name"] = profile.name
     run.outcome.identity = identity.build(
         profile, lane_identity, loader.contract_digest(args.profile)

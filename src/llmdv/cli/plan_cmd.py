@@ -66,7 +66,8 @@ class _Planner:
 
     def __init__(self, concurrency: int = 1) -> None:
         self.concurrency = concurrency
-        self.diagnostic = False
+        self.collect_or_setup_only = False
+        self.entered_runtestloop = False
         self.rows: list[dict] = []
         self.left_out = 0
         self.excluded = []
@@ -77,13 +78,13 @@ class _Planner:
         # Read the caller's options before adding the planner's own collection-only flag.
         options = early_config.known_args_namespace
         args.append("--collect-only")
-        if self.concurrency == 1:
-            return
-        self.diagnostic = (
+        self.collect_or_setup_only = (
             options.collectonly
             or getattr(options, "setuponly", False)
             or getattr(options, "setupplan", False)
         )
+        if self.concurrency == 1:
+            return
         # Includes addopts from the environment and ini, before pytest opens its debug trace.
         if getattr(options, "xmlpath", None):
             raise pytest.UsageError("--junitxml needs a single pytest session; use --concurrency 1")
@@ -94,6 +95,11 @@ class _Planner:
             raise pytest.UsageError(
                 "pytest output files need a single session; use --concurrency 1"
             )
+
+    @pytest.hookimpl(tryfirst=True)
+    def pytest_runtestloop(self) -> None:
+        # Fixture inspections collect items without entering pytest's test loop.
+        self.entered_runtestloop = True
 
     def pytest_collection_finish(self, session) -> None:
         from ..plugin import plan_row
@@ -148,7 +154,7 @@ def cmd_plan(args: argparse.Namespace, private_output: Path | None = None) -> in
     document = _document(profile.name, args, planner.rows, selected, planner.left_out)
     document["coverage"].update(excluded=planner.excluded, excluded_by_filters=planner.filtered)
     if private_output is not None:
-        document["diagnostic"] = planner.diagnostic
+        document["diagnostic"] = planner.collect_or_setup_only or not planner.entered_runtestloop
         private_output.write_text(json.dumps(document), encoding="utf-8")
     elif args.json:
         emit(json.dumps(document, indent=2))
