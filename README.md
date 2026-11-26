@@ -23,17 +23,24 @@
 
 ## How it works
 
-`llmdv` checks deployed llm-d stacks and other OpenAI- or Anthropic-compatible services.
-A profile describes the model, the reachable layers and their expected behavior. Tests send
-real requests, record the answers, and report failures with evidence and replay commands.
-Comparing layers helps locate a problem; comparing runs identifies regressions.
+`llmdv` sends real requests through every reachable layer of a deployed llm-d stack, or any
+OpenAI- or Anthropic-compatible one. It checks each answer against the API, helps pinpoint the
+layer that breaks, and flags what regressed since the last run.
 
-Validation never deploys, patches, scales or restarts the serving stack. It can read cluster
-information when granted access. Test requests do consume inference resources and may create
-API-level state; choose the profile and coverage appropriate for your deployment.
+- **It tests every layer on its own.** `llmdv` calls each layer you can reach (gateway, router,
+  engine) through Chat, Completions, Messages and Responses, and exercises streaming, tools,
+  caching, headers and failure paths, so you see which layers pass or fail the selected checks.
+- **A profile defines correct.** It describes your stack: its ingresses, its model and what each
+  layer serves. Every verdict traces back to the expectations in that file.
+- **It catches regressions.** Compare runs, and `llmdv` flags changed case outcomes and observed
+  build changes, so you can find regressions beyond what a passing health check tells you.
+- **Every run produces evidence.** You get the results, every request and response, a replay
+  script for each failure, and an optional dashboard to explore the whole run.
 
-Start with a [deployed llm-d guide](#quick-start-test-a-deployed-llm-d-guide) or
-[your own endpoint](docs/getting-started.md#run-your-own-stack).
+> [!NOTE]
+> `llmdv` never deploys, patches, scales or restarts the serving stack. Cluster access, when you
+> grant it, runs through a read-only verb allowlist. You name credentials by environment
+> variable; `llmdv` redacts them from logs and recorded evidence.
 
 <p align="center">
   <img src="docs/images/llmdv-overview.gif" width="100%" alt="Animated overview: a profile defines the test plan; llmdv sends requests to the reachable gateway, router and engine, records verdicts and evidence, and publishes results and notifications.">
