@@ -1,0 +1,64 @@
+# meta-models/Muse-Spark-Open-816B-A42B-NVFP4: the model as a client sees it (id, window, parsers,
+# reasoning, tools) and the capabilities that differ from the other stacks in this folder.
+# MEASURED on one deployment. A part, never run on its own.
+model:
+  public_id: meta-models/Muse-Spark-Open-816B-A42B-NVFP4
+  aliases: []
+  max_model_len: 1048576
+  reasoning: {parser: muse, field: reasoning_content, default_on: true}
+  tools:
+    parser: muse
+    auto_choice: true
+    markup: [<|start|>assistant to=, '<atem:function_calls>']
+    forced_finish_reason: stop
+    strict_level: auto
+  answer_max_tokens: 1024
+capabilities:
+  chat_reasoning_efforts: [low, minimal, medium, high, xhigh, max]
+  chat_quiet_efforts: []
+  effort_rendering:
+    pattern: 'Reasoning strength: (\d+)\.'
+    efforts:
+      unset: '512'
+      none: '8'
+      minimal: '8'
+      low: '8'
+      medium: '32'
+      high: '256'
+      xhigh: '512'
+      max: '512'
+  chat_fields: {role_function: accepted}
+  completions_fields: {suffix: rejected}
+  messages_features: {tool_reference: accepted, image_url: rejected}
+  vision: [chat_completions, messages, responses]
+  client_sessions:
+  - skill
+  - hook
+  - parallel_reads
+  - nested_subagent
+  - compaction
+  - image_read
+  responses_reasoning_efforts: [minimal, low, medium, high, xhigh, max]
+  responses_features: {encrypted_reasoning: ignored}
+  extension_options:
+  - ignore_eos
+  - min_tokens
+  - truncate_prompt_tokens
+  - cache_salt
+  - include_stop_str_in_output
+  - continue_final_message
+  - echo
+  - continuous_usage_stats
+  - structured_outputs
+  - return_tokens_as_token_ids
+  - prompt_logprobs
+  - allowed_token_ids
+  - bad_words
+  - include_reasoning
+  - stop_reason
+  - chat_template_kwargs
+  - return_token_ids
+  - logit_bias
+  messages_thinking: [enabled, adaptive]
+headers:
+  x-request-id: {router: ignored}

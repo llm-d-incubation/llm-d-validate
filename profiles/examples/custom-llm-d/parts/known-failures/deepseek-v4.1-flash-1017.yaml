@@ -1,0 +1,11 @@
+# deepseek-ai/DeepSeek-V4.1-Flash-1017: the failures this stack is known to have, each citing the
+# public issue it waits on. A known failure still counts as failed; the report names its issue. A
+# part, never run on its own.
+known_failures:
+- check: field_status
+  cases:
+  - openai_chat.request_field[logprob_token_ids]
+  - openai_completions.request_field[logprob_token_ids]
+  ingress: litellm
+  issue: vllm-project/vllm#61219
+  fix: vllm-project/vllm#61219, vllm-project/vllm#44727
