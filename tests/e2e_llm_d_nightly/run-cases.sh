@@ -27,7 +27,7 @@ trap cleanup EXIT
 # profile in place of the real ones.
 release="$work/release"
 mkdir -p "$release/deploy/llm-d-nightly" "$release/profiles/llm-d/optimized-baseline"
-cp "$root/deploy/llm-d-nightly/smoke-step.sh" "$release/deploy/llm-d-nightly/"
+cp "$root/deploy/llm-d-nightly/"*.{sh,py} "$release/deploy/llm-d-nightly/"
 cat > "$release/deploy/llm-d-nightly/overlays.yaml" <<'EOF'
 lanes:
   optimized-baseline:
@@ -140,14 +140,14 @@ echo "case 4: no router Service in the namespace"
 ns=$(namespace noservice)
 step "$ns" gke
 check 4 "the step exits 0" exit_is 0
-check 4 "it warns that the Service is missing" grep -q "Service optimized-baseline-epp not found" "$work/step.log"
+check 4 "it warns that the Service is missing" grep -q "integration failed, not a guide failure" "$work/step.log"
 check 4 "it created nothing" nothing_made "$ns"
 
 echo "case 5: a router Service with nothing behind it"
 ns=$(namespace down) && router "$ns"
 step "$ns" gke
 check 5 "the step exits 0" exit_is 0
-check 5 "it reports llmdv's exit 3 as not a guide failure" grep -q "llmdv exited 3" "$work/step.log"
+check 5 "it reports llmdv's exit 3 as not a guide failure" grep -q "verification exit 3" "$work/step.log"
 check 5 "the pod and ConfigMap are removed" leftovers_gone "$ns"
 
 if [ "$failed" -ne 0 ]; then echo "smoke-step e2e: FAILED"; exit 1; fi

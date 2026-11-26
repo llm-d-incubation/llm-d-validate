@@ -12,6 +12,8 @@ on:
       - tests/fakes.py
       - tests/transport_fakes.py
       - Containerfile
+      - src/llmdv/**
+      - pyproject.toml
       - .github/workflows/smoke-step-e2e.yaml
   workflow_dispatch:
 
@@ -39,6 +41,8 @@ jobs:
           uv venv "$RUNNER_TEMP/venv"
           VIRTUAL_ENV="$RUNNER_TEMP/venv" uv pip install .
           echo "$RUNNER_TEMP/venv/bin" >> "$GITHUB_PATH"
+          uv build --wheel --out-dir "$RUNNER_TEMP/wheels"
+          echo "LLMDV_PACKAGE=$(find "$RUNNER_TEMP/wheels" -name '*.whl' -print -quit)" >> "$GITHUB_ENV"
 
       - uses: docker/setup-buildx-action@v3
 
