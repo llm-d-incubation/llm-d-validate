@@ -1,7 +1,7 @@
-# deepseek-ai/DeepSeek-V4.1-Flash-1017 on a custom llm-d stack: a LiteLLM gateway (`litellm`) in
-# front of vLLM; no router layer was measured. MEASURED on one deployment of each layer: every
-# surface, error status, capability and header the parts below declare is what that layer served,
-# and so are the change sentinels in parts/sentinels/deepseek-v4.1-flash-1017.yaml.
+# deepseek-ai/DeepSeek-V4.1-Flash-1017 on a custom llm-d stack: a LiteLLM gateway (`litellm`)
+# and a directly reachable llm-d router (`router`). The gateway declarations and sentinels
+# retain the deployment measurements. The router uses the shared llm-d contract with the
+# model's capabilities; its change sentinels are placeholders to seed from that ingress.
 #
 # Validation scope: the default selects the existing library before applicability gates.
 # Start with smoke at a reachable ingress, then review the default plan (see README.md).
@@ -19,6 +19,7 @@
 extends:
   - parts/base.yaml
   - parts/proxy-litellm.yaml
+  - parts/router-llm-d.yaml
   - parts/models/deepseek-v4.1-flash-1017.yaml
   - parts/known-failures/deepseek-v4.1-flash-1017.yaml
   - parts/sentinels/deepseek-v4.1-flash-1017.yaml
@@ -40,3 +41,43 @@ ingresses:
   transport:
     present_paths: [/v1/models, /openapi.json, /metrics/]
     absent_paths: [/docs, /tokenize, /detokenize, /version]
+- id: router
+  # INTENT: validate the four generation APIs directly through the llm-d router.
+  surfaces: [chat_completions, completions, messages, responses]
+  # Native vLLM reasoning field; LiteLLM exposes reasoning_content at the gateway.
+  model:
+    reasoning: {field: reasoning}
+  capabilities:
+    # Seed from this ingress; gateway measurements do not establish router baselines.
+    prompt_pins:
+      chat_completions: {conversation: 1, tools: 1}
+      completions: {conversation: 1}
+      messages: {conversation: 1, tools: 1}
+      responses: {conversation: 1, tools: 1}
+    contract_baseline:
+      chat_completions:
+        response: {llmdv_seed: [absent]}
+        stream: {llmdv_seed: [absent]}
+        error: {llmdv_seed: [absent]}
+        invalid: {llmdv_seed: [absent]}
+        tool_response: {llmdv_seed: [absent]}
+        tool_stream: {llmdv_seed: [absent]}
+      completions:
+        response: {llmdv_seed: [absent]}
+        stream: {llmdv_seed: [absent]}
+        error: {llmdv_seed: [absent]}
+        invalid: {llmdv_seed: [absent]}
+      messages:
+        response: {llmdv_seed: [absent]}
+        stream: {llmdv_seed: [absent]}
+        error: {llmdv_seed: [absent]}
+        invalid: {llmdv_seed: [absent]}
+        tool_response: {llmdv_seed: [absent]}
+        tool_stream: {llmdv_seed: [absent]}
+      responses:
+        response: {llmdv_seed: [absent]}
+        stream: {llmdv_seed: [absent]}
+        error: {llmdv_seed: [absent]}
+        invalid: {llmdv_seed: [absent]}
+        tool_response: {llmdv_seed: [absent]}
+        tool_stream: {llmdv_seed: [absent]}
