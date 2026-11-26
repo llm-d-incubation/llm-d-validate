@@ -153,7 +153,7 @@ llmdv verify --profile <profile> --evidence all -k "<tests>"  # the cases you ca
 llmdv verify --profile <profile> --full-suite --analyze                    # the full suite, 15-60 min; runs/<timestamp>/
 ```
 
-Restrict a multi-ingress profile with `--ingress <id>`. Keep the machine awake for the full run, or run it unattended with `llmdv job` or as a cluster job ([deploy/README.md](../../../deploy/README.md); [`.agents/ENVIRONMENT.md`](../../ENVIRONMENT.md), "Long runs"). Exit `1` is test failures, `3` your environment rather than the fleet, `5` results not delivered, `6` interrupted; see [docs/cli.md](../../../docs/cli.md#exit-codes).
+Restrict a multi-ingress profile with `--ingress <id>`, or several ids comma-separated (`--ingress litellm,router`); preflight checks only the layers selected. Keep the machine awake for the full run, or run it unattended with `llmdv job` or as a cluster job ([deploy/README.md](../../../deploy/README.md); [`.agents/ENVIRONMENT.md`](../../ENVIRONMENT.md), "Long runs"). Exit `1` is test failures, `3` your environment rather than the fleet, `5` results not delivered, `6` interrupted; see [docs/cli.md](../../../docs/cli.md#exit-codes).
 
 ## 8. Compare and report
 

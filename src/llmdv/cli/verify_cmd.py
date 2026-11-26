@@ -177,7 +177,7 @@ def add_selection_arguments(parser: argparse.ArgumentParser) -> None:
         "--ingress",
         action="append",
         default=[],
-        help="restrict to this ingress id (repeatable; a union)",
+        help="restrict to these ingress ids, comma-separated or repeated (a union)",
     )
     parser.add_argument(
         "--client",
@@ -932,6 +932,29 @@ def _write_reproduce(args, profile, run_dir, setup_commands) -> None:
     )
 
 
+def select_ingresses(profile, tokens: list[str]) -> tuple[list[str], list[str]]:
+    """The ingress ids --ingress names, in the profile's order, and the names it does not declare.
+
+    Each value may hold several ids separated by commas (`--ingress litellm,router`), and the
+    flag may be repeated; the result is their union. So one profile can declare every layer of a
+    stack and a run can pick the layers it reaches.
+    """
+    wanted: set[str] = set()
+    unknown: list[str] = []
+    for value in tokens:
+        names = [t.strip() for t in value.split(",") if t.strip()]
+        if not names:
+            # An explicit value that names nothing (an empty variable, a stray comma) must not
+            # widen the run to every ingress: it is reported like an unknown id.
+            unknown.append(value)
+        for token in names:
+            if token in profile.ingress_ids:
+                wanted.add(token)
+            else:
+                unknown.append(token)
+    return [i for i in profile.ingress_ids if i in wanted], unknown
+
+
 def _unknown_selectors(profile, args) -> list[str]:
     """Names given to --ingress/--client/--surface that this profile does not define."""
     from ..surfaces.base import KNOWN_SURFACES
@@ -941,12 +964,16 @@ def _unknown_selectors(profile, args) -> list[str]:
         resolve_coverage(profile, args)
     except loader.ProfileError as exc:
         problems.append(str(exc))
-    for ingress_id in args.ingress or []:
-        if ingress_id not in profile.ingress_ids:
-            problems.append(
-                f"--ingress {ingress_id!r} is not in profile {profile.name!r}; "
-                f"it declares: {', '.join(profile.ingress_ids)}"
-            )
+    args.ingress, unknown = select_ingresses(profile, args.ingress or [])
+    for token in unknown:
+        what = (
+            "names no ingress id"
+            if not token.strip(" ,")
+            else f"is not in profile {profile.name!r}"
+        )
+        problems.append(
+            f"--ingress {token!r} {what}; it declares: {', '.join(profile.ingress_ids)}"
+        )
     declared_clients = [client.id for client in profile.clients]
     for client_id in args.client or []:
         if client_id not in declared_clients:

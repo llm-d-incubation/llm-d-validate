@@ -59,13 +59,19 @@ free-form, recorded in `env.json` and `outcome.json`; it cannot use an identity 
 ```sh
 llmdv verify --profile P --client agent        # the cases a client depends on
 llmdv verify --profile P --surface responses   # one API surface
-llmdv verify --profile P --ingress litellm     # one layer
+llmdv verify --profile P --ingress litellm     # one layer, by its id
+llmdv verify --profile P --ingress litellm,router   # several layers, comma-separated
 llmdv verify --profile P -m "not disruptive"   # leave the fleet alone
 llmdv verify --profile P -k discovery          # a pytest keyword expression
 llmdv verify --profile P --full-suite          # every case in the library, before other filters narrow it
 ```
 
-Repeating `--ingress`, `--client` or `--surface` is a union; different selectors intersect. `-k` and `-m` narrow the chosen scope
+Repeating `--ingress`, `--client` or `--surface` is a union; different selectors intersect.
+`--ingress` also takes a comma-separated list of ingress ids. So one profile can declare every
+layer of a stack, and each run picks the layers it can reach: preflight and the cases touch only
+the selected ones. Without `--ingress`, every declared ingress runs. A value that names no
+id (empty, spaces or only commas, as from an unset shell variable) or an id the profile does not
+declare exits 2 before any request; it never falls back to every ingress. `-k` and `-m` narrow the chosen scope
 but never widen it. The ingress id is the parametrisation id, so `-k router` keeps one column.
 
 `-m` takes one marker per suite package under `src/llmdv/suites/`: `anthropic_messages`,
