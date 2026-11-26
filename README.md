@@ -15,7 +15,7 @@
 
 <p align="center">
   <a href="https://github.com/llm-d-incubation/llm-d-validate#quick-start-test-a-deployed-llm-d-guide">Quick start</a> ·
-  <a href="https://github.com/llm-d-incubation/llm-d-validate/blob/main/profiles/README.md">Profiles</a> ·
+  <a href="https://github.com/llm-d-incubation/llm-d-validate/blob/main/docs/README.md">Documentation</a> ·
   <a href="https://github.com/llm-d-incubation/llm-d-validate/blob/main/docs/cli.md">CLI reference</a> ·
   <a href="https://github.com/llm-d-incubation/llm-d-validate/blob/main/docs/test-suites.md">Test suites</a> ·
   <a href="https://github.com/llm-d-incubation/llm-d-validate/blob/main/CONTRIBUTING.md">Contributing</a>
@@ -27,91 +27,62 @@
 
 ## How it works
 
-`llmdv` sends real requests through every layer of a deployed [llm-d](https://github.com/llm-d/llm-d)
-stack, or any OpenAI- or Anthropic-compatible one. It checks each answer against the API,
-pinpoints the layer that breaks, and flags what regressed since the last run.
+`llmdv` checks deployed llm-d stacks and other OpenAI- or Anthropic-compatible services.
+A profile describes the model, the reachable layers and their expected behavior. Tests send
+real requests, record the answers, and report failures with evidence and replay commands.
+Comparing layers helps locate a problem; comparing runs identifies regressions.
 
-- **It tests every layer on its own.** `llmdv` calls each layer you can reach (gateway, router,
-  engine) through Chat, Completions, Messages and Responses, and exercises streaming, tools,
-  caching, headers and failure paths, so you see exactly which layer holds and which one breaks.
-- **A profile defines correct.** It describes your stack: its ingresses, its model and what each
-  layer serves. Every verdict traces back to a line in that file.
-- **It catches regressions.** Compare runs, and `llmdv` flags every case that changed and every
-  build that changed under it, so a regression never hides behind a passing health check.
-- **Every run produces evidence.** You get the results, every request and response, a replay
-  script for each failure, and an optional dashboard to explore the whole run.
-
-> [!NOTE]
-> `llmdv` is read-only: it sends requests and reads what comes back, and it never deploys,
-> patches, scales or restarts anything. Cluster access, when you grant it, runs through a
-> read-only verb allowlist. You name credentials by
-> environment variable; `llmdv` keeps them out of every file and redacts them from every log.
+Validation never deploys, patches, scales or restarts the serving stack. It can read cluster
+information when granted access. Test requests do consume inference resources and may create
+API-level state; choose the profile and coverage appropriate for your deployment.
 
 ## Quick start: test a deployed llm-d guide
 
-Every llm-d guide at [Tier 3](https://github.com/llm-d/llm-d/blob/main/guides/GUIDES-POLICY.md#5-production-readiness-tiers)
-(Validated: run end to end every night) comes with a ready-to-use
-[validation profile](https://github.com/llm-d-incubation/llm-d-validate/blob/main/profiles/README.md#llm-d-guide-validation-profiles).
-Pick the one for the overlay you deployed from the guide's README, point `llmdv` at the guide's
-router (the EPP), and run it:
+You need Python 3.10+, Git, a deployed endpoint and a profile matching its configuration.
+From a clean machine:
 
 ```bash
-./install.sh && source .venv/bin/activate
-export P=profiles/llm-d/optimized-baseline/vllm-qwen3-32b-parsers-standalone.yaml
-export LLMDV_ROUTER_URL=<your EPP's URL>
-
-llmdv profile show $P --test-sets             # what the profile's test sets hold, offline
-llmdv plan --profile $P                       # the cases a plain run selects, and why any skip
-llmdv verify --profile $P --test-set smoke    # quick: every API answers
-llmdv verify --profile $P                     # the guide's default test set
-llmdv verify --profile $P --full-suite        # every case in the library
+git clone https://github.com/llm-d-incubation/llm-d-validate.git
+cd llm-d-validate
+./install.sh
+source .venv/bin/activate
 ```
 
-Narrow any run with `-m <suite>` or `-k <case>`;
-[choosing what runs](https://github.com/llm-d-incubation/llm-d-validate/blob/main/docs/cli.md#test-sets-and-coverage)
-explains test sets, suites and the full suite. To test a gateway (Istio, agentgateway, LiteLLM) or
-the engine as well, [add it as another ingress](https://github.com/llm-d-incubation/llm-d-validate/blob/main/profiles/README.md#include-a-gateway-or-engine),
-and `llmdv` tests each layer on its own. [Getting started](https://github.com/llm-d-incubation/llm-d-validate/blob/main/docs/getting-started.md)
-has the details: reading the results, publishing and comparing runs, and running unattended.
+Choose your profile from the [guide catalog](profiles/llm-d/README.md). For example, if you
+have the optimized-baseline Qwen3-32B/vLLM deployment with parsers, set its URL and run smoke:
+
+```bash
+export P=profiles/llm-d/optimized-baseline/vllm-qwen3-32b-parsers-standalone.yaml
+export LLMDV_ROUTER_URL='https://your-router.example'
+llmdv plan --profile "$P" --test-set smoke
+llmdv verify --profile "$P" --test-set smoke --analyze
+```
+
+Replace the example URL with your reachable router. Smoke checks discovery and basic generation
+on the declared APIs; it does not establish full correctness. The command prints the run
+folder, containing `summary.md` and `dashboard.html`. Follow [Getting started](docs/getting-started.md)
+to interpret the result and run the profile's default coverage.
 
 ## Test your own stack
 
-For other model-serving stacks, whether or not they use llm-d, start from an example profile.
-Copy the closest one, fill in its placeholders, and run it. The quick start's commands work the
-same way on it:
-
-```bash
-cp profiles/examples/example-gateway-only.yaml profiles/my-stack.local.yaml   # set base_url and model
-export LLMDV_GATEWAY_KEY='<gateway key>'
-llmdv profile validate profiles/my-stack.local.yaml    # check the profile, offline
-llmdv plan --profile profiles/my-stack.local.yaml      # preview what runs and what skips, offline
-llmdv verify --profile profiles/my-stack.local.yaml    # run it against your stack
-```
-
-Git ignores `*.local.yaml` profiles, so your hosts stay out of the repository.
-[Writing a profile](https://github.com/llm-d-incubation/llm-d-validate/blob/main/docs/writing-profiles.md) walks through the other
-examples, `extends` and what to declare.
+Have another gateway, router or engine? Start with the
+[custom-stack walkthrough](docs/getting-started.md#run-your-own-stack). It uses a minimal profile
+and your endpoint's model ID, URL and credential. One reachable endpoint is enough; additional
+layers are optional.
 
 ## What it tests
 
-19 suites and growing, from every API surface to failure paths and fleet invariants. Run any
-one on its own with `--full-suite -m <suite>`; [test suites](https://github.com/llm-d-incubation/llm-d-validate/blob/main/docs/test-suites.md) describes each one and
-what turns it on.
+The [suite catalog](docs/test-suites.md) describes the API, model behavior, error-path and
+change-detection checks, and the declarations that enable them. A profile selects applicable
+checks; a passing subset says nothing about checks it did not execute.
 
 <p align="center">
-  <img src="https://raw.githubusercontent.com/llm-d-incubation/llm-d-validate/main/docs/images/llmdv-coverage.svg" width="100%" alt="What llmdv tests: 19 suites and growing, in four groups, each shown with the -m marker that runs it. API surfaces: OpenAI Chat Completions, OpenAI Completions, OpenAI Responses, Anthropic Messages, model discovery. Model behaviour: tool calling, streaming, structured output and options, image input, long context. Failure and resilience: error paths and envelopes, transport and TLS, client scenarios, real clients. Contract and change: declared surfaces and headers, render and token parity, prefix-cache reuse, change sentinels, fleet config, metrics and logs. Every case runs per layer: gateway, router, engine.">
+  <img src="docs/images/llmdv-coverage.svg" width="100%" alt="Coverage by suite: APIs, model behavior, failure paths, contracts and change detection.">
 </p>
 
 ## Learn more
 
-- [Getting started](https://github.com/llm-d-incubation/llm-d-validate/blob/main/docs/getting-started.md): install, run, read the results, publish,
-  compare and run unattended.
-- [Profiles](https://github.com/llm-d-incubation/llm-d-validate/blob/main/profiles/README.md), [writing a profile](https://github.com/llm-d-incubation/llm-d-validate/blob/main/docs/writing-profiles.md) and the
-  [field reference](https://github.com/llm-d-incubation/llm-d-validate/blob/main/profiles/REFERENCE.md).
-- [CLI reference](https://github.com/llm-d-incubation/llm-d-validate/blob/main/docs/cli.md): every command, selecting cases, exit codes and output files.
-- [Test suites](https://github.com/llm-d-incubation/llm-d-validate/blob/main/docs/test-suites.md): what each suite checks, the profile key that turns it on,
-  and how to run one.
-- [Architecture](https://github.com/llm-d-incubation/llm-d-validate/blob/main/docs/architecture.md): how the code fits together.
-- [Writing tests](https://github.com/llm-d-incubation/llm-d-validate/blob/main/docs/writing-tests.md): add a case or a suite, prove it can fail, and run it.
-- [Contributing](https://github.com/llm-d-incubation/llm-d-validate/blob/main/CONTRIBUTING.md): we welcome questions and ideas in the
-  [llm-d Slack](https://llm-d.ai/slack) and in this repository's issues.
+- [Documentation by task](docs/README.md): first run, profile selection, results and automation.
+- [Choose a profile](profiles/README.md) or [write one](docs/writing-profiles.md).
+- [Select tests](docs/cli.md#test-sets-and-coverage) and [compare runs](docs/compare.md).
+- [Contribute](CONTRIBUTING.md): add cases, profiles or documentation.

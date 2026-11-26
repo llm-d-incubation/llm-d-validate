@@ -1,163 +1,138 @@
 # Getting started
 
-Install `llmdv`, point it at a deployed stack, and read what it found. Every run writes the same
-run directory, whether it ran from your machine, as an unattended job or as a cluster job.
-[docs/cli.md](cli.md) is the command reference. Agents follow the
-[`running-and-comparing-live-runs`](../.agents/skills/running-and-comparing-live-runs/SKILL.md)
-skill.
-
-`llmdv` never deploys, patches, scales or restarts anything. Cluster access, when given, is
-read-only: every `kubectl` or `oc` call goes through a verb allowlist of `get`, `version`,
-`config` and `logs`.
+Run a small check against a deployed endpoint, read its evidence, then widen coverage. This
+walkthrough uses a local machine; [cluster jobs](../deploy/README.md) use the same profiles and
+produce the same kind of run directory.
 
 ## Install
 
-```sh
-./install.sh && source .venv/bin/activate   # llmdv only
-./install.sh --s3                           # adds boto3, for --remote-output s3://...
-```
-
-The script checks the Python floor, creates `.venv`, installs `llmdv` editable, and checks the
-entry point and the pytest plugin. Re-run it to pick up a dependency change; `--recreate` starts
-over. `--dev` adds the dev, `s3` and `ibm-cos` extras for working on `llmdv` itself: see
-[CONTRIBUTING.md](../CONTRIBUTING.md). By hand, the equivalent of `--dev` is
-`python3 -m venv .venv && ./.venv/bin/pip install -e '.[dev,s3,ibm-cos]'`.
-
-What each path needs:
-
-| You need | For |
-| --- | --- |
-| `llmdv`, installed as above (`--s3` adds the bucket client) | every path, and reading any run |
-| the URL of the layer you test, and a key if it authenticates | every live run |
-| read-only cluster access (`get` and `list` on pods, `get` on `pods/log`) | port-forwarded ingresses and `--pod-logs` |
-| cluster access with the `llmdv-trigger` Role, and the CronJob deployed ([deploy/README.md](../deploy/README.md)) | cluster jobs |
-| bucket credentials; the [AWS CLI](https://aws.amazon.com/cli/) to pull a run back | publishing and pulling runs |
-
-A profile names its variables in `base_url_env` and `auth.key_env`. Export them from wherever you
-keep the values. Never commit a credentials file, and never paste its values into a command, an
-issue or a chat. If your credentials file sets variables without `export`, load it with
-`set -a; source <file>; set +a`.
-
-## Start with a smoke check
-
-Once you have a profile and its endpoint variables, preview and run the built-in test set:
+You need Python 3.10+ and Git. Clone the repository to obtain the installer and profiles:
 
 ```sh
-llmdv plan --profile <profile> --test-set smoke
-llmdv verify --profile <profile> --test-set smoke
+git clone https://github.com/llm-d-incubation/llm-d-validate.git
+cd llm-d-validate
+./install.sh
+source .venv/bin/activate
 ```
 
-`smoke` is a built-in *test set*: model discovery, plus one plain and one streaming request on each
-API your profile declares. It shows the stack answers, not that it is correct, so check which
-cases ran and which skipped. Then widen the run:
+You also need a reachable model endpoint, and a credential if it authenticates. Cluster access
+is optional for URL-only verification. `llmdv` does not create or supervise port-forwards.
+If your profile declares setup, `llmdv profile show "$P" --setup` prints what is required;
+resolving declared pods can read the cluster.
 
-| Command | Runs |
-| --- | --- |
-| `llmdv verify --profile <profile>` | the profile's `default` set, what it is meant to run (a profile without one exits 2) |
-| `llmdv verify --profile <profile> --full-suite` | every case in the library |
-| `llmdv verify --profile <profile> --full-suite -m <suite>` | one whole suite, such as `openai_chat` |
-
-[cli.md](cli.md#test-sets-and-coverage) explains test sets, suites and the full suite, and how to
-define your own sets.
+Choose one of the two paths below. Keep credentials in your environment or a private credential
+store. Never put their values in committed profiles or shared output.
 
 ## Test a deployed llm-d guide
 
-Every llm-d guide at [Tier 3](https://github.com/llm-d/llm-d/blob/main/guides/GUIDES-POLICY.md#5-production-readiness-tiers) (Validated: run end to end every
-night) includes ready-to-use validation profiles under [`profiles/llm-d/`](../profiles/llm-d/),
-one per combination of engine, model configuration and topology, built from the guide as of
-llm-d commit `9ca8ff0`. After deploying a guide with an overlay a combination covers (its header
-lists them), use that combination to verify that your deployment behaves as specified by the guide and its
-APIs. By default it targets the guide's router, so give `llmdv` the EPP's URL. The EPP
-authenticates nothing, so no key is needed:
+Find your deployment in the [guide catalog](../profiles/llm-d/README.md). Its README maps
+configurations to profiles. The following example is for optimized-baseline's Qwen3-32B/vLLM
+configuration with parsers; use the matching profile for your own deployment:
 
 ```sh
 export P=profiles/llm-d/optimized-baseline/vllm-qwen3-32b-parsers-standalone.yaml
-export LLMDV_ROUTER_URL=<your EPP's URL>
-llmdv profile validate $P                 # offline schema and consistency checks
-llmdv plan --profile $P                   # every case verify would run or skip; sends nothing
-llmdv verify --profile $P --full-suite -m contract     # about a minute: the profile against reality
-llmdv verify --profile $P --identity accelerator=gpu --identity provider=gke
+export LLMDV_ROUTER_URL='https://your-router.example'
 ```
 
-To include a gateway or engine in your tests, add it as another ingress in a short local file
-that extends the combination; `llmdv` then tests each layer and says which one a failure came
-from. See
-[include a gateway or engine](../profiles/README.md#include-a-gateway-or-engine).
-
-`--identity` flags are optional labels. One profile covers several overlays, and the labels keep
-their runs apart, so `llmdv compare` never compares two configurations. Each guide's README gives
-an example read off the overlay path; [cli.md](cli.md#commands) lists every identity key.
-
-A guide profile runs its `test_sets.default` by default: the router path, the overlay's parsers and
-window, and what the guide changes. `--full-suite` runs every case, including engine and model
-conformance.
-[test-suites.md](test-suites.md) lists every suite, what it checks, and how to run one on its own
-(`-m <suite>`).
-
-A run opens with a banner and ends with a summary:
-
-```
-  llmdv 0.1.1  verify · example-two-ingress · 2 ingresses
-
-── preflight · 2 ingresses ──────────────────────────────────────
-   ok    vllm     http://localhost:18100                               81ms
-   ok    router   http://localhost:18180                               87ms
-
-── contract · 12 cases ──────────────────────────────────────────
-   ok    vllm     declared_surfaces_exist                              0.54s
-   skip  router   header_disposition [x-request-id]   requires_instrumentation
-
-  PASSED · 21 of 22 cases passed, 1 skipped · 13.4s
-```
-
-Cases run contract first, then by ingress in the order the profile declares them. `-v` prints
-the recorded checks under each case.
+Replace the example URL. These profiles target the router directly and declare no authentication.
+To test more layers, follow [adding a gateway or engine](../profiles/README.md#include-a-gateway-or-engine).
+Continue at [Start with a smoke check](#start-with-a-smoke-check).
 
 ## Run your own stack
 
-Any OpenAI- or Anthropic-compatible gateway, router or engine works, with or without llm-d.
-Copy the closest example from [`profiles/examples/`](../profiles/examples/) to
-`profiles/<system>/<model>.local.yaml` and fill it in; [writing-profiles.md](writing-profiles.md)
-explains the choice and the minimum, and [profiles/REFERENCE.md](../profiles/REFERENCE.md) every
-field. The `*.local.yaml` copy is gitignored, so cluster detail never enters the repository. A
-profile holds no secrets or hostnames, only the names of the variables that carry them.
-
-With only a gateway URL and a key, start from
-[`example-gateway-only.yaml`](../profiles/examples/example-gateway-only.yaml):
+Copy the minimal example to a local profile:
 
 ```sh
-export P=profiles/<system>/<model>.local.yaml
-export LLMDV_GATEWAY_KEY='<gateway key>'
-llmdv profile validate $P
-llmdv verify --profile $P --full-suite -m contract
-llmdv verify --profile $P --analyze       # the default test set, with a dashboard
+cp profiles/examples/example-minimal.yaml profiles/my-stack.local.yaml
+export P=profiles/my-stack.local.yaml
 ```
 
-A profile can also declare the local setup its layers need, as
-[`example-two-ingress.yaml`](../profiles/examples/example-two-ingress.yaml) does; `--setup` prints it:
+Edit the copy before running it:
+
+- Set `model.public_id` to the model ID your endpoint serves.
+- Set the ingress `kind` to its position: `gateway`, `router` or `engine`.
+- Set `surfaces` to the APIs it is intended to serve. The starter declares Chat Completions.
+- Review expected error statuses. They state the intended contract, not values copied from a
+  failed request. If the endpoint does not authenticate, use `auth: {type: none}`.
+
+The starter reads `LLMDV_BASE_URL` and, for bearer authentication, `LLMDV_API_KEY`. Set the URL
+and load the key from your credential store. In Bash, you can enter it without putting it in
+shell history:
+
+```bash
+export LLMDV_BASE_URL='https://your-gateway.example'
+read -r -s -p 'API key: ' LLMDV_API_KEY
+export LLMDV_API_KEY
+```
+
+Replace the URL; omit the key step for unauthenticated endpoints. Local `*.local.yaml` files
+are gitignored. [Writing a profile](writing-profiles.md) explains additional capabilities,
+per-layer model aliases and reuse through `extends`.
+
+## Start with a smoke check
+
+Both paths now have a profile in `$P` and its endpoint variables set:
 
 ```sh
-llmdv profile show $P --matrix   # what the profile claims, and what will run
-llmdv profile show $P --setup    # the setup it declares, pods resolved live
-llmdv verify --profile $P
+llmdv profile validate "$P"
+llmdv plan --profile "$P" --test-set smoke
+llmdv verify --profile "$P" --test-set smoke --analyze
 ```
+
+`validate` and `plan` are offline. Review the plan before the live command: smoke selects model
+discovery and basic non-streaming/streaming generation for the declared APIs. Cases that do not
+apply are skipped. A smoke pass establishes only those checks, not tools, caching, long context
+or every API behavior.
+
+Verification runs one case at a time. Do not add pytest's `-n`, and avoid competing live runs
+against the same endpoint. Keep a laptop awake until the run finishes.
 
 ## Read the results
 
-A run lands in `runs/<profile>-<utc-timestamp>-<unique-id>/`, named in the banner and the
-summary. `--local-output ROOT` changes the parent directory; every invocation creates its own
-child and preserves earlier runs. Start with:
+The command prints a new directory under `runs/`. Each invocation creates its own child, so
+reusing `--local-output ROOT` preserves earlier runs. Use the printed child path below:
 
-- `summary.md`: the per-ingress table and the attribution reading.
-- `failures/<ingress>/<case>/verdict.txt`: what was claimed and the observations behind it.
-- `failures/<ingress>/<case>/repro.sh`: a runnable `curl` for the exchange. Export the key under
-  the profile's variable name and run `bash` on it.
-- `dashboard.html`, with `--analyze` or `llmdv analyze runs/<run>` afterwards.
-- `outcome.json`: how the run ended, and the exit code's class.
+```sh
+export RUN='runs/<the directory printed by verify>'
+cat "$RUN/summary.md"
+```
 
-Every other file, the exit codes and the skip classes are in [cli.md](cli.md#output). To turn
-a failure group into an issue, use the
-[`filing-a-fleet-finding`](../.agents/skills/filing-a-fleet-finding/SKILL.md) skill.
+Open `$RUN/dashboard.html` in your browser. If you did not pass `--analyze`, build it with
+`llmdv analyze "$RUN"`. Start with the executed/ skipped counts, then the failures and their
+recorded checks. A green result applies only to checks that actually executed.
+
+| Result | Next action |
+| --- | --- |
+| Passed, with executed checks | Continue to the profile's default coverage below |
+| Failed | Read the failing check and its evidence; confirm the profile expectation before attributing the failure |
+| Skipped | Read the reason: an omitted declaration, missing instrument, policy or throttling is not a passing check |
+| Usage/profile error (exit 2) | Correct the command or profile; no verification occurred |
+| Environment error (exit 3) | Read the reported endpoint, credential, local connection or results-store problem |
+
+The [command reference](cli.md#exit-codes) defines every exit code and
+[skip class](cli.md#skip-classes). [Output files](cli.md#output) lists all artifacts.
+
+## Widen coverage
+
+Once smoke completes, run the profile's default selection:
+
+```sh
+llmdv plan --profile "$P"
+llmdv verify --profile "$P" --analyze
+```
+
+For a newly written profile, check the declared surfaces and headers explicitly with
+`llmdv verify --profile "$P" --full-suite -m contract` before relying on broader results.
+This checks the declarations; it is a different task from the initial smoke check.
+
+A guide's default tests its selected API and guide behavior. The minimal starter's default is
+small and leaves optional capabilities undeclared. Add the intended declarations as described
+in [Writing a profile](writing-profiles.md). When you want every applicable library case,
+preview `llmdv plan --profile "$P" --full-suite` before running it.
+
+For named subsets, individual suites or layer restrictions, use
+[Selection and coverage](cli.md#test-sets-and-coverage). No `--ingress` means every declared
+layer; an explicit selector restricts the run to the named IDs.
 
 ## Publish a run
 
@@ -193,7 +168,7 @@ and rebuilds `dashboard.html`.
 ## Compare runs
 
 `llmdv compare` reads two runs of the same profile back from the archive and reports which cases
-changed their answer. Scheduled runs (`--identity trigger=nightly`) are the baselines. See
+changed their answer. Automatic baselines must have matching configuration identity, including trigger and flavor. See
 [compare.md](compare.md).
 
 ## Run unattended
@@ -225,10 +200,8 @@ or prefix from your other runs.
 - **One live run at a time per gateway.** Cache and session cases depend on what earlier requests
   left behind, and a key is usually rate-limited.
 - **Never pass `-n`.** Live runs are always one case at a time; `llmdv verify` refuses it.
-- **Keep one-off runs apart from scheduled ones.** Publish them under a different prefix or label,
-  so a one-off never becomes one side of the next comparison.
-- **Start with `--full-suite -m contract`.** It proves the gateway, the key and the bucket work, in a minute,
-  before you spend an hour on the full run.
+- **Keep comparison lanes distinct.** Set `--identity trigger=nightly` for scheduled runs;
+  manual runs default to `trigger=manual`. Free-form labels do not isolate baselines.
 - **Keep the machine awake.** A sleeping laptop stalls requests, and the cases in flight fail on
   the stream-idle timeout.
 
