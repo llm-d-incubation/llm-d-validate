@@ -7,6 +7,7 @@ import json
 from copy import deepcopy
 from pathlib import Path
 
+import pytest
 import yaml
 
 from llmdv.cli.verify_cmd import select_ingresses
@@ -42,6 +43,14 @@ def test_an_unknown_id_is_returned_unplaced():
     assert select_ingresses(profile, ["litellm,sidecar"]) == (["litellm"], ["sidecar"])
 
 
+@pytest.mark.parametrize("value", ["", " ", ",", " , ,"])
+def test_a_value_that_names_no_id_is_reported_not_dropped(value):
+    """An explicit value with no id in it, such as an empty shell variable, never widens the run."""
+    profile = loader.load(THREE)
+    assert select_ingresses(profile, [value]) == ([], [value])
+    assert select_ingresses(profile, ["router", value]) == (["router"], [value])
+
+
 def test_no_ids_select_nothing_so_every_ingress_runs():
     profile = loader.load(THREE)
     assert select_ingresses(profile, []) == ([], [])
@@ -75,6 +84,31 @@ def test_an_unknown_id_is_a_usage_error_listing_the_ids(tmp_path):
     assert result.returncode == 2
     assert "--ingress 'sidecar'" in result.stderr
     assert "vllm, router, litellm" in result.stderr
+
+
+@pytest.mark.parametrize("value", ["", " ", ",", " , ,"])
+def test_plan_refuses_a_value_that_names_no_id(tmp_path, value):
+    result = run_llmdv(
+        "plan", "--profile", str(_three(tmp_path)), "--full-suite", "--ingress", value
+    )
+    assert result.returncode == 2, result.stdout + result.stderr
+    assert "names no ingress id" in result.stderr
+
+
+@pytest.mark.parametrize("command", ["verify", "job"])
+def test_verify_and_job_refuse_an_empty_variable_before_any_request(tmp_path, command):
+    """`--ingress "$TARGET_INGRESS"` with the variable empty: exit 2, nothing sent, nothing run."""
+    with FakeFleet() as fleet:
+        path = tmp_path / "profile.yaml"
+        path.write_text(profile_yaml(fleet.base_url, fleet.model))
+        out = "--local-output" if command == "verify" else "--work-dir"
+        result = run_llmdv(
+            command, "--profile", str(path), "--full-suite", "--ingress", "",
+            out, str(tmp_path / "run"), "--pod-logs", "off",
+        )  # fmt: skip
+        assert not fleet.seen
+    assert result.returncode == 2, result.stdout + result.stderr
+    assert "names no ingress id" in result.stdout + result.stderr
 
 
 def test_verify_never_reaches_a_layer_left_out(tmp_path):

@@ -69,7 +69,9 @@ llmdv verify --profile P --full-suite          # every case in the library, befo
 Repeating `--ingress`, `--client` or `--surface` is a union; different selectors intersect.
 `--ingress` also takes a comma-separated list of ingress ids. So one profile can declare every
 layer of a stack, and each run picks the layers it can reach: preflight and the cases touch only
-the selected ones. `-k` and `-m` narrow the chosen scope
+the selected ones. Without `--ingress`, every declared ingress runs. A value that names no
+id (empty, spaces or only commas, as from an unset shell variable) or an id the profile does not
+declare exits 2 before any request; it never falls back to every ingress. `-k` and `-m` narrow the chosen scope
 but never widen it. The ingress id is the parametrisation id, so `-k router` keeps one column.
 
 `-m` takes one marker per suite package under `src/llmdv/suites/`: `anthropic_messages`,

@@ -941,13 +941,17 @@ def select_ingresses(profile, tokens: list[str]) -> tuple[list[str], list[str]]:
     """
     wanted: set[str] = set()
     unknown: list[str] = []
-    for token in (t.strip() for value in tokens for t in value.split(",")):
-        if not token:
-            continue
-        if token in profile.ingress_ids:
-            wanted.add(token)
-        else:
-            unknown.append(token)
+    for value in tokens:
+        names = [t.strip() for t in value.split(",") if t.strip()]
+        if not names:
+            # An explicit value that names nothing (an empty variable, a stray comma) must not
+            # widen the run to every ingress: it is reported like an unknown id.
+            unknown.append(value)
+        for token in names:
+            if token in profile.ingress_ids:
+                wanted.add(token)
+            else:
+                unknown.append(token)
     return [i for i in profile.ingress_ids if i in wanted], unknown
 
 
@@ -962,9 +966,13 @@ def _unknown_selectors(profile, args) -> list[str]:
         problems.append(str(exc))
     args.ingress, unknown = select_ingresses(profile, args.ingress or [])
     for token in unknown:
+        what = (
+            "names no ingress id"
+            if not token.strip(" ,")
+            else f"is not in profile {profile.name!r}"
+        )
         problems.append(
-            f"--ingress {token!r} is not in profile {profile.name!r}; "
-            f"it declares: {', '.join(profile.ingress_ids)}"
+            f"--ingress {token!r} {what}; it declares: {', '.join(profile.ingress_ids)}"
         )
     declared_clients = [client.id for client in profile.clients]
     for client_id in args.client or []:
