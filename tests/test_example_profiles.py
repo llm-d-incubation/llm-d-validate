@@ -11,13 +11,16 @@ safe to assert in a unit test.
 
 from __future__ import annotations
 
+import re
 from pathlib import Path
 
 import pytest
+import yaml
 
 from llmdv.profile import compose, loader
 
-PROFILES = Path(__file__).resolve().parents[1] / "profiles"
+ROOT = Path(__file__).resolve().parents[1]
+PROFILES = ROOT / "profiles"
 EXAMPLES = sorted((PROFILES / "examples").glob("*.yaml"))
 # Every committed file, at any depth. Local variants are gitignored and never checked here.
 FILES = sorted(p for p in PROFILES.rglob("*.yaml") if not p.name.endswith(".local.yaml"))
@@ -77,3 +80,25 @@ def test_a_real_profile_names_its_url_by_variable(path: Path):
     """A real hostname is cluster-identifiable, so a committed real profile uses base_url_env."""
     for ingress in loader.load(path).ingresses:
         assert ingress.base_url_env, f"{path.name}: ingress {ingress.id} hardcodes base_url"
+
+
+def _image_claude_code_version() -> str:
+    text = (ROOT / "Containerfile").read_text()
+    return re.search(r"^ARG CLAUDE_CODE_VERSION=(\S+)$", text, re.M).group(1)
+
+
+@pytest.mark.parametrize("path", FILES, ids=lambda p: str(p.relative_to(PROFILES)))
+def test_every_committed_client_pins_the_images_claude_code(path):
+    """The runner image installs one Claude Code at /usr/local/bin/claude, and every committed
+    profile drives that one. A profile that pins another version there fails every client case
+    in that image before it checks anything; one that pins another install path needs a binary
+    the image does not have. A local profile may pin what its machine has."""
+    raw = yaml.safe_load(path.read_text()) or {}
+    image = ("/usr/local/bin/claude", _image_claude_code_version())
+    for client in raw.get("clients") or []:
+        for binary in client.get("binaries") or []:
+            pinned = (binary.get("executable"), str(binary.get("version")))
+            assert pinned == image, (
+                f"{client.get('id')}: pins {pinned[1]} at {pinned[0]}, where the image installs "
+                f"{image[1]} at {image[0]}"
+            )
