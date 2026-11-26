@@ -35,7 +35,10 @@ def serve() -> None:
 
     transport_fakes.QuietServer = Bound
     defect = os.environ.get("FAKE_DEFECT", "")
-    with FakeFleet(**({defect: True} if defect else {})) as fleet:
+    with FakeFleet(
+        delay_s=float(os.environ.get("FAKE_DELAY_SECONDS", "0")),
+        **({defect: True} if defect else {}),
+    ) as fleet:
         sys.stdout.write(f"fake router on {fleet.base_url} (defect: {defect or 'none'})\n")
         sys.stdout.flush()
         while True:

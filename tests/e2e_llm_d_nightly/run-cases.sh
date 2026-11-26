@@ -50,7 +50,7 @@ namespace() {
 # The router Service as a kustomize standup creates it: <guide>-epp, port 80 named http, in
 # front of the Envoy sidecar's 8081. With no defect argument there is nothing behind it.
 router() {
-  local ns=$1 defect=${2-none}
+  local ns=$1 defect=${2-none} delay=${3-0}
   if [ "$defect" != none ]; then
     kubectl -n "$ns" apply -f - >/dev/null <<EOF
 apiVersion: apps/v1
@@ -67,7 +67,7 @@ spec:
         - name: router
           image: $FAKE_IMAGE
           imagePullPolicy: IfNotPresent
-          env: [{name: FAKE_DEFECT, value: "$defect"}]
+          env: [{name: FAKE_DEFECT, value: "$defect"}, {name: FAKE_DELAY_SECONDS, value: "$delay"}]
           ports: [{containerPort: 8081}]
           readinessProbe: {tcpSocket: {port: 8081}, periodSeconds: 2}
           securityContext: {allowPrivilegeEscalation: false, capabilities: {drop: [ALL]}}
@@ -93,7 +93,7 @@ check() { # <label> <condition description> <test command...>
 step() { # <namespace> <infra provider>
   rm -rf "$work/runner" && mkdir -p "$work/runner"
   env LLMDV_VERSION="$LLMDV_VERSION" LLMDV_IMAGE="$LLMDV_IMAGE" RUNNER_TEMP="$work/runner" \
-    LLMDV_READY_TIMEOUT=300 LLMDV_TIMEOUT=300 \
+    LLMDV_READY_TIMEOUT=300 LLMDV_TIMEOUT="${SMOKE_CASE_TIMEOUT:-300}" \
     LLMDBENCH_CICD_NS="$1" LLMDBENCH_CICD_SCENARIO=optimized-baseline \
     LLMDBENCH_CICD_ACCELERATOR=gpu LLMDBENCH_CICD_BACKEND=vllm LLMDBENCH_CICD_CONNECTOR= \
     LLMDBENCH_CICD_OFFLOADING_TARGET= LLMDBENCH_CICD_INFRA_PROVIDER="$2" \
@@ -149,6 +149,23 @@ step "$ns" gke
 check 5 "the step exits 0" exit_is 0
 check 5 "it reports llmdv's exit 3 as not a guide failure" grep -q "verification exit 3" "$work/step.log"
 check 5 "the pod and ConfigMap are removed" leftovers_gone "$ns"
+
+echo "case 6: timeout finalizes a slow verification before collecting"
+ns=$(namespace timeout) && router "$ns" "" 1
+SMOKE_CASE_TIMEOUT=8 step "$ns" gke
+check 6 "timeout does not blame the guide" exit_is 0
+check 6 "finalized interrupted evidence is collected" python3 -c '
+import json,sys
+from pathlib import Path
+root=Path(sys.argv[1]); status=json.loads((root/"integration.json").read_text())
+assert status["status"] == "timed_out", status
+assert status["verification_exit"] == 6, status
+assert status["collection_status"] == "complete", status
+run=next((root/"runs").iterdir()); outcome=json.loads((run/"outcome.json").read_text())
+assert outcome["finished"] and outcome["verification"]["exit_code"] == 6
+assert (run/"dashboard.html").is_file()
+' "$work/runner/llmdv-runs"
+check 6 "the pod and ConfigMap are removed" leftovers_gone "$ns"
 
 if [ "$failed" -ne 0 ]; then echo "smoke-step e2e: FAILED"; exit 1; fi
 echo "smoke-step e2e: all cases passed"

@@ -89,7 +89,7 @@ Artifact upload needs its own `continue-on-error: true`; report its failure in t
 script on a kind cluster, in namespaces that enforce the `restricted` Pod Security Standard,
 against a stand-in router (this repository's fake fleet behind an `optimized-baseline-epp`
 Service): a passing router, a router with a defect, an overlay with no profile, a namespace with
-no router Service, and a Service with nothing behind it. The harness is in
+no router Service, a Service with nothing behind it, and graceful timeout of a slow router. The harness is in
 [`tests/e2e_llm_d_nightly/`](../../tests/e2e_llm_d_nightly/).
 
 `tests/test_nightly_smoke_step.py` covers lookup failures, version isolation, collection retries,
