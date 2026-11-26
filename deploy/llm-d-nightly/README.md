@@ -13,6 +13,12 @@ LLMDV_VERSION="$V" bash "$RUNNER_TEMP/llmdv/deploy/llm-d-nightly/smoke-step.sh"
 The design and the reasons for it are in
 [#230](https://github.com/llm-d-incubation/llm-d-validate/issues/230).
 
+The initial integration attaches each run to GitHub Actions as an artifact. It does not
+publish to S3, fetch a baseline, or invoke `llmdv compare`. A failure means this deployment
+did not meet its profile's smoke expectations; it is not automatically classified as a new
+regression. Cross-run regression tracking is a separate follow-up requiring a retained
+results store and baseline-selection policy.
+
 ## What it reads
 
 The variables the nightly job already sets, plus the release and optional test settings:
