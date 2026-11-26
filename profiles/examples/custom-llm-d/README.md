@@ -46,8 +46,8 @@ leave the client cases out with `-m "not real_clients"`.
 **Muse's contract baselines are not seeded.** GLM-5.3's and DeepSeek's `contract_baseline` hold
 the response shapes measured on their deployments; Muse's holds the `llmdv_seed` placeholder in
 each part, so its contract-drift cases compare against nothing. Seed it from a run of a healthy
-deployment, as the [profile skill](../../../.agents/skills/writing-an-infra-profile/SKILL.md)
-describes (step 6).
+deployment using [the seeding procedure](../../../docs/profile-provenance.md#seed-change-sentinels).
+
 ## What `llmdv verify` selects
 
 The default is defined in each profile's own `test_sets:` (the copies are identical).

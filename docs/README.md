@@ -8,6 +8,7 @@ does not deploy or manage the serving stack.
 | Run my first check and understand its result | [Getting started](getting-started.md) |
 | Find a profile for my deployment | [Choose a profile](../profiles/README.md) |
 | Create or adapt a profile | [Writing a profile](writing-profiles.md) |
+| Seed baselines or maintain shared profile configurations | [Profile evidence and provenance](profile-provenance.md) |
 | Choose which tests run | [Selection and coverage](cli.md#test-sets-and-coverage) |
 | Understand a failure or a skip | [Read the results](getting-started.md#read-the-results) |
 | Publish results or run unattended | [Publishing and running unattended](running.md) |
@@ -16,6 +17,7 @@ does not deploy or manage the serving stack.
 | Look up a profile field | [Profile reference](../profiles/REFERENCE.md) |
 | See what the library can check | [Test suites](test-suites.md) |
 | Add a test case | [Writing tests](writing-tests.md) |
+| Add a surface, client or capability | [Extending llmdv](extending.md) |
 | Understand the implementation | [Architecture](architecture.md) |
 
 Guide-specific configuration mappings and coverage limits live beside the

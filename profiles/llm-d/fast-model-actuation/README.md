@@ -79,7 +79,7 @@ Preview individual cases and skip reasons with `llmdv plan --profile <profile>`.
 
 ## For maintainers
 
-See the [profile skill](../../../.agents/skills/writing-an-infra-profile/SKILL.md#how-profilesllm-d-is-built) for the layout and provenance tags.
+See the [profile provenance guide](../../../docs/profile-provenance.md#how-profilesllm-d-is-built) for the layout and provenance tags.
 
 <details>
 <summary>llm-d's nightly lanes, and how each maps to a profile</summary>

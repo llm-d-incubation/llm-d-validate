@@ -117,7 +117,7 @@ model:
   max_model_len: 32768         # optional; enables the context-overflow case
 
 ingresses:
-  - id: gateway                # becomes the column name; `-k gateway` selects it
+  - id: gateway                # becomes the column name; `--ingress gateway` selects it
     kind: gateway              # where it sits: gateway, router or engine (required)
     base_url_env: MY_BASE_URL  # the URL comes from $MY_BASE_URL, never the file
     auth:
@@ -199,10 +199,14 @@ Probe the fleet while you write, and record what you saw in a YAML comment besid
       unknown_model: [404]
 ```
 
-Declare every case family the fleet is eligible for, so a run exercises everything it can. The
-[`writing-an-infra-profile`](../.agents/skills/writing-an-infra-profile/SKILL.md) skill covers the
-procedure: how to probe safely, what to measure for a gateway, how to fill pins and baselines, and
-how to describe the layers behind an ingress without guessing.
+Review every eligible case family and record why any capability is omitted. Use
+[Profile evidence and provenance](profile-provenance.md) to measure deployment facts, identify
+layers, seed change sentinels, combine guide configurations and prepare a public profile.
+
+Header dispositions describe what the layer does. `stripped`, `forwarded` and `rewritten`
+require instrumentation to verify; `consumed` requires load. Do not substitute an observable
+disposition to obtain a passing result. A triaged success status in `error_status` declares
+that the layer does not enforce that class; cite the decision when changing it.
 
 ## Validate, plan, verify
 
@@ -228,6 +232,5 @@ narrowing a run and what a run writes.
 - [REFERENCE.md](../profiles/REFERENCE.md): every field, its type, default and meaning, and the
   `fleet` rules.
 - [profiles/llm-d/README.md](../profiles/llm-d/README.md): the llm-d guide profiles in detail.
-- [`writing-an-infra-profile`](../.agents/skills/writing-an-infra-profile/SKILL.md): the agent
-  procedure for probing a stack and choosing declarations.
+- [Profile evidence and provenance](profile-provenance.md): probes, baselines and shared configurations.
 - [Writing tests](writing-tests.md): adding a case or a suite.

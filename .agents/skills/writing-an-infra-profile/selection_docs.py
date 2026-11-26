@@ -169,7 +169,8 @@ def section(folder: Path, entries: dict[Path, dict]) -> str:
         "<details>",
         "<summary>The default's case-ID patterns</summary>",
         "",
-        "`*` selects the whole library; `suite.*` selects a suite. Other patterns select matching cases.",
+        "`*` selects the whole library; `suite.*` selects a suite. "
+        "Other patterns select matching cases.",
         "",
         "| Suite | Patterns |",
         "| --- | --- |",

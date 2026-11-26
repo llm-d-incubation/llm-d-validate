@@ -12,11 +12,13 @@ limitations beside the action they affect.
 | llm-d overview | Guide catalog and shared lane/identity conventions |
 | Individual guide README | Configuration mapping, exact commands, coverage and limitations |
 | Writing profiles | Creating and adapting a profile through examples |
+| Profile evidence and provenance | Measuring, seeding sentinels, guide parts and public-profile preparation |
 | Profile reference | Field semantics, defaults, inheritance and validation |
 | Command reference | CLI selection rules, exit codes and output artifacts |
 | Publishing and running unattended | Archive setup, retrieval, job operation and delivery troubleshooting |
 | Comparing runs | Baseline matching and interpretation of changes |
 | Deployment README | Installing and operating the validation runner in a cluster |
+| Extending llmdv | Surface, client, assertion and capability implementation procedures |
 | Writing tests | Implementing and proving a case, including evidence and gates |
 | Architecture and design decisions | Structure, invariants and their rationale |
 | Agent skills | Task checklists, required evidence and agent-specific guardrails |
@@ -42,3 +44,24 @@ Design specifications should identify their status and link to current user refe
 
 Review the result as four tasks: a first guide run, a first custom-stack run, investigating a
 failure, and comparing published runs. Each task should have a clear start and next action.
+
+## Generated profile coverage
+
+Every folder of runnable profiles has a README with a "What `llmdv verify` selects" section.
+It records the source of the default, its patterns, optional named sets, and offline plan counts
+for the default, smoke, all profile sets and the full suite.
+
+```sh
+PYTHONPATH=src python .agents/skills/writing-an-infra-profile/selection_docs.py
+PYTHONPATH=src python .agents/skills/writing-an-infra-profile/selection_docs.py --check
+```
+
+Regenerate after adding, removing or renaming a runnable profile or case, or changing test sets,
+inheritance, declarations or capabilities. Commit the README changes with the source change.
+Create a title and introduction before generating a new folder's section, and link it from the
+profile catalog.
+
+The helper requires a shared set definition and a default in each folder. It refuses a folder
+whose profiles define different sets, or whose planned suites do not match the default patterns.
+Such a folder needs an explicit per-profile explanation and a corresponding generator update;
+do not silently omit it from verification. Counts are planning evidence, not a live measurement.

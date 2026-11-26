@@ -1,7 +1,7 @@
 # Writing a test case
 
 A case is a pytest function in a module under `src/llmdv/suites/<suite>/`. `llmdv` runs it against
-every layer a profile declares (gateway, router, engine), so one case tells you which layer broke.
+each selected ingress (gateway, router, engine), providing evidence to help locate a failure.
 A case records what it observed, then asserts what the API defines: not what one deployment
 happens to do today.
 
@@ -63,7 +63,8 @@ Prefer `surface_generic`: a surface added later inherits the case. A generic cas
 request through the surface (`minimal_body`, `stream_body`, `invalid_body`,
 `structured_output_body`) and never writes a wire field name; a body in one surface's shape is
 garbled on the others. Both markers on one function, or a feature outside `SURFACE_FEATURES`,
-fails collection.
+fails collection as a tool defect. A known feature with no drivable surface produces one
+`not_implemented` skip.
 
 ### Fixtures
 
@@ -93,14 +94,16 @@ expected)` redacts the values, records a not-ok check and raises in one call.
 - `@pytest.mark.needs("<capability>")` skips the case as `undeclared` unless the ingress declares
   that capability; `needs("<field>:<value>")` gates on one value of a closed vocabulary, such as
   `needs("messages_checks:parallel_tool_calls")`. An unknown name is a usage error at
-  collection, never a silent skip. The gate is applied to cases that run on a surface.
+  collection, never a silent skip. The gate is applied only to cases that run on a surface.
+  For a case without a surface, `gate()` returns before reading `needs`; check the capability
+  inside the case body and raise a classified skip instead.
 - `@pytest.mark.disruptive("<reason>")` marks a case that costs a fleet real work or sends
   deliberately malformed input. Under `fleet_policy: shared` it skips as `excluded_by_policy`
   before any connection opens.
 - `@pytest.mark.samples("count" | "ratio" | "order", n=..., <bounds>)` declares a claim that holds
   over many requests rather than one (repeats agree, outputs differ). Send through
-  `assertions.samples.draw` and decide with `judge`; see "Add an assertion" in the
-  [`extending-llmdv`](../.agents/skills/extending-llmdv/SKILL.md) skill.
+  `assertions.samples.draw` using the resolved `samples` fixture and decide with `judge`; see
+  [Adding an assertion](extending.md#add-an-assertion).
 
 ## Skips
 
@@ -156,6 +159,11 @@ def test_finish_reason_passes_on_a_healthy_fleet(tmp_path):
 returns the exit code and the rows of `results.jsonl`. A row whose outcome is `fail` while every
 check is ok means the deciding assertion recorded nothing.
 
+HTTP and SSE defects belong in `tests/transport_fakes.py` (`DEFECTS`, passed through
+`FakeFleet(transport=...)`); response-content defects belong in `tests/fakes.py`, and fleet-suite
+defects in `tests/fleet_fakes.py`. Keep the healthy fake healthy. Never retry a request to make
+a case pass.
+
 ## Run it
 
 Offline, against the fakes:
@@ -190,6 +198,10 @@ though no profile's test set lists it yet. Without it, `-k` would search only th
    `discovery` first, `logs` last, everything else alphabetically between. Add an entry only if
    your suite must run at a fixed place.
 
+A suite directory needs a `test_*.py` to become a marker; helper-only packages and directories
+starting with `_` are not suites. Put a suite-only fixture in that suite's `conftest.py`, and a
+fixture shared by suites in `src/llmdv/suites/conftest.py`.
+
 ## Before you open the PR
 
 - [ ] The case can fail: the defect is in a fake, and an offline test shows it fails with the
@@ -201,6 +213,9 @@ though no profile's test set lists it yet. Without it, `-k` would search only th
       (`profiles/llm-d/<guide>/parts/common.yaml`); guide lanes run only the cases a test set
       names. Then plan every combination, since a test set naming a missing case id exits `2`:
       `for p in profiles/llm-d/*/*.yaml; do llmdv plan --profile "$p" -q || echo "$p"; done`.
+- [ ] Built-in and profile-defined test sets have no stale case IDs. Keep smoke small: discovery,
+      basic generation and streaming. Reuse case IDs instead of creating a duplicate smoke suite.
+- [ ] [Generated selection sections](maintaining-docs.md#generated-profile-coverage) are current.
 - [ ] For a new suite, the coverage graphic is regenerated with
       `python docs/images/make_coverage_svg.py`. The offline tests check that it lists every
       suite.
@@ -214,4 +229,4 @@ Contributor process (issues, sign-off, PR description) is in
 
 Agents follow the `writing-a-test-case` skill,
 [`.agents/skills/writing-a-test-case/SKILL.md`](../.agents/skills/writing-a-test-case/SKILL.md),
-which carries the same procedure and its checks.
+which provides a checklist and links to these procedures.
