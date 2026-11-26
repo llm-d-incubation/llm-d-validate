@@ -23,24 +23,30 @@
 
 ## How it works
 
-`llmdv` sends real requests through every reachable layer of a deployed llm-d stack, or any
-OpenAI- or Anthropic-compatible one. It checks each answer against the API, helps pinpoint the
-layer that breaks, and flags what regressed since the last run.
+`llmdv` is a functional validation framework for deployed model-serving infrastructure. It
+validates gateways, routers and engines against explicit API and deployment expectations,
+identifies regressions across runs, and preserves the evidence needed to investigate failures.
+Built for llm-d, it also supports other OpenAI- and Anthropic-compatible stacks.
 
-- **It tests every layer on its own.** `llmdv` calls each layer you can reach (gateway, router,
-  engine) through Chat, Completions, Messages and Responses, and exercises streaming, tools,
-  caching, headers and failure paths, so you see which layers pass or fail the selected checks.
-- **A profile defines correct.** It describes your stack: its ingresses, its model and what each
-  layer serves. Every verdict traces back to the expectations in that file.
-- **It catches regressions.** Compare runs, and `llmdv` flags changed case outcomes and observed
-  build changes, so you can find regressions beyond what a passing health check tells you.
-- **Every run produces evidence.** You get the results, every request and response, a replay
-  script for each failure, and an optional dashboard to explore the whole run.
+- **Validate behavior across the serving stack.** Test each reachable layer through Chat,
+  Completions, Messages and Responses, covering generation, streaming, tool calls, caching,
+  headers and error handling.
+- **Define the contract for your deployment.** Profiles describe the model, topology, APIs and
+  capabilities your stack should support. Select focused checks for a guide or build broader
+  coverage for production requirements.
+- **Detect regressions, investigate and track failures.** Compare outcomes across layers and
+  runs, trace failures to recorded checks and replayable evidence, and link known failures to
+  issues so subsequent runs show whether they persist or their fixes have landed.
+- **Integrate validation into your operations.** Run checks locally or unattended, explore
+  results in a dashboard, publish evidence to S3-compatible storage and deliver Slack
+  notifications.
+- **Extend coverage within one framework.** Add profiles, test sets, cases, APIs, clients and
+  assertions while retaining consistent execution, evidence, comparison and reporting.
 
 > [!NOTE]
-> `llmdv` never deploys, patches, scales or restarts the serving stack. Cluster access, when you
-> grant it, runs through a read-only verb allowlist. You name credentials by environment
-> variable; `llmdv` redacts them from logs and recorded evidence.
+> `llmdv` validates existing infrastructure; it never deploys, patches, scales or restarts the
+> serving stack. Optional cluster access uses a read-only verb allowlist. Credentials are
+> supplied through environment variables and redacted from logs and recorded evidence.
 
 <p align="center">
   <img src="docs/images/llmdv-overview.gif" width="100%" alt="Animated overview: a profile defines the test plan; llmdv sends requests to the reachable gateway, router and engine, records verdicts and evidence, and publishes results and notifications.">
