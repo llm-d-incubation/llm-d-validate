@@ -9,11 +9,21 @@ themselves (in Claude Code, a command prefixed with `!` runs in the session).
 
 ```sh
 for t in curl jq python3 gh aws kubectl oc; do command -v $t >/dev/null && echo "have $t" || echo "no $t"; done
-test -x .venv/bin/llmdv && echo "llmdv installed" || echo "run ./install.sh"
+if command -v llmdv >/dev/null; then
+  llmdv --version
+elif test -x .venv/bin/llmdv; then
+  .venv/bin/llmdv --version
+else
+  echo "install llmdv using docs/getting-started.md"
+fi
 gh auth status >/dev/null 2>&1 && echo "gh logged in"
 kubectl config current-context 2>/dev/null || oc whoami --show-context 2>/dev/null
 for v in AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY AWS_ENDPOINT_URL_S3 AWS_BUCKET; do [ -n "${!v}" ] && echo "$v set"; done
 ```
+
+For a release install, confirm the profile checkout tag matches the package version; profiles
+and shared parts come from the checkout. Activate the environment before running skill snippets.
+Do not replace an installed release with editable source just because `.venv` is absent.
 
 `${!v}` is bash; in zsh use `${(P)v}`. Never `echo` a credential's value: test it with `[ -n "$VAR" ]`.
 
@@ -21,7 +31,7 @@ for v in AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY AWS_ENDPOINT_URL_S3 AWS_BUCKET;
 
 | Have | Unlocks | Without it |
 |---|---|---|
-| `.venv` (`./install.sh`; `--dev` for tests, `--s3` for the bucket) | `llmdv` and the repo's Python with PyYAML, used by the snippets | install it first; nothing live works |
+| An active Python environment with `llm-d-validate` installed from PyPI or editable source | `llmdv` and Python dependencies used by the snippets | follow [installation](../docs/getting-started.md#install); source development uses `./install.sh --dev` |
 | `curl`, `jq` | hand checks and probes | install them; `python3 -m json.tool` stands in for pretty-printing only |
 | A gateway URL and key, or a router route | live runs at that layer | ask the person; a router (EPP) route needs no key |
 | `gh`, logged in | issue and PR search, filing | the person searches or files from the browser; you draft |

@@ -5,7 +5,7 @@ description: Use when asked what broke in an `llmdv` run, why cases failed, whet
 
 # Triaging a run
 
-Turn a run directory into a short list of causes, each with the issue that tracks it (or none), whether it is real or transient, the layer responsible and how sure that is, and a command that reproduces it. Building the HTML dashboard and its notes is reporting-a-run; writing up a new cause is filing-a-fleet-finding. This skill is the investigation between them.
+Turn a run directory into a short list of causes, each with the issue that tracks it (or none), whether it is real or transient, the layer responsible and how sure that is, and a command that reproduces it. Building the HTML dashboard and its notes is reporting-a-run. Keep fleet findings with the run evidence; this repository tracks defects in `llmdv`, not deployment failures.
 
 Investigate read-only against the fleet: rerunning cases and sending single requests is fine; changing a deployment to test a theory needs the user's explicit approval. Writing your notes into the run directory is fine.
 
@@ -145,7 +145,7 @@ Write `runs/<run_id>/triage.md`, one row per cause (not per check), largest firs
 
 **Evidence** is the observation that decided the row (the split, the log line, the A/B); **Next** is the action and who owns it (rerun after a fix, file, comment on an issue, ask the owner).
 
-Lead with what changed against a baseline run of the same profile (running-and-comparing-live-runs for published runs; for local runs, join the two `results.jsonl` on `nodeid`): new causes, fixed ones, and cases a new cause now hides (a case that fails earlier for the new reason says nothing about its old one). Then what is real and whose, and what is noise. Hand the per-group notes to reporting-a-run for the dashboard, and new causes to filing-a-fleet-finding. Keep hostnames out of anything shared.
+Lead with what changed against a baseline run of the same profile (running-and-comparing-live-runs for published runs; for local runs, join the two `results.jsonl` on `nodeid`): new causes, fixed ones, and cases a new cause now hides (a case that fails earlier for the new reason says nothing about its old one). Then what is real and whose, and what is noise. Hand the per-group notes to reporting-a-run for the dashboard. Keep hostnames out of anything shared.
 
 ## Red flags
 

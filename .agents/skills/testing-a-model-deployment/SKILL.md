@@ -161,7 +161,6 @@ Restrict a multi-ingress profile with `--ingress <id>`, or several ids comma-sep
 - **Against an earlier run of the same profile:** running-and-comparing-live-runs.
 - **Against the same model elsewhere** (prod vs staging, gateway vs router): `llmdv compare` only compares runs of one profile, so join two `results.jsonl` files on `nodeid` (with the ingress id taken out of the brackets; a multi-ingress run filtered to the matching column), and split the differences into pass → fail, fail → pass and skip changes. When the other deployment already has published runs, use its latest complete one (running-and-comparing-live-runs, "Pull a run back") rather than starting one; note when its `llmdv` version differs from yours. A group of new failures sharing one first-failing check is one cause.
 - **Read the failures:** triaging-a-run (causes, tracking issues, layer, repro), then reporting-a-run for the dashboard. A failure shared with other models' profiles (vLLM API layers, fleet-wide flags) is not this deployment's defect.
-- **File what is new:** filing-a-fleet-finding.
 
 Hand back: what was tested (endpoints described, never their hosts), the build, the counts against the baseline, what changed and why, and what is left for whom.
 

@@ -26,7 +26,6 @@ Each lives at `.agents/skills/<name>/SKILL.md`. Load the one that matches before
 | [running-and-comparing-live-runs](.agents/skills/running-and-comparing-live-runs/SKILL.md) | starting a live run (PC, unattended or cluster job), publishing one, pulling one back, comparing runs |
 | [reporting-a-run](.agents/skills/reporting-a-run/SKILL.md) | sharing a run directory; building the annotated HTML dashboard and its notes |
 | [triaging-a-run](.agents/skills/triaging-a-run/SKILL.md) | finding out what broke in a run and why: grouping failures into causes, existing issues, transient or real, the layer responsible, reproducing from bundles and logs |
-| [filing-a-fleet-finding](.agents/skills/filing-a-fleet-finding/SKILL.md) | turning a failure group into a GitHub issue or issue draft |
 
 `.agents/` is the shared place for agent instructions and skills. `.claude/` is gitignored:
 keep personal Claude Code settings there. To have Claude Code load these skills automatically,

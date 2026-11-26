@@ -67,6 +67,10 @@ commit in a PR for it. Sign your commits as well (`git commit -S -s`).
 
 ## Development and testing
 
+For using a released tool, follow [Getting started](docs/getting-started.md#install). To change
+llmdv, clone your fork or the repository and create a branch from current `main`. From the
+checkout root, install editable source and development dependencies:
+
 ```sh
 ./install.sh --dev && source .venv/bin/activate
 python -m pytest tests/ -q                     # one test at a time; no cluster or gateway needed
@@ -86,6 +90,24 @@ still be rejected.
 
 [docs/architecture.md](docs/architecture.md) describes the layout, and the invariants a change
 must keep.
+
+### Build a Python distribution
+
+From your source checkout and active virtual environment:
+
+```sh
+python -m pip install build
+python -m build
+```
+
+This produces a wheel and source archive under `dist/` using the pinned build backend. To
+check the wheel independently of the editable install, use a fresh virtual environment outside
+the checkout, install the wheel there and run `llmdv --version`, `profile validate` and `plan`
+against a copied profile tree. The [release workflow](.github/workflows/release.yaml) shows the
+offline wheel smoke test. Profiles remain separate from the wheel.
+
+For an image build, follow [Build a custom image](deploy/README.md#build-a-custom-image).
+Publishing official packages and images follows [Releasing](#releasing).
 
 ### Test layout
 

@@ -6,6 +6,7 @@
 
 | I want to… | Read |
 | --- | --- |
+| Install from PyPI or use a released image | [Installation choices](getting-started.md#install) |
 | Run my first check | [Getting started](getting-started.md) |
 | Find a profile for my deployment | [Choose a profile](../profiles/README.md) |
 | Understand a guide's checks and their purpose | [Guide catalog](../profiles/llm-d/README.md) |

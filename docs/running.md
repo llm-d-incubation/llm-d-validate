@@ -32,12 +32,21 @@ Neither command reruns inference. To investigate the evidence, see
 
 ## Publish a run
 
-For AWS or an S3-compatible store using access keys, install the storage extra with
-`./install.sh --s3`. Load credentials through the SDK's credential chain (including a session
+For AWS or an S3-compatible store using access keys, add the storage extra to your active
+release environment:
+
+```sh
+python -m pip install 'llm-d-validate[s3]==0.1.1'
+```
+
+Match the version to your [installed release](getting-started.md#install). For a source install,
+use `./install.sh --s3` instead. The released runner image already includes both storage extras.
+Load credentials through the SDK's credential chain (including a session
 token for temporary credentials), and set `$AWS_BUCKET` to your bucket. For a non-AWS endpoint,
 set `AWS_ENDPOINT_URL_S3` (or `AWS_ENDPOINT_URL` when the first is unset).
 
-For IBM IAM authentication, install `python -m pip install -e '.[ibm-cos]'`, set
+For IBM IAM authentication, install `python -m pip install 'llm-d-validate[ibm-cos]==0.1.1'`
+(or `python -m pip install -e '.[ibm-cos]'` for source development), set
 `LLMDV_S3_AUTH=ibm-iam`, and export `IBM_COS_ENDPOINT`, `IBM_COS_API_KEY` and
 `IBM_COS_SERVICE_INSTANCE_ID`. [IBM authentication details](../deploy/README.md#credentials)
 cover token endpoints and alternatives.

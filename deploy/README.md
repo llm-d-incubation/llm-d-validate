@@ -17,13 +17,58 @@ output file is in [docs/cli.md](../docs/cli.md).
 Real overlays carry cluster detail: keep them with the fleet's manifests or in a gitignored
 `deploy/overlays/*.local/` directory.
 
+## Use the released image locally
+
+You need Git and a running Docker-compatible container engine. Clone the release for its
+profiles and shared parts; the image contains the tool, not the profile catalog:
+
+```sh
+git clone --branch v0.1.1 https://github.com/llm-d-incubation/llm-d-validate.git
+cd llm-d-validate
+export LLMDV_IMAGE=ghcr.io/llm-d-incubation/llm-d-validate:v0.1.1
+docker pull "$LLMDV_IMAGE"
+export P=profiles/llm-d/optimized-baseline/vllm-qwen3-32b-parsers-standalone.yaml
+mkdir -p runs
+```
+
+Choose the profile matching your deployment. Mount the complete `profiles/` tree read-only so
+relative `extends` paths resolve. The following Linux/macOS example uses your host UID/GID so
+local run files remain writable. With rootless Podman, run it as `podman run` and add
+`--userns=keep-id`: without it, the host UID is remapped inside the container, and `verify` stops
+with `Permission denied` and exit 3 creating its run directory. Override the image's default
+`llmdv job` entrypoint to call `plan` or `verify` directly:
+
+```sh
+docker run --rm --user "$(id -u):$(id -g)" --entrypoint llmdv \
+  -v "$PWD/profiles:/profiles:ro" \
+  "$LLMDV_IMAGE" plan --profile "/$P" --test-set smoke
+
+export LLMDV_ROUTER_URL='https://your-router.example'
+docker run --rm --user "$(id -u):$(id -g)" --entrypoint llmdv \
+  -e LLMDV_ROUTER_URL \
+  -v "$PWD/profiles:/profiles:ro" -v "$PWD/runs:/work/runs" \
+  "$LLMDV_IMAGE" verify --profile "/$P" --test-set smoke --analyze \
+  --local-output /work/runs
+```
+
+Replace the endpoint with an address reachable **from the container**; `localhost` there refers
+to the container, not your host or a host port-forward. This router example needs no key. For
+other profiles, load and forward every selected ingress's URL and credential variables with
+`-e VARIABLE_NAME`, without putting secret values in the command. Pass any model-ID override
+variables the same way. Results persist in the host's `runs/` directory after `--rm` removes the
+container. A printed `/work/runs/<run>` path corresponds to `runs/<run>` on the host.
+
+Use `llmdv job` for unattended orchestration as described in
+[the job workflow](../docs/running.md#run-unattended). The deployment instructions below cover
+cluster execution; [building an image](#build-a-custom-image) is optional.
+
 ## Deploying
 
 Replace the quoted placeholders below with your overlay, namespace and image values.
 
-1. Choose an existing CI-published image from
-   `ghcr.io/llm-d-incubation/llm-d-validate`: a `vX.Y.Z` release tag or a `sha-<short sha>`
-   tag from a successful main build. Set the example overlay's `newTag` to that exact tag;
+1. Prefer the released image `ghcr.io/llm-d-incubation/llm-d-validate:v0.1.1` with profiles
+   from the matching tag. A `sha-<short sha>` tag from a successful main build is also available
+   when deliberately testing unreleased changes. Set the example overlay's `newTag` to that exact tag;
    `replace-with-published-tag` is a placeholder. New releases do not update your overlay.
 2. Write an overlay from [`overlays/example/`](overlays/example/): namespace, image tag, an
    in-cluster profile (Service DNS, empty `setup`; check it with `llmdv profile validate`),
@@ -37,7 +82,9 @@ Replace the quoted placeholders below with your overlay, namespace and image val
    kubectl -n '<namespace>' logs -f "job/$job"
    ```
 
-For a custom image, build and push from the repository root, then set both `newName` and
+### Build a custom image
+
+For changes to the runner or its dependencies, build and push from the repository root, then set both `newName` and
 `newTag` in your overlay to match:
 
 ```sh
@@ -139,7 +186,7 @@ existing Secret from the `llmdv` container's `env` in your overlay:
 ```
 
 `optional: true` lets `llmdv job` skip publication if a key is absent; a rejected key is a
-delivery failure. Outside the cluster, install `llmdv[ibm-cos]` and export the same settings,
+delivery failure. Outside the cluster, install the [`llm-d-validate[ibm-cos]` extra](../docs/running.md#publish-a-run) and export the same settings,
 with the two credentials decoded (not base64). `IBM_COS_AUTH_ENDPOINT`, if overridden, is the
 full token URL ending in `/identity/token`. No bucket is created. Before switching the CronJob,
 prove a real upload from the intended environment with
