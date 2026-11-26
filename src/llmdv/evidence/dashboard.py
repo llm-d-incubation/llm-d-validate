@@ -517,7 +517,9 @@ CREDENTIAL_PAIR = re.compile(
 )
 
 SECRET_PATTERNS = [
-    re.compile(r"\bsk-[A-Za-z0-9_-]{16,}"),
+    # A key starts its token. A `sk-` inside a longer token is part of that token: an opaque id
+    # (a gateway's base64url Responses id, for one) holds it by chance, and `\b` matches after `-`.
+    re.compile(r"(?<![A-Za-z0-9_-])sk-[A-Za-z0-9_-]{16,}"),
     re.compile(r"Bearer\s+(?!\$\{)(?!\*\*\*)[A-Za-z0-9._~+/-]{20,}"),
     re.compile(r"AKIA[0-9A-Z]{16}"),
 ]
