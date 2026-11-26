@@ -10,10 +10,11 @@ import json
 
 import pytest
 
+from ...assertions.samples import draw, judge, sample
 from ...assertions.tool_calls import call_arguments
 from ...evidence import journal
 from ...surfaces.tool_wire import ToolChoice, ToolDef
-from ..conftest import check_completion
+from ..conftest import check_completion, last_seq
 from .common import (
     ASK_WEATHER,
     TIME,
@@ -417,6 +418,92 @@ def test_name_outside_spec(client, surface, model, ingress):
     if served_or_refused(exchange, surface, ingress):
         completion = surface.parse_completion(exchange.response_body)
         check_call_turn(completion, surface, model, [tool], REQUIRED, names=[name])
+
+
+def _agent_tool(name: str, summary: str, **properties: str) -> ToolDef:
+    """A tool whose parameters are all strings; the first is required. Bash's own parameter is
+    called `description`, so the tool's description is `summary` here."""
+    return ToolDef(
+        name,
+        summary,
+        {
+            "type": "object",
+            "properties": {
+                key: {"type": "string", "description": text} for key, text in properties.items()
+            },
+            "required": list(properties)[:1],
+        },
+    )
+
+
+# A coding agent's core tools as Claude Code names them, with their leading parameters.
+AGENT_TOOLS = (
+    _agent_tool(
+        "Bash",
+        "Run a shell command and return its output.",
+        command="The command to run",
+        description="What the command does, in a few words",
+    ),
+    _agent_tool("Read", "Read a file from the local filesystem.", file_path="Absolute path"),
+    _agent_tool("Glob", "Find files whose path matches a glob pattern.", pattern="Glob pattern"),
+    _agent_tool(
+        "Grep", "Search file contents with a regular expression.", pattern="Regex", path="Where"
+    ),
+    _agent_tool(
+        "Edit",
+        "Replace text in a file.",
+        file_path="Absolute path",
+        old_string="Text to replace",
+        new_string="Replacement text",
+    ),
+)
+AGENT_TASKS = (
+    "List the Python files under src with your tools, then read src/app/main.py.",
+    "Find where the function parse_config is defined with your tools and open that file.",
+    "Run the test suite with pytest using your tools and show the last lines of its output.",
+)
+
+
+# Independent sampled turns, no retry: a model that misnames a tool now and then shows in some
+# turns only, so a clean case means none in this many, not that it cannot happen. Every turn's
+# names are collected before any is judged, so a profile can raise n to chase an intermittent one.
+@pytest.mark.samples("count", n=6, min=6, target=True)
+@pytest.mark.parametrize("stream", [False, True], ids=["json", "sse"])
+@pytest.mark.case_id("tools.offered_names")
+def test_offered_names(client, surface, model, ingress, stream, samples):
+    """In coding-agent turns with an agent's tools, every call names an offered tool exactly.
+
+    A model that names a parameter after the tool (`Bash.command`, `Read.file_path`, `Glob.`)
+    makes the client answer "No such tool available", and an agent often gives up after a few.
+    """
+    require_auto(model, ingress)
+    choice, offered, drawn = ToolChoice("auto"), {tool.name for tool in AGENT_TOOLS}, []
+
+    def take(_group):
+        body = wire(surface).request(
+            model.public_id,
+            AGENT_TASKS[len(drawn) % len(AGENT_TASKS)],
+            list(AGENT_TOOLS),
+            choice,
+            tool_budget(model),
+            parallel=True,
+            stream=stream,
+            sampled=True,
+        )
+        completion = (stream_tools if stream else post_tools)(client, surface, ingress, body)
+        drawn.append(completion)
+        names = [call.name for call in completion.tool_calls]
+        return sample(all(name in offered for name in names), last_seq(client), preview=names)
+
+    judge(
+        "offered_names",
+        samples,
+        draw(samples, take),
+        f"every call in all {samples.n} turns names one of {sorted(offered)}",
+    )
+    # The rest of each turn's contract: a call at all, its ids, arguments and finish reason.
+    for completion in drawn:
+        check_call_turn(completion, surface, model, AGENT_TOOLS, choice)
 
 
 @pytest.mark.case_id("tools.long_description")

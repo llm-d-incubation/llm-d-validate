@@ -18,9 +18,20 @@ from ...assertions.structured_output import assert_structured_answer
 from ...assertions.tool_calls import assert_answer_contains
 from ...evidence import journal
 from ...surfaces.images import encode_png, striped_image
-from ...surfaces.tool_wire import PriorCall, ToolDef, ToolOutput
+from ...surfaces.tool_wire import PriorCall, ToolChoice, ToolDef, ToolOutput
 from ..conftest import check_basic_completion
-from .common import TIME, WEATHER, call_id, fresh, served_or_refused, tool_budget, wire
+from .common import (
+    TIME,
+    WEATHER,
+    call_id,
+    check_call_turn,
+    fresh,
+    post_tools,
+    require_auto,
+    served_or_refused,
+    tool_budget,
+    wire,
+)
 
 pytestmark = [pytest.mark.surface_generic("tools"), pytest.mark.needs("tools")]
 
@@ -331,6 +342,98 @@ def test_result_blocks(client, surface, model, ingress, kind):
     if served_or_refused(exchange, surface, ingress):
         answer = _check_answer(exchange, surface, model, ingress)
         assert_answer_contains(answer, [sky])
+
+
+TOOL_SEARCH = ToolDef(
+    "tool_search",
+    "Search the available tools by keyword. Returns a reference to each matching tool.",
+    {"type": "object", "properties": {"query": {"type": "string"}}, "required": ["query"]},
+)
+SEARCH_PROMPT = (
+    "Find a tool that reports the weather with tool_search, then use the tool it found to get "
+    "the weather in Paris."
+)
+# The least growth a rendered reference adds: the referenced tool's name, description and
+# schema, which run to several dozen tokens. A reference rendered as nothing adds none.
+TOOL_REFERENCE_MIN_TOKENS = 8
+
+
+def _require_tool_reference(ingress) -> None:
+    if ingress.capabilities.messages_features.get("tool_reference") != "accepted":
+        # A declared refusal is the feature case's to check (anthropic_messages.request_feature).
+        pytest.skip(
+            f"[undeclared] ingress {ingress.id!r} does not declare Messages feature "
+            "'tool_reference' accepted"
+        )
+
+
+@pytest.mark.surface("messages")
+@pytest.mark.case_id("tools.result_tool_reference")
+def test_result_tool_reference(client, surface, model, ingress):
+    """A tool_reference in a tool search's result is rendered into the prompt, and the model
+    then calls the tool it names.
+
+    Claude Code's tool search answers with a reference to a matching tool instead of text. A
+    template that renders the reference as nothing leaves the model a search that found nothing,
+    so the same turn with the reference must render more input than with an empty result.
+    """
+    _require_tool_reference(ingress)
+    # The request leaves the choice to the model, which must pick the found tool itself.
+    require_auto(model, ingress)
+    tools, sizes = [TOOL_SEARCH, WEATHER], {}
+    identity = call_id()
+    search = PriorCall(identity, "tool_search", {"query": "weather"})
+    reference = wire(surface).tool_reference(WEATHER.name)
+    completion = None
+    for label, output in (
+        ("empty", ToolOutput(identity, "")),
+        ("reference", ToolOutput(identity, blocks=(reference,))),
+    ):
+        body = wire(surface).history(
+            model.public_id, SEARCH_PROMPT, tools, [search], [output], tool_budget(model)
+        )
+        completion = post_tools(client, surface, ingress, body)
+        # The whole prompt, cached or not, as tools.result_is_error reads it.
+        sizes[label] = prompt_size(surface, completion)
+    grew = sizes["reference"] - sizes["empty"]
+    ok = grew >= TOOL_REFERENCE_MIN_TOKENS
+    journal.record(
+        "tool_reference_rendered",
+        {**sizes, "grew": grew},
+        f"at least {TOOL_REFERENCE_MIN_TOKENS} more input tokens with the reference",
+        ok=ok,
+    )
+    assert ok, f"the tool_reference did not change the rendered input: {sizes}"
+    check_call_turn(completion, surface, model, tools, ToolChoice("auto"), names=[WEATHER.name])
+
+
+DEFERRED_WEATHER = ToolDef(
+    WEATHER.name, WEATHER.description, WEATHER.parameters, extra={"defer_loading": True}
+)
+
+
+@pytest.mark.surface("messages")
+@pytest.mark.case_id("tools.deferred_tool_call")
+def test_deferred_tool_call(client, surface, model, ingress):
+    """A deferred tool that a tool search found can be called.
+
+    Claude Code defers most of its tools (`defer_loading`): the model learns of one only through
+    the `tool_reference` a search returns. A stack that leaves deferred tools out of the prompt
+    and renders the reference as nothing, or drops them on the way, leaves the model a tool it
+    cannot call. `tools.result_tool_reference` offers its tool up front, so it cannot see this.
+    """
+    _require_tool_reference(ingress)
+    # The request leaves the choice to the model, which must pick the found tool itself.
+    require_auto(model, ingress)
+    tools = [TOOL_SEARCH, DEFERRED_WEATHER]
+    identity = call_id()
+    search = PriorCall(identity, "tool_search", {"query": "weather"})
+    found = ToolOutput(identity, blocks=(wire(surface).tool_reference(WEATHER.name),))
+    body = wire(surface).history(
+        model.public_id, SEARCH_PROMPT, tools, [search], [found], tool_budget(model)
+    )
+    completion = post_tools(client, surface, ingress, body)
+    check_call_turn(completion, surface, model, tools, ToolChoice("auto"), names=[WEATHER.name])
 
 
 MARKUP_SUMMARY = {

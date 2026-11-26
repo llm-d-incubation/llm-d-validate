@@ -57,6 +57,62 @@ def test_tools_reuse_needs_a_stable_tool_render(tmp_path, surface, defect, outco
     assert records[0]["outcome"] == outcome, records
 
 
+SEARCH = {"messages_features": {"tool_reference": "accepted"}}
+
+
+@pytest.mark.parametrize(
+    "declaration,defect,outcome,request_label",
+    [
+        (BLOCKS, None, "pass", None),
+        (RATIO, None, "pass", None),
+        # The head changes the turn a search finds a tool, so that turn reads almost nothing.
+        (BLOCKS, "found_tools_in_head", "fail", "search found a tool"),
+        (RATIO, "found_tools_in_head", "fail", "search found a tool"),
+        # The reference renders differently once it is no longer last: the turn after loses the
+        # expanded definition, more than the one block of slack a turn has.
+        (BLOCKS, "references_expanded_last", "fail", "found tool called"),
+    ],
+)
+def test_tool_search_keeps_the_session_prefix(
+    tmp_path, declaration, defect, outcome, request_label
+):
+    code, records = run_cache_case(
+        tmp_path,
+        "messages",
+        declaration,
+        "test_tool_search_cache_reuse",
+        defect,
+        model=TOOLS,
+        **SEARCH,
+    )
+    assert code == (1 if outcome == "fail" else 0), records
+    (row,) = records
+    assert row["outcome"] == outcome, row
+    failed = [c for c in row["checks"] if c.get("ok") is False]
+    if outcome == "pass":
+        assert not failed, row
+        return
+    (check,) = failed
+    assert check["name"] in ("cache_turn_floor", "cache_turn_ratio"), row
+    assert check["observed"]["request"] == request_label, row
+
+
+@pytest.mark.parametrize(
+    "model,features",
+    [
+        (TOOLS, {}),
+        (TOOLS, {"messages_features": {"tool_reference": "rejected"}}),
+        ({"tools": {"parser": "fake"}}, SEARCH),
+    ],
+)
+def test_tool_search_case_skips_without_its_declarations(tmp_path, model, features):
+    code, records = run_cache_case(
+        tmp_path, "messages", BLOCKS, "test_tool_search_cache_reuse", model=model, **features
+    )
+    assert code == 0 and records[0]["outcome"] == "skip", records
+    assert "[undeclared]" in records[0]["reason"], records
+
+
 @pytest.mark.parametrize("surface", SURFACES)
 @pytest.mark.parametrize("defect,outcome", [(None, "pass"), ("key_order_sensitive", "fail")])
 def test_tool_key_order_needs_a_canonical_render(tmp_path, surface, defect, outcome):

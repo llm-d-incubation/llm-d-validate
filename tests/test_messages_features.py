@@ -133,6 +133,8 @@ def test_undeclared_features_send_nothing(tmp_path):
         ("assistant_prefill", (), "restarts_prefill", "prefill_continued"),
         ("max_tokens_zero", (), "overruns_max_tokens", "cache_prewarm"),
         ("container", ("container",), None, "http_status"),
+        # A server that refuses a tool search's reference block in a tool_result.
+        ("tool_reference", ("tool_reference",), None, "http_status"),
     ],
 )
 def test_an_accepted_feature_must_be_served(tmp_path, feature, rejects, defect, check):
