@@ -1175,8 +1175,8 @@ def mark_skip_current(skip_class: SkipClass) -> None:
 # ------------------------------------------------------------------ reporting
 
 
-def _public_nodeid(item: pytest.Item) -> str:
-    return getattr(item.config, "_llmdv_public_nodes", {}).get(item.nodeid, item.nodeid)
+def _public_nodeid(config: pytest.Config, item: pytest.Item) -> str:
+    return getattr(config, "_llmdv_public_nodes", {}).get(item.nodeid, item.nodeid)
 
 
 @pytest.hookimpl(hookwrapper=True)
@@ -1302,7 +1302,7 @@ def pytest_runtest_makereport(item: pytest.Item, call: pytest.CallInfo):
         evidence_ref = write_evidence(
             run_dir,
             FailureContext(
-                nodeid=_public_nodeid(item),
+                nodeid=_public_nodeid(config, item),
                 case_id=case_marker.args[0] if case_marker and case_marker.args else None,
                 ingress=ingress,
                 surface=surface,
@@ -1334,7 +1334,7 @@ def pytest_runtest_makereport(item: pytest.Item, call: pytest.CallInfo):
         writer.append(
             ResultRecord(
                 run_id=getattr(config, "_llmdv_run_id", "unknown"),
-                nodeid=_public_nodeid(item),
+                nodeid=_public_nodeid(config, item),
                 outcome=verdict,
                 profile=profile.name,
                 profile_digest=getattr(config, "_llmdv_profile_digest", None),
@@ -1481,7 +1481,7 @@ def _write_exchanges(
                 redact.redact_value(
                     {
                         "run_id": getattr(config, "_llmdv_run_id", None),
-                        "nodeid": _public_nodeid(item),
+                        "nodeid": _public_nodeid(config, item),
                         "case_id": case_marker.args[0]
                         if case_marker and case_marker.args
                         else None,
