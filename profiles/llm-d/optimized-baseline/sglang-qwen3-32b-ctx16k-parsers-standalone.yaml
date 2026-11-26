@@ -2,24 +2,24 @@
 # SGLang serving Qwen/Qwen3-32B at a 16384-token window with the qwen3 and qwen parsers (sglang
 # v0.1.0-tpu).
 #
+# Validate your deployment after installing the guide in standalone mode (guide.yaml deploy.standalone)
+# with one of the overlays listed below:
+#   export LLMDV_ROUTER_URL='https://your-router.example' # replace with your router URL
+#   llmdv profile validate profiles/llm-d/optimized-baseline/sglang-qwen3-32b-ctx16k-parsers-standalone.yaml
+#   llmdv verify --profile profiles/llm-d/optimized-baseline/sglang-qwen3-32b-ctx16k-parsers-standalone.yaml \
+#     --identity accelerator=<ACCELERATOR_TYPE> --identity provider=<INFRA_PROVIDER>
+#
 # Composed from the guide's shipped config at
 # llm-d 9ca8ff0 and the API references. Only the router layer has been measured (on kind,
 # with a simulator engine; see ../parts/topology/standalone.yaml).
 #
-# CI lane that deploys this configuration (llm-d's nightly-e2e-optimized-baseline-<lane>
+# Maintainer provenance: upstream workflow for this configuration (llm-d's nightly-e2e-optimized-baseline-<workflow-suffix>
 # workflow; it runs in standalone mode):
-#   gke-acc-tpu-sglang-x              tpu/v5p/sglang (the lane sets no provider, so it applies
+#   gke-acc-tpu-sglang-x              tpu/v5p/sglang (the upstream workflow sets no provider, so it applies
 #                                     that folder's own kustomization, which includes `base`;
 #                                     `gke` renders the same engine arguments)
-# Same to a client, but run by no lane: tpu/v6/sglang and tpu/v7/sglang (community).
+# Same to a client, but run by no configuration: tpu/v6/sglang and tpu/v7/sglang (community).
 #
-# How a lane runs it, after deploying the guide in standalone mode (guide.yaml deploy.standalone)
-# with one of the overlays above:
-#   export LLMDV_ROUTER_URL=<the EPP's URL>
-#   llmdv profile validate profiles/llm-d/optimized-baseline/sglang-qwen3-32b-ctx16k-parsers-standalone.yaml
-#   llmdv verify --profile profiles/llm-d/optimized-baseline/sglang-qwen3-32b-ctx16k-parsers-standalone.yaml \
-#     --identity accelerator=<ACCELERATOR_TYPE> --identity provider=<INFRA_PROVIDER>
-
 extends:
   - ../parts/base.yaml
   - ../parts/topology/standalone.yaml

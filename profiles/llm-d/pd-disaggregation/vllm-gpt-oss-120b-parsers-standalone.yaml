@@ -2,6 +2,14 @@
 # vLLM serving openai/gpt-oss-120b with the openai_gptoss reasoning parser and the openai
 # tool parser, at the model's own window.
 #
+# Validate your deployment after installing the guide in standalone mode (guide.yaml deploy.standalone)
+# with one of the overlays listed below:
+#   export LLMDV_ROUTER_URL='https://your-router.example' # replace with your router URL
+#   llmdv profile validate profiles/llm-d/pd-disaggregation/vllm-gpt-oss-120b-parsers-standalone.yaml
+#   llmdv verify --profile profiles/llm-d/pd-disaggregation/vllm-gpt-oss-120b-parsers-standalone.yaml \
+#     --identity accelerator=<ACCELERATOR_TYPE> --identity provider=<INFRA_PROVIDER>
+# with the values each configuration above lists (README.md beside this file).
+#
 # llm-d 9ca8ff0. Composed from the guide's shipped config and the API
 # references. Only the router layer has been measured (on kind, with a simulator engine and
 # optimized-baseline's router values; see ../parts/topology/standalone.yaml).
@@ -9,7 +17,7 @@
 # Prefill and decode run the same model id, window and parser flags (FROM values: both roles of
 # each overlay below); the decode pod's routing sidecar returns one response per request.
 #
-# CI lanes that deploy this configuration (llm-d's nightly-e2e-pd-disaggregation-<lane>
+# Maintainer provenance: upstream workflows for this configuration (llm-d's nightly-e2e-pd-disaggregation-<workflow-suffix>
 # workflows; each runs in standalone mode, gateway_class epponly):
 #   gke-acc-gpu-vllm-x                gpu/vllm/gke/base        vllm-openai v0.31.0
 #   cks-acc-gpu-vllm-x                gpu/vllm/coreweave       vllm-openai v0.31.0
@@ -20,14 +28,6 @@
 # client-visible arguments; the AMD overlay adds --kv-cache-memory-bytes. The two accelerators run
 # the same vLLM release, so their runs are worth comparing with llmdv compare.
 #
-# How a lane runs it, after deploying the guide in standalone mode (guide.yaml deploy.standalone)
-# with one of the overlays above:
-#   export LLMDV_ROUTER_URL=<the EPP's URL>
-#   llmdv profile validate profiles/llm-d/pd-disaggregation/vllm-gpt-oss-120b-parsers-standalone.yaml
-#   llmdv verify --profile profiles/llm-d/pd-disaggregation/vllm-gpt-oss-120b-parsers-standalone.yaml \
-#     --identity accelerator=<ACCELERATOR_TYPE> --identity provider=<INFRA_PROVIDER>
-# with the values each lane above lists (README.md beside this file).
-
 extends:
   - ../parts/base.yaml
   - ../parts/topology/standalone.yaml

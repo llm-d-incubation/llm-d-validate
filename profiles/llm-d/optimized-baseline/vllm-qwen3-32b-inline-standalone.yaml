@@ -1,28 +1,28 @@
 # The optimized-baseline guide in standalone mode (the client reaches the EPP's own listener):
 # vLLM serving Qwen/Qwen3-32B with no parsers: inline <think>, no tool calls.
 #
+# Validate your deployment after installing the guide in standalone mode (guide.yaml deploy.standalone)
+# with one of the overlays listed below:
+#   export LLMDV_ROUTER_URL='https://your-router.example' # replace with your router URL
+#   llmdv profile validate profiles/llm-d/optimized-baseline/vllm-qwen3-32b-inline-standalone.yaml
+#   llmdv verify --profile profiles/llm-d/optimized-baseline/vllm-qwen3-32b-inline-standalone.yaml \
+#     --identity accelerator=<ACCELERATOR_TYPE> --identity provider=<INFRA_PROVIDER>
+#
 # Composed from the guide's shipped config at
 # llm-d 9ca8ff0 and the API references. Only the router layer has been measured (on kind,
 # with a simulator engine; see ../parts/topology/standalone.yaml).
 #
-# CI lanes that deploy this configuration (llm-d's nightly-e2e-optimized-baseline-<lane>
+# Maintainer provenance: upstream workflows for this configuration (llm-d's nightly-e2e-optimized-baseline-<workflow-suffix>
 # workflows; each runs in standalone mode):
 #   amd-acc-rocm-vllm-x               amd/vllm/amd-ci
-#   gke-acc-tpu-vllm-x                tpu/v5p/vllm (the lane sets no provider, so it applies
+#   gke-acc-tpu-vllm-x                tpu/v5p/vllm (the upstream workflow sets no provider, so it applies
 #                                     that folder's own kustomization, which includes `base`;
 #                                     `gke` renders the same engine arguments)
-# Same to a client, but run by no lane: amd/vllm/base.
+# Same to a client, but run by no configuration: amd/vllm/base.
 #
 # The two accelerators run the same vLLM release (v0.31.0, ROCm and TPU builds) with the same
 # client-visible arguments; their runs are worth comparing with llmdv compare.
 #
-# How a lane runs it, after deploying the guide in standalone mode (guide.yaml deploy.standalone)
-# with one of the overlays above:
-#   export LLMDV_ROUTER_URL=<the EPP's URL>
-#   llmdv profile validate profiles/llm-d/optimized-baseline/vllm-qwen3-32b-inline-standalone.yaml
-#   llmdv verify --profile profiles/llm-d/optimized-baseline/vllm-qwen3-32b-inline-standalone.yaml \
-#     --identity accelerator=<ACCELERATOR_TYPE> --identity provider=<INFRA_PROVIDER>
-
 extends:
   - ../parts/base.yaml
   - ../parts/topology/standalone.yaml

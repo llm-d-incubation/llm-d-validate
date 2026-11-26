@@ -1,6 +1,6 @@
 ---
 name: writing-an-infra-profile
-description: Use when writing, updating or reviewing an `llmdv` infra-profile; when choosing error_status, unstructured_errors, header dispositions, efforts, capabilities or change sentinels; when deciding which case families to leave out; when tempted to declare what a probe returned; before naming LiteLLM, an llm-d router or EPP, or vLLM behind an ingress; when one stack needs several profiles (models, engines, an llm-d guide's CI lanes); when publishing a profile that was written against a private stack; or when a profile change must be reflected in its folder README's description of what a verification command selects.
+description: Use when writing, updating or reviewing an `llmdv` infra-profile; when choosing error_status, unstructured_errors, header dispositions, efforts, capabilities or change sentinels; when deciding which case families to leave out; when tempted to declare what a probe returned; before naming LiteLLM, an llm-d router or EPP, or vLLM behind an ingress; when one stack needs several profiles (models, engines, an llm-d guide's deployment configurations); when publishing a profile that was written against a private stack; or when a profile change must be reflected in its folder README's description of what a verification command selects.
 ---
 
 # Writing an infra-profile
@@ -33,7 +33,7 @@ in [REFERENCE.md](../../../profiles/REFERENCE.md). This checklist retains agent 
 
 Respect requested scope. Use the [CLI selection rules](../../../docs/cli.md#test-sets-and-coverage)
 and report partial coverage as partial coverage. A smaller test set does not justify removing
-an intended capability. Guide validation follows the lane requirements below.
+an intended capability. The broader-validation requirements for maintained guide profiles appear below.
 
 ### Keep each folder's "What `llmdv verify` selects" section current
 
@@ -44,15 +44,15 @@ generated README changes in the same PR.
 ## More than one configuration: parts and combinations
 
 Use the [parts and combinations procedure](../../../docs/profile-provenance.md#more-than-one-configuration-parts-and-combinations).
-Write each fact once; name combinations by client-visible configuration, and distinguish lanes
+Write each fact once; name combinations by client-visible configuration, and distinguish configurations
 with identity flags, never labels.
 
 ### Profiles for an llm-d guide
 
-Read nightly lanes, deploy scripts, rendered overlays, `guide.yaml` and the guide README.
-Profile what lanes actually deploy; record disagreements with other sources. Follow the
+Read nightly workflows, deploy scripts, rendered overlays, `guide.yaml` and the guide README.
+Profile the configurations those workflows deploy; record disagreements with other sources. Follow the
 [guide procedure](../../../docs/profile-provenance.md#profiles-for-an-llm-d-guide), including a
-full-suite lane for each configuration and distinct engine build.
+full-suite validation run for each configuration and distinct engine build.
 
 #### How profiles/llm-d is built
 
@@ -85,3 +85,7 @@ Record gaps explicitly; do not silently widen a user's requested run.
 
 Keep the case failing until triage establishes a defect or an intended deviation. Use
 [known failures](../../../profiles/REFERENCE.md#known_failures) only for tracked findings.
+
+In guide documentation and YAML comments, lead with deployment configuration and validation
+purpose. Put upstream workflow mappings in labeled maintainer provenance. Follow the
+[documentation terminology guidance](../../../docs/maintaining-docs.md).

@@ -53,7 +53,7 @@ llmdv verify --profile "$P" --analyze --evidence all \
 ```
 
 Labels are free-form `key=value` pairs recorded in `outcome.json` and on the dashboard.
-Use `--identity` for baseline matching; a label does not isolate a comparison lane.
+Use `--identity` for baseline matching; a label does not isolate a comparison history.
 
 A published run lives at `<prefix>/<profile name>/<run id>/` and is complete once its
 `MANIFEST.json` is there. A local archive uses the same layout: pass
@@ -119,7 +119,7 @@ or prefix from your other runs.
   left behind, and a key is usually rate-limited.
 - **Never pass `-n`.** Cases run sequentially; an individual case can send concurrent requests.
   `llmdv verify` refuses parallel pytest workers.
-- **Keep comparison lanes distinct.** Set `--identity trigger=nightly` for scheduled runs;
+- **Keep comparison histories distinct.** Set `--identity trigger=nightly` for scheduled runs;
   manual runs default to `trigger=manual`. Free-form labels do not isolate baselines.
 - **Keep the machine awake.** A sleeping laptop stalls requests, and the cases in flight fail on
   the stream-idle timeout.

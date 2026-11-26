@@ -4,12 +4,18 @@ Give each topic one authoritative home. Other pages may repeat a runnable comman
 reminder needed for their task, then link to the explanation. Keep prerequisites and material
 limitations beside the action they affect.
 
+Describe guides and profile comments in terms of deployment configurations, validation scope
+and comparison identity. Explain what users test and why it matters. Keep upstream workflow
+names and automation-specific overrides in clearly labeled maintainer provenance; preserve
+those identifiers exactly. Use “workflow” for automation, “configuration” for the deployed
+model/engine/options, and “validation run” for an execution. Avoid “lane.”
+
 | Document | Owns |
 | --- | --- |
 | Root README | Purpose, prerequisites, brief quick start and navigation |
 | Getting started | Installation through the first result and its interpretation |
 | Profiles overview | Choosing an existing profile or a starting example |
-| llm-d overview | Guide catalog and shared lane/identity conventions |
+| llm-d overview | Guide catalog and deployment configuration and comparison identity |
 | Individual guide README | Configuration mapping, exact commands, coverage and limitations |
 | Writing profiles | Creating and adapting a profile through examples |
 | Profile evidence and provenance | Measuring, seeding sentinels, guide parts and public-profile preparation |

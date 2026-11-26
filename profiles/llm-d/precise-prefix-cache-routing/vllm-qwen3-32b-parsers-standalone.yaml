@@ -3,14 +3,21 @@
 # vLLM serving Qwen/Qwen3-32B with the qwen3 reasoning parser and the hermes tool parser,
 # publishing KV events to the router, which renders every prompt on the pods.
 #
+# Validate your deployment after installing the guide in standalone mode (guide.yaml deploy.standalone)
+# with one of the overlays listed below (GUIDE_NAME=precise-prefix-cache-routing):
+#   export LLMDV_ROUTER_URL='https://your-router.example' # replace with your router URL
+#   llmdv profile validate profiles/llm-d/precise-prefix-cache-routing/vllm-qwen3-32b-parsers-standalone.yaml
+#   llmdv verify --profile profiles/llm-d/precise-prefix-cache-routing/vllm-qwen3-32b-parsers-standalone.yaml \
+#     <the matching identity flags below>
+#
 # llm-d 9ca8ff0.
 #
-# CI lanes that deploy this configuration (llm-d's nightly-e2e-precise-prefix-cache-routing-<lane>
+# Maintainer provenance: upstream workflows for this configuration (llm-d's nightly-e2e-precise-prefix-cache-routing-<workflow-suffix>
 # workflows; each runs in standalone mode, gateway_class epponly):
 #   cks-acc-gpu-vllm-x                gpu/vllm/base
 #   gke-acc-gpu-vllm-x                gpu/vllm/gke
 #   ibm-acc-gpu-vllm-x                gpu/vllm/ocp (serves from a local path under the same model id)
-# Identity flags per lane:
+# Comparison identity by deployment configuration:
 #   cks-acc-gpu-vllm-x                --identity accelerator=gpu --identity provider=base
 #   gke-acc-gpu-vllm-x                --identity accelerator=gpu --identity provider=gke
 #   ibm-acc-gpu-vllm-x                --identity accelerator=gpu --identity provider=ocp
@@ -19,13 +26,6 @@
 # same to a client. vllm-openai v0.31.0 with --enable-scale-out, --block-size=64 and
 # --kv-events-config (FROM values: modelserver/gpu/vllm/base/patch-vllm.yaml).
 #
-# How a lane runs it, after deploying the guide in standalone mode (guide.yaml deploy.standalone)
-# with one of the overlays above (GUIDE_NAME=precise-prefix-cache-routing):
-#   export LLMDV_ROUTER_URL=<the EPP's URL>
-#   llmdv profile validate profiles/llm-d/precise-prefix-cache-routing/vllm-qwen3-32b-parsers-standalone.yaml
-#   llmdv verify --profile profiles/llm-d/precise-prefix-cache-routing/vllm-qwen3-32b-parsers-standalone.yaml \
-#     <the lane's identity flags above>
-
 extends:
   - ../parts/base.yaml
   - ../parts/topology/standalone.yaml
@@ -49,7 +49,7 @@ model:
     parser: hermes
 
 ingresses:
-  # Overrides ../parts/topology/standalone.yaml on purpose: this lane's engine runs with
+  # Overrides ../parts/topology/standalone.yaml on purpose: this configuration's engine runs with
   # --enable-scale-out (FROM values: modelserver/gpu/vllm/base/patch-vllm.yaml), and vLLM v0.30
   # and later register the four render routes only with that flag (FROM docs:
   # vllm@v0.31.0:vllm/entrypoints/scale_out/factories.py, register_scale_out_api_routers; the
@@ -58,7 +58,7 @@ ingresses:
   # parsers/openai/openai.go:133 and anthropic.go:69) and passes
   # /v1/responses/render through; it does not re-tokenize a client's render call (the
   # token-producer returns early for one) and routes it by model to one pod. Declared here, not
-  # in parts/common.yaml, because the TPU v5p lane's engine runs without the flag.
+  # in parts/common.yaml, because the TPU v5p configuration's engine runs without the flag.
   - id: router
     surfaces: [chat_completions, completions, messages, responses, chat_render, completions_render, messages_render, responses_render]
 

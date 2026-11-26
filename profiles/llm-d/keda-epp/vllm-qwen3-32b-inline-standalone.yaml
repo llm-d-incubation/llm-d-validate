@@ -2,12 +2,18 @@
 # listener, with flow control on): vLLM serving Qwen/Qwen3-32B with no parsers: inline <think>,
 # no tool calls, autoscaled by KEDA on the flow-control queue between one and two replicas.
 #
+# Validate your deployment after the deploy script:
+#   export LLMDV_ROUTER_URL='https://your-router.example' # replace with your router URL
+#   llmdv profile validate profiles/llm-d/keda-epp/vllm-qwen3-32b-inline-standalone.yaml
+#   llmdv verify --profile profiles/llm-d/keda-epp/vllm-qwen3-32b-inline-standalone.yaml \
+#     --identity accelerator=amd --identity provider=base --identity flavor=queue
+#
 # llm-d 9ca8ff0. Composed from the guide's shipped config and the API
 # references. Only the router layer has been measured, and that with optimized-baseline's router
 # config, without flow control (on kind, with a simulator engine; see
 # ../parts/topology/standalone.yaml).
 #
-# CI lanes that deploy this configuration (llm-d's nightly-e2e-workload-autoscaling-keda-epp-<lane>
+# Maintainer provenance: upstream workflows for this configuration (llm-d's nightly-e2e-workload-autoscaling-keda-epp-<workflow-suffix>
 # workflows; standalone mode, with a custom_deploy_script):
 #   amd-acc-rocm-vllm-x  reusable-nightly-e2e-amd,
 #                        guides/workload-autoscaling/scripts/nightly-deploy-amd-keda-epp.sh:
@@ -15,12 +21,6 @@
 #                        (vllm-openai-rocm v0.31.0), flow control on, queue ScaledObject;
 #                        Service <release>-rocm-epp
 #
-# How a lane runs it, after the deploy script:
-#   export LLMDV_ROUTER_URL=<the EPP's URL>
-#   llmdv profile validate profiles/llm-d/keda-epp/vllm-qwen3-32b-inline-standalone.yaml
-#   llmdv verify --profile profiles/llm-d/keda-epp/vllm-qwen3-32b-inline-standalone.yaml \
-#     --identity accelerator=amd --identity provider=base --identity flavor=queue
-
 extends:
   - ../parts/base.yaml
   - ../parts/topology/standalone.yaml
@@ -34,7 +34,7 @@ name: keda-epp-vllm-qwen3-32b-inline-standalone
 headers:
   # FROM docs: llm-d-router@main:pkg/epp/handlers/response.go:436-445 and
   # pkg/epp/metadata/consts.go:74-76, the router build guides/env.sh pins (ROUTER_EPP_VERSION
-  # main). With the flowControl feature gate on, which this lane's router values set
+  # main). With the flowControl feature gate on, which this configuration's router values set
   # (guides/workload-autoscaling/keda-epp/optimized-baseline/router.values.yaml; see
   # parts/common.yaml), the EPP adds this header, the time the request waited in flow control, to
   # the response of every request flow control admits, before the first byte; without flow

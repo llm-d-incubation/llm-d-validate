@@ -22,7 +22,7 @@
 # refused or dropped connection, and any error it answers itself, have not been measured.
 #
 # The modelserver/gpu/vllm/{base,gke,ocp} overlays are detection-only stubs for the benchmark
-# harness (a replicas: 0 Deployment that only names the model); the lanes stand the guide up with
+# harness (a replicas: 0 Deployment that only names the model); the upstream workflows install the guide with
 # `kubectl apply -k platform/<INFRA_PROVIDER>` (guide.yaml deploy.modelserver).
 #
 # The guide's claims (G/README.md, G/guide.yaml) and where each one lands:
@@ -38,7 +38,7 @@
 #       instances, one launcher per GPU node)
 #       -> NOT COVERED: cluster state, which a committed profile does not read
 #   5   gateway mode and the GATEWAY_CLASS values other than epponly
-#       -> NOT COVERED: no lane runs them
+#       -> NOT COVERED: no tracked upstream workflow runs them
 
 guide: fast-model-actuation
 
@@ -50,14 +50,15 @@ capabilities:
   # `affinity: routed` has nothing to observe.
   cache_reuse: null
 
-# The cases this guide's lanes run by default (`llmdv verify --full-suite` runs everything). They test
-# what a lane's own deployment can get wrong: the router path, the overlay's parsers and window,
-# and what this guide changes. Engine and model conformance, the rest of the suite, depends only
-# on the engine build, model and flags, which many lanes share; it runs with `--full-suite` once per
-# configuration (profiles/llm-d/README.md, "Which lane runs everything").
+# Default validation scope: the router path, configured parsers and context window,
+# plus the serving behavior this guide introduces. These focused checks are a starting
+# point for deployment validation. Expand coverage for the APIs and operating conditions
+# you rely on; --full-suite selects the existing library before applicability gates.
+# Maintainer assignments for broader validation are in profiles/llm-d/README.md,
+# under "Broader validation assignments".
 test_sets:
   default:
-    # Every lane: the router serves each API a client uses, and refuses what it should.
+    # Every deployment: the router serves each API a client uses, and refuses what it should.
     - contract.*
     - discovery.models_lists_declared_model
     - discovery.unknown_model_no_fallback
@@ -80,11 +81,11 @@ test_sets:
     - unhappy.error_envelope_fields
     - transport.connection
     - transport.health_status
-    # Every lane: the overlay's parser flags take effect (skips where the model part has none).
+    # Every deployment: the overlay's parser flags take effect (skips where the model part has none).
     - openai_chat.configured_reasoning
     - tools.auto_call
     - tools.auto_stream
-    # Every lane: the overlay's context window is the one declared.
+    # Every deployment: the overlay's context window is the one declared.
     - long_context.*
     - unhappy.context_overflow
     - unhappy.token_limit_over_context

@@ -13,7 +13,7 @@
 # (llm-d-coordinator:8080), which none of these profiles reach.
 #
 # The router, as this guide configures it (FROM values: MT/values/router/, layered on
-# R/router/base.values.yaml; the lanes pick one with FLOW_CONTROL):
+# R/router/base.values.yaml; the configurations pick one with FLOW_CONTROL):
 #   both        feature gate flowControl; profile `default` = queue-scorer 2,
 #               kv-cache-utilization-scorer 2, prefix-cache-scorer 3; concurrency-detector
 #               maxConcurrency 10; maxBytes 10Gi, maxRequests 1k, defaultRequestTTL 300s; six
@@ -26,14 +26,14 @@
 #               eviction
 #   objectives  MT/manifests/objectives: reserved-interactive 100, reserved-async 60,
 #               reserved-batch 30, overflow-interactive 10, overflow-async -5, overflow-batch -10
-# CI-only changes (FROM values: MT/scripts/nightly-deploy-gke.sh): EPP --v=4 and EPP metrics auth
+# Upstream validation overrides (FROM values: MT/scripts/nightly-deploy-gke.sh): EPP --v=4 and EPP metrics auth
 # off.
 #
-# The two router configurations differ only under saturation. llmdv sends one request at a time,
-# so a correct stack answers every case the same way under either; the two lanes share one
-# combination and are told apart with --identity flavor=evictable|holdback. Both run flow
-# control, which a client sees only as the x-llm-d-flow-queue-duration-ms response header
-# (declared below).
+# Both router configurations share the expected API and flow-control header contract,
+# so they use one profile. Set --identity flavor=evictable or flavor=holdback to keep
+# comparison histories distinct. The selected concurrent and cancellation checks do not
+# establish eviction or holdback policy under saturation; that needs a load experiment.
+# The promised x-llm-d-flow-queue-duration-ms response header is declared below.
 #
 # The guide's claims (MT/README.md, MT/guide.yaml, .github/scripts/e2e/async-multitenant/) and
 # where each one lands. Router claims it shares with optimized-baseline (surfaces, streaming
@@ -46,7 +46,7 @@
 #       ../../parts/topology/standalone.yaml, which skip as requires_load (#23)
 #   3   eviction (evictable) or holdback (holdback) protects realtime traffic: bounded TTFT,
 #       latency and throughput degradation at 20/80/90/100 % of capacity with an async backlog
-#       (the CI validator's inference-perf experiment) -> NOT COVERED: requires_load (#23) and a
+#       (the upstream validator's inference-perf experiment) -> NOT COVERED: requires_load (#23) and a
 #       benchmark
 #   4   async alone saturates the pool -> NOT COVERED: requires_load (#23)
 #   5   an evicted request is cancelled by the router and retried by llm-d-async -> NOT COVERED:
@@ -54,7 +54,7 @@
 #   6   the coordinator's x-llm-d-async-mode (passthrough, wait, enqueue) and x-llm-d-tenant
 #       routing to team queues and tiers -> NOT COVERED: needs a coordinator ingress in front of
 #       the router, and an enqueue and poll surface llmdv does not have
-#   7   llm-d-async quota gates, tier priority and lane objective stamping from Redis queues
+#   7   llm-d-async quota gates, tier priority and configuration objective stamping from Redis queues
 #       -> NOT COVERED: the queues are not an HTTP surface
 #   8   llm-d-async runs with --transport=redis-sortedset (MT/guide.yaml verify.tests.transport)
 #       -> NOT COVERED: a config read, fleet.config, which needs cluster access a committed
@@ -66,7 +66,7 @@ guide: async-multitenant
 
 capabilities:
   # Not declared, on purpose, as in optimized-baseline. The cache suite reads cached_tokens from
-  # each response, and the overlay both lanes render (MT/modelserver/gpu/vllm/gke, built on
+  # each response, and the overlay both configurations render (MT/modelserver/gpu/vllm/gke, built on
   # OB/modelserver/gpu/vllm/base) does not pass vLLM's --enable-prompt-tokens-details. With no
   # cached_tokens, `affinity: routed` would fail on a correct stack for want of the field.
   cache_reuse: null
@@ -81,14 +81,15 @@ headers:
   x-llm-d-flow-queue-duration-ms:
     router: promised
 
-# The cases this guide's lanes run by default (`llmdv verify --full-suite` runs everything). They test
-# what a lane's own deployment can get wrong: the router path, the overlay's parsers and window,
-# and what this guide changes. Engine and model conformance, the rest of the suite, depends only
-# on the engine build, model and flags, which many lanes share; it runs with `--full-suite` once per
-# configuration (profiles/llm-d/README.md, "Which lane runs everything").
+# Default validation scope: the router path, configured parsers and context window,
+# plus the serving behavior this guide introduces. These focused checks are a starting
+# point for deployment validation. Expand coverage for the APIs and operating conditions
+# you rely on; --full-suite selects the existing library before applicability gates.
+# Maintainer assignments for broader validation are in profiles/llm-d/README.md,
+# under "Broader validation assignments".
 test_sets:
   default:
-    # Every lane: the router serves each API a client uses, and refuses what it should.
+    # Every deployment: the router serves each API a client uses, and refuses what it should.
     - contract.*
     - discovery.models_lists_declared_model
     - discovery.unknown_model_no_fallback
@@ -111,11 +112,11 @@ test_sets:
     - unhappy.error_envelope_fields
     - transport.connection
     - transport.health_status
-    # Every lane: the overlay's parser flags take effect (skips where the model part has none).
+    # Every deployment: the overlay's parser flags take effect (skips where the model part has none).
     - openai_chat.configured_reasoning
     - tools.auto_call
     - tools.auto_stream
-    # Every lane: the overlay's context window is the one declared.
+    # Every deployment: the overlay's context window is the one declared.
     - long_context.*
     - unhappy.context_overflow
     - unhappy.token_limit_over_context

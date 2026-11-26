@@ -223,19 +223,19 @@ Preview cases and reasons with `llmdv plan --profile <profile>`.
 
 ## Not covered
 
-- **Configurations no lane runs:** MooncakeStore, the NVIDIA and XPU `fs` variants, TPU v6e and v7 (including multi-host and the TPU v7 `fs` tier), SGLang `fs`; gateway mode.
-- **Everything the offload does**: offload and load-back counters, the native connector's offload gate, the shared filesystem tier (a prefix primed on one pod hits on another) and the fs lanes' PVC. They need per-pod URLs, engine metrics or cluster objects a committed profile does not carry, and no response field shows a tier hit. A run of these profiles checks that the stack serves correctly with offloading on, not that offloading works.
+- **Configurations no configuration runs:** MooncakeStore, the NVIDIA and XPU `fs` variants, TPU v6e and v7 (including multi-host and the TPU v7 `fs` tier), SGLang `fs`; gateway mode.
+- **Everything the offload does**: offload and load-back counters, the native connector's offload gate, the shared filesystem tier (a prefix primed on one pod hits on another) and the fs configurations' PVC. They need per-pod URLs, engine metrics or cluster objects a committed profile does not carry, and no response field shows a tier hit. A run of these profiles checks that the stack serves correctly with offloading on, not that offloading works.
 - **`cache_reuse`**: no overlay passes `--enable-prompt-tokens-details` or `--enable-cache-report`.
 
 ## For maintainers
 
 <details>
-<summary>llm-d's nightly lanes, and how each maps to a profile</summary>
+<summary>llm-d's nightly workflows, and how each maps to a profile</summary>
 
 
-The overlay is `modelserver/<ACCELERATOR_TYPE>/<MODEL_SERVER>/<CONNECTOR>/<VARIANT>/<INFRA_PROVIDER>/`. Each workflow passes `connector` (`lmcache-connector` or `native`) and `offloading_target` (`cpu` or `fs`) to llm-d-infra's reusable workflow; `guide.yaml` says the nightlies override `CONNECTOR` and `VARIANT`, so `offloading_target` is read as `VARIANT` (inferred: the reusable workflow is not in the llm-d repository). The connector and the tier never change the model, window or parsers, so fifteen lanes (each `gateway_class: epponly`, so standalone) deploy five configurations that differ to a client.
+The overlay is `modelserver/<ACCELERATOR_TYPE>/<MODEL_SERVER>/<CONNECTOR>/<VARIANT>/<INFRA_PROVIDER>/`. Each workflow passes `connector` (`lmcache-connector` or `native`) and `offloading_target` (`cpu` or `fs`) to llm-d-infra's reusable workflow; `guide.yaml` says the nightlies override `CONNECTOR` and `VARIANT`, so `offloading_target` is read as `VARIANT` (inferred: the reusable workflow is not in the llm-d repository). The connector and the tier never change the model, window or parsers, so fifteen workflows (each `gateway_class: epponly`, so standalone) deploy five configurations that differ to a client.
 
-| CI lane | Overlay | Profile | Identity flags |
+| upstream workflow | Overlay | Profile | Identity flags |
 | --- | --- | --- | --- |
 | `cks-cpu-gpu-vllm-lmcache` | `gpu/vllm/lmcache-connector/cpu/base` | `vllm-qwen3-32b-parsers-standalone` | `--identity accelerator=gpu --identity provider=base --identity flavor=lmcache-connector/cpu` |
 | `cks-cpu-gpu-vllm-native` | `gpu/vllm/native/cpu/base` | `vllm-qwen3-32b-parsers-standalone` | `--identity accelerator=gpu --identity provider=base --identity flavor=native/cpu` |
@@ -253,16 +253,16 @@ The overlay is `modelserver/<ACCELERATOR_TYPE>/<MODEL_SERVER>/<CONNECTOR>/<VARIA
 | `gke-cpu-gpu-sglang-native` | `gpu/sglang/native/cpu/gke` | `sglang-qwen3-32b-parsers-standalone` | `--identity accelerator=gpu --identity provider=gke --identity flavor=native/cpu` |
 | `gke-cpu-tpu-sglang-native` | `tpu/v5p/sglang/native/cpu` (no provider; includes `base`) | `sglang-qwen3-32b-ctx16k-parsers-standalone` | `--identity accelerator=tpu/v5p --identity provider=base --identity flavor=native/cpu` |
 
-`accelerator` is the lane's `ACCELERATOR_TYPE` and `provider` the `INFRA_PROVIDER` folder it renders (`base` for the two TPU lanes, which set none). `flavor` is `<CONNECTOR>/<VARIANT>`, the workflow's `connector` and `offloading_target` in overlay-path order, and every lane passes it, as [../README.md](../README.md) sets out. Lanes that would otherwise share a profile, accelerator and provider need it to stay apart: the six NVIDIA vLLM lanes (two connectors per provider) and the four AMD lanes (one provider, two connectors by two tiers).
+`accelerator` is the workflow's `ACCELERATOR_TYPE` and `provider` the `INFRA_PROVIDER` folder it renders (`base` for the two TPU workflows, which set none). `flavor` is `<CONNECTOR>/<VARIANT>`, the workflow's `connector` and `offloading_target` in overlay-path order, and every workflow passes it, as [../README.md](../README.md) sets out. Workflows that would otherwise share a profile, accelerator and provider need it to stay apart: the six NVIDIA vLLM workflows (two connectors per provider) and the four AMD workflows (one provider, two connectors by two tiers).
 
 </details>
 
 <details>
 <summary>Where llm-d's own sources disagree</summary>
 
-- **Unlisted providers.** The four AMD lanes deploy `amd-ci`, which is among `guide.yaml`'s `INFRA_PROVIDER` values but not in the `amd` providers (`base` only). The two `ibm-*` lanes deploy `ocp`, which is in neither the `INFRA_PROVIDER` values (`base`, `gke`, `amd-ci`) nor the `gpu` providers.
-- **Providers of the no-provider lanes.** The two TPU lanes pass an empty provider and apply `base`; `guide.yaml` lists only `gke` for `tpu/v5p`.
+- **Unlisted providers.** The four AMD workflows deploy `amd-ci`, which is among `guide.yaml`'s `INFRA_PROVIDER` values but not in the `amd` providers (`base` only). The two `ibm-*` workflows deploy `ocp`, which is in neither the `INFRA_PROVIDER` values (`base`, `gke`, `amd-ci`) nor the `gpu` providers.
+- **Providers of the no-provider workflows.** The two TPU workflows pass an empty provider and apply `base`; `guide.yaml` lists only `gke` for `tpu/v5p`.
 - **The XPU support row names one model for two.** `guide.yaml` gives `Qwen/Qwen3-32B` for `xpu`, and its notes and `MODEL` comment say the `lmcache-connector` overlay serves `Qwen/Qwen3-8B` (rendered: `--max-model-len 20480`, one XPU). The guide's own `model` check fails a run that leaves `MODEL` at the default.
-- **Router CPU-tier capacity is sized for one overlay.** `router/single-host/tiered-prefix-cache-cpu.values.yaml` sets `lruCapacityPerServer: 19200`, sized for the NVIDIA native overlay's 300 GiB CPU tier; the AMD and XPU native overlays give 100 GiB and the LMCache overlays 100 GB (20 GB on XPU), and every lane uses the same router values. This affects routing quality, not what a client sees.
+- **Router CPU-tier capacity is sized for one overlay.** `router/single-host/tiered-prefix-cache-cpu.values.yaml` sets `lruCapacityPerServer: 19200`, sized for the NVIDIA native overlay's 300 GiB CPU tier; the AMD and XPU native overlays give 100 GiB and the LMCache overlays 100 GB (20 GB on XPU), and every workflow uses the same router values. This affects routing quality, not what a client sees.
 
 </details>

@@ -7,7 +7,7 @@
 #                               --enable-auto-tool-choice
 #   gpu/sglang/{base,gke}       sglang --reasoning-parser=qwen3 --tool-call-parser=qwen
 # FROM values: guides/optimized-baseline/modelserver/gpu/{vllm,sglang}/base/patch-*.yaml.
-# The same vLLM overlays, deployed by other guides' lanes:
+# The same vLLM overlays, deployed by other guides' configurations:
 #   flow-control       optimized-baseline gpu/vllm/gke, relabelled
 #   agentic-api        guides/agentic-api/modelserver/gpu/vllm/gke (optimized-baseline gpu/vllm/gke)
 #   async-multitenant  guides/batch-serving/asynchronous-processing/multitenant/modelserver/

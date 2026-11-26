@@ -60,7 +60,7 @@ Record: the gateway version, the engine build (`system_fingerprint`), and which 
 | You have | Profile |
 |---|---|
 | A committed profile for this model and layer (under `profiles/<system>/`) | use it |
-| A deployment of an llm-d guide | the guide's combination under `profiles/llm-d/<guide>/`; its `README.md` names the combination for each CI lane, the URL variable to export (`LLMDV_ROUTER_URL`) and the exact `--identity` flags. It runs the guide's `test_sets.default`; add `--full-suite` for every case |
+| A deployment of an llm-d guide | the guide's combination under `profiles/llm-d/<guide>/`; its `README.md` maps each deployment configuration to a profile, the URL variable to export (`LLMDV_ROUTER_URL`) and the exact `--identity` flags. It runs the guide's `test_sets.default`; add `--full-suite` for every case |
 | One for the model through another layer | copy it to `<system>/<model>.local.yaml` and change what differs: `kind`, `auth`, `model.public_id`, `health_path`, `rate_limited`, the surfaces |
 | A gateway and the router for the same model | a two-ingress `.local.yaml`: the gateway profile plus a `kind: router` ingress (below); `llmdv` then reports each layer as a column and attributes differences |
 | Nothing for this model | [writing-an-infra-profile](../writing-an-infra-profile/SKILL.md); start with `examples/example-minimal.yaml` when no fuller profile matches |

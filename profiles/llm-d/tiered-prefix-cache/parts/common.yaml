@@ -9,11 +9,11 @@
 # <INFRA_PROVIDER>/ (FROM values: G/guide.yaml env.static and deploy.modelserver). CONNECTOR is
 # the offloading implementation (native, lmcache-connector) and VARIANT the tier (cpu = CPU RAM,
 # fs = CPU RAM plus a shared filesystem on a ReadWriteMany PVC). Neither changes the model, the
-# window or the parsers a client sees, so lanes that differ only in them share a combination. Every
-# lane passes --identity flavor=<CONNECTOR>/<VARIANT> (README.md), which keeps them apart.
+# window or the parsers a client sees, so configurations that differ only in them share a combination. Every
+# deployment uses --identity flavor=<CONNECTOR>/<VARIANT> (README.md), which keeps them apart.
 #
-# The router, as every lane configures it (FROM values: G/router/single-host/
-# tiered-prefix-cache-cpu.values.yaml; no lane sets HOST_TYPE=multi-host):
+# The router, as every configuration configures it (FROM values: G/router/single-host/
+# tiered-prefix-cache-cpu.values.yaml; no tracked upstream workflow sets HOST_TYPE=multi-host):
 #   approx-prefix-cache-producer twice: `gpu-prefix-cache-producer` (auto-tuned, the HBM tier) and
 #                                  `cpu-prefix-cache-producer` (autoTune false,
 #                                  lruCapacityPerServer 19200 blocks of 64 tokens, sized for the
@@ -51,8 +51,8 @@
 #   shared_tier    native fs: a prefix primed on one pod is a hit on another, which loads it from
 #                  the shared filesystem -> NOT COVERED: calls each pod directly (per-pod engine
 #                  ingresses a committed profile cannot name) and reads its metrics
-#   pvc            fs lanes: the guide's shared KV-cache PVC exists -> NOT COVERED: a cluster object,
-#                  for fleet.config from a lane's own local file
+#   pvc            fs configurations: the guide's shared KV-cache PVC exists -> NOT COVERED: a cluster object,
+#                  for fleet.config from your local profile
 #   offload        evicted blocks are loaded back rather than recomputed, so long shared prefixes get
 #                  faster -> a benchmark, not llmdv; no response field shows a tier hit
 #   context        each overlay's window -> long_context.*, unhappy.context_overflow via
@@ -69,14 +69,15 @@ capabilities:
   # of the field, and a hit served from the CPU or filesystem tier is invisible to a client anyway.
   cache_reuse: null
 
-# The cases this guide's lanes run by default (`llmdv verify --full-suite` runs everything). They test
-# what a lane's own deployment can get wrong: the router path, the overlay's parsers and window,
-# and what this guide changes. Engine and model conformance, the rest of the suite, depends only
-# on the engine build, model and flags, which many lanes share; it runs with `--full-suite` once per
-# configuration (profiles/llm-d/README.md, "Which lane runs everything").
+# Default validation scope: the router path, configured parsers and context window,
+# plus the serving behavior this guide introduces. These focused checks are a starting
+# point for deployment validation. Expand coverage for the APIs and operating conditions
+# you rely on; --full-suite selects the existing library before applicability gates.
+# Maintainer assignments for broader validation are in profiles/llm-d/README.md,
+# under "Broader validation assignments".
 test_sets:
   default:
-    # Every lane: the router serves each API a client uses, and refuses what it should.
+    # Every deployment: the router serves each API a client uses, and refuses what it should.
     - contract.*
     - discovery.models_lists_declared_model
     - discovery.unknown_model_no_fallback
@@ -99,11 +100,11 @@ test_sets:
     - unhappy.error_envelope_fields
     - transport.connection
     - transport.health_status
-    # Every lane: the overlay's parser flags take effect (skips where the model part has none).
+    # Every deployment: the overlay's parser flags take effect (skips where the model part has none).
     - openai_chat.configured_reasoning
     - tools.auto_call
     - tools.auto_stream
-    # Every lane: the overlay's context window is the one declared.
+    # Every deployment: the overlay's context window is the one declared.
     - long_context.*
     - unhappy.context_overflow
     - unhappy.token_limit_over_context

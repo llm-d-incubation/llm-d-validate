@@ -2,6 +2,14 @@
 # vLLM serving Qwen/Qwen3-32B at a 9216-token window with the qwen3 reasoning parser and
 # the hermes tool parser (vllm-tpu v0.31.0).
 #
+# Validate your deployment after installing the guide in standalone mode (guide.yaml deploy.standalone)
+# with one of the overlays listed below:
+#   export LLMDV_ROUTER_URL='https://your-router.example' # replace with your router URL
+#   llmdv profile validate profiles/llm-d/pd-disaggregation/vllm-qwen3-32b-ctx9k-parsers-standalone.yaml
+#   llmdv verify --profile profiles/llm-d/pd-disaggregation/vllm-qwen3-32b-ctx9k-parsers-standalone.yaml \
+#     --identity accelerator=<ACCELERATOR_TYPE> --identity provider=<INFRA_PROVIDER>
+# with the values each configuration above lists (README.md beside this file).
+#
 # llm-d 9ca8ff0. Composed from the guide's shipped config and the API
 # references. Only the router layer has been measured (on kind, with a simulator engine and
 # optimized-baseline's router values; see ../parts/topology/standalone.yaml).
@@ -9,20 +17,12 @@
 # Prefill and decode run the same model id, window and parser flags (FROM values: both roles of
 # each overlay below); the decode pod's routing sidecar returns one response per request.
 #
-# CI lane that deploys this configuration (llm-d's nightly-e2e-pd-disaggregation-<lane>
+# Maintainer provenance: upstream workflow for this configuration (llm-d's nightly-e2e-pd-disaggregation-<workflow-suffix>
 # workflow; it runs in standalone mode, gateway_class epponly):
-#   gke-acc-tpu-vllm-x                tpu/v5p/vllm (the lane sets no provider, so it applies that
+#   gke-acc-tpu-vllm-x                tpu/v5p/vllm (the upstream workflow sets no provider, so it applies that
 #                                     folder's own kustomization, which includes `base`; `gke`
 #                                     renders the same engine arguments)
 #
-# How a lane runs it, after deploying the guide in standalone mode (guide.yaml deploy.standalone)
-# with one of the overlays above:
-#   export LLMDV_ROUTER_URL=<the EPP's URL>
-#   llmdv profile validate profiles/llm-d/pd-disaggregation/vllm-qwen3-32b-ctx9k-parsers-standalone.yaml
-#   llmdv verify --profile profiles/llm-d/pd-disaggregation/vllm-qwen3-32b-ctx9k-parsers-standalone.yaml \
-#     --identity accelerator=<ACCELERATOR_TYPE> --identity provider=<INFRA_PROVIDER>
-# with the values each lane above lists (README.md beside this file).
-
 extends:
   - ../parts/base.yaml
   - ../parts/topology/standalone.yaml

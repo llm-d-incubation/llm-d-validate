@@ -50,31 +50,42 @@ Deployments that look the same to a client share a profile. `--identity` flags r
 
 Each guide's README gives an example.
 
+## Validation scope
+
+Each profile's default selects checks tied to the guide's serving behavior. Start there,
+then expand coverage for the APIs, clients and operating conditions your deployment needs.
+`--full-suite` selects the existing library before filters and applicability gates; it does
+not guarantee complete API or production coverage. See
+[growing coverage toward production](../../docs/getting-started.md#widen-coverage).
+
+The broader-validation assignments below are maintainer guidance for avoiding duplicate
+qualification work across shared configurations. They do not restrict what you can test.
+
 ## Not covered
 
 - **Layers other than the router**: agentic-api's stateful Responses server, the async coordinator and its queues, and the prefill/decode routing sidecar. Each needs its own ingress, placed with `fronts`, and measured behaviour.
 - **Claims that hold only under load or need cluster reads**: queueing, priority and fairness, eviction and shedding, scaling events, prefill/decode decisions, offload and cache counters, snapshot restore, prefix affinity (#23, #27).
-- **Guides without a profile yet**: fast-model-actuation-keda (#130), and the guides llm-d does not test nightly (coord-disaggregation, p2p-kv-cache-sharing, multi-model-routing, omni-serving, turn-priority-fairness, modelexpress-p2p, hyperconverged-cephfs, the per-model guides and the other workload-autoscaling variants). The details are under [For maintainers](#for-maintainers).
+- **Guides without a profile yet**: fast-model-actuation-keda (#130), and these additional guides (coord-disaggregation, p2p-kv-cache-sharing, multi-model-routing, omni-serving, turn-priority-fairness, modelexpress-p2p, hyperconverged-cephfs, the per-model guides and the other workload-autoscaling variants). The details are under [For maintainers](#for-maintainers).
 
 ## For maintainers
 
 How the folders are built and where each value comes from: [profile evidence and provenance](../../docs/profile-provenance.md#how-profilesllm-d-is-built). To find what changed in llm-d since these profiles were written: [the drift skill](../../.agents/skills/tracking-llm-d-guide-drift/SKILL.md).
 
 <details>
-<summary>Coverage: which guides have profiles, and how many nightly lanes each covers</summary>
+<summary>Coverage: which guides have profiles, and how many nightly workflows each covers</summary>
 
 The guide profiles and coverage below are based on llm-d commit `9ca8ff0`.
 
-Every guide llm-d runs in a nightly lane, which llm-d's guide policy calls
+Every guide llm-d runs in a nightly workflow, which llm-d's guide policy calls
 [Tier 3, Validated](https://github.com/llm-d/llm-d/blob/main/guides/GUIDES-POLICY.md#5-production-readiness-tiers) (`.github/workflows/nightly-e2e-*.yaml`; keda-epp's are `nightly-e2e-workload-autoscaling-keda-epp-*`), has a folder here,
-named as its `guide.yaml` names it, except those listed under [Not covered](#not-covered). Lanes that look the same to a
+named as its `guide.yaml` names it, except those listed under [Not covered](#not-covered). Workflows that look the same to a
 client share a profile.
 
-| Guide | Lanes | Profiles | Notes |
+| Guide | Workflows | Profiles | Notes |
 | --- | --- | --- | --- |
 | [optimized-baseline](optimized-baseline/) | 10 | 7, plus a simulator profile | see [optimized-baseline coverage](optimized-baseline/README.md#for-maintainers) |
 | [pd-disaggregation](pd-disaggregation/README.md) | 8 | 5 | requests pass the decode pod's routing sidecar |
-| [wide-ep](wide-ep/README.md) | 5 | 3 | the XPU lane runs aggregated, without prefill/decode |
+| [wide-ep](wide-ep/README.md) | 5 | 3 | the XPU workflow runs aggregated, without prefill/decode |
 | [precise-prefix-cache-routing](precise-prefix-cache-routing/README.md) | 6 | 4 | |
 | [predicted-latency-routing](predicted-latency-routing/README.md) | 5 | 2 | |
 | [tiered-prefix-cache](tiered-prefix-cache/README.md) | 15 | 5 | `flavor` names the connector and tier |
@@ -84,16 +95,17 @@ client share a profile.
 | [flow-control](flow-control/README.md) | 2 | 2 | |
 | [agentic-api](agentic-api/README.md) | 1 | 1 | the router only |
 | [async-multitenant](async-multitenant/README.md) | 2 | 1 | the router only; `flavor` names evictable or holdback |
-| [keda-epp](keda-epp/README.md) | 3 | 3 | `flavor` names the scaling signal; the router runs flow control on the queue lanes only |
+| [keda-epp](keda-epp/README.md) | 3 | 3 | `flavor` names the scaling signal; the router runs flow control on the queue workflows only |
 
-Every profile tests at the router (`<release>-epp`, standalone mode), the only layer every lane exposes the same way.
+Every profile tests at the router (`<release>-epp`, standalone mode), the only layer every workflow exposes the same way.
 
 **Not covered, in detail:**
 
-- **fast-model-actuation-keda** (2 lanes, #130). The pool scales from zero on the router's
+- **fast-model-actuation-keda** (2 workflows, #130). The pool scales from zero on the router's
   flow-control queue size only (`minReplicaCount: 0`, `cooldownPeriod: 30`; llm-d
   `guides/fast-model-actuation/fast-model-actuation-keda/keda/base/kustomization.yaml`), and
-  `llmdv`'s one-at-a-time requests never queue. So the pool can drop to zero mid-run and
+  `llmdv` does not sustain the load needed to keep a queue-based scaler active. The pool can
+  drop to zero between checks and
   cold-start, holding a request up to the router's `noEndpointRequestTTL` of 300 s
   (`guides/fast-model-actuation/fast-model-actuation-keda/router/fast-model-actuation-keda.values.yaml`).
   `llmdv` has no warm-up; tolerating that means raising `stream_idle` and `stream_budget`
@@ -110,21 +122,20 @@ Every profile tests at the router (`<release>-epp`, standalone mode), the only l
 - **Claims that hold only under load or need cluster reads**: queueing, priority and fairness,
   eviction and shedding, scaling events, prefill/decode decisions, offload and cache counters,
   snapshot restore, prefix affinity (#23, #27).
-- **Guides no nightly lane runs**: coord-disaggregation, p2p-kv-cache-sharing,
+- **Guides no nightly workflow runs**: coord-disaggregation, p2p-kv-cache-sharing,
   multi-model-routing, omni-serving, turn-priority-fairness, modelexpress-p2p,
   hyperconverged-cephfs, the per-model guides under `guides/models/`, and the other
-  workload-autoscaling variants. Each is added when a lane runs it.
+  workload-autoscaling variants. Each is added when a workflow runs it.
 
 </details>
 
 <details>
-<summary>Which lane runs the full suite</summary>
+<summary>Broader validation assignments</summary>
 
-A guide's `test_sets.default` (in its `parts/common.yaml`) is what its lanes run by default: the router
-path, the overlay's parsers and window, and what the guide changes. The rest of the suite is
-engine and model conformance, which depends only on the engine build, the model and its
-client-visible flags, so one lane per configuration runs it with `llmdv verify --full-suite` and the
-others rely on that run. Where optimized-baseline deploys a configuration, its lane is the one.
+For maintained upstream coverage, assign a full-library validation run to each engine/model
+configuration and distinct engine build, in addition to the focused guide checks. The table
+identifies which profile supplies that broader coverage when several guides share a
+configuration. Where optimized-baseline covers it, use that profile's validation run.
 
 Each profile below is `<guide>/<engine>-<model part>[-<variant>]-standalone`. GPU means NVIDIA GPU, XPU
 Intel XPU.
@@ -155,17 +166,17 @@ Intel XPU.
 | `optimized-baseline/vllm-qwen3-32b-inline` | TPU | tiered-prefix-cache |
 | `optimized-baseline/vllm-qwen3-32b-parsers` | GPU | agentic-api, async-multitenant, flow-control, keda-epp\*, precise-prefix-cache-routing, tiered-prefix-cache |
 
-\* One of this guide's lanes for the configuration runs `--full-suite` too. Two lanes run a different
+\* One of this guide's workflows for the configuration runs `--full-suite` too. Two workflows run a different
 engine build from the rest of their configuration, so each runs `--full-suite`: pd-disaggregation's
 `amd-ci-acc-rocm-vllm-moriio` (vllm-openai-rocm v0.32.0-rc.2, an llm-d build) and keda-epp's
-`ibm-acc-gpu-vllm-x` (vLLM's floating `nightly` image). A lane whose engine image changes runs
+`ibm-acc-gpu-vllm-x` (vLLM's floating `nightly` image). A workflow whose engine image changes runs
 `--full-suite` once on the new build; `llmdv compare` reports the build change (`the stack changed`).
 
 </details>
 
 The [optimized-baseline guide page](optimized-baseline/README.md#for-maintainers) owns its
-lane-to-profile mapping. The shared router declarations were measured on a simulator-backed
-router; engine and model declarations come from the documented lane configurations and API
+workflow-to-profile mapping. The shared router declarations were measured on a simulator-backed
+router; engine and model declarations come from the documented workflow configurations and API
 contracts. Preserve that distinction when interpreting a pass.
 
 <details>
@@ -177,16 +188,16 @@ contracts. Preserve that distinction when interpreting a pass.
   requests stay on one pod, needs a case family reading per-pod counters. Kind showed it for sequential requests (ten of
   ten on one replica), but `llmdv` cannot check it yet. Nor can the cache suite: no overlay asks the
   engine to report `cached_tokens`, so `cache_reuse` is undeclared.
-- **Gateway mode** (#24): no lane runs it, so no profile has a `kind: gateway` ingress.
+- **Gateway mode** (#24): no workflow runs it, so no profile has a `kind: gateway` ingress.
 - **Surfaces**: the EPP also routes `/v1/embeddings` and `/inference/v1/generate` (both answered
   on kind), which `llmdv` has no surface for.
 - **Engine ingresses**: none, because a committed profile names no pod and per-replica URLs are a
-  lane's to provide. An engine layer, when added, is `kind: engine`, with SGLang's and Atom's
+  workflow's to provide. An engine layer, when added, is `kind: engine`, with SGLang's and Atom's
   error statuses, health paths and metric names declared on it, not implied by the kind.
 - **Non-vLLM extensions**: `extension_options` and the extension entries of `chat_fields` and
   `completions_fields` are vLLM's vocabularies; `parts/engines/sglang.yaml` and `atom.yaml`
   declare none until a run shows which each engine serves.
-- **`ocp` provider**: the `ibm-acc-gpu-vllm-x` lane deploys `gpu/vllm/ocp`, but `ocp` is not among
+- **`ocp` provider**: the `ibm-acc-gpu-vllm-x` workflow deploys `gpu/vllm/ocp`, but `ocp` is not among
   `guide.yaml`'s `INFRA_PROVIDER` values or the README's support table.
 - **Unknown context window**: no source states the Atom overlay's window, so that profile's
   context cases skip as undeclared.
@@ -194,7 +205,7 @@ contracts. Preserve that distinction when interpreting a pass.
   `x-llm-d-model-name-rewrite`, but `transport.model_rewrite_header` requires the answer to echo
   the client's name, which the EPP does not promise.
 - **Per-pod metrics and fleet rules**: engine metrics, replica counts and router settings need
-  cluster access; a lane adds an `environment` block in its own local file.
+  cluster access; a workflow adds an `environment` block in its own local file.
 - **Load mode** (#23): the objective and fairness headers, the dropped-reason values and
   load-aware scoring show only under contention, so they skip as `requires_load`.
 

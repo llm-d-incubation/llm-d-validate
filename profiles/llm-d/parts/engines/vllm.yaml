@@ -2,20 +2,20 @@
 # from it. Not a profile on its own; a combination file lists it after the topology part. Never
 # extends anything.
 #
-# Used by the vLLM overlays optimized-baseline's lanes deploy, rendered at llm-d 9ca8ff0 (FROM
+# Used by the vLLM overlays optimized-baseline's upstream workflows deploy, rendered at llm-d 9ca8ff0 (FROM
 # values: guides/optimized-baseline/modelserver/{gpu,amd,tpu/v5p,xpu}/vllm/): vllm-openai v0.31.0
 # (gpu/vllm/{base,gke,ocp}), vllm-openai-rocm v0.31.0 (amd/vllm/amd-ci), vllm-tpu v0.31.0
-# (tpu/v5p/vllm) and llm-d-xpu v1.0.0 (xpu/vllm). The other guides' lanes add: vllm-openai-rocm v0.32.0-rc.2 (an llm-d
+# (tpu/v5p/vllm) and llm-d-xpu v1.0.0 (xpu/vllm). The other guides' configurations add: vllm-openai-rocm v0.32.0-rc.2 (an llm-d
 # build; pd-disaggregation and wide-ep on AMD), llm-d-xpu v1.0.0 (pd-disaggregation and wide-ep on
 # Intel XPU), vllm-tpu v0.31.0, vLLM inside the fast-model-actuation launcher (version not
-# stated), and vLLM's floating `nightly` image on keda-epp's OpenShift lane. They share vLLM's
+# stated), and vLLM's floating `nightly` image on keda-epp's OpenShift configuration. They share vLLM's
 # OpenAI-compatible server, so they share its request vocabulary; an older or forked build that
 # lacks an extension fails that field's case, which is the measurement.
 
 #
 # Not declared here, and why:
 #   the engine ingress          llmdv reaches each replica only by a URL, and a committed profile
-#                               names no pod; the per-replica layer waits for lane-provided URLs.
+#                               names no pod; the per-replica layer waits for operator-provided URLs.
 #                               When it lands it is `kind: engine`
 #   tools.strict_level          vLLM's --tool-strict-level; no overlay passes it, so the default
 #                               (`auto`, the schema default) applies and nothing is declared

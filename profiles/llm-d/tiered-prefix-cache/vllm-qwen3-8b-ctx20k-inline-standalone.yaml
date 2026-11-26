@@ -3,26 +3,26 @@
 # vLLM serving Qwen/Qwen3-8B at a 20480-token window with no parsers, offloading KV cache to
 # CPU RAM through LMCache (an Intel XPU vLLM build).
 #
+# Validate your deployment after installing the guide in standalone mode (guide.yaml deploy.standalone)
+# with one of the overlays listed below (GUIDE_NAME=tiered-prefix-cache):
+#   export LLMDV_ROUTER_URL='https://your-router.example' # replace with your router URL
+#   llmdv profile validate profiles/llm-d/tiered-prefix-cache/vllm-qwen3-8b-ctx20k-inline-standalone.yaml
+#   llmdv verify --profile profiles/llm-d/tiered-prefix-cache/vllm-qwen3-8b-ctx20k-inline-standalone.yaml \
+#     <the matching identity flags below>
+#
 # llm-d 9ca8ff0.
 #
-# CI lane that deploys this configuration (llm-d's nightly-e2e-tiered-prefix-cache-<lane>
+# Maintainer provenance: upstream workflow for this configuration (llm-d's nightly-e2e-tiered-prefix-cache-<workflow-suffix>
 # workflow; it runs in standalone mode, gateway_class epponly):
 #   intel-acc-xpu-vllm-lmcache        xpu/vllm/lmcache-connector/cpu/base
 # (overlay as ACCELERATOR_TYPE/MODEL_SERVER/CONNECTOR/VARIANT/INFRA_PROVIDER)
-# Identity flags per lane:
+# Comparison identity by deployment configuration:
 #   intel-acc-xpu-vllm-lmcache        --identity accelerator=xpu --identity provider=base --identity flavor=lmcache-connector/cpu
 #
 # llm-d-xpu v1.0.0 on one XPU. guide.yaml's support table lists Qwen/Qwen3-32B for xpu and
 # says in its notes that this overlay serves Qwen/Qwen3-8B; the run's guide.yaml MODEL must
 # be set to it.
 #
-# How a lane runs it, after deploying the guide in standalone mode (guide.yaml deploy.standalone)
-# with one of the overlays above (GUIDE_NAME=tiered-prefix-cache):
-#   export LLMDV_ROUTER_URL=<the EPP's URL>
-#   llmdv profile validate profiles/llm-d/tiered-prefix-cache/vllm-qwen3-8b-ctx20k-inline-standalone.yaml
-#   llmdv verify --profile profiles/llm-d/tiered-prefix-cache/vllm-qwen3-8b-ctx20k-inline-standalone.yaml \
-#     <the lane's identity flags above>
-
 extends:
   - ../parts/base.yaml
   - ../parts/topology/standalone.yaml

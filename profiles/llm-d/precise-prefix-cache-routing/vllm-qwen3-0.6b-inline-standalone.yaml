@@ -2,13 +2,20 @@
 # listener):
 # vLLM serving Qwen/Qwen3-0.6B with no parsers (an Intel XPU vLLM build).
 #
+# Validate your deployment after installing the guide in standalone mode (guide.yaml deploy.standalone)
+# with one of the overlays listed below (GUIDE_NAME=precise-prefix-cache-routing):
+#   export LLMDV_ROUTER_URL='https://your-router.example' # replace with your router URL
+#   llmdv profile validate profiles/llm-d/precise-prefix-cache-routing/vllm-qwen3-0.6b-inline-standalone.yaml
+#   llmdv verify --profile profiles/llm-d/precise-prefix-cache-routing/vllm-qwen3-0.6b-inline-standalone.yaml \
+#     <the matching identity flags below>
+#
 # llm-d 9ca8ff0.
 #
-# CI lane that deploys this configuration (llm-d's nightly-e2e-precise-prefix-cache-routing-<lane>
+# Maintainer provenance: upstream workflow for this configuration (llm-d's nightly-e2e-precise-prefix-cache-routing-<workflow-suffix>
 # workflow; it runs in standalone mode, gateway_class epponly):
-#   intel-acc-xpu-vllm-x              xpu/vllm (the lane sets no provider, so it applies that
+#   intel-acc-xpu-vllm-x              xpu/vllm (the upstream workflow sets no provider, so it applies that
 #                                     folder's own kustomization, which includes `base`)
-# Identity flags per lane:
+# Comparison identity by deployment configuration:
 #   intel-acc-xpu-vllm-x              --identity accelerator=xpu --identity provider=base
 #
 # llm-d-xpu v1.0.0 with --enable-scale-out, --block-size=64 and --kv-events-config (FROM
@@ -18,13 +25,6 @@
 # README asks the operator to edit it by hand. Unedited, every render call names a model the
 # pods do not serve and is refused (README.md, "For maintainers").
 #
-# How a lane runs it, after deploying the guide in standalone mode (guide.yaml deploy.standalone)
-# with one of the overlays above (GUIDE_NAME=precise-prefix-cache-routing):
-#   export LLMDV_ROUTER_URL=<the EPP's URL>
-#   llmdv profile validate profiles/llm-d/precise-prefix-cache-routing/vllm-qwen3-0.6b-inline-standalone.yaml
-#   llmdv verify --profile profiles/llm-d/precise-prefix-cache-routing/vllm-qwen3-0.6b-inline-standalone.yaml \
-#     <the lane's identity flags above>
-
 extends:
   - ../parts/base.yaml
   - ../parts/topology/standalone.yaml
@@ -36,7 +36,7 @@ extends:
 name: precise-prefix-cache-routing-vllm-qwen3-0.6b-inline-standalone
 
 ingresses:
-  # Overrides ../parts/topology/standalone.yaml on purpose: this lane's engine runs with
+  # Overrides ../parts/topology/standalone.yaml on purpose: this configuration's engine runs with
   # --enable-scale-out (FROM values: modelserver/xpu/vllm/base/patch-vllm.yaml), and vLLM v0.30
   # and later register the four render routes only with that flag (FROM docs:
   # vllm@v0.31.0:vllm/entrypoints/scale_out/factories.py, register_scale_out_api_routers; the
@@ -45,7 +45,7 @@ ingresses:
   # parsers/openai/openai.go:133 and anthropic.go:69) and passes
   # /v1/responses/render through; it does not re-tokenize a client's render call (the
   # token-producer returns early for one) and routes it by model to one pod. Declared here, not
-  # in parts/common.yaml, because the TPU v5p lane's engine runs without the flag.
+  # in parts/common.yaml, because the TPU v5p configuration's engine runs without the flag.
   - id: router
     surfaces: [chat_completions, completions, messages, responses, chat_render, completions_render, messages_render, responses_render]
 

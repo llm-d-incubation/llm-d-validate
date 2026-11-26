@@ -1,6 +1,6 @@
 # The optimized-baseline guide in standalone mode, with llm-d-inference-sim in place of every
 # model server: the guide's real router (EPP and its Envoy sidecar, this guide's router values) in
-# front of simulated replicas answering as Qwen/Qwen3-32B. For a kind or CI cluster with no
+# front of simulated replicas answering as Qwen/Qwen3-32B. For a local or automated test deployment with no
 # accelerators. Not a shipped overlay; the guide has no simulator overlay.
 #
 # IT VALIDATES THE ROUTER, NOT AN ENGINE. See ../parts/models/qwen3-32b-sim.yaml for what a run of it
@@ -10,10 +10,10 @@
 # ../parts/topology/standalone.yaml come from this setup (llm-d-router-endpoint-picker main, chart
 # llm-d-router-standalone, Envoy v1.40.2, llm-d-inference-sim v1.2.0, two replicas).
 #
-# How a lane runs it: deploy the guide's router in standalone mode, and in place of the
+# Validate your deployment: deploy the guide's router in standalone mode, and in place of the
 # model-server overlay two simulator replicas that carry the guide's model-server label, started
 # with --model Qwen/Qwen3-32B --max-model-len=40960 (see the model part). Then:
-#   export LLMDV_ROUTER_URL=<the EPP's URL>
+#   export LLMDV_ROUTER_URL='https://your-router.example' # replace with your router URL
 #   llmdv profile validate profiles/llm-d/optimized-baseline/sim-qwen3-32b-standalone.yaml
 #   llmdv verify --profile profiles/llm-d/optimized-baseline/sim-qwen3-32b-standalone.yaml \
 #     --identity accelerator=kind --identity provider=sim

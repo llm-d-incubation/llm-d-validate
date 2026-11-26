@@ -11,7 +11,7 @@
 # FROM values: guides/wide-ep/modelserver/xpu/vllm/xpu-ci/ (patch-xpu-ci-lws.yaml over
 # ../base/lws.yaml), rendered with kubectl kustomize. No --reasoning-parser, --tool-call-parser,
 # --enable-auto-tool-choice or --chat-template. The xpu `base` overlay serves Qwen/Qwen3-235B-A22B
-# instead, and no lane deploys it.
+# instead, and no tracked upstream workflow deploys it.
 #
 # Reasoning: as in deepseek-v3-ctx36k-inline.yaml, whose header explains the split. The
 # reasoning shape is an existence fact (none here); the effort and thinking vocabularies are

@@ -171,21 +171,21 @@ Preview cases and reasons with `llmdv plan --profile <profile>`.
 - **Single GPU, TP=1**, and the engine flags: fleet configuration rules need cluster access.
 - **SGLang's startup `/health` 503**: startup behaviour; `llmdv` runs against a Ready stack.
 - **The cache suite**: neither overlay asks its engine to report `cached_tokens`, so `cache_reuse` is not declared (see `parts/common.yaml`).
-- **Gateway mode**: `guide.yaml` has a gateway deploy step, but llm-d does not test it nightly.
+- **Gateway mode**: `guide.yaml` has a gateway deploy step, but these profiles target the standalone router.
 
 ## For maintainers
 
 <details>
-<summary>llm-d's nightly lanes, and how each maps to a profile</summary>
+<summary>llm-d's nightly workflows, and how each maps to a profile</summary>
 
-The guide has no support table; `guide.yaml` offers `MODEL_SERVER` `vllm` or `sglang`, on GKE only. Both nightly lanes deploy through `guides/pod-snapshot/scripts/nightly-deploy-gke.sh`, which applies `modelserver/gpu/<MODEL_SERVER>/gke` and finishes with two Ready replicas: one cold started and checkpointed, one restored from that snapshot. The two engines differ to a client, so each has its own combination. Both serve `Qwen/Qwen3-32B` at an 8192-token window with no parsers.
+The guide has no support table; `guide.yaml` offers `MODEL_SERVER` `vllm` or `sglang`, on GKE only. Both nightly workflows deploy through `guides/pod-snapshot/scripts/nightly-deploy-gke.sh`, which applies `modelserver/gpu/<MODEL_SERVER>/gke` and finishes with two Ready replicas: one cold started and checkpointed, one restored from that snapshot. The two engines differ to a client, so each has its own combination. Both serve `Qwen/Qwen3-32B` at an 8192-token window with no parsers.
 
-| CI lane (`nightly-e2e-pod-snapshot-<lane>`) | Overlay the deploy script applies | Profile | Identity flags |
+| upstream workflow (`nightly-e2e-pod-snapshot-<workflow-suffix>`) | Overlay the deploy script applies | Profile | Identity flags |
 | --- | --- | --- | --- |
 | `gke-acc-gpu-vllm-x` | `modelserver/gpu/vllm/gke` (vLLM v0.31.0, `--max-model-len 8192`, `--enable-sleep-mode`) | `vllm-qwen3-32b-ctx8k-inline-standalone` | `--identity accelerator=gpu --identity provider=gke` |
 | `gke-acc-gpu-sglang-x` | `modelserver/gpu/sglang/gke` (SGLang v0.5.22, `--context-length 8192`, `--enable-memory-saver --enable-weights-cpu-backup`) | `sglang-qwen3-32b-ctx8k-inline-standalone` | `--identity accelerator=gpu --identity provider=gke` |
 
-The client calls the `<GUIDE_NAME>-epp` Service on port 80 (the lanes' `gateway_host`), in standalone mode. Run `llmdv` after the deploy script returns, so the run reaches both replicas.
+The client calls the `<GUIDE_NAME>-epp` Service on port 80 (the workflows' `gateway_host`), in standalone mode. Run `llmdv` after the deploy script returns, so the run reaches both replicas.
 
 </details>
 

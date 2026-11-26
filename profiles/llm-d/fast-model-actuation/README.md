@@ -164,19 +164,21 @@ Preview cases and reasons with `llmdv plan --profile <profile>`.
 - **Hot and warm start times**: timing is a benchmark's measurement, not `llmdv`'s.
 - **The FMA controllers' lifecycle** (binding, LRU eviction of sleeping instances, launcher population): cluster state.
 - **The cache suite**: the vLLM options do not include `--enable-prompt-tokens-details`, and the router has no prefix-cache plugin, so `cache_reuse` is not declared (see `parts/common.yaml`).
-- **Gateway mode** and the other `GATEWAY_CLASS` values: llm-d does not test them nightly.
-- **fast-model-actuation-keda** (`fast-model-actuation/fast-model-actuation-keda/`, lanes `nightly-e2e-fast-model-actuation-keda-{gke,ibm}-acc-gpu-vllm-x`): deferred. It scales the requesters from zero on EPP flow-control metrics, so the first request waits for the scale-up (the EPP holds it up to `noEndpointRequestTTL: 300s`, `router/fast-model-actuation-keda.values.yaml`), and the pool returns to zero after about 60 s idle (`cooldownPeriod` 30 s plus the HPA's 30 s stabilization, `keda/base/kustomization.yaml`). A profile cannot express that without loosening every latency check, and a run with gaps between cases would keep paying the cold start.
+- **Gateway mode** and the other `GATEWAY_CLASS` values: these profiles cover only the standalone router.
+- **fast-model-actuation-keda** (`fast-model-actuation/fast-model-actuation-keda/`): deferred. It scales the requesters from zero on EPP flow-control metrics, so the first request waits for the scale-up (the EPP holds it up to `noEndpointRequestTTL: 300s`, `router/fast-model-actuation-keda.values.yaml`), and the pool returns to zero after about 60 s idle (`cooldownPeriod` 30 s plus the HPA's 30 s stabilization, `keda/base/kustomization.yaml`). A profile cannot express that without loosening every latency check, and a run with gaps between cases would keep paying the cold start.
 
 ## For maintainers
+
+Deferred configuration provenance: `nightly-e2e-fast-model-actuation-keda-{gke,ibm}-acc-gpu-vllm-x` deploy the variant described under [Not covered](#not-covered).
 
 See the [profile provenance guide](../../../docs/profile-provenance.md#how-profilesllm-d-is-built) for the layout and provenance tags.
 
 <details>
-<summary>llm-d's nightly lanes, and how each maps to a profile</summary>
+<summary>llm-d's nightly workflows, and how each maps to a profile</summary>
 
-The guide has no support table; `guide.yaml` offers `INFRA_PROVIDER` `ocp` or `gke`. Both nightly lanes stand the guide up with `kubectl apply -k platform/<INFRA_PROVIDER>`: the FMA InferenceServerConfig, LauncherConfig and LauncherPopulationPolicy, and the requester Deployment. The vLLM instance runs inside an FMA launcher pod with `--model Qwen/Qwen3-0.6B --enable-sleep-mode --gpu-memory-utilization 0.9` and no parsers; the EPP reaches it through the requester's TCP proxy on port 8000. The two providers change only how the launcher reaches the node's GPUs, so one combination covers both.
+The guide has no support table; `guide.yaml` offers `INFRA_PROVIDER` `ocp` or `gke`. Both nightly workflows stand the guide up with `kubectl apply -k platform/<INFRA_PROVIDER>`: the FMA InferenceServerConfig, LauncherConfig and LauncherPopulationPolicy, and the requester Deployment. The vLLM instance runs inside an FMA launcher pod with `--model Qwen/Qwen3-0.6B --enable-sleep-mode --gpu-memory-utilization 0.9` and no parsers; the EPP reaches it through the requester's TCP proxy on port 8000. The two providers change only how the launcher reaches the node's GPUs, so one combination covers both.
 
-| CI lane (`nightly-e2e-fast-model-actuation-<lane>`) | What it applies | Profile | Identity flags |
+| upstream workflow (`nightly-e2e-fast-model-actuation-<workflow-suffix>`) | What it applies | Profile | Identity flags |
 | --- | --- | --- | --- |
 | `gke-acc-gpu-vllm-x` | `platform/gke` | `vllm-qwen3-0.6b-inline-standalone` | `--identity accelerator=gpu --identity provider=gke` |
 | `ibm-acc-gpu-vllm-x` | `platform/ocp` | `vllm-qwen3-0.6b-inline-standalone` | `--identity accelerator=gpu --identity provider=ocp` |

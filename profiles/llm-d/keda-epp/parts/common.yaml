@@ -8,7 +8,7 @@
 
 #
 # The guide autoscales optimized-baseline's model server with a KEDA ScaledObject on an EPP
-# metric. Its lanes deploy the router and model server themselves (FROM values: S/nightly-deploy-*):
+# metric. Its upstream workflows deploy the router and model server themselves (FROM values: S/nightly-deploy-*):
 #   gke    helm release <release>-gke (Service <release>-gke-epp): R/router/base.values.yaml,
 #          OB/router/optimized-baseline.values.yaml, R/router/features/monitoring-gke.values.yaml,
 #          K/optimized-baseline/router.values.yaml; model server OB/modelserver/gpu/vllm/gke;
@@ -26,14 +26,14 @@
 # no flowControl section, so the EPP's defaults apply (global-strict fairness, FCFS,
 # utilization-detector; FROM docs: guides/flow-control/README.md "Default Configuration"), and
 # replaces optimized-baseline's scheduling profile with queue-scorer 2,
-# kv-cache-utilization-scorer 2, prefix-cache-scorer 3, no-hit-lru-scorer 2. Every lane starts the
+# kv-cache-utilization-scorer 2, prefix-cache-scorer 3, no-hit-lru-scorer 2. Every configuration starts the
 # model server at one replica with maxReplicaCount 2.
 #
-# What that means for llmdv's run: with one request at a time, flow control is work conserving and
-# the scheduling profile changes nothing a client sees, but flow control adds one response header,
+# Validation checks the serving contract through the configured scheduling profile.
+# Flow control also adds one response header,
 # x-llm-d-flow-queue-duration-ms, to every request it admits. The gke and amd combinations declare
-# it `promised`; the ibm lane, with no flow control, has its own combination without it, though it
-# serves the gke lane's model configuration. The replica count is not fixed: the lane's scale-event
+# it `promised`; the ibm configuration, with no flow control, has its own combination without it, though it
+# serves the gke configuration's model configuration. The replica count is not fixed: the upstream scale-event
 # validator drives the HPA from 1 to 2 and back. A run that overlaps a scale event may see a second
 # replica join the pool, or stay Pending; nothing declared here depends on the replica count
 # (cache_reuse is not declared, and no case reads per-pod counters).
@@ -63,19 +63,20 @@ guide: keda-epp
 
 capabilities:
   # Not declared, on purpose, as in optimized-baseline. The cache suite reads cached_tokens from
-  # each response, and none of the overlays this guide's lanes render (OB/modelserver/gpu/vllm/gke,
+  # each response, and none of the overlays this guide's configurations render (OB/modelserver/gpu/vllm/gke,
   # gpu/vllm/base, amd/vllm/base) passes vLLM's --enable-prompt-tokens-details. With no
   # cached_tokens, `affinity: routed` would fail on a correct stack for want of the field.
   cache_reuse: null
 
-# The cases this guide's lanes run by default (`llmdv verify --full-suite` runs everything). They test
-# what a lane's own deployment can get wrong: the router path, the overlay's parsers and window,
-# and what this guide changes. Engine and model conformance, the rest of the suite, depends only
-# on the engine build, model and flags, which many lanes share; it runs with `--full-suite` once per
-# configuration (profiles/llm-d/README.md, "Which lane runs everything").
+# Default validation scope: the router path, configured parsers and context window,
+# plus the serving behavior this guide introduces. These focused checks are a starting
+# point for deployment validation. Expand coverage for the APIs and operating conditions
+# you rely on; --full-suite selects the existing library before applicability gates.
+# Maintainer assignments for broader validation are in profiles/llm-d/README.md,
+# under "Broader validation assignments".
 test_sets:
   default:
-    # Every lane: the router serves each API a client uses, and refuses what it should.
+    # Every deployment: the router serves each API a client uses, and refuses what it should.
     - contract.*
     - discovery.models_lists_declared_model
     - discovery.unknown_model_no_fallback
@@ -98,11 +99,11 @@ test_sets:
     - unhappy.error_envelope_fields
     - transport.connection
     - transport.health_status
-    # Every lane: the overlay's parser flags take effect (skips where the model part has none).
+    # Every deployment: the overlay's parser flags take effect (skips where the model part has none).
     - openai_chat.configured_reasoning
     - tools.auto_call
     - tools.auto_stream
-    # Every lane: the overlay's context window is the one declared.
+    # Every deployment: the overlay's context window is the one declared.
     - long_context.*
     - unhappy.context_overflow
     - unhappy.token_limit_over_context

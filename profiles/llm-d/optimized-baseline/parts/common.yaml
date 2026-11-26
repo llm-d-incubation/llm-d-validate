@@ -47,7 +47,7 @@
 #             sglang:num_requests_total and sglang:cached_tokens_total{cache_source="device"}
 #             (the README notes sglang:cache_hit_rate is a rolling gauge that reads 0 on some
 #             builds even when hits occur)
-#   4      TensorRT-LLM request spread -> same family, with TensorRT-LLM's metric names. No CI lane
+#   4      TensorRT-LLM request spread -> same family, with TensorRT-LLM's metric names. No upstream workflow
 #          runs TensorRT-LLM, so no profile here covers it
 #   5, 6   load-aware scoring and the saturation override -> load mode (#23) or a benchmark
 #   7      latency and throughput -> a benchmark, not llmdv
@@ -74,13 +74,13 @@
 #          requires_load
 #   17     SLO headers have no effect in this guide -> declared `ignored` in the topology parts
 #   18     x-llm-d-request-dropped-reason absent on success -> topology parts; its values need load
-#   19, 24 FailOpen and graceful drain -> fault injection or a rollout in CI, not llmdv
+#   19, 24 FailOpen and graceful drain -> a separate fault-injection or rollout experiment
 #   20     standalone endpoint `<GUIDE_NAME>-epp` on port 80 -> topology/standalone.yaml
-#   21     gateway mode through `llm-d-inference-gateway` on port 80 -> NOT COVERED: no CI lane
+#   21     gateway mode through `llm-d-inference-gateway` on port 80 -> NOT COVERED: no upstream workflow
 #          runs gateway mode, and llmdv has no gateway role yet (#24). A wrong provider (503s on
-#          GKE with provider none) is a CI matter
+#          GKE with provider none) is an upstream deployment concern
 #   28     the standalone sidecar proxy can be agentgateway instead of Envoy (README, "Deploy the
-#          llm-d Router") -> NOT COVERED: every CI lane uses the Envoy sidecar, and the router
+#          llm-d Router") -> NOT COVERED: every upstream workflow uses the Envoy sidecar, and the router
 #          facts in topology/standalone.yaml were measured with Envoy
 #   22, 23, 25   router and engine settings agree, replica counts, sidecar args
 #          -> fleet.config rules, which need cluster access a committed profile does not carry
@@ -94,19 +94,20 @@ capabilities:
   # overlay of this guide asks an engine to report it: none passes vLLM's
   # --enable-prompt-tokens-details or SGLang's --enable-cache-report (FROM values:
   # G/modelserver/; at llm-d 9ca8ff0 only pd-disaggregation's community TPU v7 overlays, which no
-  # lane runs, pass either). With no cached_tokens,
+  # configuration runs, pass either). With no cached_tokens,
   # `affinity: routed` would fail on a correct stack for want of the field, not for want of
   # affinity. The guide's own prefix-affinity claim (3 above) needs routing.prefix_affinity.
   cache_reuse: null
 
-# The cases this guide's lanes run by default (`llmdv verify --full-suite` runs everything). They test
-# what a lane's own deployment can get wrong: the router path, the overlay's parsers and window,
-# and what this guide changes. Engine and model conformance, the rest of the suite, depends only
-# on the engine build, model and flags, which many lanes share; it runs with `--full-suite` once per
-# configuration (profiles/llm-d/README.md, "Which lane runs everything").
+# Default validation scope: the router path, configured parsers and context window,
+# plus the serving behavior this guide introduces. These focused checks are a starting
+# point for deployment validation. Expand coverage for the APIs and operating conditions
+# you rely on; --full-suite selects the existing library before applicability gates.
+# Maintainer assignments for broader validation are in profiles/llm-d/README.md,
+# under "Broader validation assignments".
 test_sets:
   default:
-    # Every lane: the router serves each API a client uses, and refuses what it should.
+    # Every deployment: the router serves each API a client uses, and refuses what it should.
     - contract.*
     - discovery.models_lists_declared_model
     - discovery.unknown_model_no_fallback
@@ -129,11 +130,11 @@ test_sets:
     - unhappy.error_envelope_fields
     - transport.connection
     - transport.health_status
-    # Every lane: the overlay's parser flags take effect (skips where the model part has none).
+    # Every deployment: the overlay's parser flags take effect (skips where the model part has none).
     - openai_chat.configured_reasoning
     - tools.auto_call
     - tools.auto_stream
-    # Every lane: the overlay's context window is the one declared.
+    # Every deployment: the overlay's context window is the one declared.
     - long_context.*
     - unhappy.context_overflow
     - unhappy.token_limit_over_context

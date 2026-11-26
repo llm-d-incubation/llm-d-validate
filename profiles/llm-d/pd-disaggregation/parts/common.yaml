@@ -11,7 +11,7 @@
 # twice, once onto a prefill pod and once onto a decode pod, and forwards it to the decode pod's
 # routing sidecar (port 8000), which runs the prefill on the prefill pod, then the decode on its
 # own engine (port 8200), and returns one response. Prefill and decode are separate engines, but
-# in every overlay a lane runs they carry the same model id, window and parser flags, so the
+# in every overlay a configuration runs they carry the same model id, window and parser flags, so the
 # client sees one model. Nothing about this path changes what a correct API returns, so every
 # behaviour line is the same INTENT as in optimized-baseline; a field or option the sidecar drops
 # or mangles on its way to either engine fails its case, which is the measurement.
@@ -28,8 +28,8 @@
 #
 # Block sizes, for when the cache suite or routing.prefix_affinity can use them (FROM values,
 # both roles): gpu and amd vLLM --block-size=128; xpu vLLM --block-size=64; SGLang --page-size=64;
-# tpu/v5p vLLM and the AMD MoRI-IO overlay the engine default. No router override in any lane
-# (G/router/tpu-v7.values.yaml and npu.rbln.values.yaml belong to accelerators no lane runs).
+# tpu/v5p vLLM and the AMD MoRI-IO overlay the engine default. No router override in any configuration
+# (G/router/tpu-v7.values.yaml and npu.rbln.values.yaml belong to accelerators no tracked upstream workflow runs).
 #
 # The guide's claims (G/README.md "Verification" and G/guide.yaml verify) and where each one
 # lands. Router claims this guide shares with optimized-baseline (header handling, the EPP's HTTP
@@ -50,7 +50,7 @@
 #             serve a request end to end on its own, so a 200 proves nothing about the split
 #   4      the router decides prefill-decode for each request (llm_d_epp_disagg_decision_total,
 #          decision_type="prefill-decode"; verify.tests.router_metrics, MONITORING=true only)
-#          -> NOT COVERED: EPP metrics, fleet.metrics, same reason; no lane sets MONITORING
+#          -> NOT COVERED: EPP metrics, fleet.metrics, same reason; no tracked upstream workflow sets MONITORING
 #   5      prefix affinity on prefill, least in-flight requests on decode (README "Overview")
 #          -> NOT COVERED: needs routing.prefix_affinity against the prefill role, per-pod counter
 #             deltas (#27) and roles llmdv can tell apart (#24)
@@ -65,7 +65,7 @@
 #             stranded cache is visible only in the prefill pod's metrics
 #   10     standalone endpoint `<GUIDE_NAME>-epp` on port 80 -> topology/standalone.yaml
 #   11     the decode pod's routing sidecar handles every request (always-disagg-pd-decider, above;
-#          FROM docs: llm-d-router main@a490c31e, the `:main` image the lanes render through
+#          FROM docs: llm-d-router main@a490c31e, the `:main` image the configurations render through
 #          R/modelserver/components/images/routing-sidecar/nightly/kustomization.yaml; also holds
 #          at v1.0.0). What it changes that a client can see, and the case that sees it:
 #          - it caps the prefill leg to one token, non-streaming, and deletes `n`, `min_tokens`,
@@ -89,23 +89,24 @@ guide: pd-disaggregation
 
 capabilities:
   # Not declared, on purpose. The cache suite reads cached_tokens from each response, and no
-  # overlay a lane runs asks an engine to report it: none passes vLLM's
-  # --enable-prompt-tokens-details or SGLang's --enable-cache-report (FROM values: every lane's
-  # rendered overlay). Only G/modelserver/tpu/v7/ passes them, a community overlay no lane runs.
+  # overlay a configuration runs asks an engine to report it: none passes vLLM's
+  # --enable-prompt-tokens-details or SGLang's --enable-cache-report (FROM values: every configuration's
+  # rendered overlay). Only G/modelserver/tpu/v7/ passes them, a community overlay no tracked upstream workflow runs.
   # The routing sidecar adds cached_tokens itself, possibly 0, to every decode response the engine
-  # left without it (claim 11; the nixlv2 path the vLLM lanes run), so the field can be there, but
+  # left without it (claim 11; the nixlv2 path the vLLM configurations run), so the field can be there, but
   # the sidecar wrote it, not the engine on the pod the router chose: `affinity: routed` cannot be
   # judged from it. Claim 5 needs routing.prefix_affinity instead.
   cache_reuse: null
 
-# The cases this guide's lanes run by default (`llmdv verify --full-suite` runs everything). They test
-# what a lane's own deployment can get wrong: the router path, the overlay's parsers and window,
-# and what this guide changes. Engine and model conformance, the rest of the suite, depends only
-# on the engine build, model and flags, which many lanes share; it runs with `--full-suite` once per
-# configuration (profiles/llm-d/README.md, "Which lane runs everything").
+# Default validation scope: the router path, configured parsers and context window,
+# plus the serving behavior this guide introduces. These focused checks are a starting
+# point for deployment validation. Expand coverage for the APIs and operating conditions
+# you rely on; --full-suite selects the existing library before applicability gates.
+# Maintainer assignments for broader validation are in profiles/llm-d/README.md,
+# under "Broader validation assignments".
 test_sets:
   default:
-    # Every lane: the router serves each API a client uses, and refuses what it should.
+    # Every deployment: the router serves each API a client uses, and refuses what it should.
     - contract.*
     - discovery.models_lists_declared_model
     - discovery.unknown_model_no_fallback
@@ -128,11 +129,11 @@ test_sets:
     - unhappy.error_envelope_fields
     - transport.connection
     - transport.health_status
-    # Every lane: the overlay's parser flags take effect (skips where the model part has none).
+    # Every deployment: the overlay's parser flags take effect (skips where the model part has none).
     - openai_chat.configured_reasoning
     - tools.auto_call
     - tools.auto_stream
-    # Every lane: the overlay's context window is the one declared.
+    # Every deployment: the overlay's context window is the one declared.
     - long_context.*
     - unhappy.context_overflow
     - unhappy.token_limit_over_context

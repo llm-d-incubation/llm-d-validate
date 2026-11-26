@@ -38,8 +38,8 @@ judges the job's own finishing run, even when another run was published more rec
 **Identity.** Without an explicit baseline, both commands pick earlier runs whose guide,
 accelerator, engine, provider, gateway, model, trigger and flavor match
 ([run identity](architecture.md#run-identity)). A run without an identity is never picked, but
-can be named. `--identity trigger=nightly` marks a scheduled lane (default `manual`);
-`--identity flavor=<value>` separates lanes that share a profile, such as `lmcache-connector/cpu`
+can be named. `--identity trigger=nightly` marks a scheduled configuration (default `manual`);
+`--identity flavor=<value>` separates configurations that share a profile, such as `lmcache-connector/cpu`
 and `native/cpu` offload. A run without a flavor matches only runs without one. Labels do not affect matching.
 An explicit baseline can select legacy runs without identity; when both identities are present,
 a configuration mismatch is rejected. A different

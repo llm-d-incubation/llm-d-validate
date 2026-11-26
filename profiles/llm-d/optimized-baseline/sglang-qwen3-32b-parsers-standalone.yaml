@@ -1,26 +1,26 @@
 # The optimized-baseline guide in standalone mode (the client reaches the EPP's own listener):
 # SGLang serving Qwen/Qwen3-32B with the qwen3 reasoning parser and the qwen tool parser.
 #
+# Validate your deployment after installing the guide in standalone mode (guide.yaml deploy.standalone)
+# with one of the overlays listed below:
+#   export LLMDV_ROUTER_URL='https://your-router.example' # replace with your router URL
+#   llmdv profile validate profiles/llm-d/optimized-baseline/sglang-qwen3-32b-parsers-standalone.yaml
+#   llmdv verify --profile profiles/llm-d/optimized-baseline/sglang-qwen3-32b-parsers-standalone.yaml \
+#     --identity accelerator=<ACCELERATOR_TYPE> --identity provider=<INFRA_PROVIDER>
+#
 # Composed from the guide's shipped config at
 # llm-d 9ca8ff0 and the API references. Only the router layer has been measured (on kind,
 # with a simulator engine; see ../parts/topology/standalone.yaml).
 #
-# CI lane that deploys this configuration (llm-d's nightly-e2e-optimized-baseline-<lane>
+# Maintainer provenance: upstream workflow for this configuration (llm-d's nightly-e2e-optimized-baseline-<workflow-suffix>
 # workflow; it runs in standalone mode):
 #   gke-acc-gpu-sglang-x              gpu/sglang/gke
-# Same to a client, but run by no lane: gpu/sglang/base.
+# Same to a client, but run by no configuration: gpu/sglang/base.
 #
 # These overlays run SGLang's Rust HTTP frontend (SGLANG_RUST_SERVER=1,
 # guides/optimized-baseline/README.md, "Tuning"), unlike the other SGLang overlays; its response
 # and error shapes are pinned by contract_baseline below, once a run supplies it.
 #
-# How a lane runs it, after deploying the guide in standalone mode (guide.yaml deploy.standalone)
-# with one of the overlays above:
-#   export LLMDV_ROUTER_URL=<the EPP's URL>
-#   llmdv profile validate profiles/llm-d/optimized-baseline/sglang-qwen3-32b-parsers-standalone.yaml
-#   llmdv verify --profile profiles/llm-d/optimized-baseline/sglang-qwen3-32b-parsers-standalone.yaml \
-#     --identity accelerator=<ACCELERATOR_TYPE> --identity provider=<INFRA_PROVIDER>
-
 extends:
   - ../parts/base.yaml
   - ../parts/topology/standalone.yaml

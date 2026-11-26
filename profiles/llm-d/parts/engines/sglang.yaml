@@ -1,13 +1,13 @@
 # Part: SGLang, for a stack whose replicas run `sglang.launch_server`. Not a profile on its own; a
 # combination file lists it after the topology part. Never extends anything.
 #
-# Used by the SGLang overlays optimized-baseline's lanes deploy, rendered at llm-d 9ca8ff0 (FROM
+# Used by the SGLang overlays optimized-baseline's upstream workflows deploy, rendered at llm-d 9ca8ff0 (FROM
 # values: guides/optimized-baseline/modelserver/{gpu,amd,tpu/v5p}/sglang/): sglang v0.5.22
 # (gpu/sglang/gke), sglang v0.5.22-rocm724-mi35x (amd/sglang/amd-ci) and sglang v0.1.0-tpu
 # (tpu/v5p/sglang). The NVIDIA GPU overlay
 # also runs SGLang's Rust HTTP frontend (SGLANG_RUST_SERVER=1, guides/optimized-baseline/README.md,
 # "Tuning"); its combination file says so, since that is an overlay fact, not an engine-wide one.
-# The other guides' SGLang lanes run sglang v0.5.22 (pd-disaggregation with gpt-oss-120b,
+# The other guides' SGLang configurations run sglang v0.5.22 (pd-disaggregation with gpt-oss-120b,
 # pod-snapshot, tiered-prefix-cache on GPU) and sglang v0.1.0-tpu (tiered-prefix-cache on TPU).
 #
 # DECLARES NOTHING YET, on purpose. Everything engine-independent comes from parts/base.yaml; what is
@@ -15,7 +15,7 @@
 # the extension entries of `chat_fields` and `completions_fields`) are vLLM's. Which of them SGLang
 # also serves, and with what effect, is not established by the shipped config or by any run, so
 # they stay skip:undeclared rather than borrowing vLLM's answers. The first run against an SGLang
-# lane settles them: add the fields it accepts here, each with its MEASURED note.
+# deployment settles them: add the fields it accepts here, each with its MEASURED note.
 #
 # FROM docs: SGLang serves /v1/responses, stateless unless launched with --enable-response-store
 # (none of these overlays is); without it chaining, background, GET and cancel answer 400
@@ -29,6 +29,6 @@
 # Not declared here, and why:
 #   the engine ingress          as for vLLM (engines/vllm.yaml): a per-replica SGLang layer is
 #                               `kind: engine`, declaring SGLang's own error envelopes and health
-#                               path, once lanes provide per-replica URLs
+#                               path, once the operator provides per-replica URLs
 
 engine: sglang

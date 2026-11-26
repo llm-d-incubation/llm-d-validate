@@ -18,7 +18,7 @@ Use [Getting started](../../../docs/getting-started.md) for a first check,
    declarations with `--full-suite -m contract` before broader verification. A first-user smoke
    check has the narrower purpose described in Getting started.
 4. Respect requested scope and keep the machine awake. Do not silently widen to the full suite.
-   A guide's full-validation lane requirements remain in its profile documentation.
+   A guide's broader-validation requirements remain in its profile documentation.
 
 ## Credentials, without echoing them
 
@@ -36,7 +36,7 @@ ignored `*.local.yaml` files. Cluster runner operation is in [deploy/README.md](
 
 ## Prefixes and triggers
 
-Set configuration identity explicitly when required by the profile's lane instructions.
+Set configuration identity explicitly when required by the profile's comparison-identity guidance.
 Scheduled runs use `trigger=nightly`; manual runs default to `trigger=manual`. Labels do not
 separate baselines. Standalone compare judges the latest profile run; a job judges its own run.
 

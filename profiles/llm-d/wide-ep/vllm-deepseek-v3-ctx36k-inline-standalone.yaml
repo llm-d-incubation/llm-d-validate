@@ -2,22 +2,22 @@
 # serving deepseek-ai/DeepSeek-V3 at a 36864-token window, P/D disaggregated with MoRI-IO, with no
 # parsers: a non-reasoning model, no tool calls.
 #
+# Validate your deployment after installing the guide in standalone mode (guide.yaml deploy.standalone)
+# with the overlay above:
+#   export LLMDV_ROUTER_URL='https://your-router.example' # replace with your router URL
+#   llmdv profile validate profiles/llm-d/wide-ep/vllm-deepseek-v3-ctx36k-inline-standalone.yaml
+#   llmdv verify --profile profiles/llm-d/wide-ep/vllm-deepseek-v3-ctx36k-inline-standalone.yaml \
+#     --identity accelerator=amd --identity provider=amd-ci
+#
 # llm-d 9ca8ff0. Composed from the guide's shipped config and the API
 # references. Only the router layer has been measured (on kind, with a simulator engine; see
 # ../parts/topology/standalone.yaml).
 #
-# CI lane that deploys this configuration (llm-d's nightly-e2e-wide-ep-<lane> workflow; it runs
+# Maintainer provenance: upstream workflow for this configuration (llm-d's nightly-e2e-wide-ep-<workflow-suffix> workflow; it runs
 # in standalone mode, gateway_class epponly):
 #   amd-ci-acc-rocm-vllm-moriio       amd/vllm/amd-ci
-# Same to a client, but run by no lane: amd/vllm/base.
+# Same to a client, but run by no configuration: amd/vllm/base.
 #
-# How a lane runs it, after deploying the guide in standalone mode (guide.yaml deploy.standalone)
-# with the overlay above:
-#   export LLMDV_ROUTER_URL=<the EPP's URL>
-#   llmdv profile validate profiles/llm-d/wide-ep/vllm-deepseek-v3-ctx36k-inline-standalone.yaml
-#   llmdv verify --profile profiles/llm-d/wide-ep/vllm-deepseek-v3-ctx36k-inline-standalone.yaml \
-#     --identity accelerator=amd --identity provider=amd-ci
-
 extends:
   - ../parts/base.yaml
   - ../parts/topology/standalone.yaml

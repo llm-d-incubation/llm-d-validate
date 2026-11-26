@@ -171,9 +171,9 @@ may need instruments or experiments beyond a functional run.
 
 [Selection and coverage](cli.md#test-sets-and-coverage) explains how to combine suites and
 restrict ingresses. [Writing a profile](writing-profiles.md) explains how to declare expected
-behavior without weakening it to obtain a pass. The maintained llm-d validation lanes also
-[assign full-suite coverage to configurations](../profiles/llm-d/README.md#for-maintainers);
-that broader qualification complements focused guide runs.
+behavior without weakening it to obtain a pass. For maintainers, the
+[broader validation assignments](../profiles/llm-d/README.md#for-maintainers) explain how
+shared configurations receive full-library checks alongside focused guide validation.
 
 ## Publish a run
 

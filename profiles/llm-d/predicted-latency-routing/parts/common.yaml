@@ -5,7 +5,7 @@
 #
 # No `name` here: each combination names itself.
 #
-# The router, as every CI lane configures it (FROM values: G/router/predicted-latency.values.yaml;
+# The router, as every upstream workflow configures it (FROM values: G/router/predicted-latency.values.yaml;
 # guide.yaml deploy.router_values `routing`, SLO_AWARE=false):
 #   router.latencyPredictor.enabled   the training and prediction servers run as sidecars in the
 #                                  EPP pod (ports 8000 and 8001, guide.yaml verify.tests.predictor);
@@ -21,7 +21,7 @@
 #   R/router/base.values.yaml for the rest, as in optimized-baseline
 # No admission plugin is configured, so the SLO headers have no effect and the topology part's
 # `ignored` declarations stand. The SLO-aware values (G/router/predicted-latency-slo.values.yaml)
-# are skip_in: [ci] in guide.yaml, so no lane deploys them and no profile here covers them.
+# are skip_in: [ci] in guide.yaml, so no tracked upstream workflow deploys them and no profile here covers them.
 #
 # Block sizes: no overlay sets one; the engines use their default and the router's prefix
 # producer auto-tunes from what they publish. Not declared, because cache_reuse is not.
@@ -39,12 +39,12 @@
 #                  /status on 8001 -> NOT COVERED: sidecar ports reached through the API-server
 #                  pod proxy, which needs cluster access a committed profile does not carry
 #   router_metrics llm_d_epp_request_(predicted_)?(ttft|tpot)_seconds_count on the EPP's /metrics,
-#                  only with MONITORING=true, which no lane sets -> NOT COVERED (fleet.metrics)
+#                  only with MONITORING=true, which no tracked upstream workflow sets -> NOT COVERED (fleet.metrics)
 #   routing        lower latency than load-only scoring, the affinity filter's TTFT penalty
 #                  -> a benchmark, not llmdv
 #   SLO headers    without the SLO values they change nothing -> declared `ignored` in the
 #                  topology part; with them (slo_request, SLO-aware scheduling) -> NOT COVERED,
-#                  no lane deploys them
+#                  no tracked upstream workflow deploys them
 #   context        the NVIDIA and AMD overlays serve a RoPE-scaled 131072-token window
 #                  -> long_context.*, unhappy.context_overflow via model.max_model_len
 #   model          each accelerator serves the one model of the support table
@@ -60,14 +60,15 @@ capabilities:
   # for want of the field, not for want of affinity.
   cache_reuse: null
 
-# The cases this guide's lanes run by default (`llmdv verify --full-suite` runs everything). They test
-# what a lane's own deployment can get wrong: the router path, the overlay's parsers and window,
-# and what this guide changes. Engine and model conformance, the rest of the suite, depends only
-# on the engine build, model and flags, which many lanes share; it runs with `--full-suite` once per
-# configuration (profiles/llm-d/README.md, "Which lane runs everything").
+# Default validation scope: the router path, configured parsers and context window,
+# plus the serving behavior this guide introduces. These focused checks are a starting
+# point for deployment validation. Expand coverage for the APIs and operating conditions
+# you rely on; --full-suite selects the existing library before applicability gates.
+# Maintainer assignments for broader validation are in profiles/llm-d/README.md,
+# under "Broader validation assignments".
 test_sets:
   default:
-    # Every lane: the router serves each API a client uses, and refuses what it should.
+    # Every deployment: the router serves each API a client uses, and refuses what it should.
     - contract.*
     - discovery.models_lists_declared_model
     - discovery.unknown_model_no_fallback
@@ -90,11 +91,11 @@ test_sets:
     - unhappy.error_envelope_fields
     - transport.connection
     - transport.health_status
-    # Every lane: the overlay's parser flags take effect (skips where the model part has none).
+    # Every deployment: the overlay's parser flags take effect (skips where the model part has none).
     - openai_chat.configured_reasoning
     - tools.auto_call
     - tools.auto_stream
-    # Every lane: the overlay's context window is the one declared.
+    # Every deployment: the overlay's context window is the one declared.
     - long_context.*
     - unhappy.context_overflow
     - unhappy.token_limit_over_context

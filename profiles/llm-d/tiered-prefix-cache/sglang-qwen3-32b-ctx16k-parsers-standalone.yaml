@@ -3,25 +3,25 @@
 # SGLang on TPU v5p serving Qwen/Qwen3-32B at a 16384-token window with the qwen3 and qwen
 # parsers, offloading KV cache to CPU RAM through HiCache (sglang v0.1.0-tpu).
 #
+# Validate your deployment after installing the guide in standalone mode (guide.yaml deploy.standalone)
+# with one of the overlays listed below (GUIDE_NAME=tiered-prefix-cache):
+#   export LLMDV_ROUTER_URL='https://your-router.example' # replace with your router URL
+#   llmdv profile validate profiles/llm-d/tiered-prefix-cache/sglang-qwen3-32b-ctx16k-parsers-standalone.yaml
+#   llmdv verify --profile profiles/llm-d/tiered-prefix-cache/sglang-qwen3-32b-ctx16k-parsers-standalone.yaml \
+#     <the matching identity flags below>
+#
 # llm-d 9ca8ff0.
 #
-# CI lane that deploys this configuration (llm-d's nightly-e2e-tiered-prefix-cache-<lane>
+# Maintainer provenance: upstream workflow for this configuration (llm-d's nightly-e2e-tiered-prefix-cache-<workflow-suffix>
 # workflow; it runs in standalone mode, gateway_class epponly):
 #   gke-cpu-tpu-sglang-native         tpu/v5p/sglang/native/cpu (no provider: applies `base`)
 # (overlay as ACCELERATOR_TYPE/MODEL_SERVER/CONNECTOR/VARIANT/INFRA_PROVIDER)
-# Identity flags per lane:
+# Comparison identity by deployment configuration:
 #   gke-cpu-tpu-sglang-native         --identity accelerator=tpu/v5p --identity provider=base --identity flavor=native/cpu
 #
 # --context-length=16384, --enable-hierarchical-cache, --hicache-size=32 (FROM values:
 # modelserver/tpu/v5p/sglang/native/cpu/base/patch-decode.yaml).
 #
-# How a lane runs it, after deploying the guide in standalone mode (guide.yaml deploy.standalone)
-# with one of the overlays above (GUIDE_NAME=tiered-prefix-cache):
-#   export LLMDV_ROUTER_URL=<the EPP's URL>
-#   llmdv profile validate profiles/llm-d/tiered-prefix-cache/sglang-qwen3-32b-ctx16k-parsers-standalone.yaml
-#   llmdv verify --profile profiles/llm-d/tiered-prefix-cache/sglang-qwen3-32b-ctx16k-parsers-standalone.yaml \
-#     <the lane's identity flags above>
-
 extends:
   - ../parts/base.yaml
   - ../parts/topology/standalone.yaml

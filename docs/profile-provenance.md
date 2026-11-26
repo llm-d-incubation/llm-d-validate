@@ -186,43 +186,43 @@ When one stack needs several profiles, write each fact once in a **part** and li
 - A part holds one kind of fact (what the APIs promise, a layer, an engine, a model configuration). It is not a profile, and it never extends anything: a file reached by two routes is an error.
 - Anything inside a `parts/` folder is a building block; every other file is a profile you can run. What only one group of profiles shares goes in that group's own `parts/common.yaml` (`profiles/llm-d/<guide>/parts/common.yaml`), so the group's name appears once, as its folder.
 - A combination is `extends: [parts/…, …]`, a `name`, and only what belongs to that one stack: the engine's own names (parser names, the reasoning field), block size, per-layer differences and the change sentinels.
-- Name a model part by what a client sees (model, context window, parsers), never by accelerator or cluster. Configurations that give a client the same model, window, parsers and engine share one combination; tell their runs apart with `--identity accelerator=<value> --identity provider=<value>` (and `--identity llm-d-ref=<value>` when applicable), not `--label`. For an llm-d guide, follow llm-d's own lane inputs: `accelerator` is the guide's `ACCELERATOR_TYPE`, `provider` the `INFRA_PROVIDER` folder the lane renders (with any connector the guide folds into it, such as `nixl/amd-ci`; `base` when the lane sets none), and every other variable the guide's lanes vary (connector, variant, topology, scaler) goes into one `--identity flavor=`, llm-d's values joined with `/` in overlay-path order (`flavor=lmcache-connector/cpu`), passed on every lane of that guide, rather than a new profile or a label.
+- Name a model part by what a client sees (model, context window, parsers), never by accelerator or cluster. Configurations that give a client the same model, window, parsers and engine share one combination; tell their runs apart with `--identity accelerator=<value> --identity provider=<value>` (and `--identity llm-d-ref=<value>` when applicable), not `--label`. For an llm-d guide, follow llm-d's own workflow inputs: `accelerator` is the guide's `ACCELERATOR_TYPE`, `provider` the `INFRA_PROVIDER` folder the workflow renders (with any connector the guide folds into it, such as `nixl/amd-ci`; `base` when the workflow sets none), and every other variable the guide's workflows vary (connector, variant, topology, scaler) goes into one `--identity flavor=`, llm-d's values joined with `/` in overlay-path order (`flavor=lmcache-connector/cpu`), passed on every workflow of that guide, rather than a new profile or a label.
 - Tag every line with where its value came from: `FROM values: <path>` (shipped configuration), `FROM docs: <path>`, `INTENT` ([intended behavior](writing-profiles.md#declare-intended-behaviour)), `DERIVED`, or `MEASURED on <where>`. Nothing unmeasured is tagged measured.
 - Mappings merge; ordinary lists replace; `null` clears where allowed. Ingress lists merge by `id`, so `ingresses: []` does not remove inherited ingresses. Inspect unexpected overrides with `profile explain <combination> --field <field>`.
 - Validate and plan a combination, never a part: `llmdv profile validate <combination>` and `llmdv plan --profile <combination> -q`.
 
 ### Profiles for an llm-d guide
 
-To find which guides and lanes need this after llm-d moves, use
+To find which guides and workflows need this after llm-d moves, use
 [tracking-llm-d-guide-drift](../.agents/skills/tracking-llm-d-guide-drift/SKILL.md).
 
 Decide which configurations get a profile from the guide itself, and read all of its sources,
 checking each against the others:
 
-- the nightly lanes, `.github/workflows/nightly-e2e-<guide>-*.yaml`, and the deploy scripts they call;
-- the rendered manifests of the overlay each lane applies (`kubectl kustomize <path>`, locally, never against a cluster), for the model, context window, parsers, engine build and flags;
+- the nightly workflows, `.github/workflows/nightly-e2e-<guide>-*.yaml`, and the deploy scripts they call;
+- the rendered manifests of the overlay each workflow applies (`kubectl kustomize <path>`, locally, never against a cluster), for the model, context window, parsers, engine build and flags;
 - the guide's `guide.yaml`, including any `support:` table;
 - the guide's README, including any support or supported-accelerators section.
 
-Write a profile for each configuration a nightly lane deploys, as the rendered manifests show
+Write a profile for each configuration a nightly workflow deploys, as the rendered manifests show
 it, and none for any other. `guide.yaml` and the README are statements to check against the
-lanes and manifests, not the source of truth. Wherever they disagree (a lane deploying something
-the table or README does not list, a table cell no lane runs, a README naming a different model
-or flag than the manifest), profile what the lane deploys and record the disagreement under
+workflows and manifests, not the source of truth. Wherever they disagree (a workflow deploying something
+the table or README does not list, a table cell no workflow runs, a README naming a different model
+or flag than the manifest), profile what the workflow deploys and record the disagreement under
 "Where llm-d's own sources disagree" in the guide folder's README (in its "For maintainers"
 section), citing paths. Say "guide", the word llm-d's own files use (`guides/`, `guide.yaml`,
 `GUIDE_NAME`), and name the folder exactly as llm-d names the guide; do not write "well-lit
 path" or any other term for it.
 
-1. List the guide's nightly workflows in llm-d and the deploy scripts they call. For each lane read its accelerator, engine, provider and gateway class.
-2. Render the overlay that lane applies, locally (`kubectl kustomize <path>`, never against a cluster). A lane that sets no provider applies the accelerator and engine folder's own kustomization. Read the model, context window, parsers, engine build and flags, for each role (prefill and decode can differ). Check what you read against `guide.yaml` and the README.
-3. Group lanes that look the same to a client. Each group is one combination; its header names its lanes, and the directory's README maps every lane to its profile with the exact `--identity` flags that keep lanes sharing a combination apart, lists what no lane runs, and records under "Where llm-d's own sources disagree" every disagreement between the guide's sources. The README is for someone who deployed the guide, not for CI: it opens with "What it tests", "Pick your profile" (model/configuration, overlays, linked profile), "Run it", the generated "What `llmdv verify` selects" and "Not covered", and keeps the lane table, the identity derivation and the disagreements between llm-d's sources in collapsed `<details>` blocks under "For maintainers". Keep lane and CI wording out of the sections above it, and keep each lane name in backticks: the drift skill's report matches them. [`tiered-prefix-cache/README.md`](../profiles/llm-d/tiered-prefix-cache/README.md) is the model.
-4. Give the guide's `parts/common.yaml` a `test_sets.default` of the cases the guide's claims touch, keeping `contract.*` (see [REFERENCE.md](../profiles/REFERENCE.md#test_sets)), and check every glob with `llmdv plan --profile <combination>`. The [coverage rule](#coverage-and-known-failures) still holds for the configuration: one lane per configuration runs `--full-suite`, recorded in `profiles/llm-d/README.md` under "Which lane runs everything", as does a lane whose engine build differs from the rest of its configuration.
+1. List the guide's nightly workflows in llm-d and the deploy scripts they call. For each workflow read its accelerator, engine, provider and gateway class.
+2. Render the overlay that workflow applies, locally (`kubectl kustomize <path>`, never against a cluster). A workflow that sets no provider applies the accelerator and engine folder's own kustomization. Read the model, context window, parsers, engine build and flags, for each role (prefill and decode can differ). Check what you read against `guide.yaml` and the README.
+3. Group deployment configurations that look the same to a client. Each group is one combination; its header names its workflows, and the directory's README maps every workflow to its profile with the exact `--identity` flags that distinguish configurations sharing a profile, lists what no workflow runs, and records under "Where llm-d's own sources disagree" every disagreement between the guide's sources. Write the README for someone validating a deployment: it opens with "What it tests", "Pick your profile" (model/configuration, overlays, linked profile), "Run it", the generated "What `llmdv verify` selects" and "Not covered", and keeps the workflow table, the identity derivation and the disagreements between llm-d's sources in collapsed `<details>` blocks under "For maintainers". Keep automation provenance in those maintainer sections, and keep each workflow name in backticks: the drift skill's report matches them. [`tiered-prefix-cache/README.md`](../profiles/llm-d/tiered-prefix-cache/README.md) is the model.
+4. Give the guide's `parts/common.yaml` a `test_sets.default` of the cases the guide's claims touch, keeping `contract.*` (see [REFERENCE.md](../profiles/REFERENCE.md#test_sets)), and check every glob with `llmdv plan --profile <combination>`. The [coverage rule](#coverage-and-known-failures) still holds for the configuration: assign a full-suite validation run to each configuration, recorded in `profiles/llm-d/README.md` under "Broader validation assignments", and separately cover each distinct engine build.
 5. A layer the kinds cannot order (a routing sidecar between the router and the engines, two routers in series, a coordinator in front of the router) is placed with `fronts`; see [Declared layer edges](../profiles/REFERENCE.md#declared-layer-edges). An ingress may front only ingresses at its own position or deeper.
 
 #### How profiles/llm-d is built
 
-**A sum, not a product.** The guide profiles share router declarations, engine parts, model configurations, and a topology: the standalone router (`parts/topology/standalone.yaml`). A gateway topology is added when a lane runs gateway mode. One file per combination would repeat every fact in dozens of files, so each fact lives in one part and a combination lists the parts:
+**A sum, not a product.** The guide profiles share router declarations, engine parts, model configurations, and a topology: the standalone router (`parts/topology/standalone.yaml`). A gateway topology is added when a workflow runs gateway mode. One file per combination would repeat every fact in dozens of files, so each fact lives in one part and a combination lists the parts:
 
 ```
 profiles/llm-d/
@@ -254,8 +254,8 @@ part.
 
 | Source | Owns |
 | --- | --- |
-| the guide's nightly lanes and the deploy scripts they call | which configurations get a profile |
-| the guide's `guide.yaml` and README | what the guide says exists and is supported, checked against the lanes and manifests (a disagreement goes under "Where llm-d's own sources disagree"); how a client reaches the stack |
+| the guide's nightly workflows and the deploy scripts they call | which configurations get a profile |
+| the guide's `guide.yaml` and README | what the guide says exists and is supported, checked against the workflows and manifests (a disagreement goes under "Where llm-d's own sources disagree"); how a client reaches the stack |
 | router values and model-server overlays | the deployed configuration: model id, window, parsers, router plugins, block sizes |
 | the APIs (OpenAI, Anthropic, the EPP reference) | behaviour: statuses, envelopes, fields, header handling |
 | a run | existence (surfaces served, the window an engine resolves) and the truth of every line above |
@@ -318,11 +318,11 @@ instrument is unavailable (no cluster or metrics access, no instrument, no secon
 it executes model-written code on the operator's machine. A promised route returning 404 is a
 failure to investigate, not an exclusion.
 
-For llm-d guide validation, a profile's `test_sets.default` narrows what one lane runs; another
-lane runs the same configuration with `--full-suite` (see [Profiles for an llm-d
-guide](#profiles-for-an-llm-d-guide)). For a configuration whose canonical lane should exercise
-the library, invoke that lane with `--full-suite`; a profile without `test_sets.default`
-requires an explicit coverage choice.
+For llm-d guide validation, `test_sets.default` selects focused checks for the deployment.
+Maintainers also assign broader validation with `--full-suite` to each shared configuration
+and distinct engine build (see [Profiles for an llm-d guide](#profiles-for-an-llm-d-guide)).
+Users can expand coverage for their own requirements independently of those assignments.
+A profile without `test_sets.default` requires an explicit coverage choice.
 
 ### Preserve failures for triage
 

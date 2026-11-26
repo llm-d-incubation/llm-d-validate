@@ -160,15 +160,15 @@ Preview cases and reasons with `llmdv plan --profile <profile>`.
 ## For maintainers
 
 <details>
-<summary>llm-d's nightly lanes, and how each maps to a profile</summary>
+<summary>llm-d's nightly workflows, and how each maps to a profile</summary>
 
-| CI lane (`nightly-e2e-agentic-api-<lane>`) | Reusable workflow | Overlay it renders | Profile | Identity flags |
+| upstream workflow (`nightly-e2e-agentic-api-<workflow-suffix>`) | Reusable workflow | Overlay it renders | Profile | Identity flags |
 | --- | --- | --- | --- | --- |
 | `gke-acc-gpu-vllm-x` | `reusable-nightly-e2e-gke` | `agentic-api/modelserver/gpu/vllm/gke` (= `optimized-baseline/modelserver/gpu/vllm/gke`) | `vllm-qwen3-32b-parsers-standalone` | `--identity accelerator=gpu --identity provider=gke` |
 
-The lane's deploy script is `guides/agentic-api/scripts/nightly-deploy-gke.sh` (one model-server replica), and its validator is `.github/scripts/e2e/e2e-validate-agentic-api.sh`, which runs the guide's `verify.py` against agentic-api.
+The workflow's deploy script is `guides/agentic-api/scripts/nightly-deploy-gke.sh` (one model-server replica), and its validator is `.github/scripts/e2e/e2e-validate-agentic-api.sh`, which runs the guide's `verify.py` against agentic-api.
 
-The helm release is `agentic-api`, so the Service is `<GUIDE_NAME>-epp` on port 80 (the lane's `gateway_host`).
+The helm release is `agentic-api`, so the Service is `<GUIDE_NAME>-epp` on port 80 (the workflow's `gateway_host`).
 
 </details>
 
@@ -188,8 +188,8 @@ Until a run measures agentic-api's behaviour, nothing about it is declared.
 <details>
 <summary>Where llm-d's own sources disagree</summary>
 
-- `guide.yaml` marks only `gpu`/`vllm` `validated`, with providers `base` and `gke`; the one lane runs `gke`.
+- `guide.yaml` marks only `gpu`/`vllm` `validated`, with providers `base` and `gke`; the one workflow runs `gke`.
 - The guide's model server keeps optimized-baseline's labels (`llm-d.ai/guide: optimized-baseline`), and the router selects on that label.
-- `guide.yaml`'s support notes describe 2 replicas; the lane runs one (`nightly-deploy-gke.sh`, CI-only deviation 1).
+- `guide.yaml`'s support notes describe 2 replicas; the workflow runs one (`nightly-deploy-gke.sh`, upstream validation override 1).
 
 </details>

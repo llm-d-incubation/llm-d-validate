@@ -3,27 +3,27 @@
 # and the hermes tool parser, autoscaled by KEDA on the flow-control queue between one and two
 # replicas.
 #
+# Validate your deployment after the deploy script:
+#   export LLMDV_ROUTER_URL='https://your-router.example' # replace with your router URL
+#   llmdv profile validate profiles/llm-d/keda-epp/vllm-qwen3-32b-parsers-queue-standalone.yaml
+#   llmdv verify --profile profiles/llm-d/keda-epp/vllm-qwen3-32b-parsers-queue-standalone.yaml \
+#     --identity accelerator=gpu --identity provider=gke --identity flavor=queue
+#
 # llm-d 9ca8ff0. Composed from the guide's shipped config and the API
 # references. Only the router layer has been measured, and that with optimized-baseline's router
 # config, without flow control (on kind, with a simulator engine; see
 # ../parts/topology/standalone.yaml).
 #
-# CI lanes that deploy this configuration (llm-d's nightly-e2e-workload-autoscaling-keda-epp-<lane>
+# Maintainer provenance: upstream workflows for this configuration (llm-d's nightly-e2e-workload-autoscaling-keda-epp-<workflow-suffix>
 # workflows; standalone mode, with a custom_deploy_script):
 #   gke-acc-gpu-vllm-x   reusable-nightly-e2e-gke,
 #                        guides/workload-autoscaling/scripts/nightly-deploy-gke-keda-epp.sh:
 #                        guides/optimized-baseline/modelserver/gpu/vllm/gke, flow control on,
 #                        queue ScaledObject; Service <release>-gke-epp
-# The ibm lane serves the same model configuration without flow control, so it has its own
+# The ibm configuration serves the same model configuration without flow control, so it has its own
 # combination, vllm-qwen3-32b-parsers-inflight-standalone.yaml: this one promises the flow-control
 # header, which its router does not send.
 #
-# How a lane runs it, after the deploy script:
-#   export LLMDV_ROUTER_URL=<the EPP's URL>
-#   llmdv profile validate profiles/llm-d/keda-epp/vllm-qwen3-32b-parsers-queue-standalone.yaml
-#   llmdv verify --profile profiles/llm-d/keda-epp/vllm-qwen3-32b-parsers-queue-standalone.yaml \
-#     --identity accelerator=gpu --identity provider=gke --identity flavor=queue
-
 extends:
   - ../parts/base.yaml
   - ../parts/topology/standalone.yaml
@@ -50,7 +50,7 @@ model:
 headers:
   # FROM docs: llm-d-router@main:pkg/epp/handlers/response.go:436-445 and
   # pkg/epp/metadata/consts.go:74-76, the router build guides/env.sh pins (ROUTER_EPP_VERSION
-  # main). With the flowControl feature gate on, which this lane's router values set
+  # main). With the flowControl feature gate on, which this configuration's router values set
   # (guides/workload-autoscaling/keda-epp/optimized-baseline/router.values.yaml; see
   # parts/common.yaml), the EPP adds this header, the time the request waited in flow control, to
   # the response of every request flow control admits, before the first byte; without flow

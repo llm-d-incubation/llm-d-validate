@@ -1,24 +1,24 @@
 # The flow-control guide in standalone mode (the client reaches the EPP's own listener, with flow
 # control on): vLLM serving Qwen/Qwen3-32B with no parsers: inline <think>, no tool calls.
 #
+# Validate your deployment after the deploy script:
+#   export LLMDV_ROUTER_URL='https://your-router.example' # replace with your router URL
+#   llmdv profile validate profiles/llm-d/flow-control/vllm-qwen3-32b-inline-standalone.yaml
+#   llmdv verify --profile profiles/llm-d/flow-control/vllm-qwen3-32b-inline-standalone.yaml \
+#     --identity accelerator=amd --identity provider=base
+#
 # llm-d 9ca8ff0. Composed from the guide's shipped config and the API
 # references. Only the router layer has been measured, and that with optimized-baseline's router
 # config, without flow control (on kind, with a simulator engine; see
 # ../parts/topology/standalone.yaml).
 #
-# CI lanes that deploy this configuration (llm-d's nightly-e2e-flow-control-<lane> workflows;
+# Maintainer provenance: upstream workflows for this configuration (llm-d's nightly-e2e-flow-control-<workflow-suffix> workflows;
 # standalone mode, through reusable-nightly-e2e-amd with a custom_deploy_script):
 #   amd-ci-acc-rocm-vllm-x   guides/flow-control/scripts/nightly-deploy-gke.sh with
 #                            ACCELERATOR_TYPE=amd INFRA_PROVIDER=base: renders
 #                            guides/optimized-baseline/modelserver/amd/vllm/base
 #                            (vllm-openai-rocm v0.31.0), relabelled for this guide, one replica
 #
-# How a lane runs it, after the deploy script:
-#   export LLMDV_ROUTER_URL=<the EPP's URL>
-#   llmdv profile validate profiles/llm-d/flow-control/vllm-qwen3-32b-inline-standalone.yaml
-#   llmdv verify --profile profiles/llm-d/flow-control/vllm-qwen3-32b-inline-standalone.yaml \
-#     --identity accelerator=amd --identity provider=base
-
 extends:
   - ../parts/base.yaml
   - ../parts/topology/standalone.yaml

@@ -187,26 +187,26 @@ The guide's other claims are about contention, and none of them is covered yet:
 ## For maintainers
 
 <details>
-<summary>llm-d's nightly lanes, and how each maps to a profile</summary>
+<summary>llm-d's nightly workflows, and how each maps to a profile</summary>
 
-Both lanes run `guides/flow-control/scripts/nightly-deploy-gke.sh` as a `custom_deploy_script`, which renders optimized-baseline's model-server overlay, relabels it for this guide and cuts it to one replica. They then run `.github/scripts/e2e/e2e-validate-flow-control.sh`.
+Both workflows run `guides/flow-control/scripts/nightly-deploy-gke.sh` as a `custom_deploy_script`, which renders optimized-baseline's model-server overlay, relabels it for this guide and cuts it to one replica. They then run `.github/scripts/e2e/e2e-validate-flow-control.sh`.
 
-| CI lane (`nightly-e2e-flow-control-<lane>`) | Reusable workflow | Overlay it renders | Profile | Identity flags |
+| upstream workflow (`nightly-e2e-flow-control-<workflow-suffix>`) | Reusable workflow | Overlay it renders | Profile | Identity flags |
 | --- | --- | --- | --- | --- |
 | `gke-acc-gpu-vllm-x` | `reusable-nightly-e2e-gke` | `optimized-baseline/modelserver/gpu/vllm/gke` | `vllm-qwen3-32b-parsers-standalone` | `--identity accelerator=gpu --identity provider=gke` |
 | `amd-ci-acc-rocm-vllm-x` | `reusable-nightly-e2e-amd` | `optimized-baseline/modelserver/amd/vllm/base` | `vllm-qwen3-32b-inline-standalone` | `--identity accelerator=amd --identity provider=base` |
 
-The provider value is the `INFRA_PROVIDER` the lane passes to the deploy script.
+The provider value is the `INFRA_PROVIDER` the workflow passes to the deploy script.
 
-The helm release is `flow-control`, so the Service is `<GUIDE_NAME>-epp` on port 80 (the lanes' `gateway_host`).
+The helm release is `flow-control`, so the Service is `<GUIDE_NAME>-epp` on port 80 (the workflows' `gateway_host`).
 
 </details>
 
 <details>
 <summary>Where llm-d's own sources disagree</summary>
 
-- The guide's `guide.yaml` has no `support:` table, so no configuration is marked `validated` there; these profiles follow the two lanes. Its `INFRA_PROVIDER` values are `base` and `gke`, and its `deploy.modelserver` step names only the `gpu` overlay; the AMD path is documented in the README and run by the `amd-ci` lane.
-- The README's "Default Configuration" table says 2 replicas; both lanes run one (`nightly-deploy-gke.sh`, CI-only deviation 3 of 3).
-- The AMD lane runs the script named `nightly-deploy-gke.sh` through `reusable-nightly-e2e-amd`.
+- The guide's `guide.yaml` has no `support:` table, so no configuration is marked `validated` there; these profiles follow the two workflows. Its `INFRA_PROVIDER` values are `base` and `gke`, and its `deploy.modelserver` step names only the `gpu` overlay; the AMD path is documented in the README and run by the `amd-ci` workflow.
+- The README's "Default Configuration" table says 2 replicas; both workflows run one (`nightly-deploy-gke.sh`, upstream validation override 3 of 3).
+- The AMD workflow runs the script named `nightly-deploy-gke.sh` through `reusable-nightly-e2e-amd`.
 
 </details>
