@@ -2,19 +2,41 @@
 
 Profiles for testing a deployment of llm-d's [pd-disaggregation](https://github.com/llm-d/llm-d/tree/main/guides/pd-disaggregation) guide, in which prefill and decode run on separate pods: the router (the EPP) schedules each request onto a prefill pod and a decode pod, and the decode pod's routing sidecar runs the prefill, then the decode, and returns one response.
 
-[Pick your profile](#pick-your-profile) · [Run it](#run-it) · [What it tests](#what-it-tests) · [What `llmdv verify` selects](#what-llmdv-verify-selects) · [Not covered](#not-covered) · [For maintainers](#for-maintainers)
+[What it tests](#what-it-tests) · [Pick your profile](#pick-your-profile) · [Run it](#run-it) · [What `llmdv verify` selects](#what-llmdv-verify-selects) · [Not covered](#not-covered) · [For maintainers](#for-maintainers)
+
+## What it tests
+
+**Validation focus: api correctness through the disaggregated path.** Exercise fields, errors and streaming so changes introduced by the routing sidecar or either engine become visible to the client.
+
+**What a pass establishes:** the selected checks held for the declared APIs and reachable
+ingress during this run. **Coverage boundary:** A successful response does not establish that prefill and decode were actually split.
+
+These focused defaults are a starting point for validating a production deployment. Add coverage
+for the APIs, clients and operating conditions you rely on; see
+[Growing coverage toward production](../../../docs/getting-started.md#widen-coverage).
+
+<details>
+<summary>Why these checks relate to the guide</summary>
+
+The base tests every guide gets (each API, error handling, streaming, the parsers and the context window), sent through the disaggregated path. Nothing about that path changes what a correct API returns, so a field or option the routing sidecar drops or mangles on its way to either engine fails its case. It checks that the stack serves correctly when disaggregated, not that requests are actually split: see [Not covered](#not-covered).
+
+The declaration rationale and claim-to-case mapping live in
+[`parts/common.yaml`](parts/common.yaml). [Not covered](#not-covered) explains the remaining
+access, instrumentation and load requirements.
+
+</details>
 
 ## Pick your profile
 
 Pick the profile for the overlay you deployed (under `guides/pd-disaggregation/modelserver/`). Prefill and decode carry the same model id, window and parser flags, so a client sees one model.
 
-| Profile | Model a client sees | Overlays |
+| Model a client sees | Overlays | Profile |
 | --- | --- | --- |
-| `vllm-gpt-oss-120b-parsers-standalone` | gpt-oss-120b on vLLM v0.31.0 (also the ROCm build), with reasoning and tool-call parsers | `gpu/vllm/gke/base`, `gpu/vllm/coreweave`, `gpu/vllm/ocp`, `amd/vllm/nixl/amd-ci` |
-| `sglang-gpt-oss-120b-inline-standalone` | gpt-oss-120b on SGLang v0.5.22, no parsers: the reasoning text arrives in `content`, and no tool calls | `gpu/sglang/gke` |
-| `vllm-qwen3-32b-inline-standalone` | Qwen3-32B on vLLM v0.32.0-rc.2 (llm-d ROCm build), reasoning inline, no tool parser | `amd/vllm/moriio/amd-ci-1p1d-tp8` |
-| `vllm-qwen3-32b-ctx9k-parsers-standalone` | Qwen3-32B on vllm-tpu v0.31.0, 9216-token window, with parsers | `tpu/v5p/vllm` |
-| `vllm-qwen3-0.6b-ctx32000-inline-standalone` | Qwen3-0.6B on llm-d-xpu v1.0.0, 32000-token window, no parsers | `xpu/vllm` |
+| gpt-oss-120b on vLLM v0.31.0 (also the ROCm build), with reasoning and tool-call parsers | `gpu/vllm/gke/base`, `gpu/vllm/coreweave`, `gpu/vllm/ocp`, `amd/vllm/nixl/amd-ci` | [vllm-gpt-oss-120b-parsers-standalone](vllm-gpt-oss-120b-parsers-standalone.yaml) |
+| gpt-oss-120b on SGLang v0.5.22, no parsers: the reasoning text arrives in `content`, and no tool calls | `gpu/sglang/gke` | [sglang-gpt-oss-120b-inline-standalone](sglang-gpt-oss-120b-inline-standalone.yaml) |
+| Qwen3-32B on vLLM v0.32.0-rc.2 (llm-d ROCm build), reasoning inline, no tool parser | `amd/vllm/moriio/amd-ci-1p1d-tp8` | [vllm-qwen3-32b-inline-standalone](vllm-qwen3-32b-inline-standalone.yaml) |
+| Qwen3-32B on vllm-tpu v0.31.0, 9216-token window, with parsers | `tpu/v5p/vllm` | [vllm-qwen3-32b-ctx9k-parsers-standalone](vllm-qwen3-32b-ctx9k-parsers-standalone.yaml) |
+| Qwen3-0.6B on llm-d-xpu v1.0.0, 32000-token window, no parsers | `xpu/vllm` | [vllm-qwen3-0.6b-ctx32000-inline-standalone](vllm-qwen3-0.6b-ctx32000-inline-standalone.yaml) |
 
 ## Run it
 
@@ -25,11 +47,8 @@ export LLMDV_ROUTER_URL=<your EPP's URL>
 llmdv verify --profile profiles/llm-d/pd-disaggregation/<profile>.yaml
 ```
 
-To test a gateway or the engine as well, [add it as another ingress](../../README.md#include-a-gateway-or-engine). `--identity` flags are optional: they label a run so `llmdv compare` never compares two configurations, for example `--identity accelerator=gpu --identity provider=coreweave`, read off your overlay path.
+To test a gateway or the engine as well, [add it as another ingress](../../README.md#include-a-gateway-or-engine). `--identity` flags are optional for verification. Set them when comparing deployments that share a profile, so their recorded configuration dimensions remain distinct; for example `--identity accelerator=gpu --identity provider=coreweave`, read off your overlay path.
 
-## What it tests
-
-The base tests every guide gets (each API, error handling, streaming, the parsers and the context window), sent through the disaggregated path. Nothing about that path changes what a correct API returns, so a field or option the routing sidecar drops or mangles on its way to either engine fails its case. It checks that the stack serves correctly when disaggregated, not that requests are actually split: see [Not covered](#not-covered).
 
 ## What `llmdv verify` selects
 

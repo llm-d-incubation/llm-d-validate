@@ -2,15 +2,37 @@
 
 Profiles for testing a deployment of llm-d's [agentic-api](https://github.com/llm-d/llm-d/tree/main/guides/agentic-api) guide, in which vLLM Agentic API (`vllm/agentic-api:v0.9.0`, Service `agentic-api` on port 9000), backed by PostgreSQL, sits in front of an llm-d router and optimized-baseline's vLLM model server.
 
-[Pick your profile](#pick-your-profile) · [Run it](#run-it) · [What it tests](#what-it-tests) · [What `llmdv verify` selects](#what-llmdv-verify-selects) · [Not covered](#not-covered) · [For maintainers](#for-maintainers)
+[What it tests](#what-it-tests) · [Pick your profile](#pick-your-profile) · [Run it](#run-it) · [What `llmdv verify` selects](#what-llmdv-verify-selects) · [Not covered](#not-covered) · [For maintainers](#for-maintainers)
+
+## What it tests
+
+**Validation focus: stateless responses calls used by agentic-api.** Exercise input items, instructions, function output and streamed tool loops because the front-end depends on these router-to-engine exchanges.
+
+**What a pass establishes:** the selected checks held for the declared APIs and reachable
+ingress during this run. **Coverage boundary:** The profile reaches the router; stateful agentic-api behavior needs a separate ingress.
+
+These focused defaults are a starting point for validating a production deployment. Add coverage
+for the APIs, clients and operating conditions you rely on; see
+[Growing coverage toward production](../../../docs/getting-started.md#widen-coverage).
+
+<details>
+<summary>Why these checks relate to the guide</summary>
+
+The llm-d router only, in standalone mode (through `../parts/topology/standalone.yaml`), not agentic-api in front of it: see [Not covered](#not-covered). The router's config is optimized-baseline's, unchanged, so the router behaves as optimized-baseline's does. On top of the base tests every guide gets (each API, error handling, the parsers and the context window), the profile tests the stateless Responses API in more depth (input items, instructions, function output, a streamed tool loop, the stateless contract), because agentic-api calls vLLM's stateless Responses API through this router.
+
+The declaration rationale and claim-to-case mapping live in
+[`parts/common.yaml`](parts/common.yaml). [Not covered](#not-covered) explains the remaining
+access, instrumentation and load requirements.
+
+</details>
 
 ## Pick your profile
 
 Pick the profile for the model-server overlay you deployed (under `guides/agentic-api/modelserver/`). The guide has one, so there is one profile.
 
-| Profile | Model a client sees | Overlay |
+| Model a client sees | Overlay | Profile |
 | --- | --- | --- |
-| `vllm-qwen3-32b-parsers-standalone` | Qwen3-32B on vLLM, with reasoning and tool-call parsers | `gpu/vllm/gke` (= `optimized-baseline/modelserver/gpu/vllm/gke`) |
+| Qwen3-32B on vLLM, with reasoning and tool-call parsers | `gpu/vllm/gke` (= `optimized-baseline/modelserver/gpu/vllm/gke`) | [vllm-qwen3-32b-parsers-standalone](vllm-qwen3-32b-parsers-standalone.yaml) |
 
 ## Run it
 
@@ -21,11 +43,8 @@ export LLMDV_ROUTER_URL=<your EPP's URL>
 llmdv verify --profile profiles/llm-d/agentic-api/vllm-qwen3-32b-parsers-standalone.yaml
 ```
 
-To test a gateway or the engine as well, [add it as another ingress](../../README.md#include-a-gateway-or-engine). `--identity` flags are optional: they label a run so `llmdv compare` never compares two configurations, for example `--identity accelerator=gpu --identity provider=gke`, read off your overlay path.
+To test a gateway or the engine as well, [add it as another ingress](../../README.md#include-a-gateway-or-engine). `--identity` flags are optional for verification. Set them when comparing deployments that share a profile, so their recorded configuration dimensions remain distinct; for example `--identity accelerator=gpu --identity provider=gke`, read off your overlay path.
 
-## What it tests
-
-The llm-d router only, in standalone mode (through `../parts/topology/standalone.yaml`), not agentic-api in front of it: see [Not covered](#not-covered). The router's config is optimized-baseline's, unchanged, so the router behaves as optimized-baseline's does. On top of the base tests every guide gets (each API, error handling, the parsers and the context window), the profile tests the stateless Responses API in more depth (input items, instructions, function output, a streamed tool loop, the stateless contract), because agentic-api calls vLLM's stateless Responses API through this router.
 
 ## What `llmdv verify` selects
 

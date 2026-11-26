@@ -139,25 +139,40 @@ Compare the new evidence with the original, and retain the original run for the 
 
 ## Widen coverage
 
-Once smoke completes, run the profile's default selection:
+Guide profiles select checks related to the guide's configuration and promises. They provide
+focused feedback and a starting point for production validation. A routine guide check does not
+need every unrelated library case.
+
+After smoke, preview and run the profile's default:
 
 ```sh
 llmdv plan --profile "$P"
 llmdv verify --profile "$P" --analyze
 ```
 
-For a newly written profile, check the declared surfaces and headers explicitly with
+Grow coverage according to what your deployment needs:
+
+| Your purpose | Next step |
+| --- | --- |
+| Check a guide's intended serving behavior | Use its default and read the guide's coverage boundaries |
+| Adopt another API, client or model feature | Declare the intended capability and add the relevant cases to a named test set |
+| Qualify an engine/model upgrade or prepare for production | Review all relevant APIs, error paths, clients and deployment-specific risks; preview broader suites |
+| Test a contract the library does not cover | [Add a case](writing-tests.md), prove it against a fake defect, and include it in your profile |
+
+For a newly written profile, check its surface and header declarations with
 `llmdv verify --profile "$P" --full-suite -m contract` before relying on broader results.
-This checks the declarations; it is a different task from the initial smoke check.
 
-A guide's default tests its selected API and guide behavior. The minimal starter's default is
-small and leaves optional capabilities undeclared. Add the intended declarations as described
-in [Writing a profile](writing-profiles.md). When you want every applicable library case,
-preview `llmdv plan --profile "$P" --full-suite` before running it.
+Users can build extensive coverage through profile declarations, named test sets and additional
+cases. `--full-suite` selects every existing library case before filters and applicability gates;
+it is not a guarantee of complete API or production coverage. Review skipped checks and
+[known library gaps](test-suites.md#gaps). Load, routing internals and other operational claims
+may need instruments or experiments beyond a functional run.
 
-For named subsets, individual suites or layer restrictions, use
-[Selection and coverage](cli.md#test-sets-and-coverage). No `--ingress` means every declared
-layer; an explicit selector restricts the run to the named IDs.
+[Selection and coverage](cli.md#test-sets-and-coverage) explains how to combine suites and
+restrict ingresses. [Writing a profile](writing-profiles.md) explains how to declare expected
+behavior without weakening it to obtain a pass. The maintained llm-d validation lanes also
+[assign full-suite coverage to configurations](../profiles/llm-d/README.md#for-maintainers);
+that broader qualification complements focused guide runs.
 
 ## Publish a run
 

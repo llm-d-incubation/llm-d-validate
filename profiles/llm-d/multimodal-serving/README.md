@@ -2,15 +2,37 @@
 
 Profiles for testing a deployment of llm-d's [multimodal-serving](https://github.com/llm-d/llm-d/tree/main/guides/multimodal-serving) guide, in which vLLM serves a vision model, `Qwen/Qwen3-VL-32B-Instruct`, either aggregated or with image encoding on its own encode pods (E/PD).
 
-[Pick your profile](#pick-your-profile) · [Run it](#run-it) · [What it tests](#what-it-tests) · [What `llmdv verify` selects](#what-llmdv-verify-selects) · [Not covered](#not-covered) · [For maintainers](#for-maintainers)
+[What it tests](#what-it-tests) · [Pick your profile](#pick-your-profile) · [Run it](#run-it) · [What `llmdv verify` selects](#what-llmdv-verify-selects) · [Not covered](#not-covered) · [For maintainers](#for-maintainers)
+
+## What it tests
+
+**Validation focus: image understanding across the serving path.** Require answers about a freshly drawn image on Chat, Messages and Responses, so accepting image syntax alone cannot count as working vision.
+
+**What a pass establishes:** the selected checks held for the declared APIs and reachable
+ingress during this run. **Coverage boundary:** The tests do not establish encoder/prefill/decode placement or performance; topology-specific limitations remain below.
+
+These focused defaults are a starting point for validating a production deployment. Add coverage
+for the APIs, clients and operating conditions you rely on; see
+[Growing coverage toward production](../../../docs/getting-started.md#widen-coverage).
+
+<details>
+<summary>Why these checks relate to the guide</summary>
+
+Vision on top of the base tests every guide gets: the vision cases run on Chat, Messages and Responses and require the answer to describe a freshly drawn picture (the guide itself only sends an inline PNG through Chat `image_url`; the other two surfaces are declared because the APIs define image input). The Instruct model does not think, so the reasoning cases skip as `undeclared`; the reasoning efforts and Messages thinking modes are still declared, as the APIs define them, and cases that expect an effort to change the answer are expected to fail until the team triages them. The window is 262144 tokens, from `text_config.max_position_embeddings` in the model's `config.json` on Hugging Face (no overlay sets one; the first run's `GET /v1/models` confirms it). On the E/PD topology `unhappy.invalid_image` is expected to fail, and that is a finding for the team, not an excuse: the decode pod's routing sidecar turns the encoder's 400 for a corrupt image into its own 502 (details under [For maintainers](#for-maintainers)).
+
+The declaration rationale and claim-to-case mapping live in
+[`parts/common.yaml`](parts/common.yaml). [Not covered](#not-covered) explains the remaining
+access, instrumentation and load requirements.
+
+</details>
 
 ## Pick your profile
 
 There is one profile: every topology and overlay below looks the same to a client, vLLM v0.31.0 serving `Qwen/Qwen3-VL-32B-Instruct` at its own window.
 
-| Profile | Model a client sees | Overlays |
+| Model a client sees | Overlays | Profile |
 | --- | --- | --- |
-| `vllm-qwen3-vl-32b-instruct-inline-standalone` | Qwen3-VL-32B-Instruct on vLLM, reads images, no reasoning or tool parser | `aggregation/modelserver/gpu/vllm/gke`, `aggregation/modelserver/tpu/v7/vllm/qwen3-vl`, `e-disaggregation/modelserver/gpu/vllm/e-pd/gke` |
+| Qwen3-VL-32B-Instruct on vLLM, reads images, no reasoning or tool parser | `aggregation/modelserver/gpu/vllm/gke`, `aggregation/modelserver/tpu/v7/vllm/qwen3-vl`, `e-disaggregation/modelserver/gpu/vllm/e-pd/gke` | [vllm-qwen3-vl-32b-instruct-inline-standalone](vllm-qwen3-vl-32b-instruct-inline-standalone.yaml) |
 
 ## Run it
 
@@ -21,11 +43,8 @@ export LLMDV_ROUTER_URL=<your EPP's URL>
 llmdv verify --profile profiles/llm-d/multimodal-serving/vllm-qwen3-vl-32b-instruct-inline-standalone.yaml
 ```
 
-To test a gateway or the engine as well, [add it as another ingress](../../README.md#include-a-gateway-or-engine). `--identity` flags are optional: they label a run so `llmdv compare` never compares two configurations, for example `--identity accelerator=gpu --identity provider=gke --identity flavor=e-disaggregation/e-pd`, where `flavor` is the topology as your overlay path spells it.
+To test a gateway or the engine as well, [add it as another ingress](../../README.md#include-a-gateway-or-engine). `--identity` flags are optional for verification. Set them when comparing deployments that share a profile, so their recorded configuration dimensions remain distinct; for example `--identity accelerator=gpu --identity provider=gke --identity flavor=e-disaggregation/e-pd`, where `flavor` is the topology as your overlay path spells it.
 
-## What it tests
-
-Vision on top of the base tests every guide gets: the vision cases run on Chat, Messages and Responses and require the answer to describe a freshly drawn picture (the guide itself only sends an inline PNG through Chat `image_url`; the other two surfaces are declared because the APIs define image input). The Instruct model does not think, so the reasoning cases skip as `undeclared`; the reasoning efforts and Messages thinking modes are still declared, as the APIs define them, and cases that expect an effort to change the answer are expected to fail until the team triages them. The window is 262144 tokens, from `text_config.max_position_embeddings` in the model's `config.json` on Hugging Face (no overlay sets one; the first run's `GET /v1/models` confirms it). On the E/PD topology `unhappy.invalid_image` is expected to fail, and that is a finding for the team, not an excuse: the decode pod's routing sidecar turns the encoder's 400 for a corrupt image into its own 502 (details under [For maintainers](#for-maintainers)).
 
 ## What `llmdv verify` selects
 

@@ -158,7 +158,9 @@ cases within the chosen test sets or full suite; it does not expand the scope.
 Keep expected behavior and coverage separate. To run less, choose a smaller test set instead of
 removing a promised capability. Define sets using [the schema](../profiles/REFERENCE.md#test_sets)
 and select them using [the CLI rules](cli.md#test-sets-and-coverage). Preview with `plan` before
-sending requests.
+sending requests. Guide defaults are focused starting points; use
+[the coverage progression](getting-started.md#widen-coverage) to expand them for your APIs,
+clients and production requirements. Add cases when the library does not yet express your contract.
 
 ## Declarations are verified, not trusted
 

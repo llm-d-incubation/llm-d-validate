@@ -2,19 +2,41 @@
 
 Profiles for testing a deployment of llm-d's [tiered-prefix-cache](https://github.com/llm-d/llm-d/tree/main/guides/tiered-prefix-cache) guide, in which engines offload evicted KV-cache blocks to CPU RAM (or, with the `fs` variant, a shared filesystem) and the router scores pods on both tiers.
 
-[Pick your profile](#pick-your-profile) · [Run it](#run-it) · [What it tests](#what-it-tests) · [What `llmdv verify` selects](#what-llmdv-verify-selects) · [Not covered](#not-covered) · [For maintainers](#for-maintainers)
+[What it tests](#what-it-tests) · [Pick your profile](#pick-your-profile) · [Run it](#run-it) · [What `llmdv verify` selects](#what-llmdv-verify-selects) · [Not covered](#not-covered) · [For maintainers](#for-maintainers)
+
+## What it tests
+
+**Validation focus: serving correctness with cache offloading configured.** Exercise shared-prefix completions and the API contract because offloading must preserve the answers seen by clients.
+
+**What a pass establishes:** the selected checks held for the declared APIs and reachable
+ingress during this run. **Coverage boundary:** Offload/load-back events and tier hits require engine metrics; ordinary responses do not prove offloading works.
+
+These focused defaults are a starting point for validating a production deployment. Add coverage
+for the APIs, clients and operating conditions you rely on; see
+[Growing coverage toward production](../../../docs/getting-started.md#widen-coverage).
+
+<details>
+<summary>Why these checks relate to the guide</summary>
+
+Completions that share a long prefix, the request the guide's own check sends, on top of the base tests every guide gets (each API, error handling, the parsers and the context window). It checks that the stack serves correctly with offloading on, not that offloading itself works: see [Not covered](#not-covered).
+
+The declaration rationale and claim-to-case mapping live in
+[`parts/common.yaml`](parts/common.yaml). [Not covered](#not-covered) explains the remaining
+access, instrumentation and load requirements.
+
+</details>
 
 ## Pick your profile
 
 Pick the profile for the overlay you deployed (under `guides/tiered-prefix-cache/modelserver/`). The connector (`lmcache-connector` or `native`) and the tier (`cpu` or `fs`) don't change what a client sees, so they share a profile.
 
-| Profile | Model a client sees | Overlays |
+| Model a client sees | Overlays | Profile |
 | --- | --- | --- |
-| `vllm-qwen3-32b-parsers-standalone` | Qwen3-32B on vLLM, with reasoning and tool-call parsers | `gpu/vllm/<connector>/cpu/<provider>` |
-| `vllm-qwen3-32b-inline-standalone` | Qwen3-32B on vLLM, reasoning inline, no tool parser | `amd/vllm/<connector>/<tier>/amd-ci`, `tpu/v5p/vllm/native/cpu`, `xpu/vllm/native/cpu/base` |
-| `vllm-qwen3-8b-ctx20k-inline-standalone` | Qwen3-8B on vLLM, 20k window, reasoning inline | `xpu/vllm/lmcache-connector/cpu/base` |
-| `sglang-qwen3-32b-parsers-standalone` | Qwen3-32B on SGLang, with parsers | `gpu/sglang/native/cpu/gke` |
-| `sglang-qwen3-32b-ctx16k-parsers-standalone` | Qwen3-32B on SGLang, 16k window, with parsers | `tpu/v5p/sglang/native/cpu` |
+| Qwen3-32B on vLLM, with reasoning and tool-call parsers | `gpu/vllm/<connector>/cpu/<provider>` | [vllm-qwen3-32b-parsers-standalone](vllm-qwen3-32b-parsers-standalone.yaml) |
+| Qwen3-32B on vLLM, reasoning inline, no tool parser | `amd/vllm/<connector>/<tier>/amd-ci`, `tpu/v5p/vllm/native/cpu`, `xpu/vllm/native/cpu/base` | [vllm-qwen3-32b-inline-standalone](vllm-qwen3-32b-inline-standalone.yaml) |
+| Qwen3-8B on vLLM, 20k window, reasoning inline | `xpu/vllm/lmcache-connector/cpu/base` | [vllm-qwen3-8b-ctx20k-inline-standalone](vllm-qwen3-8b-ctx20k-inline-standalone.yaml) |
+| Qwen3-32B on SGLang, with parsers | `gpu/sglang/native/cpu/gke` | [sglang-qwen3-32b-parsers-standalone](sglang-qwen3-32b-parsers-standalone.yaml) |
+| Qwen3-32B on SGLang, 16k window, with parsers | `tpu/v5p/sglang/native/cpu` | [sglang-qwen3-32b-ctx16k-parsers-standalone](sglang-qwen3-32b-ctx16k-parsers-standalone.yaml) |
 
 ## Run it
 
@@ -25,11 +47,8 @@ export LLMDV_ROUTER_URL=<your EPP's URL>
 llmdv verify --profile profiles/llm-d/tiered-prefix-cache/<profile>.yaml
 ```
 
-To test a gateway or the engine as well, [add it as another ingress](../../README.md#include-a-gateway-or-engine). `--identity` flags are optional: they label a run so `llmdv compare` never compares two configurations, for example `--identity accelerator=gpu --identity provider=gke --identity flavor=native/cpu`, read off your overlay path.
+To test a gateway or the engine as well, [add it as another ingress](../../README.md#include-a-gateway-or-engine). `--identity` flags are optional for verification. Set them when comparing deployments that share a profile, so their recorded configuration dimensions remain distinct; for example `--identity accelerator=gpu --identity provider=gke --identity flavor=native/cpu`, read off your overlay path.
 
-## What it tests
-
-Completions that share a long prefix, the request the guide's own check sends, on top of the base tests every guide gets (each API, error handling, the parsers and the context window). It checks that the stack serves correctly with offloading on, not that offloading itself works: see [Not covered](#not-covered).
 
 ## What `llmdv verify` selects
 

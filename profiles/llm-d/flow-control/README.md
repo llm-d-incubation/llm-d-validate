@@ -2,16 +2,40 @@
 
 Profiles for testing a deployment of llm-d's [flow-control](https://github.com/llm-d/llm-d/tree/main/guides/flow-control) guide, in which the llm-d router runs with its `flowControl` feature gate on (priority bands 100, 0 and -10, round-robin fairness and FCFS ordering) in front of optimized-baseline's vLLM model servers.
 
-[Pick your profile](#pick-your-profile) · [Run it](#run-it) · [What it tests](#what-it-tests) · [What `llmdv verify` selects](#what-llmdv-verify-selects) · [Not covered](#not-covered) · [For maintainers](#for-maintainers)
+[What it tests](#what-it-tests) · [Pick your profile](#pick-your-profile) · [Run it](#run-it) · [What `llmdv verify` selects](#what-llmdv-verify-selects) · [Not covered](#not-covered) · [For maintainers](#for-maintainers)
+
+## What it tests
+
+**Validation focus: admission signals and cancellation recovery.** Check the queue-duration header and cancel-burst behavior to detect a missing flow-control gate or requests that leave the path unable to serve.
+
+**What a pass establishes:** the selected checks held for the declared APIs and reachable
+ingress during this run. **Coverage boundary:** Priority, fairness, sustained queueing and shedding need a bounded load experiment.
+
+These focused defaults are a starting point for validating a production deployment. Add coverage
+for the APIs, clients and operating conditions you rely on; see
+[Growing coverage toward production](../../../docs/getting-started.md#widen-coverage).
+
+<details>
+<summary>Why these checks relate to the guide</summary>
+
+Flow control is work-conserving: a request that finds a free slot dispatches at once. `llmdv` sends one request at a time, so on a correct stack a client sees this router as it would see optimized-baseline's, but for one response header: flow control adds `x-llm-d-flow-queue-duration-ms` (the time the request waited) to every request it admits, before the first byte, and the router sends no such header without it (llm-d-router `pkg/epp/handlers/response.go`, at the `main` build `guides/env.sh` pins). `parts/common.yaml` declares it `promised`, so `contract.header_disposition` fails a router running without flow control.
+
+On top of the base tests every guide gets (each API, error handling, the parsers and the context window), the profiles send cancelled and disconnected requests, which must still be served and must free their slot. One case sends concurrent requests: `scenarios.cancel_burst` opens eight streams at once. Under the setting llm-d tests with (`maxConcurrency: 4`, one replica), four dispatch and four wait in the EPP until a cancelled stream frees a slot, well inside `defaultRequestTTL` (60s) and the standard band's 200-request limit. A rejection there is a finding.
+
+The declaration rationale and claim-to-case mapping live in
+[`parts/common.yaml`](parts/common.yaml). [Not covered](#not-covered) explains the remaining
+access, instrumentation and load requirements.
+
+</details>
 
 ## Pick your profile
 
 Pick the profile for the optimized-baseline model-server overlay you deployed.
 
-| Profile | Model a client sees | Overlay |
+| Model a client sees | Overlay | Profile |
 | --- | --- | --- |
-| `vllm-qwen3-32b-parsers-standalone` | Qwen3-32B on vLLM, with reasoning and tool-call parsers | `optimized-baseline/modelserver/gpu/vllm/gke` |
-| `vllm-qwen3-32b-inline-standalone` | Qwen3-32B on vLLM, reasoning inline, no tool parser | `optimized-baseline/modelserver/amd/vllm/base` |
+| Qwen3-32B on vLLM, with reasoning and tool-call parsers | `optimized-baseline/modelserver/gpu/vllm/gke` | [vllm-qwen3-32b-parsers-standalone](vllm-qwen3-32b-parsers-standalone.yaml) |
+| Qwen3-32B on vLLM, reasoning inline, no tool parser | `optimized-baseline/modelserver/amd/vllm/base` | [vllm-qwen3-32b-inline-standalone](vllm-qwen3-32b-inline-standalone.yaml) |
 
 ## Run it
 
@@ -22,13 +46,8 @@ export LLMDV_ROUTER_URL=<your EPP's URL>
 llmdv verify --profile profiles/llm-d/flow-control/<profile>.yaml
 ```
 
-To test a gateway or the engine as well, [add it as another ingress](../../README.md#include-a-gateway-or-engine). `--identity` flags are optional: they label a run so `llmdv compare` never compares two configurations, for example `--identity accelerator=gpu --identity provider=gke`, read off your overlay path.
+To test a gateway or the engine as well, [add it as another ingress](../../README.md#include-a-gateway-or-engine). `--identity` flags are optional for verification. Set them when comparing deployments that share a profile, so their recorded configuration dimensions remain distinct; for example `--identity accelerator=gpu --identity provider=gke`, read off your overlay path.
 
-## What it tests
-
-Flow control is work-conserving: a request that finds a free slot dispatches at once. `llmdv` sends one request at a time, so on a correct stack a client sees this router as it would see optimized-baseline's, but for one response header: flow control adds `x-llm-d-flow-queue-duration-ms` (the time the request waited) to every request it admits, before the first byte, and the router sends no such header without it (llm-d-router `pkg/epp/handlers/response.go`, at the `main` build `guides/env.sh` pins). `parts/common.yaml` declares it `promised`, so `contract.header_disposition` fails a router running without flow control.
-
-On top of the base tests every guide gets (each API, error handling, the parsers and the context window), the profiles send cancelled and disconnected requests, which must still be served and must free their slot. One case sends concurrent requests: `scenarios.cancel_burst` opens eight streams at once. Under the setting llm-d tests with (`maxConcurrency: 4`, one replica), four dispatch and four wait in the EPP until a cancelled stream frees a slot, well inside `defaultRequestTTL` (60s) and the standard band's 200-request limit. A rejection there is a finding.
 
 ## What `llmdv verify` selects
 

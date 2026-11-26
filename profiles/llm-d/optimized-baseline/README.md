@@ -2,22 +2,44 @@
 
 Profiles for testing a deployment of llm-d's [optimized-baseline](https://github.com/llm-d/llm-d/tree/main/guides/optimized-baseline) guide, in which a model server runs behind llm-d's router (the EPP), which places each request by prefix-cache affinity and token load.
 
-[Pick your profile](#pick-your-profile) · [Run it](#run-it) · [What it tests](#what-it-tests) · [What `llmdv verify` selects](#what-llmdv-verify-selects) · [Not covered](#not-covered) · [For maintainers](#for-maintainers)
+[What it tests](#what-it-tests) · [Pick your profile](#pick-your-profile) · [Run it](#run-it) · [What `llmdv verify` selects](#what-llmdv-verify-selects) · [Not covered](#not-covered) · [For maintainers](#for-maintainers)
+
+## What it tests
+
+**Validation focus: the baseline router-to-model api contract.** Check advertised models, generation, streaming, parsers and errors because later guide configurations depend on this serving contract.
+
+**What a pass establishes:** the selected checks held for the declared APIs and reachable
+ingress during this run. **Coverage boundary:** API correctness does not establish prefix affinity, throughput or backend placement.
+
+These focused defaults are a starting point for validating a production deployment. Add coverage
+for the APIs, clients and operating conditions you rely on; see
+[Growing coverage toward production](../../../docs/getting-started.md#widen-coverage).
+
+<details>
+<summary>Why these checks relate to the guide</summary>
+
+The base tests every guide gets: each API through the router, error handling, streaming pass-through, the parsers and the context window, and that the deployment serves exactly one model. The guide's own check, `/v1/completions` answering, also ten times with a shared prefix, is covered by the completions cases. For the Atom profile no source states the window, so its context-overflow and long-context cases skip as `undeclared` until a run supplies it.
+
+The declaration rationale and claim-to-case mapping live in
+[`parts/common.yaml`](parts/common.yaml). [Not covered](#not-covered) explains the remaining
+access, instrumentation and load requirements.
+
+</details>
 
 ## Pick your profile
 
 Pick the profile for the overlay you deployed (under `guides/optimized-baseline/modelserver/`, as `ACCELERATOR_TYPE/MODEL_SERVER/INFRA_PROVIDER`). A provider overlay changes only node, cache and NCCL settings, so overlays that differ only in provider share a profile.
 
-| Profile | Model a client sees | Overlays |
+| Model a client sees | Overlays | Profile |
 | --- | --- | --- |
-| `vllm-qwen3-32b-parsers-standalone` | Qwen3-32B on vLLM, with reasoning and tool-call parsers | `gpu/vllm/base`, `gpu/vllm/gke`, `gpu/vllm/ocp` |
-| `vllm-qwen3-32b-inline-standalone` | Qwen3-32B on vLLM, reasoning inline, no tool parser | `amd/vllm/amd-ci`, `tpu/v5p/vllm` |
-| `vllm-qwen3-0.6b-inline-standalone` | Qwen3-0.6B on vLLM (an Intel XPU build), reasoning inline, no tool parser | `xpu/vllm` |
-| `sglang-qwen3-32b-parsers-standalone` | Qwen3-32B on SGLang, with parsers | `gpu/sglang/gke` |
-| `sglang-qwen3-32b-ctx16k-parsers-standalone` | Qwen3-32B on SGLang, 16k window, with parsers | `tpu/v5p/sglang` |
-| `sglang-qwen3-32b-inline-standalone` | Qwen3-32B on SGLang, reasoning inline, no tool parser | `amd/sglang/amd-ci` |
-| `atom-qwen3-32b-ctxunknown-inline-standalone` | Qwen3-32B on Atom, reasoning inline, no tool parser, window not yet known | `amd/atom/amd-ci` |
-| `sim-qwen3-32b-standalone` | the llm-d inference simulator answering as Qwen3-32B | none: simulator replicas in place of the model server |
+| Qwen3-32B on vLLM, with reasoning and tool-call parsers | `gpu/vllm/base`, `gpu/vllm/gke`, `gpu/vllm/ocp` | [vllm-qwen3-32b-parsers-standalone](vllm-qwen3-32b-parsers-standalone.yaml) |
+| Qwen3-32B on vLLM, reasoning inline, no tool parser | `amd/vllm/amd-ci`, `tpu/v5p/vllm` | [vllm-qwen3-32b-inline-standalone](vllm-qwen3-32b-inline-standalone.yaml) |
+| Qwen3-0.6B on vLLM (an Intel XPU build), reasoning inline, no tool parser | `xpu/vllm` | [vllm-qwen3-0.6b-inline-standalone](vllm-qwen3-0.6b-inline-standalone.yaml) |
+| Qwen3-32B on SGLang, with parsers | `gpu/sglang/gke` | [sglang-qwen3-32b-parsers-standalone](sglang-qwen3-32b-parsers-standalone.yaml) |
+| Qwen3-32B on SGLang, 16k window, with parsers | `tpu/v5p/sglang` | [sglang-qwen3-32b-ctx16k-parsers-standalone](sglang-qwen3-32b-ctx16k-parsers-standalone.yaml) |
+| Qwen3-32B on SGLang, reasoning inline, no tool parser | `amd/sglang/amd-ci` | [sglang-qwen3-32b-inline-standalone](sglang-qwen3-32b-inline-standalone.yaml) |
+| Qwen3-32B on Atom, reasoning inline, no tool parser, window not yet known | `amd/atom/amd-ci` | [atom-qwen3-32b-ctxunknown-inline-standalone](atom-qwen3-32b-ctxunknown-inline-standalone.yaml) |
+| the llm-d inference simulator answering as Qwen3-32B | none: simulator replicas in place of the model server | [sim-qwen3-32b-standalone](sim-qwen3-32b-standalone.yaml) |
 
 `sim-qwen3-32b-standalone` is for a cluster without accelerators, such as kind: it runs the guide's router in front of llm-d-inference-sim, so it tests the router, not an engine.
 
@@ -30,11 +52,8 @@ export LLMDV_ROUTER_URL=<your EPP's URL>
 llmdv verify --profile profiles/llm-d/optimized-baseline/<profile>.yaml
 ```
 
-To test a gateway or the engine as well, [add it as another ingress](../../README.md#include-a-gateway-or-engine). `--identity` flags are optional: they label a run so `llmdv compare` never compares two configurations, for example `--identity accelerator=gpu --identity provider=gke`, read off your overlay path (`provider=base` if you applied the accelerator folder's own kustomization).
+To test a gateway or the engine as well, [add it as another ingress](../../README.md#include-a-gateway-or-engine). `--identity` flags are optional for verification. Set them when comparing deployments that share a profile, so their recorded configuration dimensions remain distinct; for example `--identity accelerator=gpu --identity provider=gke`, read off your overlay path (`provider=base` if you applied the accelerator folder's own kustomization).
 
-## What it tests
-
-The base tests every guide gets: each API through the router, error handling, streaming pass-through, the parsers and the context window, and that the deployment serves exactly one model. The guide's own check, `/v1/completions` answering, also ten times with a shared prefix, is covered by the completions cases. For the Atom profile no source states the window, so its context-overflow and long-context cases skip as `undeclared` until a run supplies it.
 
 ## What `llmdv verify` selects
 
@@ -84,14 +103,19 @@ Preview individual cases and skip reasons with `llmdv plan --profile <profile>`.
 
 ## Not covered
 
-See [optimized-baseline details](../README.md#for-maintainers): the community overlays, gateway mode and agentgateway as the standalone sidecar proxy are configurations llm-d does not test nightly, so no profile here covers them.
+No nightly lane covers these configurations, so no profile here covers them: the community
+overlays (TPU v6e and v7, TPU v7 dynamic slicing, Rebellions NPU, CPU, Iluvatar, MetaX, Biren,
+Enflame, Moore Threads, TensorRT-LLM, and SGLang on Intel XPU), gateway mode, and agentgateway
+as the standalone sidecar proxy.
+
+For library-wide limitations, see the [shared guide gaps](../README.md#not-covered).
 
 ## For maintainers
 
 <details>
 <summary>llm-d's nightly lanes, and how each maps to a profile</summary>
 
-Why the lanes group as they do: [optimized-baseline details](../README.md#for-maintainers).
+Lanes share a profile when their model, context window, parsers and engine match. Provider-only node, cache and NCCL settings do not require another profile. These lanes use no `flavor` dimension.
 
 Every lane runs standalone: the client calls the `<GUIDE_NAME>-epp` Service on port 80 (the lanes' `gateway_host`). Lanes that share a profile are told apart by `--identity`; the provider value is the overlay's `INFRA_PROVIDER` folder, and `base` for a lane that sets none, which applies the `base` overlay.
 

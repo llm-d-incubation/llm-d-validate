@@ -2,17 +2,39 @@
 
 Profiles for testing a deployment of llm-d's [keda-epp](https://github.com/llm-d/llm-d/tree/main/guides/workload-autoscaling/keda-epp) guide (`guides/workload-autoscaling/keda-epp`), in which optimized-baseline's model server is autoscaled by a KEDA `ScaledObject` on an EPP metric (flow-control queue size and running requests, or in-flight requests).
 
-[Pick your profile](#pick-your-profile) · [Run it](#run-it) · [What it tests](#what-it-tests) · [What `llmdv verify` selects](#what-llmdv-verify-selects) · [Not covered](#not-covered) · [For maintainers](#for-maintainers)
+[What it tests](#what-it-tests) · [Pick your profile](#pick-your-profile) · [Run it](#run-it) · [What `llmdv verify` selects](#what-llmdv-verify-selects) · [Not covered](#not-covered) · [For maintainers](#for-maintainers)
+
+## What it tests
+
+**Validation focus: serving through an autoscaled pool.** Check APIs, streaming and cancellation; queue profiles also require the flow-control header. These checks detect serving regressions while the pool changes.
+
+**What a pass establishes:** the selected checks held for the declared APIs and reachable
+ingress during this run. **Coverage boundary:** Scaling decisions and replica transitions need metrics and cluster observations.
+
+These focused defaults are a starting point for validating a production deployment. Add coverage
+for the APIs, clients and operating conditions you rely on; see
+[Growing coverage toward production](../../../docs/getting-started.md#widen-coverage).
+
+<details>
+<summary>Why these checks relate to the guide</summary>
+
+The base tests every guide gets (each API, error handling, streaming and cancellation, the parsers and the context window), through the autoscaled pool. The `queue` profiles also check that flow control is on: a router with flow control adds `x-llm-d-flow-queue-duration-ms` to every request it admits, even one at a time, and `contract.header_disposition` checks for it. No declaration depends on the replica count, so a run that overlaps a scale event (a second replica joining the pool, or staying Pending) is still valid; the scaling itself is not tested: see [Not covered](#not-covered).
+
+The declaration rationale and claim-to-case mapping live in
+[`parts/common.yaml`](parts/common.yaml). [Not covered](#not-covered) explains the remaining
+access, instrumentation and load requirements.
+
+</details>
 
 ## Pick your profile
 
 Pick the profile for the optimized-baseline overlay you deployed and the router it sits behind: a router with flow control (the `queue` signal) looks different to a client from one without (the `inflight` signal), so they have separate profiles.
 
-| Profile | Model a client sees | Router and scaling signal | Overlay |
+| Model a client sees | Router and scaling signal | Profile |
 | --- | --- | --- | --- |
-| `vllm-qwen3-32b-parsers-queue-standalone` | Qwen3-32B on vLLM, with reasoning and tool-call parsers | flow control on, queue `ScaledObject` | `optimized-baseline/modelserver/gpu/vllm/gke` |
-| `vllm-qwen3-32b-parsers-inflight-standalone` | Qwen3-32B on vLLM, with reasoning and tool-call parsers | optimized-baseline's, no flow control, inflight `ScaledObject` | `optimized-baseline/modelserver/gpu/vllm/base` |
-| `vllm-qwen3-32b-inline-standalone` | Qwen3-32B on vLLM, reasoning inline, no tool parser | flow control on, queue `ScaledObject` | `optimized-baseline/modelserver/amd/vllm/base` |
+| Qwen3-32B on vLLM, with reasoning and tool-call parsers | flow control on, queue `ScaledObject` | [vllm-qwen3-32b-parsers-queue-standalone](vllm-qwen3-32b-parsers-queue-standalone.yaml) |
+| Qwen3-32B on vLLM, with reasoning and tool-call parsers | optimized-baseline's, no flow control, inflight `ScaledObject` | [vllm-qwen3-32b-parsers-inflight-standalone](vllm-qwen3-32b-parsers-inflight-standalone.yaml) |
+| Qwen3-32B on vLLM, reasoning inline, no tool parser | flow control on, queue `ScaledObject` | [vllm-qwen3-32b-inline-standalone](vllm-qwen3-32b-inline-standalone.yaml) |
 
 ## Run it
 
@@ -23,11 +45,8 @@ export LLMDV_ROUTER_URL=<your EPP's URL>
 llmdv verify --profile profiles/llm-d/keda-epp/<profile>.yaml
 ```
 
-To test a gateway or the engine as well, [add it as another ingress](../../README.md#include-a-gateway-or-engine). `--identity` flags are optional: they label a run so `llmdv compare` never compares two configurations, for example `--identity accelerator=gpu --identity provider=gke --identity flavor=queue`, where `provider` is your overlay's `INFRA_PROVIDER` folder and `flavor` the guide's `SIGNAL` value.
+To test a gateway or the engine as well, [add it as another ingress](../../README.md#include-a-gateway-or-engine). `--identity` flags are optional for verification. Set them when comparing deployments that share a profile, so their recorded configuration dimensions remain distinct; for example `--identity accelerator=gpu --identity provider=gke --identity flavor=queue`, where `provider` is your overlay's `INFRA_PROVIDER` folder and `flavor` the guide's `SIGNAL` value.
 
-## What it tests
-
-The base tests every guide gets (each API, error handling, streaming and cancellation, the parsers and the context window), through the autoscaled pool. The `queue` profiles also check that flow control is on: a router with flow control adds `x-llm-d-flow-queue-duration-ms` to every request it admits, even one at a time, and `contract.header_disposition` checks for it. No declaration depends on the replica count, so a run that overlaps a scale event (a second replica joining the pool, or staying Pending) is still valid; the scaling itself is not tested: see [Not covered](#not-covered).
 
 ## What `llmdv verify` selects
 
