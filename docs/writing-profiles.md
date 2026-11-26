@@ -36,6 +36,7 @@ The examples are templates with placeholders. Each validates offline; none runs 
 | [example-three-ingress.yaml](../profiles/examples/example-three-ingress.yaml) | LiteLLM in front of the router and engine, including header dispositions. Replace deployment facts with yours; choose behavior from the intended API contract. |
 | [example-two-ingress-staging.yaml](../profiles/examples/example-two-ingress-staging.yaml) | The two-ingress stack in a second namespace, written with [`extends`](#reuse-a-profile-with-extends) as only its changes. |
 | [custom-llm-d/](../profiles/examples/custom-llm-d/) | A deployment that follows none of llm-d's guides (LiteLLM, the llm-d router, vLLM), for two models, built from parts. |
+| [measured/](../profiles/examples/measured/README.md) | Complete profiles for GLM-5.3, DeepSeek-V4.1-Flash-1017 and Muse-Spark-Open, measured on real deployments. One file per model declares each layer (a LiteLLM gateway, the llm-d router); point it at any deployment with variables and pick layers with `--ingress`. A plain run selects every case. |
 
 In `custom-llm-d/`, run [glm-5.3.yaml](../profiles/examples/custom-llm-d/glm-5.3.yaml) (a text-only reasoning
 model on prefill/decode vLLM) or [deepseek-v4.1-flash.yaml](../profiles/examples/custom-llm-d/deepseek-v4.1-flash.yaml)

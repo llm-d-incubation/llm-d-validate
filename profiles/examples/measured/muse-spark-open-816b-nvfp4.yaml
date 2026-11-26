@@ -1,0 +1,468 @@
+# meta-models/Muse-Spark-Open-816B-A42B-NVFP4, served by llm-d. Measured on real deployments of each layer below.
+#
+# Every surface, error status, capability and header is what that layer served, and the
+# prompt_pins and render_pins are the values measured there. The contract_baseline is not seeded
+# yet: each part holds the llmdv_seed placeholder, so the contract-drift cases compare against
+# nothing until a run of a healthy deployment seeds them (see README.md).
+# The client cases drive Claude Code 2.1.289, the version these layers were measured with, from
+# /opt/claude-code/2.1.289/claude; the runner image's /usr/local/bin/claude is another version.
+# Install it there (see README.md), or leave the client cases out with -m "not real_clients".
+# A plain run selects every case (test_sets.default is "*"). Point it at any deployment of
+# the model, production or staging, with variables; nothing else changes:
+#
+#   export LLMDV_GATEWAY_URL=<the gateway's base URL> LLMDV_GATEWAY_KEY=<a key>
+#   export LLMDV_GATEWAY_MODEL=<the id the gateway serves the model as>   # optional; default above
+#   export LLMDV_ROUTER_URL=<the router's base URL>
+#   export LLMDV_ROUTER_MODEL=<the id the router serves>             # optional
+#
+#   llmdv verify --profile <this file> --ingress litellm   # the gateway
+#   llmdv verify --profile <this file> --ingress router    # the router
+#   llmdv verify --profile <this file>                     # both
+#
+# A deployment that differs (another error status, another path) is a short file that
+# extends this one and changes only that.
+
+schema: llmdv.profile/1
+name: measured-muse-spark-open-816b-nvfp4
+vantage: external
+fleet_policy: dedicated
+model:
+  public_id: meta-models/Muse-Spark-Open-816B-A42B-NVFP4
+  aliases: []
+  max_model_len: 1048576
+  reasoning: {parser: muse, field: reasoning_content, default_on: true}
+  tools:
+    parser: muse
+    auto_choice: true
+    markup: [<|start|>assistant to=, '<atem:function_calls>']
+    forced_finish_reason: stop
+    strict_level: auto
+  answer_max_tokens: 1024
+ingresses:
+- id: litellm
+  kind: gateway
+  base_url_env: LLMDV_GATEWAY_URL
+  auth: {type: bearer, key_env: LLMDV_GATEWAY_KEY}
+  health_path: /health/liveliness
+  surfaces: [chat_completions, completions, messages, responses]
+  timeouts: {connect: 10, request: 600, stream_idle: 120}
+  error_status:
+    unknown_model: [400, 403, 404]
+    unknown_path: [404]
+    wrong_method: [405]
+    bad_credentials: [401]
+    unsupported_option: [200]
+    invalid_api_version: [400]
+    output_overflow: [200]
+  unstructured_errors: []
+  rate_limited: true
+  setup: {proxy: allow}
+  transport:
+    health_status: [200]
+    present_paths: [/v1/models, /openapi.json, /metrics/]
+    absent_paths: [/docs, /tokenize, /detokenize, /version]
+    absent_status: [403, 404]
+    cors_preflight: allowed
+    alpn: h2
+    credential_headers: [x-api-key, api-key]
+    idempotency: ignored
+    http_redirect: expected
+    stream_budget: {first_event_s: 30, max_gap_s: 15, min_tokens_per_s: 5, next_request_s: 60}
+  capabilities:
+    model_info:
+      supported_endpoints: [/v1/messages, /v1/chat/completions]
+      llm_d_headers: true
+      litellm_provider: hosted_vllm
+  model: {public_id_env: LLMDV_GATEWAY_MODEL}
+- id: router
+  kind: router
+  base_url_env: LLMDV_ROUTER_URL
+  auth: {type: none}
+  health_path: /health
+  surfaces: [chat_completions, completions, messages, responses, chat_render, completions_render, messages_render,
+    responses_render]
+  timeouts: {connect: 10, request: 600, stream_idle: 120}
+  error_status:
+    unknown_model: [404]
+    unknown_path: [404]
+    wrong_method: [405]
+    unsupported_option: [200]
+    invalid_api_version: [400]
+    output_overflow: [200]
+  unstructured_errors: []
+  rate_limited: false
+  transport:
+    health_status: [200]
+    present_paths: [/v1/models, /openapi.json, /docs, /metrics, /version]
+    absent_paths: [/v1/model/info]
+    absent_status: [404]
+    cors_preflight: refused
+    idempotency: ignored
+    stream_budget: {first_event_s: 30, max_gap_s: 15, min_tokens_per_s: 5, next_request_s: 60}
+  model:
+    reasoning: {field: reasoning}
+    public_id_env: LLMDV_ROUTER_MODEL
+  capabilities:
+    model_retrieval: true
+    prefix_stability: [chat_render, completions_render, messages_render, responses_render]
+    render_pins:
+      completions_render: {conversation: 7e400f5aaa2ba61ec4a75b53611ef2de7ba34337202a1f07542ee634ba72eda7}
+capabilities:
+  count_tokens: true
+  reasoning_tokens: [chat_completions, responses]
+  json_object: [chat_completions, responses]
+  structured_output: [chat_completions, messages, responses]
+  structured_output_streaming: [chat_completions, messages, responses]
+  chat_reasoning_efforts: [low, minimal, medium, high, xhigh, max]
+  chat_quiet_efforts: []
+  effort_rendering:
+    pattern: 'Reasoning strength: (\d+)\.'
+    surfaces: [chat_completions]
+    efforts: {unset: '512', none: '8', minimal: '8', low: '8', medium: '32', high: '256', xhigh: '512',
+      max: '512'}
+  chat_options: [logprobs, n]
+  chat_repeats: [seed, greedy, fresh]
+  openai_contract: true
+  chat_fields: {add_generation_prompt: accepted, add_special_tokens: accepted, allowed_token_ids: accepted,
+    assistant_content_parts: accepted, assistant_last: accepted, assistant_refusal: accepted, audio: accepted,
+    bad_words: accepted, cache_salt: accepted, chat_template: rejected, chat_template_kwargs: accepted,
+    consecutive_users: accepted, content_file: rejected, content_image_url: accepted, content_input_audio: rejected,
+    continuous_usage_stats: accepted, documents: accepted, empty_user_content: accepted, frequency_penalty: accepted,
+    functions: accepted, guided_choice: accepted, guided_decoding_backend: accepted, guided_grammar: accepted,
+    guided_json: accepted, guided_regex: accepted, include_obfuscation: accepted, include_reasoning: accepted,
+    length_penalty: accepted, logit_bias: accepted, logprob_token_ids: accepted, message_name: accepted,
+    metadata: accepted, min_p: accepted, modalities: accepted, moderation: accepted, parallel_tool_calls: accepted,
+    prediction: accepted, presence_penalty: accepted, prompt_cache_key: accepted, prompt_cache_options: accepted,
+    prompt_cache_retention: accepted, prompt_logprobs: accepted, repetition_detection: accepted, repetition_penalty: accepted,
+    request_id: accepted, response_format_text: accepted, return_prompt_text: accepted, return_token_offsets: accepted,
+    role_assistant: accepted, role_developer: accepted, role_function: accepted, role_system: accepted,
+    role_tool: accepted, routed_experts_prompt_start: accepted, safety_identifier: accepted, seed: accepted,
+    service_tier: accepted, session_id: accepted, skip_special_tokens: accepted, spaces_between_special_tokens: accepted,
+    stop_token_ids: accepted, store: accepted, stream_interval: accepted, stream_options_alone: rejected,
+    structured_outputs: accepted, system_content_parts: accepted, system_only: accepted, temperature: accepted,
+    thinking_token_budget: accepted, tools: accepted, top_k: accepted, top_logprobs_alone: rejected, top_p: accepted,
+    truncation_side: accepted, use_beam_search: accepted, user: accepted, verbosity: accepted, web_search_options: accepted}
+  completions_fields: {add_special_tokens: accepted, allowed_token_ids: accepted, bad_words: accepted,
+    best_of: accepted, cache_salt: accepted, frequency_penalty: accepted, ignore_eos: accepted, include_stop_str_in_output: accepted,
+    length_penalty: accepted, logit_bias: accepted, logprob_token_ids: accepted, min_p: accepted, min_tokens: accepted,
+    presence_penalty: accepted, prompt_logprobs: accepted, repetition_detection: accepted, repetition_penalty: accepted,
+    request_id: accepted, response_format_json_object: accepted, return_token_ids: accepted, return_token_offsets: accepted,
+    return_tokens_as_token_ids: accepted, routed_experts_prompt_start: accepted, seed: accepted, session_id: accepted,
+    skip_special_tokens: accepted, spaces_between_special_tokens: accepted, stop_token_ids: accepted,
+    stream_interval: accepted, stream_options_alone: rejected, structured_outputs: accepted, suffix: rejected,
+    temperature: accepted, thinking_token_budget: accepted, top_k: accepted, top_p: accepted, truncate_prompt_tokens: accepted,
+    truncation_side: accepted, use_beam_search: accepted, user: accepted}
+  messages_checks: [block_forms, context_management, count_tokens_parts, effort_effect, error_types, incremental_streaming,
+    max_tokens_limit, mid_conversation_system, parallel_tool_calls, prompt_accounting, response_shape,
+    stop_sequences, tool_result_error]
+  messages_features: {tool_reference: accepted, assistant_prefill: accepted, cache_breakpoints_five: accepted, cache_control_message_block: accepted,
+    cache_control_tool: accepted, cache_control_ttl_1h: accepted, consecutive_assistant_turns: accepted,
+    consecutive_user_turns: accepted, container: accepted, diagnostics: accepted, document_citations: accepted,
+    document_content: accepted, document_pdf: accepted, document_text: accepted, image_base64: accepted,
+    image_url: rejected, inference_geo: accepted, leading_assistant: accepted, max_tokens_large: accepted,
+    max_tokens_over_window: accepted, max_tokens_zero: accepted, mcp_servers: accepted, metadata_user_id: accepted,
+    redacted_thinking_passback: accepted, search_result: accepted, server_tool_history: accepted, service_tier: accepted,
+    speed_fast: accepted, stop_sequences_five: accepted, text_citations_passback: accepted, thinking_between_tools: accepted,
+    thinking_display_omitted: accepted, thinking_display_updates: accepted, tool_result_blocks: accepted,
+    tool_result_image: accepted, top_k: accepted, top_level_cache_control: accepted, top_p: accepted}
+  anthropic_betas: [prompt-caching-2024-07-31]
+  vision: [chat_completions, messages, responses]
+  client_sessions: [skill, hook, parallel_reads, nested_subagent, compaction, image_read]
+  responses_reasoning_efforts: [minimal, low, medium, high, xhigh, max]
+  responses_options: [metadata, logprobs]
+  responses_features: {access_programs: accepted, additional_tools: accepted, apply_patch: ignored, background_false: accepted,
+    code_interpreter: ignored, computer_use_preview: ignored, context_management: accepted, conversation: ignored,
+    encrypted_reasoning: ignored, file_search: ignored, image_generation: ignored, include_tool_outputs: accepted,
+    include_web_search_sources: accepted, input_file: accepted, input_image: accepted, item_reference: ignored,
+    local_shell: ignored, max_tool_calls: accepted, mcp: ignored, moderation: accepted, namespace_tools: ignored,
+    parallel_tool_calls: accepted, programmatic_tool_calling: ignored, prompt_cache_key: accepted, prompt_cache_options: accepted,
+    prompt_cache_retention: accepted, prompt_template: ignored, reasoning_context: accepted, reasoning_generate_summary: accepted,
+    reasoning_mode: accepted, reasoning_summary: accepted, safety_identifier: accepted, service_tier: accepted,
+    shell: ignored, stream_obfuscation_off: accepted, temperature: accepted, text_format_text: accepted,
+    text_verbosity: accepted, tool_search: ignored, top_p: accepted, truncation_auto: accepted, user: accepted,
+    web_search: ignored, web_search_preview: ignored}
+  stateless_responses: true
+  model_retrieval: false
+  responses_compact: false
+  extension_options: [ignore_eos, min_tokens, truncate_prompt_tokens, cache_salt, include_stop_str_in_output,
+    continue_final_message, echo, continuous_usage_stats, structured_outputs, return_tokens_as_token_ids,
+    prompt_logprobs, allowed_token_ids, bad_words, include_reasoning, stop_reason, chat_template_kwargs,
+    return_token_ids, logit_bias]
+  cache_reuse:
+    min_ratio: 0.9
+    cold_max_ratio: 0.1
+    prefix_words: 2048
+    surfaces: [chat_completions, responses, messages]
+    affinity: routed
+  client_reuse: true
+  messages_thinking: [enabled, adaptive]
+  messages_efforts: [low, medium, high, xhigh, max]
+  scenario_checks: [blank_turns, cache_hints, inline_system, long_context, output_overflow, parallel_subagents]
+  client_model_names: [claude-sonnet-4-5, claude-haiku-4-5-20251001, claude-opus-4-1]
+  forward_compat: {count_tokens_block: either, unknown_beta: either, unknown_block: either, unknown_enum_value: either,
+    unknown_header: either, unknown_item: either, unknown_message_field: either, unknown_tool_type: either}
+  byte_fidelity: [big_integer, big_integer_history, key_order, unicode_escapes]
+  prompt_pins:
+    chat_completions: {conversation: 179, tools: 671}
+    completions: {conversation: 31}
+    messages: {conversation: 179, tools: 671}
+    responses: {conversation: 179, tools: 671}
+  contract_baseline:
+    chat_completions:
+      response:
+        llmdv_seed: [absent]
+      stream:
+        llmdv_seed: [absent]
+      error:
+        llmdv_seed: [absent]
+      invalid:
+        llmdv_seed: [absent]
+      tool_response:
+        llmdv_seed: [absent]
+      tool_stream:
+        llmdv_seed: [absent]
+    completions:
+      response:
+        llmdv_seed: [absent]
+      stream:
+        llmdv_seed: [absent]
+      error:
+        llmdv_seed: [absent]
+      invalid:
+        llmdv_seed: [absent]
+    messages:
+      response:
+        llmdv_seed: [absent]
+      stream:
+        llmdv_seed: [absent]
+      error:
+        llmdv_seed: [absent]
+      invalid:
+        llmdv_seed: [absent]
+      tool_response:
+        llmdv_seed: [absent]
+      tool_stream:
+        llmdv_seed: [absent]
+    responses:
+      response:
+        llmdv_seed: [absent]
+      stream:
+        llmdv_seed: [absent]
+      error:
+        llmdv_seed: [absent]
+      invalid:
+        llmdv_seed: [absent]
+      tool_response:
+        llmdv_seed: [absent]
+      tool_stream:
+        llmdv_seed: [absent]
+headers:
+  x-request-id: {litellm: ignored, router: ignored}
+clients:
+- id: smoke
+  surfaces: [chat_completions]
+  needs: [streaming]
+- id: claude-code
+  surfaces: [messages]
+  needs: [streaming]
+  binaries:
+  - {version: 2.1.289, executable: /opt/claude-code/2.1.289/claude}
+test_sets:
+  default: ['*']
+known_failures:
+- check: error_envelope
+  cases: [anthropic_messages.count_tokens_invalid_messages*, 'anthropic_messages.error_type[invalid_thinking_type]',
+    'anthropic_messages.error_type[missing_max_tokens]', 'anthropic_messages.error_type[thinking_budget_too_small]',
+    anthropic_messages.invalid_effort, tools.server_tool*, 'unhappy.invalid_role[messages]', unhappy.invalid_thinking_type,
+    'unhappy.invalid_token_limit[messages]', 'unhappy.invalid_tool_schema[messages]', unhappy.missing_token_limit,
+    unhappy.server_tool]
+  ingress: litellm
+  issue: vllm-project/vllm#57997
+  fix: vllm-project/vllm#57997, vllm-project/vllm#58023
+- check: tool_result_error_rendered
+  cases: [anthropic_messages.tool_result_error_rendered]
+  ingress: litellm
+  issue: vllm-project/vllm#58700
+  fix: vllm-project/vllm#58700
+- check: prefill_continued
+  cases: ['anthropic_messages.request_feature[assistant_prefill]']
+  ingress: litellm
+  issue: vllm-project/vllm#61857
+  fix: vllm-project/vllm#61857
+- check: orphan_tool_result_status
+  cases: [tools.result_unknown_id*]
+  ingress: litellm
+  issue: vllm-project/vllm#66383
+  fix: vllm-project/vllm#66383, vllm-project/vllm#47877
+- check: invalid_role_status
+  cases: ['unhappy.invalid_role[chat_completions]']
+  ingress: litellm
+  issue: vllm-project/vllm#59090
+  fix: vllm-project/vllm#59090, vllm-project/vllm#59108
+- check: invalid_tool_choice_status
+  cases: ['unhappy.invalid_tool_choice[messages]']
+  ingress: litellm
+  issue: vllm-project/vllm#59718
+  fix: vllm-project/vllm#59718
+- check: completed_at
+  cases: [openai_responses.completed_at]
+  ingress: litellm
+  issue: vllm-project/vllm#63183
+  fix: vllm-project/vllm#63183, vllm-project/vllm#63448, vllm-project/vllm#63783
+- check: feature_summary
+  cases: ['openai_responses.request_feature[reasoning_summary]']
+  ingress: litellm
+  issue: vllm-project/vllm#63184
+  fix: vllm-project/vllm#63184, vllm-project/vllm#63238
+- check: legacy_function_call
+  cases: [tools.legacy_functions]
+  ingress: litellm
+  issue: vllm-project/vllm#66098
+  fix: vllm-project/vllm#66098
+- check: is_error_input_tokens
+  cases: [tools.result_is_error]
+  ingress: litellm
+  issue: vllm-project/vllm#58700
+  fix: vllm-project/vllm#58700
+- {check: choice_index, ingress: litellm, issue: BerriAI/litellm#47109, fix: BerriAI/litellm#47109}
+- check: usage_chunk_choices
+  cases: ['openai_chat.stream_chunk_fields[usage]']
+  ingress: litellm
+  issue: BerriAI/litellm#47109
+  fix: BerriAI/litellm#47109
+- check: terminal_usage_frames
+  cases: [openai_chat.streaming_include_usage]
+  ingress: litellm
+  issue: BerriAI/litellm#47109
+  fix: BerriAI/litellm#47109
+- {check: responses_event_name, ingress: litellm, issue: BerriAI/litellm#47944, fix: BerriAI/litellm#47944}
+- check: model_echo
+  cases: ['openai_responses.sdk_parse[sse]', 'cache.sdk_stream_session[responses]']
+  ingress: litellm
+  issue: BerriAI/litellm#46662
+  fix: BerriAI/litellm#46662
+- check: chunk_text
+  cases: ['evolution.stream_contract[completions]', 'openai_completions.request_field[stream_interval]',
+    openai_completions.stream_chunk_fields, streaming.completions_lifecycle*, 'streaming.steady_flow[completions]']
+  ingress: litellm
+  issue: BerriAI/litellm#45343
+  fix: BerriAI/litellm#45343
+- check: error_envelope
+  cases: ['headers.required_authentication[messages]', 'unhappy.bad_credentials[messages]', 'unhappy.malformed_json[messages]']
+  ingress: litellm
+  issue: BerriAI/litellm#47948
+  fix: BerriAI/litellm#47948
+- check: error_envelope
+  cases: [discovery.model_retrieve*]
+  ingress: litellm
+  issue: BerriAI/litellm#37271
+  fix: BerriAI/litellm#37271, BerriAI/litellm#37810, BerriAI/litellm#37275, BerriAI/litellm#37940
+- check: probe_status
+  cases: ['evolution.unknown_block[chat_completions]']
+  ingress: litellm
+  issue: BerriAI/litellm#47950
+  fix: BerriAI/litellm#47950
+- check: wrong_field_type_status
+  cases: ['unhappy.wrong_field_type[completions]']
+  ingress: litellm
+  issue: BerriAI/litellm#47950
+  fix: BerriAI/litellm#47950
+- check: field_status
+  cases: ['openai_completions.request_field[response_format_json_object]']
+  ingress: litellm
+  issue: BerriAI/litellm#47951
+  fix: BerriAI/litellm#47951
+- check: http_status
+  cases: ['openai_completions.prompt_forms[token_id*]']
+  ingress: litellm
+  issue: BerriAI/litellm#45253
+  fix: BerriAI/litellm#45253, BerriAI/litellm#45278
+- check: openai_error_fields
+  cases: ['unhappy.error_envelope_fields[completions]']
+  ingress: litellm
+  issue: BerriAI/litellm#47949
+  fix: BerriAI/litellm#47949
+- check: stop_reason
+  cases: [openai_chat.stop_reason]
+  ingress: litellm
+  issue: BerriAI/litellm#47945
+  fix: BerriAI/litellm#47945
+- check: token_ids
+  cases: ['field_options.extension_observable[chat_completions/return_token_ids]']
+  ingress: litellm
+  issue: BerriAI/litellm#47945
+  fix: BerriAI/litellm#47945
+- check: continuous_usage
+  cases: [openai_chat.continuous_usage]
+  ingress: litellm
+  issue: BerriAI/litellm#45359
+  fix: BerriAI/litellm#45359, BerriAI/litellm#46075
+- check: message_stop_sequence
+  cases: [anthropic_messages.response_shape]
+  ingress: litellm
+  issue: BerriAI/litellm#47946
+  fix: BerriAI/litellm#47946
+- check: input_tokens_integer_vs_float
+  cases: [evolution.big_integer*]
+  ingress: litellm
+  issue: BerriAI/litellm#47947
+  fix: BerriAI/litellm#47947
+- check: tool_markup_in_answer
+  cases: ['tools.allowed[auto]', 'tools.allowed[required]']
+  ingress: litellm
+  issue: vllm-project/vllm#60585
+  fix: vllm-project/vllm#60585
+- check: error_envelope
+  cases: [anthropic_messages.count_tokens_invalid_messages*, 'anthropic_messages.error_type[invalid_thinking_type]',
+    'anthropic_messages.error_type[missing_max_tokens]', 'anthropic_messages.error_type[thinking_budget_too_small]',
+    anthropic_messages.invalid_effort, tools.server_tool*, 'unhappy.invalid_role[messages]', unhappy.invalid_thinking_type,
+    'unhappy.invalid_token_limit[messages]', 'unhappy.invalid_tool_schema[messages]', unhappy.missing_token_limit,
+    unhappy.server_tool]
+  ingress: router
+  issue: vllm-project/vllm#57997
+  fix: vllm-project/vllm#57997, vllm-project/vllm#58023
+- check: tool_result_error_rendered
+  cases: [anthropic_messages.tool_result_error_rendered]
+  ingress: router
+  issue: vllm-project/vllm#58700
+  fix: vllm-project/vllm#58700
+- check: prefill_continued
+  cases: ['anthropic_messages.request_feature[assistant_prefill]']
+  ingress: router
+  issue: vllm-project/vllm#61857
+  fix: vllm-project/vllm#61857
+- check: orphan_tool_result_status
+  cases: [tools.result_unknown_id*]
+  ingress: router
+  issue: vllm-project/vllm#66383
+  fix: vllm-project/vllm#66383, vllm-project/vllm#47877
+- check: invalid_role_status
+  cases: ['unhappy.invalid_role[chat_completions]']
+  ingress: router
+  issue: vllm-project/vllm#59090
+  fix: vllm-project/vllm#59090, vllm-project/vllm#59108
+- check: invalid_tool_choice_status
+  cases: ['unhappy.invalid_tool_choice[messages]']
+  ingress: router
+  issue: vllm-project/vllm#59718
+  fix: vllm-project/vllm#59718
+- check: completed_at
+  cases: [openai_responses.completed_at]
+  ingress: router
+  issue: vllm-project/vllm#63183
+  fix: vllm-project/vllm#63183, vllm-project/vllm#63448, vllm-project/vllm#63783
+- check: feature_summary
+  cases: ['openai_responses.request_feature[reasoning_summary]']
+  ingress: router
+  issue: vllm-project/vllm#63184
+  fix: vllm-project/vllm#63184, vllm-project/vllm#63238
+- check: legacy_function_call
+  cases: [tools.legacy_functions]
+  ingress: router
+  issue: vllm-project/vllm#66098
+  fix: vllm-project/vllm#66098
+- check: is_error_input_tokens
+  cases: [tools.result_is_error]
+  ingress: router
+  issue: vllm-project/vllm#58700
+  fix: vllm-project/vllm#58700
