@@ -1,9 +1,10 @@
-# Measured profiles for three models
+# Custom llm-d profiles for three models
 
 Broad profiles for three models served by llm-d, based on measurements from real deployments,
 with every identifying detail removed. Each declares what each layer served (surfaces, error
 statuses, capabilities, headers and change sentinels) and how a correct stack
-behaves, so a plain run selects every case in the library.
+behaves. The default selects the existing library before applicability gates; begin with
+smoke and review broader coverage below. The profiles are composed from shared parts.
 
 | Profile | Model | Layers |
 | --- | --- | --- |
@@ -62,9 +63,34 @@ These profiles' defaults select the whole library before applicability gates. Ad
 executed and skipped counts; a broad selection does not guarantee complete API coverage.
 See [growing coverage toward production](../../../docs/getting-started.md#widen-coverage).
 
+## Adapt a profile built from parts
+
+Run a combination from this directory, never a file under `parts/`. Each combination lists
+its shared base, layer declarations, model, known failures and change sentinels in `extends`.
+It then supplies cache settings and any ingress-specific overrides.
+
+| File | Owns |
+| --- | --- |
+| `parts/base.yaml` | Shared API expectations, client pin and test sets |
+| `parts/proxy-litellm.yaml`, `parts/router-llm-d.yaml` | Layer declarations |
+| `parts/models/<model>.yaml` | Model configuration and model-specific capabilities |
+| `parts/known-failures/<model>.yaml` | Tracked findings |
+| `parts/sentinels/<model>.yaml` | Prompt pins and response-shape baselines |
+| `<model>.yaml` | The runnable combination and its remaining overrides |
+
+Keep deployment-specific edits in a gitignored local overlay, such as
+`profiles/examples/custom-llm-d/my-stack.local.yaml` with `extends: glm-5.3.yaml`.
+Review expected behavior before adapting it; a different observed response alone does not
+justify changing an expectation. Use `profile explain` to trace a setting to its source and
+`profile validate` and `plan` to check the composed result.
+
+The profile names used by `compare --profile` are `custom-llm-d-glm-5.3`,
+`custom-llm-d-deepseek-v4.1-flash-1017`, and `custom-llm-d-muse-spark-open-816b-nvfp4`.
+Verification takes the YAML path; comparison takes the profile's `name:`.
+
 ## What `llmdv verify` selects
 
-The default is defined in each profile's own `test_sets:` (the copies are identical).
+The default is defined once in [`parts/base.yaml`](parts/base.yaml) and used unchanged by every profile here.
 See [selection rules](../../../docs/cli.md#test-sets-and-coverage) for smoke, full-library coverage and filters.
 
 <details>

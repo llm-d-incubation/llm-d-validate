@@ -89,3 +89,16 @@ Keep the case failing until triage establishes a defect or an intended deviation
 In guide documentation and YAML comments, lead with deployment configuration and validation
 purpose. Put upstream workflow mappings in labeled maintainer provenance. Follow the
 [documentation terminology guidance](../../../docs/maintaining-docs.md).
+
+## Composed custom profiles
+
+The GLM, DeepSeek and Muse examples live in
+[`profiles/examples/custom-llm-d/`](../../../profiles/examples/custom-llm-d/README.md).
+Run the combination file; use `profile explain` to locate a declaration before editing a shared
+part. Check every combination affected by a shared-part edit and regenerate its folder's coverage.
+Keep deployment overrides in a local overlay rather than copying or flattening all the parts.
+
+For a refactor, compare the entire loaded `Profile` before and after, excluding only the
+intentionally changed name and source path, and compare planned selections too.
+`compare_profiles.py` is a publication-scrubbing helper: it omits connection details and
+sentinels by design, so a zero-difference result is not proof of lossless profile refactoring.

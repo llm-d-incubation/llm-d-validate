@@ -7,7 +7,7 @@ credentials, the first run and its results.
 | Your deployment | Starting point |
 | --- | --- |
 | An llm-d guide | [Guide catalog](llm-d/README.md): match the deployed overlay |
-| GLM, DeepSeek or Muse matching a measured example | [Measured profiles](examples/measured/README.md): review deployment-specific expectations and prerequisites |
+| GLM, DeepSeek or Muse matching a measured example | [Custom llm-d profiles](examples/custom-llm-d/README.md): review deployment-specific expectations and prerequisites |
 | Another gateway, router or engine | [Your own stack](#your-own-stack): adapt a starter |
 
 ## llm-d guide validation profiles

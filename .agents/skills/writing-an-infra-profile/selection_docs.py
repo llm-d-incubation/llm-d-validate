@@ -10,7 +10,8 @@ It sends nothing to any stack.
     python .agents/skills/writing-an-infra-profile/selection_docs.py --check    # exit 1 if stale
 
 It refuses to write a shared section when the profiles of one folder define different sets, or
-when a planned suite has no pattern in the default: those need a section written by hand.
+when a planned suite has no pattern in the default. An explicit "*" covers every suite.
+Inconsistent folders need a documented generator update, not an unchecked hand-edited section.
 """
 
 from __future__ import annotations
@@ -26,6 +27,8 @@ from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 import yaml
+
+from llmdv.profile import compose
 
 ROOT = Path(__file__).resolve().parents[3]
 PROFILES = ROOT / "profiles"
@@ -47,13 +50,8 @@ def runnable() -> list[Path]:
 
 
 def extends_chain(path: Path) -> list[Path]:
-    data = yaml.safe_load(path.read_text()) or {}
-    parents = data.get("extends") or []
-    parents = [parents] if isinstance(parents, str) else parents
-    chain: list[Path] = []
-    for parent in parents:
-        chain += extends_chain((path.parent / parent).resolve())
-    return chain + [path.resolve()]
+    """Use the runtime composition rules, including cycle and repeated-parent rejection."""
+    return [layer.path for layer in compose.layers(path)]
 
 
 def composed_sets(path: Path) -> tuple[dict, dict]:
@@ -118,9 +116,11 @@ def section(folder: Path, entries: dict[Path, dict]) -> str:
     names = sorted(entries)
     sets = entries[names[0]]["sets"]
     if any(entries[p]["sets"] != sets for p in names):
-        sys.exit(f"{folder}: its profiles define different test sets; write the section by hand")
+        sys.exit(f"{folder}: different test sets; split the folder or extend the generator")
     if "default" not in sets:
-        sys.exit(f"{folder}: a profile has no default test set; write the section by hand")
+        sys.exit(
+            f"{folder}: a profile has no default test set; declare one or extend the generator"
+        )
 
     def rel(target: Path) -> str:
         return os.path.relpath(target, folder)
@@ -133,11 +133,14 @@ def section(folder: Path, entries: dict[Path, dict]) -> str:
     else:
         own = sorted(p for p, s in sources.items() if s == p)
         inherited = sorted((p, s) for p, s in sources.items() if s != p)
-        where = "defined in " + (
-            "each profile's own `test_sets:` (the copies are identical)"
-            if len(own) > 1
-            else f"`{own[0].name}`"
-        )
+        if not own:
+            where = "inherited from separate parts with identical definitions"
+        else:
+            where = "defined in " + (
+                "each profile's own `test_sets:` (the copies are identical)"
+                if len(own) > 1
+                else f"`{own[0].name}`"
+            )
         where += "".join(f"; `{p.name}` inherits it from `{rel(s)}`" for p, s in inherited)
     others = sorted(set(sets) - {"default"})
     guide = rel(ROOT / "docs/cli.md") + "#test-sets-and-coverage"
