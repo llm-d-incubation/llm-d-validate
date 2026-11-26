@@ -47,7 +47,8 @@ def test_messages_are_plain_text():
 def test_a_passing_run_names_its_trigger_counts_skips_and_where_results_are():
     text = notify.message(outcome())
     headline = (
-        "llmdv fleet-a: PASSED, every selected case passed (skips do not fail a run) (exit 0)"
+        "llmdv fleet-a: PASSED, no executed case failed; "
+        "an all-skipped run can also exit 0 (exit 0)"
     )
     assert text.splitlines()[0] == headline
     assert "trigger=rollout, rollout=r-42" in text

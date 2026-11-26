@@ -33,7 +33,7 @@ from urllib.parse import urlsplit
 # exit_codes.py). A copy, because this script must also run where llmdv is not installed;
 # tests/test_exit_codes.py keeps the two equal.
 MEANING = {
-    0: "every selected case passed (skips do not fail a run)",
+    0: "no executed case failed; an all-skipped run can also exit 0",
     1: "test failures: the fleet did not behave as the profile declares",
     2: "bad usage, or an invalid profile; nothing was verified",
     3: (
