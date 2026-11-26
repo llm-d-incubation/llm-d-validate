@@ -1,4 +1,5 @@
-"""`--ingress` picks layers by id or by position, so one profile can declare a whole stack."""
+"""`--ingress` takes ingress ids, comma-separated or repeated, so one profile can declare a whole
+stack and a run can pick its layers."""
 
 from __future__ import annotations
 
@@ -17,26 +18,31 @@ ROOT = Path(__file__).resolve().parents[1]
 THREE = ROOT / "profiles/examples/example-three-ingress.yaml"  # vllm (engine), router, litellm
 
 
-def test_a_position_selects_every_ingress_at_it_in_profile_order():
+def test_ids_combine_comma_separated_or_repeated_in_profile_order():
     profile = loader.load(THREE)
-    assert select_ingresses(profile, ["gateway,router"]) == (["router", "litellm"], [])
-    assert select_ingresses(profile, ["gateway", "engine"]) == (["vllm", "litellm"], [])
-    assert select_ingresses(profile, ["router, gateway,"]) == (["router", "litellm"], [])
+    assert select_ingresses(profile, ["litellm,router"]) == (["router", "litellm"], [])
+    assert select_ingresses(profile, ["litellm", "vllm"]) == (["vllm", "litellm"], [])
+    assert select_ingresses(profile, ["router, litellm,"]) == (["router", "litellm"], [])
 
 
-def test_an_id_wins_over_a_position_and_mixes_with_one():
+def test_a_repeated_id_is_selected_once():
     profile = loader.load(THREE)
-    # `router` is both an id and a position here; the id is the one ingress it names.
-    assert select_ingresses(profile, ["router"]) == (["router"], [])
-    assert select_ingresses(profile, ["vllm,gateway"]) == (["vllm", "litellm"], [])
+    assert select_ingresses(profile, ["router,router"]) == (["router"], [])
+    assert select_ingresses(profile, ["router", "router,litellm"]) == (["router", "litellm"], [])
 
 
-def test_a_token_that_is_neither_is_returned_unplaced():
+def test_a_position_is_not_an_id():
+    """Only ids select: a position names no ingress here, so it is reported, not expanded."""
     profile = loader.load(THREE)
-    assert select_ingresses(profile, ["gateway,sidecar"]) == (["litellm"], ["sidecar"])
+    assert select_ingresses(profile, ["gateway"]) == ([], ["gateway"])
 
 
-def test_no_tokens_select_nothing_so_every_ingress_runs():
+def test_an_unknown_id_is_returned_unplaced():
+    profile = loader.load(THREE)
+    assert select_ingresses(profile, ["litellm,sidecar"]) == (["litellm"], ["sidecar"])
+
+
+def test_no_ids_select_nothing_so_every_ingress_runs():
     profile = loader.load(THREE)
     assert select_ingresses(profile, []) == ([], [])
 
@@ -52,26 +58,26 @@ def _three(tmp_path):
     return path
 
 
-def test_plan_takes_positions_comma_separated(tmp_path):
+def test_plan_takes_ids_comma_separated(tmp_path):
     result = run_llmdv(
         "plan", "--profile", str(_three(tmp_path)), "--full-suite", "--json",
-        "--ingress", "gateway,router", "-m", "discovery",
+        "--ingress", "litellm,router", "-m", "discovery",
     )  # fmt: skip
     assert result.returncode == 0, result.stderr
     rows = json.loads(result.stdout)["cases"]
     assert rows and {row["ingress"] for row in rows} == {"litellm", "router"}
 
 
-def test_an_unknown_token_is_a_usage_error_naming_ids_and_positions(tmp_path):
+def test_an_unknown_id_is_a_usage_error_listing_the_ids(tmp_path):
     result = run_llmdv(
-        "plan", "--profile", str(_three(tmp_path)), "--full-suite", "--ingress", "gateway,sidecar"
+        "plan", "--profile", str(_three(tmp_path)), "--full-suite", "--ingress", "litellm,sidecar"
     )
     assert result.returncode == 2
     assert "--ingress 'sidecar'" in result.stderr
-    assert "litellm (gateway)" in result.stderr and "vllm (engine)" in result.stderr
+    assert "vllm, router, litellm" in result.stderr
 
 
-def test_verify_never_reaches_a_layer_left_out_by_position(tmp_path):
+def test_verify_never_reaches_a_layer_left_out(tmp_path):
     """The unselected engine is unroutable: preflight and the cases must not touch it."""
     with FakeFleet() as fleet:
         config = yaml.safe_load(profile_yaml("http://10.255.255.1:9", fleet.model))
@@ -85,7 +91,7 @@ def test_verify_never_reaches_a_layer_left_out_by_position(tmp_path):
         path.write_text(yaml.safe_dump(config))
         run_dir = tmp_path / "run"
         result = run_llmdv(
-            "verify", "--profile", str(path), "--full-suite", "--ingress", "gateway",
+            "verify", "--profile", str(path), "--full-suite", "--ingress", "front",
             "--local-output", str(run_dir), "--pod-logs", "off",
             "-k", "test_models_lists_declared_model",
         )  # fmt: skip

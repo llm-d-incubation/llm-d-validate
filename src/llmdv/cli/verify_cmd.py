@@ -177,8 +177,7 @@ def add_selection_arguments(parser: argparse.ArgumentParser) -> None:
         "--ingress",
         action="append",
         default=[],
-        help="restrict to these ingresses: an id or a position (gateway, router, engine), "
-        "comma-separated or repeated; a union",
+        help="restrict to these ingress ids, comma-separated or repeated (a union)",
     )
     parser.add_argument(
         "--client",
@@ -934,12 +933,11 @@ def _write_reproduce(args, profile, run_dir, setup_commands) -> None:
 
 
 def select_ingresses(profile, tokens: list[str]) -> tuple[list[str], list[str]]:
-    """The ingress ids that --ingress names, in the profile's order, and the tokens it cannot place.
+    """The ingress ids --ingress names, in the profile's order, and the names it does not declare.
 
-    Each value may hold several tokens separated by commas (`--ingress gateway,router`). A token
-    that is an ingress id selects that ingress; otherwise a position (`gateway`, `router`,
-    `engine`) selects every ingress at that position. So one profile can declare every layer of
-    a stack and a run can pick the layers it reaches.
+    Each value may hold several ids separated by commas (`--ingress litellm,router`), and the
+    flag may be repeated; the result is their union. So one profile can declare every layer of a
+    stack and a run can pick the layers it reaches.
     """
     wanted: set[str] = set()
     unknown: list[str] = []
@@ -948,10 +946,6 @@ def select_ingresses(profile, tokens: list[str]) -> tuple[list[str], list[str]]:
             continue
         if token in profile.ingress_ids:
             wanted.add(token)
-            continue
-        at_position = [i.id for i in profile.ingresses if i.kind.value == token]
-        if at_position:
-            wanted.update(at_position)
         else:
             unknown.append(token)
     return [i for i in profile.ingress_ids if i in wanted], unknown
@@ -968,10 +962,9 @@ def _unknown_selectors(profile, args) -> list[str]:
         problems.append(str(exc))
     args.ingress, unknown = select_ingresses(profile, args.ingress or [])
     for token in unknown:
-        declared = ", ".join(f"{i.id} ({i.kind.value})" for i in profile.ingresses)
         problems.append(
-            f"--ingress {token!r} is neither an ingress id nor a position in profile "
-            f"{profile.name!r}; it declares: {declared}"
+            f"--ingress {token!r} is not in profile {profile.name!r}; "
+            f"it declares: {', '.join(profile.ingress_ids)}"
         )
     declared_clients = [client.id for client in profile.clients]
     for client_id in args.client or []:
