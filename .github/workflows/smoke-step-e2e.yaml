@@ -1,0 +1,69 @@
+# Runs deploy/llm-d-nightly/smoke-step.sh, the step llm-d's nightly CI runs, on a kind cluster
+# against a stand-in router, for each case it must handle (tests/e2e_llm_d_nightly/run-cases.sh).
+# The pod runs this commit's image, built here, so a change to the script, the harness or the
+# image is tested together. Nothing is pushed.
+name: smoke-step-e2e
+
+on:
+  pull_request:
+    paths:
+      - deploy/llm-d-nightly/**
+      - tests/e2e_llm_d_nightly/**
+      - tests/fakes.py
+      - tests/transport_fakes.py
+      - Containerfile
+      - .github/workflows/smoke-step-e2e.yaml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: smoke-step-e2e-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  e2e:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: ShellCheck
+        run: shellcheck deploy/llm-d-nightly/*.sh tests/e2e_llm_d_nightly/*.sh
+
+      - uses: astral-sh/setup-uv@v6
+
+      - name: Install llmdv on the runner, as the step does from PyPI
+        run: |
+          uv venv "$RUNNER_TEMP/venv"
+          VIRTUAL_ENV="$RUNNER_TEMP/venv" uv pip install .
+          echo "$RUNNER_TEMP/venv/bin" >> "$GITHUB_PATH"
+
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Build this commit's image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: Containerfile
+          platforms: linux/amd64
+          load: true
+          push: false
+          tags: llmdv:e2e
+
+      - name: Build the stand-in router
+        run: bash tests/e2e_llm_d_nightly/build-fake-router.sh docker llmdv:e2e llmdv-fake-router:e2e
+
+      - uses: helm/kind-action@v1
+        with:
+          cluster_name: smoke-step-e2e
+
+      - name: Load both images into kind
+        run: kind load docker-image llmdv:e2e llmdv-fake-router:e2e --name smoke-step-e2e
+
+      - name: Run the cases
+        run: |
+          LLMDV_VERSION=$(llmdv --version | awk '{print $2}') \
+          LLMDV_IMAGE=llmdv:e2e FAKE_IMAGE=llmdv-fake-router:e2e \
+            bash tests/e2e_llm_d_nightly/run-cases.sh
