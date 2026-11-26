@@ -55,14 +55,19 @@ Built for llm-d, it also supports other OpenAI- and Anthropic-compatible stacks.
 ## Quick start: test a deployed llm-d guide
 
 You need Python 3.10+, Git, a deployed endpoint and a profile matching its configuration.
-From a clean machine:
+Clone the release tag for its profiles and shared parts, then install the matching tool from
+[PyPI](https://pypi.org/project/llm-d-validate/). From a clean machine:
 
 ```bash
-git clone https://github.com/llm-d-incubation/llm-d-validate.git
+git clone --branch v0.1.1 https://github.com/llm-d-incubation/llm-d-validate.git
 cd llm-d-validate
-./install.sh
+python3 -m venv .venv
 source .venv/bin/activate
+python -m pip install 'llm-d-validate==0.1.1'
 ```
+
+For the [released container](deploy/README.md#use-the-released-image-locally) or a
+[source installation](CONTRIBUTING.md#development-and-testing), follow the linked instructions.
 
 Choose your profile from the [guide catalog](profiles/llm-d/README.md). For example, if you
 have the optimized-baseline Qwen3-32B/vLLM deployment with parsers, set its URL and run smoke:

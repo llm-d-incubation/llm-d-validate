@@ -6,14 +6,38 @@ produce the same kind of run directory.
 
 ## Install
 
-You need Python 3.10+ and Git. Clone the repository to obtain the installer and profiles:
+For a local Python installation, you need Python 3.10+ and Git. Use the released package from
+[PyPI](https://pypi.org/project/llm-d-validate/) with profiles from the matching repository tag.
+The package installs the CLI and test library; profiles and their shared `extends` parts come
+from the checkout. Keep the directory structure intact rather than downloading a single YAML.
+
+| How you want to run | Installation |
+| --- | --- |
+| Local released tool | Clone the release tag and install from PyPI, as below |
+| Released container | Clone the same tag for profiles and use the [matching image](../deploy/README.md#use-the-released-image-locally); host Python is not required |
+| Develop or run source changes | Follow [source installation and builds](../CONTRIBUTING.md#development-and-testing) |
+
+These examples pair release `v0.1.1` with package version `0.1.1`:
 
 ```sh
-git clone https://github.com/llm-d-incubation/llm-d-validate.git
+git clone --branch v0.1.1 https://github.com/llm-d-incubation/llm-d-validate.git
 cd llm-d-validate
-./install.sh
+python3 -m venv .venv
 source .venv/bin/activate
+python -m pip install 'llm-d-validate==0.1.1'
+llmdv --version
 ```
+
+Run the remaining examples from the checkout root with the virtual environment active.
+The release checkout is detached at its tag; use gitignored `*.local.yaml` overlays for local
+profile changes. Editing a profile takes effect immediately; editing `src/` does not change the
+installed PyPI package. Use the source installation when developing cases or library code.
+
+Python installation does not install external executables: cluster reads need `kubectl` or
+`oc`, and real-client cases need the binary/version declared by their profile. Smoke does not
+run those real-client cases. The released image includes the pinned Claude Code client and
+both object-storage backends. See [storage extras](running.md#publish-a-run) when publishing
+from a PyPI installation.
 
 You also need a reachable model endpoint, and a credential if it authenticates. Cluster access
 is optional for URL-only verification. `llmdv` does not create or supervise port-forwards.
@@ -197,3 +221,21 @@ comparison identity.
 ## Troubleshooting
 
 Use [the troubleshooting table](running.md#troubleshooting) for endpoint, storage and job errors.
+
+## Upgrade a release installation
+
+Check [releases](https://github.com/llm-d-incubation/llm-d-validate/releases) and choose a package,
+profile checkout and image from the same release. For an existing PyPI installation upgrading
+to the version used in this guide, activate its environment and run:
+
+```sh
+python -m pip install --upgrade 'llm-d-validate==0.1.1'
+llmdv --version
+```
+
+If you use a storage extra, include it in the requirement as shown in
+[storage setup](running.md#publish-a-run). Obtain the matching tagged profiles in a separate
+checkout so existing local work is preserved. Review and adapt local overlays, then run
+`llmdv profile validate "$P"` and `llmdv plan --profile "$P" --test-set smoke` before live checks.
+For containers, update the image tag and matching profile checkout together. Keep existing run
+directories for comparison; installing a release does not rerun or replace their evidence.
