@@ -60,7 +60,7 @@ The guide profiles are built from llm-d at one commit, which `profiles/llm-d/REA
    diff <(kubectl kustomize "$D-old/<overlay>") <(kubectl kustomize "$D-new/<overlay>")
    ```
 
-6. **Make the changes** with the profile skill: tag every new or changed line `FROM values: <path>` at the new commit, and keep `WRITTEN, NOT RUN` on anything no run has measured. Then, for each changed combination:
+6. **Make the changes** with the profile skill: tag every new or changed line `FROM values: <path>` at the new commit. Then, for each changed combination:
 
    ```sh
    llmdv profile validate <combination>

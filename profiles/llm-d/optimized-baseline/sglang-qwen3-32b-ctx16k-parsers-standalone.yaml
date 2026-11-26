@@ -2,7 +2,7 @@
 # SGLang serving Qwen/Qwen3-32B at a 16384-token window with the qwen3 and qwen parsers (sglang
 # v0.1.0-tpu).
 #
-# STATUS: WRITTEN, NOT RUN against this engine. Composed from the guide's shipped config at
+# Composed from the guide's shipped config at
 # llm-d 9ca8ff0 and the API references. Only the router layer has been measured (on kind,
 # with a simulator engine; see ../parts/topology/standalone.yaml).
 #
@@ -15,7 +15,7 @@
 #
 # How a lane runs it, after deploying the guide in standalone mode (guide.yaml deploy.standalone)
 # with one of the overlays above:
-#   export LLMDV_EPP_URL=<the EPP's URL>
+#   export LLMDV_ROUTER_URL=<the EPP's URL>
 #   llmdv profile validate profiles/llm-d/optimized-baseline/sglang-qwen3-32b-ctx16k-parsers-standalone.yaml
 #   llmdv verify --profile profiles/llm-d/optimized-baseline/sglang-qwen3-32b-ctx16k-parsers-standalone.yaml \
 #     --identity accelerator=<ACCELERATOR_TYPE> --identity provider=<INFRA_PROVIDER>

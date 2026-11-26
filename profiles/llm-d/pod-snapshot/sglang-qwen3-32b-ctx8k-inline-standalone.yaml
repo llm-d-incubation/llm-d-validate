@@ -1,7 +1,7 @@
 # The pod-snapshot guide in standalone mode (the client reaches the EPP's own listener): SGLang
 # serving Qwen/Qwen3-32B at an 8192-token window with no parsers: inline <think>, no tool calls.
 #
-# STATUS: WRITTEN, NOT RUN. llm-d 9ca8ff0. Composed from the guide's shipped config and the API
+# llm-d 9ca8ff0. Composed from the guide's shipped config and the API
 # references. Only the router layer has been measured (on kind, with a simulator engine; see
 # ../parts/topology/standalone.yaml).
 #
@@ -17,7 +17,7 @@
 #                                     snapshot
 #
 # How a lane runs it, after the deploy script has finished (Pod 1 snapshotted, Pod 2 restored):
-#   export LLMDV_EPP_URL=<the EPP's URL>
+#   export LLMDV_ROUTER_URL=<the EPP's URL>
 #   llmdv profile validate profiles/llm-d/pod-snapshot/sglang-qwen3-32b-ctx8k-inline-standalone.yaml
 #   llmdv verify --profile profiles/llm-d/pod-snapshot/sglang-qwen3-32b-ctx8k-inline-standalone.yaml \
 #     --identity accelerator=gpu --identity provider=gke

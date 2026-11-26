@@ -2,7 +2,7 @@
 # vLLM serving Qwen/Qwen3-VL-32B-Instruct, which reads images, with no parsers: no reasoning, no
 # tool calls.
 #
-# STATUS: WRITTEN, NOT RUN. llm-d 9ca8ff0. Composed from the guide's shipped config and the API
+# llm-d 9ca8ff0. Composed from the guide's shipped config and the API
 # references. Only the router layer has been measured (on kind, with a simulator engine; see
 # ../parts/topology/standalone.yaml).
 #
@@ -24,7 +24,7 @@
 #
 # How a lane runs it, after deploying the guide in standalone mode (guide.yaml deploy.standalone)
 # with one of the overlays above:
-#   export LLMDV_EPP_URL=<the EPP's URL>
+#   export LLMDV_ROUTER_URL=<the EPP's URL>
 #   llmdv profile validate profiles/llm-d/multimodal-serving/vllm-qwen3-vl-32b-instruct-inline-standalone.yaml
 #   llmdv verify --profile profiles/llm-d/multimodal-serving/vllm-qwen3-vl-32b-instruct-inline-standalone.yaml \
 #     --identity accelerator=<ACCELERATOR_TYPE> --identity provider=<INFRA_PROVIDER> \

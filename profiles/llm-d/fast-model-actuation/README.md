@@ -17,7 +17,7 @@ Pick the profile for the platform you applied (`kubectl apply -k platform/<INFRA
 The profiles test the guide's router (the EPP). Give `llmdv` its URL:
 
 ```sh
-export LLMDV_EPP_URL=<your EPP's URL>
+export LLMDV_ROUTER_URL=<your EPP's URL>
 llmdv verify --profile profiles/llm-d/fast-model-actuation/vllm-qwen3-0.6b-inline-standalone.yaml
 ```
 

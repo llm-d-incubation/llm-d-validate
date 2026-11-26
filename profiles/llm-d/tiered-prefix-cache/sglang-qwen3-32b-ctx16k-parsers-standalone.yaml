@@ -3,7 +3,7 @@
 # SGLang on TPU v5p serving Qwen/Qwen3-32B at a 16384-token window with the qwen3 and qwen
 # parsers, offloading KV cache to CPU RAM through HiCache (sglang v0.1.0-tpu).
 #
-# STATUS: WRITTEN, NOT RUN. llm-d 9ca8ff0.
+# llm-d 9ca8ff0.
 #
 # CI lane that deploys this configuration (llm-d's nightly-e2e-tiered-prefix-cache-<lane>
 # workflow; it runs in standalone mode, gateway_class epponly):
@@ -17,7 +17,7 @@
 #
 # How a lane runs it, after deploying the guide in standalone mode (guide.yaml deploy.standalone)
 # with one of the overlays above (GUIDE_NAME=tiered-prefix-cache):
-#   export LLMDV_EPP_URL=<the EPP's URL>
+#   export LLMDV_ROUTER_URL=<the EPP's URL>
 #   llmdv profile validate profiles/llm-d/tiered-prefix-cache/sglang-qwen3-32b-ctx16k-parsers-standalone.yaml
 #   llmdv verify --profile profiles/llm-d/tiered-prefix-cache/sglang-qwen3-32b-ctx16k-parsers-standalone.yaml \
 #     <the lane's identity flags above>

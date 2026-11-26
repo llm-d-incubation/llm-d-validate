@@ -3,7 +3,7 @@
 # vLLM serving Qwen/Qwen3-32B at a RoPE-scaled (YaRN, factor 3.2) 131072-token window, with
 # the qwen3 reasoning parser and the hermes tool parser.
 #
-# STATUS: WRITTEN, NOT RUN. llm-d 9ca8ff0.
+# llm-d 9ca8ff0.
 #
 # CI lanes that deploy this configuration (llm-d's nightly-e2e-predicted-latency-routing-<lane>
 # workflows; each runs in standalone mode, gateway_class epponly):
@@ -26,7 +26,7 @@
 #
 # How a lane runs it, after deploying the guide in standalone mode (guide.yaml deploy.standalone)
 # with one of the overlays above (GUIDE_NAME=predicted-latency-routing):
-#   export LLMDV_EPP_URL=<the EPP's URL>
+#   export LLMDV_ROUTER_URL=<the EPP's URL>
 #   llmdv profile validate profiles/llm-d/predicted-latency-routing/vllm-qwen3-32b-ctx128k-parsers-standalone.yaml
 #   llmdv verify --profile profiles/llm-d/predicted-latency-routing/vllm-qwen3-32b-ctx128k-parsers-standalone.yaml \
 #     <the lane's identity flags above>

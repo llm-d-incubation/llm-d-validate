@@ -29,7 +29,7 @@ Each guide's README says which profile matches what you deployed, how to run it 
 Pick the profile for the overlay you deployed, from the guide's README. The profiles test the guide's router (the EPP), so give `llmdv` its URL; it needs no key:
 
 ```sh
-export LLMDV_EPP_URL=<your EPP's URL>
+export LLMDV_ROUTER_URL=<your EPP's URL>
 llmdv profile validate profiles/llm-d/optimized-baseline/vllm-qwen3-32b-parsers-standalone.yaml
 llmdv verify --profile profiles/llm-d/optimized-baseline/vllm-qwen3-32b-parsers-standalone.yaml
 ```

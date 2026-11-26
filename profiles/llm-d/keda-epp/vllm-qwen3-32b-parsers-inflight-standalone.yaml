@@ -3,7 +3,7 @@
 # and the hermes tool parser, autoscaled by KEDA on in-flight requests between one and two
 # replicas.
 #
-# STATUS: WRITTEN, NOT RUN. llm-d 9ca8ff0. Composed from the guide's shipped config and the API
+# llm-d 9ca8ff0. Composed from the guide's shipped config and the API
 # references. Only the router layer has been measured, and that with optimized-baseline's router
 # config (on kind, with a simulator engine; see ../parts/topology/standalone.yaml).
 #
@@ -21,7 +21,7 @@
 # for it here, since the router's other headers are the topology part's.
 #
 # How a lane runs it, after the deploy script:
-#   export LLMDV_EPP_URL=<the EPP's URL>
+#   export LLMDV_ROUTER_URL=<the EPP's URL>
 #   llmdv profile validate profiles/llm-d/keda-epp/vllm-qwen3-32b-parsers-inflight-standalone.yaml
 #   llmdv verify --profile profiles/llm-d/keda-epp/vllm-qwen3-32b-parsers-inflight-standalone.yaml \
 #     --identity accelerator=gpu --identity provider=base --identity flavor=inflight

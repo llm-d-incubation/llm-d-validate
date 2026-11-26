@@ -17,7 +17,7 @@ Pick the profile for the model-server overlay you deployed (under `guides/agenti
 The profiles test the guide's router (the EPP). Give `llmdv` its URL:
 
 ```sh
-export LLMDV_EPP_URL=<your EPP's URL>
+export LLMDV_ROUTER_URL=<your EPP's URL>
 llmdv verify --profile profiles/llm-d/agentic-api/vllm-qwen3-32b-parsers-standalone.yaml
 ```
 
@@ -86,7 +86,7 @@ The helm release is `agentic-api`, so the Service is `<GUIDE_NAME>-epp` on port 
 <details>
 <summary>Covering agentic-api: what a profile would need</summary>
 
-To cover agentic-api, a profile declares a second ingress in the gateway position (`kind: gateway`) for the `agentic-api` Service on port 9000, in front of the router, with `fronts: [epp]` naming the router it sends to (#24, A5). That ingress then needs:
+To cover agentic-api, a profile declares a second ingress in the gateway position (`kind: gateway`) for the `agentic-api` Service on port 9000, in front of the router, with `fronts: [router]` naming the router it sends to (#24, A5). That ingress then needs:
 
 - its own surfaces and error statuses, measured: which paths agentic-api serves (at least `responses`, and whether it passes chat completions and completions through), what it answers for an unknown model, path or method, and whether its errors carry the OpenAI envelope;
 - stateful Responses cases (`store`, `previous_response_id`, a tool loop continued by `function_call_output`) that `llmdv`'s Responses suite can run against a stateful ingress;

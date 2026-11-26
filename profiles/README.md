@@ -59,7 +59,7 @@ Run the profile that matches your configuration. By default it targets the guide
 give `llmdv` the EPP's URL, which needs no key:
 
 ```sh
-export LLMDV_EPP_URL=<your EPP's URL>
+export LLMDV_ROUTER_URL=<your EPP's URL>
 llmdv verify --profile profiles/llm-d/optimized-baseline/vllm-qwen3-32b-parsers-standalone.yaml
 ```
 

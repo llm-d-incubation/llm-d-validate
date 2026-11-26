@@ -2,7 +2,7 @@
 # listener, with flow control on): vLLM serving Qwen/Qwen3-32B with no parsers: inline <think>,
 # no tool calls, autoscaled by KEDA on the flow-control queue between one and two replicas.
 #
-# STATUS: WRITTEN, NOT RUN. llm-d 9ca8ff0. Composed from the guide's shipped config and the API
+# llm-d 9ca8ff0. Composed from the guide's shipped config and the API
 # references. Only the router layer has been measured, and that with optimized-baseline's router
 # config, without flow control (on kind, with a simulator engine; see
 # ../parts/topology/standalone.yaml).
@@ -16,7 +16,7 @@
 #                        Service <release>-rocm-epp
 #
 # How a lane runs it, after the deploy script:
-#   export LLMDV_EPP_URL=<the EPP's URL>
+#   export LLMDV_ROUTER_URL=<the EPP's URL>
 #   llmdv profile validate profiles/llm-d/keda-epp/vllm-qwen3-32b-inline-standalone.yaml
 #   llmdv verify --profile profiles/llm-d/keda-epp/vllm-qwen3-32b-inline-standalone.yaml \
 #     --identity accelerator=amd --identity provider=base --identity flavor=queue
@@ -40,4 +40,4 @@ headers:
   # the response of every request flow control admits, before the first byte; without flow
   # control it is absent. Keyed by the topology part's ingress id.
   x-llm-d-flow-queue-duration-ms:
-    epp: promised
+    router: promised

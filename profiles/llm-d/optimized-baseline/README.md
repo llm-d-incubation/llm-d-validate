@@ -26,7 +26,7 @@ Pick the profile for the overlay you deployed (under `guides/optimized-baseline/
 The profiles test the guide's router (the EPP). Give `llmdv` its URL:
 
 ```sh
-export LLMDV_EPP_URL=<your EPP's URL>
+export LLMDV_ROUTER_URL=<your EPP's URL>
 llmdv verify --profile profiles/llm-d/optimized-baseline/<profile>.yaml
 ```
 
