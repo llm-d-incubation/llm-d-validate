@@ -102,3 +102,31 @@ def test_every_committed_client_pins_the_images_claude_code(path):
                 f"{client.get('id')}: pins {pinned[1]} at {pinned[0]}, where the image installs "
                 f"{image[1]} at {image[0]}"
             )
+
+
+@pytest.mark.parametrize(
+    "filename",
+    ["glm-5.3.yaml", "deepseek-v4.1-flash-1017.yaml", "muse-spark-open-816b-nvfp4.yaml"],
+)
+def test_custom_profiles_support_gateway_and_router_with_distinct_model_ids(filename, monkeypatch):
+    monkeypatch.setenv("LLMDV_GATEWAY_MODEL", "gateway-model-alias")
+    monkeypatch.setenv("LLMDV_ROUTER_MODEL", "native-model-id")
+    profile = loader.load(PROFILES / "examples" / "custom-llm-d" / filename)
+    assert profile.ingress_ids == ("litellm", "router")
+    gateway, router = profile.ingress("litellm"), profile.ingress("router")
+    assert gateway.base_url_env == "LLMDV_GATEWAY_URL"
+    assert router.base_url_env == "LLMDV_ROUTER_URL"
+    assert gateway.model.public_id == "gateway-model-alias"
+    assert router.model.public_id == "native-model-id"
+    assert "router" in profile.topology().behind("litellm")
+    assert set(gateway.surfaces) <= set(router.surfaces)
+
+
+def test_deepseek_router_does_not_inherit_gateway_measurements():
+    profile = loader.load(PROFILES / "examples" / "custom-llm-d" / "deepseek-v4.1-flash-1017.yaml")
+    gateway, router = profile.ingress("litellm"), profile.ingress("router")
+    assert gateway.capabilities.prompt_pins["chat_completions"]["conversation"] == 59
+    assert router.capabilities.prompt_pins["chat_completions"]["conversation"] == 1
+    assert gateway.capabilities.contract_baseline != router.capabilities.contract_baseline
+    assert gateway.model.reasoning.field_name == "reasoning_content"
+    assert router.model.reasoning.field_name == "reasoning"

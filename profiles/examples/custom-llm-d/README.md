@@ -1,15 +1,16 @@
 # Custom llm-d profiles for three models
 
 Broad profiles for three models served by llm-d, based on measurements from real deployments,
-with every identifying detail removed. Each declares what each layer served (surfaces, error
-statuses, capabilities, headers and change sentinels) and how a correct stack
-behaves. The default selects the existing library before applicability gates; begin with
-smoke and review broader coverage below. The profiles are composed from shared parts.
+with every identifying detail removed. Each describes a LiteLLM gateway (`litellm`) and a
+directly reachable llm-d router (`router`), with API expectations, model capabilities and
+layer-specific change sentinels. The default selects the existing library before applicability
+gates; begin with smoke and review broader coverage below. The profiles are composed from shared
+parts.
 
 | Profile | Model | Layers |
 | --- | --- | --- |
-| [`glm-5.3.yaml`](glm-5.3.yaml) | `zai-org/GLM-5.3` | `litellm` (a LiteLLM gateway), `router` (the llm-d router, reached directly) |
-| [`deepseek-v4.1-flash-1017.yaml`](deepseek-v4.1-flash-1017.yaml) | `deepseek-ai/DeepSeek-V4.1-Flash-1017` | `litellm` |
+| [`glm-5.3.yaml`](glm-5.3.yaml) | `zai-org/GLM-5.3` | `litellm`, `router` |
+| [`deepseek-v4.1-flash-1017.yaml`](deepseek-v4.1-flash-1017.yaml) | `deepseek-ai/DeepSeek-V4.1-Flash-1017` | `litellm`, `router` |
 | [`muse-spark-open-816b-nvfp4.yaml`](muse-spark-open-816b-nvfp4.yaml) | `meta-models/Muse-Spark-Open-816B-A42B-NVFP4` | `litellm`, `router` |
 
 ## Start with smoke
@@ -29,7 +30,17 @@ llmdv verify --profile "$P" --ingress litellm --test-set smoke --analyze
 
 For a direct router check, set `LLMDV_ROUTER_URL`, select `--ingress router`, and use
 `LLMDV_ROUTER_MODEL` if its model ID differs. Omitting `--ingress` selects all declared ingresses,
-so configure each one before doing so. Smoke does not run the real-client cases.
+so configure each one before doing so. Both ingresses are available in all three profiles.
+To check both, keep the gateway variables above and add:
+
+```sh
+export LLMDV_ROUTER_URL='https://your-router.example'
+# Optionally set LLMDV_ROUTER_MODEL to the model ID your router serves.
+llmdv plan --profile "$P" --test-set smoke
+llmdv verify --profile "$P" --test-set smoke --analyze
+```
+
+Smoke does not run the real-client cases.
 
 `LLMDV_GATEWAY_MODEL` and `LLMDV_ROUTER_MODEL` default to the public model ID when unset. A gateway often serves the model under its own
 name, such as a provider prefix or a staging suffix; preflight refuses a run whose model id the
@@ -46,10 +57,13 @@ Include the client version when investigating a failure. Outside the image, inst
 verification steps. Without it, leave the client cases out with
 `-m "not real_clients"`.
 
-**Muse's contract baselines are not seeded.** GLM-5.3's and DeepSeek's `contract_baseline` hold
-the response shapes measured on their deployments; Muse's holds the `llmdv_seed` placeholder in
-each part, so its contract-drift cases compare against nothing. Seed it from a run of a healthy
-deployment using [the seeding procedure](../../../docs/profile-provenance.md#seed-change-sentinels).
+**Seed layer-specific baselines before using drift checks.** GLM's baselines and DeepSeek's
+gateway baselines retain their measured values. DeepSeek's router uses the shared router
+contract with model-specific capabilities; its prompt pins are `1` placeholders and its
+response-shape baselines use `llmdv_seed`. Muse's response-shape baselines also use `llmdv_seed`.
+Placeholder prompt pins will fail until seeded, and placeholder response shapes do not establish
+drift coverage. Seed them from each intended healthy ingress using
+[the seeding procedure](../../../docs/profile-provenance.md#seed-change-sentinels).
 
 After reviewing the declarations and client prerequisite, preview broader coverage:
 
@@ -116,14 +130,14 @@ The default is also `--all-test-sets` for these profiles.
 
 | Scope | Selected | Planned run | Planned skip |
 | --- | ---: | ---: | ---: |
-| Default | 1076 | 1044 | 32 |
-| Smoke | 9 | 9 | 0 |
-| Full library | 1076 | 1044 | 32 |
+| Default | 2140 | 2086 | 54 |
+| Smoke | 18 | 18 | 0 |
+| Full library | 2140 | 2086 | 54 |
 
 Planned skips by class:
 
-- **Default:** 32 `undeclared`.
-- **Full library:** 32 `undeclared`.
+- **Default:** 54 `undeclared`.
+- **Full library:** 54 `undeclared`.
 
 </details>
 
