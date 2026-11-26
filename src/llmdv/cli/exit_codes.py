@@ -31,7 +31,7 @@ INTERRUPTED = 6
 # describes the verification: 5 means the verification passed, and publication is reported on
 # its own.
 EXITS = {
-    OK: ("ok", "every selected case passed (skips do not fail a run)"),
+    OK: ("ok", "no executed case failed; an all-skipped run can also exit 0"),
     TEST_FAILURES: ("fleet", "test failures: the fleet did not behave as the profile declares"),
     USAGE: ("usage", "bad usage, or an invalid profile; nothing was verified"),
     PREFLIGHT: (
