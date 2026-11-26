@@ -2,7 +2,7 @@
 # vLLM serving Qwen/Qwen3-32B with no parsers: inline <think>, no tool calls (an llm-d
 # ROCm vLLM build, over the MoRI-IO connector).
 #
-# STATUS: WRITTEN, NOT RUN. llm-d 9ca8ff0. Composed from the guide's shipped config and the API
+# llm-d 9ca8ff0. Composed from the guide's shipped config and the API
 # references. Only the router layer has been measured (on kind, with a simulator engine and
 # optimized-baseline's router values; see ../parts/topology/standalone.yaml).
 #
@@ -18,7 +18,7 @@
 #
 # How a lane runs it, after deploying the guide in standalone mode (guide.yaml deploy.standalone)
 # with one of the overlays above:
-#   export LLMDV_EPP_URL=<the EPP's URL>
+#   export LLMDV_ROUTER_URL=<the EPP's URL>
 #   llmdv profile validate profiles/llm-d/pd-disaggregation/vllm-qwen3-32b-inline-standalone.yaml
 #   llmdv verify --profile profiles/llm-d/pd-disaggregation/vllm-qwen3-32b-inline-standalone.yaml \
 #     --identity accelerator=<ACCELERATOR_TYPE> --identity provider=<INFRA_PROVIDER>

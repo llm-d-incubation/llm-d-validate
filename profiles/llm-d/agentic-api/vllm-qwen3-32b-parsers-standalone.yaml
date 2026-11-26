@@ -2,7 +2,7 @@
 # listener, not agentic-api): vLLM serving Qwen/Qwen3-32B with the qwen3 reasoning parser and the
 # hermes tool parser.
 #
-# STATUS: WRITTEN, NOT RUN. llm-d 9ca8ff0. Composed from the guide's shipped config and the API
+# llm-d 9ca8ff0. Composed from the guide's shipped config and the API
 # references. Only the router layer has been measured (on kind, with a simulator engine; see
 # ../parts/topology/standalone.yaml).
 #
@@ -13,7 +13,7 @@
 #                         guides/optimized-baseline/modelserver/gpu/vllm/gke), one replica
 #
 # How a lane runs it, after the deploy script:
-#   export LLMDV_EPP_URL=<the EPP's URL>
+#   export LLMDV_ROUTER_URL=<the EPP's URL>
 #   llmdv profile validate profiles/llm-d/agentic-api/vllm-qwen3-32b-parsers-standalone.yaml
 #   llmdv verify --profile profiles/llm-d/agentic-api/vllm-qwen3-32b-parsers-standalone.yaml \
 #     --identity accelerator=gpu --identity provider=gke

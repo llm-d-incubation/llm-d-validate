@@ -58,7 +58,7 @@ router (the EPP), and run it:
 ```bash
 ./install.sh && source .venv/bin/activate
 export P=profiles/llm-d/optimized-baseline/vllm-qwen3-32b-parsers-standalone.yaml
-export LLMDV_EPP_URL=<your EPP's URL>
+export LLMDV_ROUTER_URL=<your EPP's URL>
 
 llmdv profile show $P --test-sets             # what the profile's test sets hold, offline
 llmdv plan --profile $P                       # the cases a plain run selects, and why any skip

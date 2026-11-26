@@ -9,7 +9,7 @@
 #
 # No `setup.requires` is committed: the namespace is cluster detail, and how the EPP is reached is
 # the deployment's concern. llmdv reads its URL from the variable:
-#   export LLMDV_EPP_URL=<the EPP's URL>
+#   export LLMDV_ROUTER_URL=<the EPP's URL>
 #
 # What is NOT declared, and why (these rows stay skip:undeclared by design):
 #   embeddings, /inference/v1/generate   routed by the EPP (FROM docs:
@@ -63,10 +63,10 @@ ingresses:
   # own "error extracting request body: ..." text, and responses carry
   # x-went-into-resp-headers: true. No response header names the serving pod
   # (served_by.backend_pod stays empty).
-  - id: epp
+  - id: router
     kind: router
     # INTENT: the URL comes from the environment so no hostname is committed.
-    base_url_env: LLMDV_EPP_URL
+    base_url_env: LLMDV_ROUTER_URL
     # FROM values: guides/recipes/router/base.values.yaml configures no authentication.
     auth: {type: none}
     # MEASURED 2026-11-16 on kind (real EPP, simulator engine): /health through the router is
@@ -153,19 +153,19 @@ headers:
   # InferenceObjective (none exists there) is served normally, 200, with no dropped-reason header,
   # through both the canonical name and its alias.
   x-llm-d-inference-objective:
-    epp: consumed
+    router: consumed
   x-llm-d-inference-fairness-id:
-    epp: consumed
+    router: consumed
   # FROM docs: the same page, "Deprecated Aliases": read as aliases of the canonical names by llm-d
   # Router v0.9.0 and later. Precedence when both are sent needs a new case variant.
   x-gateway-inference-objective:
-    epp: consumed
+    router: consumed
   x-gateway-inference-fairness-id:
-    epp: consumed
+    router: consumed
   # FROM docs: the same page, "Response Headers": present only on 429, 503 and 500 answers the
   # EPP generates itself, so never on a success.
   x-llm-d-request-dropped-reason:
-    epp: absent
+    router: absent
   # The SLO headers. FROM docs: the same page, "Service Level Objectives": read only by SLO
   # admission plugins. They are declared here and not in a guide's common part because llmdv keys
   # header dispositions by ingress id, which differs between topologies. `ignored` holds for a
@@ -174,13 +174,13 @@ headers:
   # parts/common.yaml says why); a guide that configures one overrides these in its combination
   # files.
   x-llm-d-slo-ttft-ms:
-    epp: ignored
+    router: ignored
   x-llm-d-slo-tpot-ms:
-    epp: ignored
+    router: ignored
   # FROM docs: the same page, "Deprecated Aliases"; ignored for the same reason.
   x-slo-ttft-ms:
-    epp: ignored
+    router: ignored
   x-slo-tpot-ms:
-    epp: ignored
+    router: ignored
   # Not declared: x-llm-d-model-name-rewrite and its alias; see transport.model_rewrite_header in
   # the header of this file.

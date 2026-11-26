@@ -22,7 +22,7 @@ On `xpu/vllm`, the guide asks you to set the router's `token-producer` `modelNam
 The profiles test the guide's router (the EPP). Give `llmdv` its URL:
 
 ```sh
-export LLMDV_EPP_URL=<your EPP's URL>
+export LLMDV_ROUTER_URL=<your EPP's URL>
 llmdv verify --profile profiles/llm-d/precise-prefix-cache-routing/<profile>.yaml
 ```
 
@@ -77,7 +77,7 @@ To see every case and why one skips: `llmdv plan --profile <profile>` (add `--te
 ## Not covered
 
 - **Configurations llm-d does not test nightly:** SGLang on NVIDIA GPU and Intel XPU (with their render pools), TPU v6e and v7, and CPU, all `community` in `guide.yaml`; gateway mode.
-- **Render surfaces on TPU v5p.** The GPU, AMD and XPU combinations declare vLLM's four render surfaces (`chat_render`, `completions_render`, `messages_render`, `responses_render`) on the `epp` ingress, with `prefix_stability` on `chat_render` and `messages_render`; their engines pass `--enable-scale-out`, which vLLM v0.30 and later require to register the routes (`vllm@v0.31.0:vllm/entrypoints/scale_out/factories.py`, `register_scale_out_api_routers`). The TPU v5p combination declares none, since its engine runs without the flag (see [Where llm-d's own sources disagree](#for-maintainers)). No combination declares `render_pins` yet: an undeclared pin skips, and they are added from the first run.
+- **Render surfaces on TPU v5p.** The GPU, AMD and XPU combinations declare vLLM's four render surfaces (`chat_render`, `completions_render`, `messages_render`, `responses_render`) on the `router` ingress, with `prefix_stability` on `chat_render` and `messages_render`; their engines pass `--enable-scale-out`, which vLLM v0.30 and later require to register the routes (`vllm@v0.31.0:vllm/entrypoints/scale_out/factories.py`, `register_scale_out_api_routers`). The TPU v5p combination declares none, since its engine runs without the flag (see [Where llm-d's own sources disagree](#for-maintainers)). No combination declares `render_pins` yet: an undeclared pin skips, and they are added from the first run.
 - **The guide's per-pod render check, router render metrics, per-pod prefix-cache counters and KV-event indexing**: they need per-pod URLs or cluster access a committed profile does not carry. Without the router render metrics, a router whose renders all fail still answers 200, so a green run does not show that precise routing is on.
 - **Prefix affinity** (`routing.prefix_affinity`, #27) and `cache_reuse`: no overlay passes `--enable-prompt-tokens-details`, so no response carries `cached_tokens`.
 

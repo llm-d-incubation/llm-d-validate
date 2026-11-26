@@ -17,7 +17,7 @@ There is one profile, for the guide's `modelserver/gpu/vllm/gke` overlay (optimi
 The profiles test the guide's router (the EPP). Give `llmdv` its URL:
 
 ```sh
-export LLMDV_EPP_URL=<your EPP's URL>
+export LLMDV_ROUTER_URL=<your EPP's URL>
 llmdv verify --profile profiles/llm-d/async-multitenant/vllm-qwen3-32b-parsers-standalone.yaml
 ```
 
@@ -68,7 +68,7 @@ To see every case and why one skips: `llmdv plan --profile <profile>` (add `--te
 ## Not covered
 
 - **Eviction, holdback, priority and fairness under saturation** (`requires_load`, #23). llm-d's own validation runs an inference-perf experiment with realtime and async traffic at 20/80/90/100 % of the router's capacity; `llmdv` has no load mode. The objective and fairness headers are declared `consumed` in the topology part and skip as `requires_load`.
-- **The coordinator** (`llm-d-coordinator`, port 8080): `x-llm-d-async-mode` (`passthrough`, `wait`, `enqueue`) and `x-llm-d-tenant`. Covering it needs a coordinator ingress in front of the router (gateway position, `fronts: [epp]`, #24), measured surfaces and error statuses, and, for `enqueue`, a submit-and-poll surface `llmdv` does not have.
+- **The coordinator** (`llm-d-coordinator`, port 8080): `x-llm-d-async-mode` (`passthrough`, `wait`, `enqueue`) and `x-llm-d-tenant`. Covering it needs a coordinator ingress in front of the router (gateway position, `fronts: [router]`, #24), measured surfaces and error statuses, and, for `enqueue`, a submit-and-poll surface `llmdv` does not have.
 - **llm-d-async and Redis**: queues, quota gates, tier priority and objective stamping are not HTTP surfaces.
 - **The `GPUS=1` option** (`modelserver/gpu/vllm/single-gpu`, Qwen/Qwen3-8B) **and the Pub/Sub queue backend**: llm-d does not test them nightly, so no profile covers them.
 

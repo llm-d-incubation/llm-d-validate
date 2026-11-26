@@ -18,7 +18,7 @@ Pick the profile for the optimized-baseline model-server overlay you deployed.
 The profiles test the guide's router (the EPP). Give `llmdv` its URL:
 
 ```sh
-export LLMDV_EPP_URL=<your EPP's URL>
+export LLMDV_ROUTER_URL=<your EPP's URL>
 llmdv verify --profile profiles/llm-d/flow-control/<profile>.yaml
 ```
 

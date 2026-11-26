@@ -72,7 +72,7 @@ authenticates nothing, so no key is needed:
 
 ```sh
 export P=profiles/llm-d/optimized-baseline/vllm-qwen3-32b-parsers-standalone.yaml
-export LLMDV_EPP_URL=<your EPP's URL>
+export LLMDV_ROUTER_URL=<your EPP's URL>
 llmdv profile validate $P                 # offline schema and consistency checks
 llmdv plan --profile $P                   # every case verify would run or skip; sends nothing
 llmdv verify --profile $P --full-suite -m contract     # about a minute: the profile against reality

@@ -2,7 +2,7 @@
 # listener):
 # vLLM on TPU v5p serving Qwen/Qwen3-32B at a 4096-token window with no parsers.
 #
-# STATUS: WRITTEN, NOT RUN. llm-d 9ca8ff0.
+# llm-d 9ca8ff0.
 #
 # CI lane that deploys this configuration (llm-d's nightly-e2e-precise-prefix-cache-routing-<lane>
 # workflow; it runs in standalone mode, gateway_class epponly):
@@ -22,7 +22,7 @@
 #
 # How a lane runs it, after deploying the guide in standalone mode (guide.yaml deploy.standalone)
 # with one of the overlays above (GUIDE_NAME=precise-prefix-cache-routing):
-#   export LLMDV_EPP_URL=<the EPP's URL>
+#   export LLMDV_ROUTER_URL=<the EPP's URL>
 #   llmdv profile validate profiles/llm-d/precise-prefix-cache-routing/vllm-qwen3-32b-ctx4k-inline-standalone.yaml
 #   llmdv verify --profile profiles/llm-d/precise-prefix-cache-routing/vllm-qwen3-32b-ctx4k-inline-standalone.yaml \
 #     <the lane's identity flags above>

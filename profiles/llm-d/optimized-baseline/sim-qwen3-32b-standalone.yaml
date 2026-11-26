@@ -13,7 +13,7 @@
 # How a lane runs it: deploy the guide's router in standalone mode, and in place of the
 # model-server overlay two simulator replicas that carry the guide's model-server label, started
 # with --model Qwen/Qwen3-32B --max-model-len=40960 (see the model part). Then:
-#   export LLMDV_EPP_URL=<the EPP's URL>
+#   export LLMDV_ROUTER_URL=<the EPP's URL>
 #   llmdv profile validate profiles/llm-d/optimized-baseline/sim-qwen3-32b-standalone.yaml
 #   llmdv verify --profile profiles/llm-d/optimized-baseline/sim-qwen3-32b-standalone.yaml \
 #     --identity accelerator=kind --identity provider=sim
@@ -31,7 +31,7 @@ ingresses:
   # routes and the EPP passes them through, MEASURED 2026-11-16 on kind (real EPP, simulator
   # engine). Declared here, not in the model part, because surfaces are keyed by ingress id and
   # only this file knows the topology.
-  - id: epp
+  - id: router
     surfaces: [chat_completions, completions, messages, responses, chat_render, completions_render, messages_render, responses_render]
 
 capabilities:

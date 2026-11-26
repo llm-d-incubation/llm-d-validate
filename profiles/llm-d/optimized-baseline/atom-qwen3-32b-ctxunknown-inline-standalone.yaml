@@ -1,7 +1,7 @@
 # The optimized-baseline guide in standalone mode (the client reaches the EPP's own listener):
 # Atom serving Qwen/Qwen3-32B with no parsers, at a window no source states.
 #
-# STATUS: WRITTEN, NOT RUN against this engine. Composed from the guide's shipped config at
+# Composed from the guide's shipped config at
 # llm-d 9ca8ff0 and the API references. Only the router layer has been measured (on kind,
 # with a simulator engine; see ../parts/topology/standalone.yaml).
 #
@@ -12,7 +12,7 @@
 #
 # How a lane runs it, after deploying the guide in standalone mode (guide.yaml deploy.standalone)
 # with one of the overlays above:
-#   export LLMDV_EPP_URL=<the EPP's URL>
+#   export LLMDV_ROUTER_URL=<the EPP's URL>
 #   llmdv profile validate profiles/llm-d/optimized-baseline/atom-qwen3-32b-ctxunknown-inline-standalone.yaml
 #   llmdv verify --profile profiles/llm-d/optimized-baseline/atom-qwen3-32b-ctxunknown-inline-standalone.yaml \
 #     --identity accelerator=<ACCELERATOR_TYPE> --identity provider=<INFRA_PROVIDER>

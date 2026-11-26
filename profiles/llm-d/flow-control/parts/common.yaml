@@ -89,7 +89,7 @@ headers:
   # first byte; without flow control it is absent. Its presence on a success is the one thing a
   # client sees of the gate. Keyed by the topology part's ingress id.
   x-llm-d-flow-queue-duration-ms:
-    epp: promised
+    router: promised
 
 # The cases this guide's lanes run by default (`llmdv verify --full-suite` runs everything). They test
 # what a lane's own deployment can get wrong: the router path, the overlay's parsers and window,

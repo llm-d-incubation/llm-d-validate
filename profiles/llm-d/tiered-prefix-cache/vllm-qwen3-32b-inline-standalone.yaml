@@ -3,7 +3,7 @@
 # vLLM serving Qwen/Qwen3-32B with no parsers: inline <think>, no tool calls, offloading KV
 # cache to CPU RAM (and on some lanes a shared filesystem).
 #
-# STATUS: WRITTEN, NOT RUN. llm-d 9ca8ff0.
+# llm-d 9ca8ff0.
 #
 # CI lanes that deploy this configuration (llm-d's nightly-e2e-tiered-prefix-cache-<lane>
 # workflows; each runs in standalone mode, gateway_class epponly):
@@ -29,7 +29,7 @@
 #
 # How a lane runs it, after deploying the guide in standalone mode (guide.yaml deploy.standalone)
 # with one of the overlays above (GUIDE_NAME=tiered-prefix-cache):
-#   export LLMDV_EPP_URL=<the EPP's URL>
+#   export LLMDV_ROUTER_URL=<the EPP's URL>
 #   llmdv profile validate profiles/llm-d/tiered-prefix-cache/vllm-qwen3-32b-inline-standalone.yaml
 #   llmdv verify --profile profiles/llm-d/tiered-prefix-cache/vllm-qwen3-32b-inline-standalone.yaml \
 #     <the lane's identity flags above>

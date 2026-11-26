@@ -2,7 +2,7 @@
 # listener):
 # vLLM serving Qwen/Qwen3-0.6B with no parsers (an Intel XPU vLLM build).
 #
-# STATUS: WRITTEN, NOT RUN. llm-d 9ca8ff0.
+# llm-d 9ca8ff0.
 #
 # CI lane that deploys this configuration (llm-d's nightly-e2e-precise-prefix-cache-routing-<lane>
 # workflow; it runs in standalone mode, gateway_class epponly):
@@ -20,7 +20,7 @@
 #
 # How a lane runs it, after deploying the guide in standalone mode (guide.yaml deploy.standalone)
 # with one of the overlays above (GUIDE_NAME=precise-prefix-cache-routing):
-#   export LLMDV_EPP_URL=<the EPP's URL>
+#   export LLMDV_ROUTER_URL=<the EPP's URL>
 #   llmdv profile validate profiles/llm-d/precise-prefix-cache-routing/vllm-qwen3-0.6b-inline-standalone.yaml
 #   llmdv verify --profile profiles/llm-d/precise-prefix-cache-routing/vllm-qwen3-0.6b-inline-standalone.yaml \
 #     <the lane's identity flags above>
@@ -46,7 +46,7 @@ ingresses:
   # /v1/responses/render through; it does not re-tokenize a client's render call (the
   # token-producer returns early for one) and routes it by model to one pod. Declared here, not
   # in parts/common.yaml, because the TPU v5p lane's engine runs without the flag.
-  - id: epp
+  - id: router
     surfaces: [chat_completions, completions, messages, responses, chat_render, completions_render, messages_render, responses_render]
 
 capabilities:

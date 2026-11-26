@@ -2,7 +2,7 @@
 # deepseek-ai/DeepSeek-R1-0528, P/D disaggregated across wide DP/EP groups, with the deepseek_v3
 # tool parser and no reasoning parser: inline <think> reasoning, parsed tool calls.
 #
-# STATUS: WRITTEN, NOT RUN. llm-d 9ca8ff0. Composed from the guide's shipped config and the API
+# llm-d 9ca8ff0. Composed from the guide's shipped config and the API
 # references. Only the router layer has been measured (on kind, with a simulator engine; see
 # ../parts/topology/standalone.yaml).
 #
@@ -18,7 +18,7 @@
 #
 # How a lane runs it, after deploying the guide in standalone mode (guide.yaml deploy.standalone)
 # with one of the overlays above:
-#   export LLMDV_EPP_URL=<the EPP's URL>
+#   export LLMDV_ROUTER_URL=<the EPP's URL>
 #   llmdv profile validate profiles/llm-d/wide-ep/vllm-deepseek-r1-0528-tools-standalone.yaml
 #   llmdv verify --profile profiles/llm-d/wide-ep/vllm-deepseek-r1-0528-tools-standalone.yaml \
 #     --identity accelerator=gpu --identity provider=<gke|coreweave|ocp>

@@ -112,7 +112,7 @@ Installed. Next:
   llmdv profile validate profiles/examples/example-two-ingress.yaml
 
   # an llm-d guide: give llmdv the EPP's URL and run the guide's combination
-  export LLMDV_EPP_URL=<your EPP's URL>
+  export LLMDV_ROUTER_URL=<your EPP's URL>
   llmdv verify --profile profiles/llm-d/<guide>/<combination>.yaml --identity accelerator=<a> --identity provider=<p>
 
   # your own stack: copy an example, fill in the placeholders, then
