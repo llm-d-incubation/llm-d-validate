@@ -394,7 +394,7 @@ A statistical case sends n requests, all declared before the first, never stoppi
 
 The rule kinds:
 
-- **`count`** holds when `min` <= the samples equal to the most common one <= `max`. All equal is `min: n`, k of n is `min: k`, all distinct is `max: 1`.
+- **`count`** holds when `min` <= the samples equal to the most common one, or to the value the case names, <= `max`. All equal is `min: n`, k of n is `min: k`, all distinct is `max: 1`.
 - **`ratio`** holds when `min` <= median(a) / median(b) <= `max`. A zero median below the line fails.
 - **`order`** holds when the first group's median is below the last's, and no lower group's median exceeds a higher one's by more than `slack`.
 
@@ -415,6 +415,7 @@ The statistical cases, their check and their defaults:
 - **`openai_completions.streaming_matches_json`**: `greedy_repeat`, `count` with n 2, min 2. A measurement unless `deterministic_repeats` is declared; without it, repeats that disagree skip the stream comparison as `undeclared`. With it, the stream is held to the most common answer, or to any of several equally common ones.
 - **`openai_chat.fresh_generation`**: `fresh_generation`, `count` with n 2, max 1, over the texts; the ids are checked as `fresh_ids`.
 - **`openai_chat.reasoning_effort_order`**: `effort_order`, `order` with n 3 per declared effort, slack 1.25.
+- **`tools.offered_names`**: `offered_names`, `count` with n 6, min 6, of the turns whose calls all name an offered tool, once per variant (`json`, `sse`). Every turn is sent before any is judged; each turn's ids, arguments and finish reason are then checked as in any tool turn.
 
 ```yaml
 capabilities:

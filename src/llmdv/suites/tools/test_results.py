@@ -27,6 +27,7 @@ from .common import (
     check_call_turn,
     fresh,
     post_tools,
+    require_auto,
     served_or_refused,
     tool_budget,
     wire,
@@ -377,6 +378,8 @@ def test_result_tool_reference(client, surface, model, ingress):
     so the same turn with the reference must render more input than with an empty result.
     """
     _require_tool_reference(ingress)
+    # The request leaves the choice to the model, which must pick the found tool itself.
+    require_auto(model, ingress)
     tools, sizes = [TOOL_SEARCH, WEATHER], {}
     identity = call_id()
     search = PriorCall(identity, "tool_search", {"query": "weather"})
@@ -420,6 +423,8 @@ def test_deferred_tool_call(client, surface, model, ingress):
     cannot call. `tools.result_tool_reference` offers its tool up front, so it cannot see this.
     """
     _require_tool_reference(ingress)
+    # The request leaves the choice to the model, which must pick the found tool itself.
+    require_auto(model, ingress)
     tools = [TOOL_SEARCH, DEFERRED_WEATHER]
     identity = call_id()
     search = PriorCall(identity, "tool_search", {"query": "weather"})

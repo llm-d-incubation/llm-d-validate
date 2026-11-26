@@ -3,20 +3,21 @@ fails on the defect it exists to catch."""
 
 from __future__ import annotations
 
+import json
+
 import pytest
 import yaml
 
 from llmdv.suites.tools.test_streaming import CODE
-from tests.fakes import FakeFleet
+from tests.fakes import FakeFleet, run_llmdv
 from tests.test_suites_against_fake import run_suites, write_profile
 
 ALL = ("chat_completions", "messages", "responses")
 
 
-def run_case(
+def tool_profile(
     tmp_path,
-    test,
-    defect=None,
+    fleet,
     *,
     auto=True,
     markup=("<tool_call>",),
@@ -24,34 +25,50 @@ def run_case(
     images=True,
     structured=False,
     strict_level=None,
-    warm_cache=False,
     features=None,
+    samples=None,
 ):
-    """Run one tools-suite test function on every tool surface; outcome per surface."""
+    """A profile pointing every tool surface at `fleet`, with the tool declarations given."""
+    path = write_profile(tmp_path, fleet)
+    raw = yaml.safe_load(path.read_text())
+    raw["ingresses"][0]["surfaces"] = list(ALL)
+    raw["ingresses"][0]["error_status"].update(errors or {})
+    raw["capabilities"]["vision"] = images
+    if structured:
+        raw["capabilities"]["structured_output"] = list(ALL)
+    raw["model"]["tools"] = {
+        "parser": "example-parser",
+        "auto_choice": auto,
+        "markup": list(markup),
+    }
+    if strict_level:
+        raw["model"]["tools"]["strict_level"] = strict_level
+    if features is not None:
+        raw["capabilities"]["messages_features"] = features
+    if samples is not None:
+        raw["capabilities"]["samples"] = samples
+    path.write_text(yaml.safe_dump(raw))
+    return path
+
+
+def run_records(tmp_path, test, defect=None, *, warm_cache=False, **declared):
+    """Run one tools-suite test function on every tool surface; the exit code, every record and
+    the requests the fleet saw."""
     with FakeFleet(
         tool_engine=True,
         tool_engine_defect=defect,
         tool_engine_warm_cache=warm_cache,
         transport={"multimodal": True},
     ) as fleet:
-        path = write_profile(tmp_path, fleet)
-        raw = yaml.safe_load(path.read_text())
-        raw["ingresses"][0]["surfaces"] = list(ALL)
-        raw["ingresses"][0]["error_status"].update(errors or {})
-        raw["capabilities"]["vision"] = images
-        if structured:
-            raw["capabilities"]["structured_output"] = list(ALL)
-        raw["model"]["tools"] = {
-            "parser": "example-parser",
-            "auto_choice": auto,
-            "markup": list(markup),
-        }
-        if strict_level:
-            raw["model"]["tools"]["strict_level"] = strict_level
-        if features is not None:
-            raw["capabilities"]["messages_features"] = features
-        path.write_text(yaml.safe_dump(raw))
+        path = tool_profile(tmp_path, fleet, **declared)
         code, records = run_suites(path, tmp_path / "run", "-k", test)
+        posts = [seen for seen in fleet.seen if seen[0] == "POST"]
+    return code, records, posts
+
+
+def run_case(tmp_path, test, defect=None, **kw):
+    """Run one tools-suite test function on every tool surface; outcome per surface."""
+    code, records, _ = run_records(tmp_path, test, defect, **kw)
     rows = {r["surface"]: r for r in records if r.get("surface") in ALL}
     assert rows, records
     return code, {surface: row["outcome"] for surface, row in rows.items()}, rows
@@ -314,7 +331,7 @@ def test_reading_a_result_image_is_skipped_where_images_are_undeclared(tmp_path)
         ("test_name_outside_spec", "renames_dotted", ALL, "tool_call_names"),
         ("test_offered_names", None, (), None),
         # Bash.command, Read.file_path: a name the client never offered.
-        ("test_offered_names", "suffixes_names", ALL, "tool_call_name"),
+        ("test_offered_names", "suffixes_names", ALL, "offered_names"),
         ("test_long_description", None, (), None),
         ("test_long_description", "truncates_description", ALL, "description_tail_used"),
         ("test_duplicate_names", None, (), None),
@@ -482,6 +499,85 @@ def test_deferred_tool_call_case(tmp_path, defect, features, expected, check):
     assert got == {"messages": expected}
     if check:
         assert failed_check(rows, "messages") == check
+
+
+@pytest.mark.parametrize("test", ["test_result_tool_reference", "test_deferred_tool_call"])
+def test_tool_search_cases_skip_without_automatic_choice(tmp_path, test):
+    """The reference is accepted, but the model is never left to choose a tool: no request."""
+    code, records, posts = run_records(
+        tmp_path, test, auto=False, features={"tool_reference": "accepted"}
+    )
+    rows = [r for r in records if r.get("surface") in ALL]
+    assert [(r["surface"], r["outcome"], r["skip_class"]) for r in rows] == [
+        ("messages", "skip", "undeclared")
+    ]
+    assert "automatic tool choice" in rows[0]["reason"]
+    assert posts == []
+    assert code == 0
+
+
+OFFERED = {"Bash", "Read", "Glob", "Grep", "Edit"}
+
+
+def _offered_names_checks(records):
+    """The offered_names check of every tools.offered_names row, by surface and variant."""
+    return {
+        (r["surface"], r["variant"]): next(c for c in r["checks"] if c["name"] == "offered_names")
+        for r in records
+        if r.get("case_id") == "tools.offered_names"
+    }
+
+
+def test_offered_names_draws_six_samples_by_default_and_judges_them_all(tmp_path):
+    code, records, posts = run_records(tmp_path, "test_offered_names")
+    checks = _offered_names_checks(records)
+    assert len(checks) == 2 * len(ALL)
+    for check in checks.values():
+        assert check["ok"] is True
+        assert check["rule"] == {"kind": "count", "n": 6, "target": True, "min": 6, "max": 6}
+        assert [s["value"] for s in check["samples"]] == [True] * 6
+    assert len(posts) == 6 * 2 * len(ALL)
+    assert code == 0
+
+
+def test_a_misnamed_call_is_a_failed_statistical_verdict_over_every_sample(tmp_path):
+    """Every turn is drawn before any is judged, so all six misnamed turns are on record."""
+    code, records, _ = run_records(tmp_path, "test_offered_names", "suffixes_names")
+    checks = _offered_names_checks(records)
+    assert len(checks) == 2 * len(ALL)
+    for check in checks.values():
+        assert check["ok"] is False
+        assert check["observed"]["count"] == 0 and check["observed"]["holds"] is False
+        assert [s["value"] for s in check["samples"]] == [False] * 6
+        # Each sample points at its own request and shows the name that was not offered.
+        assert len({s["exchange"] for s in check["samples"]}) == 6
+        assert all("." in s["preview"] for s in check["samples"])
+    assert code == 1
+
+
+def test_a_profile_sets_the_offered_names_sample_count(tmp_path):
+    samples = {"tools.offered_names": {"n": 12, "min": 12}}
+    with FakeFleet(tool_engine=True) as fleet:
+        path = tool_profile(tmp_path, fleet, samples=samples)
+        raw = yaml.safe_load(path.read_text())
+        # Plan validates the whole profile: no client may need a surface left off the ingress.
+        raw["clients"] = [c for c in raw["clients"] if set(c["surfaces"]) <= set(ALL)]
+        path.write_text(yaml.safe_dump(raw))
+        plan = run_llmdv("plan", "--profile", str(path), "--full-suite", "--json")
+        assert not [seen for seen in fleet.seen if seen[0] == "POST"]
+    assert plan.returncode == 0, plan.stderr
+    rows = [r for r in json.loads(plan.stdout)["cases"] if r["case_id"] == "tools.offered_names"]
+    assert rows and {r["samples"] for r in rows} == {12}
+
+    code, records, posts = run_records(tmp_path, "test_offered_names", samples=samples)
+    checks = _offered_names_checks(records)
+    assert len(checks) == 2 * len(ALL)
+    for check in checks.values():
+        assert check["ok"] is True and check["rule"]["n"] == 12
+        assert len(check["samples"]) == 12
+        assert check["expected"].endswith("(set by the profile)")
+    assert len(posts) == 12 * 2 * len(ALL)
+    assert code == 0
 
 
 def test_max_tool_calls_allows_multiple_function_calls(tmp_path):

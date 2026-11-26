@@ -10,10 +10,11 @@ import json
 
 import pytest
 
+from ...assertions.samples import draw, judge, sample
 from ...assertions.tool_calls import call_arguments
 from ...evidence import journal
 from ...surfaces.tool_wire import ToolChoice, ToolDef
-from ..conftest import check_completion
+from ..conftest import check_completion, last_seq
 from .common import (
     ASK_WEATHER,
     TIME,
@@ -461,25 +462,27 @@ AGENT_TASKS = (
     "Find where the function parse_config is defined with your tools and open that file.",
     "Run the test suite with pytest using your tools and show the last lines of its output.",
 )
+
+
 # Independent sampled turns, no retry: a model that misnames a tool now and then shows in some
-# turns only, so a clean case means none in this many, not that it cannot happen.
-OFFERED_NAME_SAMPLES = 6
-
-
+# turns only, so a clean case means none in this many, not that it cannot happen. Every turn's
+# names are collected before any is judged, so a profile can raise n to chase an intermittent one.
+@pytest.mark.samples("count", n=6, min=6, target=True)
 @pytest.mark.parametrize("stream", [False, True], ids=["json", "sse"])
 @pytest.mark.case_id("tools.offered_names")
-def test_offered_names(client, surface, model, ingress, stream):
+def test_offered_names(client, surface, model, ingress, stream, samples):
     """In coding-agent turns with an agent's tools, every call names an offered tool exactly.
 
     A model that names a parameter after the tool (`Bash.command`, `Read.file_path`, `Glob.`)
     makes the client answer "No such tool available", and an agent often gives up after a few.
     """
     require_auto(model, ingress)
-    choice, named = ToolChoice("auto"), []
-    for sample in range(OFFERED_NAME_SAMPLES):
+    choice, offered, drawn = ToolChoice("auto"), {tool.name for tool in AGENT_TOOLS}, []
+
+    def take(_group):
         body = wire(surface).request(
             model.public_id,
-            AGENT_TASKS[sample % len(AGENT_TASKS)],
+            AGENT_TASKS[len(drawn) % len(AGENT_TASKS)],
             list(AGENT_TOOLS),
             choice,
             tool_budget(model),
@@ -487,14 +490,20 @@ def test_offered_names(client, surface, model, ingress, stream):
             stream=stream,
             sampled=True,
         )
-        journal.record("sample", sample)
         completion = (stream_tools if stream else post_tools)(client, surface, ingress, body)
-        # assert_calls fails tool_call_name on a name that was not offered, naming it.
-        calls = check_call_turn(completion, surface, model, AGENT_TOOLS, choice)
-        named += [call.name for call, _ in calls]
-    journal.record(
-        "offered_names", sorted(set(named)), "every call names an offered tool exactly", ok=True
+        drawn.append(completion)
+        names = [call.name for call in completion.tool_calls]
+        return sample(all(name in offered for name in names), last_seq(client), preview=names)
+
+    judge(
+        "offered_names",
+        samples,
+        draw(samples, take),
+        f"every call in all {samples.n} turns names one of {sorted(offered)}",
     )
+    # The rest of each turn's contract: a call at all, its ids, arguments and finish reason.
+    for completion in drawn:
+        check_call_turn(completion, surface, model, AGENT_TOOLS, choice)
 
 
 @pytest.mark.case_id("tools.long_description")
