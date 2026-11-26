@@ -92,3 +92,30 @@ def test_each_profile_exists_loads_and_reads_the_router_url(profile, monkeypatch
     assert routers and routers[0].base_url_env == "LLMDV_ROUTER_URL", (
         f"{profile}: smoke-step.sh sets LLMDV_ROUTER_URL for a `router` ingress"
     )
+
+
+# These are only public deployment selectors, extracted from workflow `with` inputs at the
+# fixture's upstream commit. Do not copy namespace, credentials or runner-specific settings.
+# Refresh alongside upstream workflow changes; unlike the README checks, this detects a map
+# key typo even when the profile, lane name and identity flags are all correct.
+def test_map_keys_match_upstream_workflow_inputs():
+    import json
+
+    fixture = json.loads((ROOT / "tests/fixtures/llmd_nightly_inputs.json").read_text())
+    for lane, inputs in fixture["workflows"].items():
+        scenario = inputs["standup_scenario"]
+        overlay = "/".join(
+            segment
+            for key in (
+                "accelerator_type",
+                "backend_type",
+                "connector",
+                "offloading_target",
+                "infra_provider",
+            )
+            for segment in inputs[key].split("/")
+            if segment
+        )
+        row = _map()["lanes"].get(scenario, {}).get(overlay)
+        assert row is not None, f"{lane}: upstream inputs select missing {scenario}/{overlay}"
+        assert row["lane"] == lane, f"{scenario}/{overlay} selects a different workflow"

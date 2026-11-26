@@ -79,3 +79,8 @@ The guide profiles are built from llm-d at one commit, which `profiles/llm-d/REA
 - Changing a profile from `guide.yaml` or a README alone, without the workflow and its rendered overlay.
 - Rendering with `kubectl apply`, `--dry-run=server`, or anything else that talks to a cluster.
 - Dropping a workflow listed under "Not covered" to make the report empty.
+
+When changing a mapped workflow's input defaults, refresh the representative public-input
+fixtures in `tests/fixtures/llmd_nightly_inputs.json` when that workflow is covered there.
+Record the upstream commit in that fixture; never copy namespaces, credentials, or runner
+settings. The map test checks those inputs independently of the README tables.
