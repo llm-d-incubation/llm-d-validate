@@ -2,17 +2,39 @@
 
 Profiles for testing a deployment of llm-d's [wide-ep](https://github.com/llm-d/llm-d/tree/main/guides/wide-ep) guide, in which models are served with wide expert parallelism and prefill/decode (P/D) disaggregation.
 
-[Pick your profile](#pick-your-profile) · [Run it](#run-it) · [What it tests](#what-it-tests) · [What `llmdv verify` selects](#what-llmdv-verify-selects) · [Not covered](#not-covered) · [For maintainers](#for-maintainers)
+[What it tests](#what-it-tests) · [Pick your profile](#pick-your-profile) · [Run it](#run-it) · [What `llmdv verify` selects](#what-llmdv-verify-selects) · [Not covered](#not-covered) · [For maintainers](#for-maintainers)
+
+## What it tests
+
+**Validation focus: api integrity through the expert-parallel serving path.** Check choices, streamed usage, errors and cancellation because the P/D sidecar can rewrite these exchanges. On XPU the same checks exercise the aggregated path.
+
+**What a pass establishes:** the selected checks held for the declared APIs and reachable
+ingress during this run. **Coverage boundary:** Expert placement and disaggregation internals need evidence beyond API responses.
+
+These focused defaults are a starting point for validating a production deployment. Add coverage
+for the APIs, clients and operating conditions you rely on; see
+[Growing coverage toward production](../../../docs/getting-started.md#widen-coverage).
+
+<details>
+<summary>Why these checks relate to the guide</summary>
+
+What the P/D routing sidecar changes, on top of the base tests every guide gets (each API, error handling, the parsers and the context window). On gpu and amd every request goes through the decode pod's sidecar, which runs the prefill leg remotely with some of the client's fields removed, rewrites streamed usage frames and writes some 400s of its own, so the profiles check that `n` still returns n choices, that streamed usage still parses, that its errors keep the API's error shape, and that a burst of cancelled streams leaves the path serving. The router differs by accelerator (always-disaggregate on gpu and amd, one aggregated profile on xpu; see [`parts/common.yaml`](parts/common.yaml)), but not in anything a client sees: the listener, APIs and header handling are the ones `../parts/topology/standalone.yaml` declares. On xpu, which has no sidecar, these cases run as plain conformance.
+
+The declaration rationale and claim-to-case mapping live in
+[`parts/common.yaml`](parts/common.yaml). [Not covered](#not-covered) explains the remaining
+access, instrumentation and load requirements.
+
+</details>
 
 ## Pick your profile
 
 Pick the profile for the overlay you deployed (under `guides/wide-ep/modelserver/`). The three NVIDIA provider overlays render identical vLLM arguments, so they share a profile.
 
-| Profile | Model a client sees | Overlays |
+| Model a client sees | Overlays | Profile |
 | --- | --- | --- |
-| `vllm-deepseek-r1-0528-tools-standalone` | DeepSeek-R1-0528 on vLLM, with a tool-call parser, reasoning inline | `gpu/vllm/gke`, `gpu/vllm/coreweave`, `gpu/vllm/ocp` |
-| `vllm-deepseek-v3-ctx36k-inline-standalone` | DeepSeek-V3 on vLLM, 36k window, no parsers | `amd/vllm/amd-ci` |
-| `vllm-deepseek-v2-lite-chat-ctx2k-inline-standalone` | DeepSeek-V2-Lite-Chat on vLLM, 2k window, no parsers, aggregated (no P/D) | `xpu/vllm/xpu-ci` |
+| DeepSeek-R1-0528 on vLLM, with a tool-call parser, reasoning inline | `gpu/vllm/gke`, `gpu/vllm/coreweave`, `gpu/vllm/ocp` | [vllm-deepseek-r1-0528-tools-standalone](vllm-deepseek-r1-0528-tools-standalone.yaml) |
+| DeepSeek-V3 on vLLM, 36k window, no parsers | `amd/vllm/amd-ci` | [vllm-deepseek-v3-ctx36k-inline-standalone](vllm-deepseek-v3-ctx36k-inline-standalone.yaml) |
+| DeepSeek-V2-Lite-Chat on vLLM, 2k window, no parsers, aggregated (no P/D) | `xpu/vllm/xpu-ci` | [vllm-deepseek-v2-lite-chat-ctx2k-inline-standalone](vllm-deepseek-v2-lite-chat-ctx2k-inline-standalone.yaml) |
 
 <details>
 <summary>What each overlay serves</summary>
@@ -34,11 +56,8 @@ export LLMDV_ROUTER_URL=<your EPP's URL>
 llmdv verify --profile profiles/llm-d/wide-ep/<profile>.yaml
 ```
 
-To test a gateway or the engine as well, [add it as another ingress](../../README.md#include-a-gateway-or-engine). `--identity` flags are optional: they label a run so `llmdv compare` never compares two configurations, for example `--identity accelerator=gpu --identity provider=gke`, read off your overlay path.
+To test a gateway or the engine as well, [add it as another ingress](../../README.md#include-a-gateway-or-engine). `--identity` flags are optional for verification. Set them when comparing deployments that share a profile, so their recorded configuration dimensions remain distinct; for example `--identity accelerator=gpu --identity provider=gke`, read off your overlay path.
 
-## What it tests
-
-What the P/D routing sidecar changes, on top of the base tests every guide gets (each API, error handling, the parsers and the context window). On gpu and amd every request goes through the decode pod's sidecar, which runs the prefill leg remotely with some of the client's fields removed, rewrites streamed usage frames and writes some 400s of its own, so the profiles check that `n` still returns n choices, that streamed usage still parses, that its errors keep the API's error shape, and that a burst of cancelled streams leaves the path serving. The router differs by accelerator (always-disaggregate on gpu and amd, one aggregated profile on xpu; see [`parts/common.yaml`](parts/common.yaml)), but not in anything a client sees: the listener, APIs and header handling are the ones `../parts/topology/standalone.yaml` declares. On xpu, which has no sidecar, these cases run as plain conformance.
 
 ## What `llmdv verify` selects
 

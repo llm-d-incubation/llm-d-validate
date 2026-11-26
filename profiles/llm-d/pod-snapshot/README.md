@@ -2,16 +2,38 @@
 
 Profiles for testing a deployment of llm-d's [pod-snapshot](https://github.com/llm-d/llm-d/tree/main/guides/pod-snapshot) guide, in which one replica cold starts and is checkpointed, and a second replica is restored from that snapshot instead of cold starting.
 
-[Pick your profile](#pick-your-profile) · [Run it](#run-it) · [What it tests](#what-it-tests) · [What `llmdv verify` selects](#what-llmdv-verify-selects) · [Not covered](#not-covered) · [For maintainers](#for-maintainers)
+[What it tests](#what-it-tests) · [Pick your profile](#pick-your-profile) · [Run it](#run-it) · [What `llmdv verify` selects](#what-llmdv-verify-selects) · [Not covered](#not-covered) · [For maintainers](#for-maintainers)
+
+## What it tests
+
+**Validation focus: serving correctness with restored replicas in the pool.** Exercise the API contract after restore to detect user-visible regressions in the deployed pool.
+
+**What a pass establishes:** the selected checks held for the declared APIs and reachable
+ingress during this run. **Coverage boundary:** Responses do not identify whether a cold-started or restored replica answered; snapshot creation and restore need cluster evidence.
+
+These focused defaults are a starting point for validating a production deployment. Add coverage
+for the APIs, clients and operating conditions you rely on; see
+[Growing coverage toward production](../../../docs/getting-started.md#widen-coverage).
+
+<details>
+<summary>Why these checks relate to the guide</summary>
+
+Nothing beyond the base tests every guide gets (each API, error handling and the context window): snapshot and restore are cluster state a client cannot see. With both replicas Ready behind the router, the run reaches a cold-started and a restored replica alike, so it checks that the stack serves correctly after a restore, though no response says which replica answered: see [Not covered](#not-covered).
+
+The declaration rationale and claim-to-case mapping live in
+[`parts/common.yaml`](parts/common.yaml). [Not covered](#not-covered) explains the remaining
+access, instrumentation and load requirements.
+
+</details>
 
 ## Pick your profile
 
 Pick the profile for the engine you deployed (`MODEL_SERVER`, under `guides/pod-snapshot/modelserver/`). The guide runs on GKE only.
 
-| Profile | Model a client sees | Overlays |
+| Model a client sees | Overlays | Profile |
 | --- | --- | --- |
-| `vllm-qwen3-32b-ctx8k-inline-standalone` | Qwen3-32B on vLLM, 8k window, reasoning inline, no tool parser | `gpu/vllm/gke` |
-| `sglang-qwen3-32b-ctx8k-inline-standalone` | Qwen3-32B on SGLang, 8k window, reasoning inline, no tool parser | `gpu/sglang/gke` |
+| Qwen3-32B on vLLM, 8k window, reasoning inline, no tool parser | `gpu/vllm/gke` | [vllm-qwen3-32b-ctx8k-inline-standalone](vllm-qwen3-32b-ctx8k-inline-standalone.yaml) |
+| Qwen3-32B on SGLang, 8k window, reasoning inline, no tool parser | `gpu/sglang/gke` | [sglang-qwen3-32b-ctx8k-inline-standalone](sglang-qwen3-32b-ctx8k-inline-standalone.yaml) |
 
 ## Run it
 
@@ -22,11 +44,8 @@ export LLMDV_ROUTER_URL=<your EPP's URL>
 llmdv verify --profile profiles/llm-d/pod-snapshot/<profile>.yaml
 ```
 
-Run it once both replicas are Ready, so the run's requests reach the cold-started one and the restored one. To test a gateway or the engine as well, [add it as another ingress](../../README.md#include-a-gateway-or-engine). `--identity` flags are optional: they label a run so `llmdv compare` never compares two configurations, for example `--identity accelerator=gpu --identity provider=gke`, read off your overlay path.
+Run it once both replicas are Ready, so the run's requests reach the cold-started one and the restored one. To test a gateway or the engine as well, [add it as another ingress](../../README.md#include-a-gateway-or-engine). `--identity` flags are optional for verification. Set them when comparing deployments that share a profile, so their recorded configuration dimensions remain distinct; for example `--identity accelerator=gpu --identity provider=gke`, read off your overlay path.
 
-## What it tests
-
-Nothing beyond the base tests every guide gets (each API, error handling and the context window): snapshot and restore are cluster state a client cannot see. With both replicas Ready behind the router, the run reaches a cold-started and a restored replica alike, so it checks that the stack serves correctly after a restore, though no response says which replica answered: see [Not covered](#not-covered).
 
 ## What `llmdv verify` selects
 

@@ -2,18 +2,40 @@
 
 Profiles for testing a deployment of llm-d's [precise-prefix-cache-routing](https://github.com/llm-d/llm-d/tree/main/guides/precise-prefix-cache-routing) guide, in which the router tokenizes every prompt by calling vLLM's render routes on the pool's own pods, looks the token blocks up in an index fed by each engine's KV-cache events, and routes to the pod that holds the prefix.
 
-[Pick your profile](#pick-your-profile) · [Run it](#run-it) · [What it tests](#what-it-tests) · [What `llmdv verify` selects](#what-llmdv-verify-selects) · [Not covered](#not-covered) · [For maintainers](#for-maintainers)
+[What it tests](#what-it-tests) · [Pick your profile](#pick-your-profile) · [Run it](#run-it) · [What `llmdv verify` selects](#what-llmdv-verify-selects) · [Not covered](#not-covered) · [For maintainers](#for-maintainers)
+
+## What it tests
+
+**Validation focus: rendering and token contracts used by precise routing.** Check declared render routes, token accounting and prompt pins because the router’s cache lookup depends on tokenized input.
+
+**What a pass establishes:** the selected checks held for the declared APIs and reachable
+ingress during this run. **Coverage boundary:** Router render success, KV-event indexing and per-pod affinity require additional instrumentation.
+
+These focused defaults are a starting point for validating a production deployment. Add coverage
+for the APIs, clients and operating conditions you rely on; see
+[Growing coverage toward production](../../../docs/getting-started.md#widen-coverage).
+
+<details>
+<summary>Why these checks relate to the guide</summary>
+
+The router's rendering, on top of the base tests every guide gets (each API, error handling, the parsers and the context window). Because the router tokenizes every prompt through the engine, the profiles check that Messages and Responses token counts agree with the engine's usage, that a fixed conversation keeps its size in input tokens (`evolution.prompt_pin`), and, on every overlay except TPU v5p, vLLM's four render routes. Every overlay passes `--block-size=64` and `--kv-events-config` and loads no KV connector. A green run does not show that precise routing is on, because a router whose renders all fail still answers 200: see [Not covered](#not-covered).
+
+The declaration rationale and claim-to-case mapping live in
+[`parts/common.yaml`](parts/common.yaml). [Not covered](#not-covered) explains the remaining
+access, instrumentation and load requirements.
+
+</details>
 
 ## Pick your profile
 
 Pick the profile for the overlay you deployed (under `guides/precise-prefix-cache-routing/modelserver/`). The NVIDIA providers (`base`, `gke`, `ocp`) don't change what a client sees, so they share a profile.
 
-| Profile | Model a client sees | Overlays |
+| Model a client sees | Overlays | Profile |
 | --- | --- | --- |
-| `vllm-qwen3-32b-parsers-standalone` | Qwen3-32B on vLLM, with reasoning and tool-call parsers | `gpu/vllm/base`, `gpu/vllm/gke`, `gpu/vllm/ocp` |
-| `vllm-qwen3-32b-inline-standalone` | Qwen3-32B on vLLM, reasoning inline, no tool parser | `amd/vllm` |
-| `vllm-qwen3-32b-ctx4k-inline-standalone` | Qwen3-32B on vLLM, 4k window, reasoning inline, no tool parser | `tpu/v5p/vllm` |
-| `vllm-qwen3-0.6b-inline-standalone` | Qwen3-0.6B on vLLM, reasoning inline, no tool parser | `xpu/vllm` |
+| Qwen3-32B on vLLM, with reasoning and tool-call parsers | `gpu/vllm/base`, `gpu/vllm/gke`, `gpu/vllm/ocp` | [vllm-qwen3-32b-parsers-standalone](vllm-qwen3-32b-parsers-standalone.yaml) |
+| Qwen3-32B on vLLM, reasoning inline, no tool parser | `amd/vllm` | [vllm-qwen3-32b-inline-standalone](vllm-qwen3-32b-inline-standalone.yaml) |
+| Qwen3-32B on vLLM, 4k window, reasoning inline, no tool parser | `tpu/v5p/vllm` | [vllm-qwen3-32b-ctx4k-inline-standalone](vllm-qwen3-32b-ctx4k-inline-standalone.yaml) |
+| Qwen3-0.6B on vLLM, reasoning inline, no tool parser | `xpu/vllm` | [vllm-qwen3-0.6b-inline-standalone](vllm-qwen3-0.6b-inline-standalone.yaml) |
 
 On `xpu/vllm`, the guide asks you to set the router's `token-producer` `modelName` to the served model by hand; left at `Qwen/Qwen3-32B`, every render the router makes is refused. On `tpu/v5p/vllm`, the engine runs without `--enable-scale-out`, so its render routes answer 404 and the router routes without cache information. In both cases requests can still answer 200.
 
@@ -26,11 +48,8 @@ export LLMDV_ROUTER_URL=<your EPP's URL>
 llmdv verify --profile profiles/llm-d/precise-prefix-cache-routing/<profile>.yaml
 ```
 
-To test a gateway or the engine as well, [add it as another ingress](../../README.md#include-a-gateway-or-engine). `--identity` flags are optional: they label a run so `llmdv compare` never compares two configurations, for example `--identity accelerator=gpu --identity provider=gke`, read off your overlay path.
+To test a gateway or the engine as well, [add it as another ingress](../../README.md#include-a-gateway-or-engine). `--identity` flags are optional for verification. Set them when comparing deployments that share a profile, so their recorded configuration dimensions remain distinct; for example `--identity accelerator=gpu --identity provider=gke`, read off your overlay path.
 
-## What it tests
-
-The router's rendering, on top of the base tests every guide gets (each API, error handling, the parsers and the context window). Because the router tokenizes every prompt through the engine, the profiles check that Messages and Responses token counts agree with the engine's usage, that a fixed conversation keeps its size in input tokens (`evolution.prompt_pin`), and, on every overlay except TPU v5p, vLLM's four render routes. Every overlay passes `--block-size=64` and `--kv-events-config` and loads no KV connector. A green run does not show that precise routing is on, because a router whose renders all fail still answers 200: see [Not covered](#not-covered).
 
 ## What `llmdv verify` selects
 

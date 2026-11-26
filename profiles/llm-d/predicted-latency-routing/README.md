@@ -2,16 +2,38 @@
 
 Profiles for testing a deployment of llm-d's [predicted-latency-routing](https://github.com/llm-d/llm-d/tree/main/guides/predicted-latency-routing) guide, in which the router scores pods on latency predicted by models it trains on its own completed requests; the predictor runs as sidecars in the EPP pod and is not on the client's path.
 
-[Pick your profile](#pick-your-profile) · [Run it](#run-it) · [What it tests](#what-it-tests) · [What `llmdv verify` selects](#what-llmdv-verify-selects) · [Not covered](#not-covered) · [For maintainers](#for-maintainers)
+[What it tests](#what-it-tests) · [Pick your profile](#pick-your-profile) · [Run it](#run-it) · [What `llmdv verify` selects](#what-llmdv-verify-selects) · [Not covered](#not-covered) · [For maintainers](#for-maintainers)
+
+## What it tests
+
+**Validation focus: serving correctness with predictor routing enabled.** Exercise streaming and non-streaming behavior and the configured context window to detect regressions on the predictor’s serving path.
+
+**What a pass establishes:** the selected checks held for the declared APIs and reachable
+ingress during this run. **Coverage boundary:** Predictor accuracy and latency improvements need timing experiments and routing evidence.
+
+These focused defaults are a starting point for validating a production deployment. Add coverage
+for the APIs, clients and operating conditions you rely on; see
+[Growing coverage toward production](../../../docs/getting-started.md#widen-coverage).
+
+<details>
+<summary>Why these checks relate to the guide</summary>
+
+Every streaming case, on top of the base tests every guide gets (each API, error handling, the parsers and the context window): the guide serves streaming and non-streaming clients alike, and on NVIDIA and AMD at a RoPE-scaled 128k window. It checks that the stack serves correctly with the predictor routing, not that the predictor works or lowers latency: see [Not covered](#not-covered).
+
+The declaration rationale and claim-to-case mapping live in
+[`parts/common.yaml`](parts/common.yaml). [Not covered](#not-covered) explains the remaining
+access, instrumentation and load requirements.
+
+</details>
 
 ## Pick your profile
 
 Pick the profile for the overlay you deployed (under `guides/predicted-latency-routing/modelserver/`). The profiles assume the guide's routing-only router values (`SLO_AWARE=false`); the SLO-aware values are [not covered](#not-covered).
 
-| Profile | Model a client sees | Overlays |
+| Model a client sees | Overlays | Profile |
 | --- | --- | --- |
-| `vllm-qwen3-32b-ctx128k-parsers-standalone` | Qwen3-32B on vLLM, 128k window, with reasoning and tool-call parsers | `gpu/vllm/base`, `gpu/vllm/gke`, `gpu/vllm/ocp`, `amd/vllm` |
-| `vllm-qwen3-0.6b-inline-standalone` | Qwen3-0.6B on vLLM, reasoning inline, no tool parser | `xpu/vllm` |
+| Qwen3-32B on vLLM, 128k window, with reasoning and tool-call parsers | `gpu/vllm/base`, `gpu/vllm/gke`, `gpu/vllm/ocp`, `amd/vllm` | [vllm-qwen3-32b-ctx128k-parsers-standalone](vllm-qwen3-32b-ctx128k-parsers-standalone.yaml) |
+| Qwen3-0.6B on vLLM, reasoning inline, no tool parser | `xpu/vllm` | [vllm-qwen3-0.6b-inline-standalone](vllm-qwen3-0.6b-inline-standalone.yaml) |
 
 The overlays reuse optimized-baseline's model servers, so the pods carry `llm-d.ai/guide=optimized-baseline`. The profiles depend on no label, but if you add a fleet block, select the pods by that label, not by this guide's name.
 
@@ -24,11 +46,8 @@ export LLMDV_ROUTER_URL=<your EPP's URL>
 llmdv verify --profile profiles/llm-d/predicted-latency-routing/<profile>.yaml
 ```
 
-To test a gateway or the engine as well, [add it as another ingress](../../README.md#include-a-gateway-or-engine). `--identity` flags are optional: they label a run so `llmdv compare` never compares two configurations, for example `--identity accelerator=amd --identity provider=base`, read off your overlay path. The NVIDIA and AMD overlays serve the same model, window and parsers, so their runs are worth comparing.
+To test a gateway or the engine as well, [add it as another ingress](../../README.md#include-a-gateway-or-engine). `--identity` flags are optional for verification. Set them when comparing deployments that share a profile, so their recorded configuration dimensions remain distinct; for example `--identity accelerator=amd --identity provider=base`, read off your overlay path. The NVIDIA and AMD overlays serve the same model, window and parsers, so their runs are worth comparing.
 
-## What it tests
-
-Every streaming case, on top of the base tests every guide gets (each API, error handling, the parsers and the context window): the guide serves streaming and non-streaming clients alike, and on NVIDIA and AMD at a RoPE-scaled 128k window. It checks that the stack serves correctly with the predictor routing, not that the predictor works or lowers latency: see [Not covered](#not-covered).
 
 ## What `llmdv verify` selects
 

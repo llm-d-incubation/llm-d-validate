@@ -2,15 +2,37 @@
 
 Profiles for testing a deployment of llm-d's [fast-model-actuation](https://github.com/llm-d/llm-d/tree/main/guides/fast-model-actuation) guide, in which the vLLM instance runs inside an FMA launcher pod with sleep mode on, and the router reaches it through a requester Deployment's TCP proxy.
 
-[Pick your profile](#pick-your-profile) · [Run it](#run-it) · [What it tests](#what-it-tests) · [What `llmdv verify` selects](#what-llmdv-verify-selects) · [Not covered](#not-covered) · [For maintainers](#for-maintainers)
+[What it tests](#what-it-tests) · [Pick your profile](#pick-your-profile) · [Run it](#run-it) · [What `llmdv verify` selects](#what-llmdv-verify-selects) · [Not covered](#not-covered) · [For maintainers](#for-maintainers)
+
+## What it tests
+
+**Validation focus: api integrity through the requester tcp proxy.** Exercise streaming and HTTP transport edges because the proxy must preserve the engine’s responses and connection behavior.
+
+**What a pass establishes:** the selected checks held for the declared APIs and reachable
+ingress during this run. **Coverage boundary:** These checks do not establish activation time or the actuation mechanism itself.
+
+These focused defaults are a starting point for validating a production deployment. Add coverage
+for the APIs, clients and operating conditions you rely on; see
+[Growing coverage toward production](../../../docs/getting-started.md#widen-coverage).
+
+<details>
+<summary>Why these checks relate to the guide</summary>
+
+The base tests every guide gets (each API, error handling and the context window), plus every streaming case and a wider set of HTTP transport cases (chunked requests, body edges, long and differently cased headers, `Expect: 100-continue` and others). They are there for the requester's TCP proxy, which sits between the router and vLLM on every request. It should pass vLLM's responses through byte for byte, so the profile declares vLLM's behaviour; what the proxy does when its vLLM instance refuses or drops a connection, and any error it answers itself, have not been measured. A failure in the error-envelope or disconnect cases that optimized-baseline's vLLM profiles do not show points at the proxy.
+
+The declaration rationale and claim-to-case mapping live in
+[`parts/common.yaml`](parts/common.yaml). [Not covered](#not-covered) explains the remaining
+access, instrumentation and load requirements.
+
+</details>
 
 ## Pick your profile
 
 Pick the profile for the platform you applied (`kubectl apply -k platform/<INFRA_PROVIDER>`). The two platforms change only how the launcher reaches the node's GPUs, so they share a profile.
 
-| Profile | Model a client sees | What you applied |
+| Model a client sees | What you applied | Profile |
 | --- | --- | --- |
-| `vllm-qwen3-0.6b-inline-standalone` | Qwen3-0.6B on vLLM, the model's 40960-token window, no reasoning or tool-call parsers | `platform/gke`, `platform/ocp` |
+| Qwen3-0.6B on vLLM, the model's 40960-token window, no reasoning or tool-call parsers | `platform/gke`, `platform/ocp` | [vllm-qwen3-0.6b-inline-standalone](vllm-qwen3-0.6b-inline-standalone.yaml) |
 
 ## Run it
 
@@ -23,11 +45,8 @@ llmdv verify --profile profiles/llm-d/fast-model-actuation/vllm-qwen3-0.6b-inlin
 
 Run it after the requester Deployment's rollout completes and before the guide's sleep/wake step, so both requesters are bound to awake instances.
 
-To test a gateway or the engine as well, [add it as another ingress](../../README.md#include-a-gateway-or-engine). `--identity` flags are optional: they label a run so `llmdv compare` never compares two configurations, for example `--identity accelerator=gpu --identity provider=gke`, with `provider` the platform you applied.
+To test a gateway or the engine as well, [add it as another ingress](../../README.md#include-a-gateway-or-engine). `--identity` flags are optional for verification. Set them when comparing deployments that share a profile, so their recorded configuration dimensions remain distinct; for example `--identity accelerator=gpu --identity provider=gke`, with `provider` the platform you applied.
 
-## What it tests
-
-The base tests every guide gets (each API, error handling and the context window), plus every streaming case and a wider set of HTTP transport cases (chunked requests, body edges, long and differently cased headers, `Expect: 100-continue` and others). They are there for the requester's TCP proxy, which sits between the router and vLLM on every request. It should pass vLLM's responses through byte for byte, so the profile declares vLLM's behaviour; what the proxy does when its vLLM instance refuses or drops a connection, and any error it answers itself, have not been measured. A failure in the error-envelope or disconnect cases that optimized-baseline's vLLM profiles do not show points at the proxy.
 
 ## What `llmdv verify` selects
 

@@ -2,15 +2,37 @@
 
 Profiles for testing a deployment of llm-d's [multitenant async-processing](https://github.com/llm-d/llm-d/tree/main/guides/batch-serving/asynchronous-processing/multitenant) guide (`guide.yaml` name `async-multitenant`), in which llm-d-async dispatches queued work from Redis through an llm-d router with flow control and six priority bands, beside realtime traffic, with the router coordinator as an HTTP front door.
 
-[Pick your profile](#pick-your-profile) · [Run it](#run-it) · [What it tests](#what-it-tests) · [What `llmdv verify` selects](#what-llmdv-verify-selects) · [Not covered](#not-covered) · [For maintainers](#for-maintainers)
+[What it tests](#what-it-tests) · [Pick your profile](#pick-your-profile) · [Run it](#run-it) · [What `llmdv verify` selects](#what-llmdv-verify-selects) · [Not covered](#not-covered) · [For maintainers](#for-maintainers)
+
+## What it tests
+
+**Validation focus: router behavior beneath the async coordinator.** Check the promised flow-control header and exercise concurrent, cancelled and disconnected requests to expose failures in the serving path.
+
+**What a pass establishes:** the selected checks held for the declared APIs and reachable
+ingress during this run. **Coverage boundary:** Coordinator scheduling, Redis and eviction/holdback policy need their own observations.
+
+These focused defaults are a starting point for validating a production deployment. Add coverage
+for the APIs, clients and operating conditions you rely on; see
+[Growing coverage toward production](../../../docs/getting-started.md#widen-coverage).
+
+<details>
+<summary>Why these checks relate to the guide</summary>
+
+The llm-d router only, in standalone mode (through `../parts/topology/standalone.yaml`), not the coordinator, llm-d-async or Redis: see [Not covered](#not-covered). The router runs flow control, which a client sees as the `x-llm-d-flow-queue-duration-ms` response header on every admitted request; `parts/common.yaml` declares it `promised`, so a router running without flow control fails. On top of the base tests every guide gets (each API, error handling, the parsers and the context window), the profile sends concurrent, cancelled and disconnected requests, which a router running flow control with eviction or holdback must still serve.
+
+The declaration rationale and claim-to-case mapping live in
+[`parts/common.yaml`](parts/common.yaml). [Not covered](#not-covered) explains the remaining
+access, instrumentation and load requirements.
+
+</details>
 
 ## Pick your profile
 
 There is one profile, for the guide's `modelserver/gpu/vllm/gke` overlay (optimized-baseline's `gpu/vllm/gke` relabelled, one replica). The router values file you deployed doesn't change what a client sending one request at a time sees, so both share it.
 
-| Profile | Model a client sees | Router values |
+| Model a client sees | Router values | Profile |
 | --- | --- | --- |
-| `vllm-qwen3-32b-parsers-standalone` | Qwen3-32B on vLLM, with reasoning and tool-call parsers | `values/router/flow-control-evictable.yaml`, `values/router/flow-control-holdback.yaml` |
+| Qwen3-32B on vLLM, with reasoning and tool-call parsers | `values/router/flow-control-evictable.yaml`, `values/router/flow-control-holdback.yaml` | [vllm-qwen3-32b-parsers-standalone](vllm-qwen3-32b-parsers-standalone.yaml) |
 
 ## Run it
 
@@ -21,11 +43,8 @@ export LLMDV_ROUTER_URL=<your EPP's URL>
 llmdv verify --profile profiles/llm-d/async-multitenant/vllm-qwen3-32b-parsers-standalone.yaml
 ```
 
-To test a gateway or the engine as well, [add it as another ingress](../../README.md#include-a-gateway-or-engine). `--identity` flags are optional: they label a run so `llmdv compare` never compares two configurations, for example `--identity accelerator=gpu --identity provider=gke --identity flavor=evictable`, with `flavor` naming your router values file (`evictable` or `holdback`).
+To test a gateway or the engine as well, [add it as another ingress](../../README.md#include-a-gateway-or-engine). `--identity` flags are optional for verification. Set them when comparing deployments that share a profile, so their recorded configuration dimensions remain distinct; for example `--identity accelerator=gpu --identity provider=gke --identity flavor=evictable`, with `flavor` naming your router values file (`evictable` or `holdback`).
 
-## What it tests
-
-The llm-d router only, in standalone mode (through `../parts/topology/standalone.yaml`), not the coordinator, llm-d-async or Redis: see [Not covered](#not-covered). The router runs flow control, which a client sees as the `x-llm-d-flow-queue-duration-ms` response header on every admitted request; `parts/common.yaml` declares it `promised`, so a router running without flow control fails. On top of the base tests every guide gets (each API, error handling, the parsers and the context window), the profile sends concurrent, cancelled and disconnected requests, which a router running flow control with eviction or holdback must still serve.
 
 ## What `llmdv verify` selects
 

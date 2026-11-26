@@ -8,21 +8,21 @@ Ready-made profiles for testing a deployment of an [llm-d](https://github.com/ll
 
 Each guide's README says which profile matches what you deployed, how to run it and what it tests.
 
-| Guide | Profiles |
+| Guide | Validation focus |
 | --- | --- |
-| [optimized-baseline](optimized-baseline/README.md) | 7, plus a simulator profile |
-| [pd-disaggregation](pd-disaggregation/README.md) | 5 |
-| [wide-ep](wide-ep/README.md) | 3 |
-| [precise-prefix-cache-routing](precise-prefix-cache-routing/README.md) | 4 |
-| [predicted-latency-routing](predicted-latency-routing/README.md) | 2 |
-| [tiered-prefix-cache](tiered-prefix-cache/README.md) | 5 |
-| [multimodal-serving](multimodal-serving/README.md) | 1 |
-| [pod-snapshot](pod-snapshot/README.md) | 2 |
-| [fast-model-actuation](fast-model-actuation/README.md) | 1 |
-| [flow-control](flow-control/README.md) | 2 |
-| [agentic-api](agentic-api/README.md) | 1 |
-| [async-multitenant](async-multitenant/README.md) | 1 |
-| [keda-epp](keda-epp/README.md) | 3 |
+| [agentic-api](agentic-api/README.md) | Stateless Responses calls used by agentic-api |
+| [async-multitenant](async-multitenant/README.md) | Router behavior beneath the async coordinator |
+| [fast-model-actuation](fast-model-actuation/README.md) | API integrity through the requester TCP proxy |
+| [flow-control](flow-control/README.md) | Admission signals and cancellation recovery |
+| [keda-epp](keda-epp/README.md) | Serving through an autoscaled pool |
+| [multimodal-serving](multimodal-serving/README.md) | Image understanding across the serving path |
+| [optimized-baseline](optimized-baseline/README.md) | The baseline router-to-model API contract |
+| [pd-disaggregation](pd-disaggregation/README.md) | API correctness through the disaggregated path |
+| [pod-snapshot](pod-snapshot/README.md) | Serving correctness with restored replicas in the pool |
+| [precise-prefix-cache-routing](precise-prefix-cache-routing/README.md) | Rendering and token contracts used by precise routing |
+| [predicted-latency-routing](predicted-latency-routing/README.md) | Serving correctness with predictor routing enabled |
+| [tiered-prefix-cache](tiered-prefix-cache/README.md) | Serving correctness with cache offloading configured |
+| [wide-ep](wide-ep/README.md) | API integrity through the expert-parallel serving path |
 
 ## Test your deployment
 
@@ -40,7 +40,7 @@ To test a gateway or the engine as well, [add it as another ingress](../README.m
 
 A profile is `<engine>-<model configuration>[-<variant>]-<topology>.yaml`, named by what a client sees: `vllm-qwen3-32b-parsers-standalone` is Qwen3-32B on vLLM with reasoning and tool-call parsers, behind the standalone router. Files in a `parts/` folder are building blocks and never run on their own.
 
-Deployments that look the same to a client share a profile. `--identity` flags are optional labels that keep their runs apart, so `llmdv compare` never compares two different configurations. Read them off your overlay path:
+Deployments that look the same to a client share a profile. `--identity` flags record the dimensions comparison uses to keep configurations apart. They are optional for verification, but set the relevant dimensions when comparing deployments that share a profile. Omitted dimensions cannot distinguish those deployments; free-form `--label` values do not affect matching. Read them off your overlay path:
 
 | Flag | Value |
 | --- | --- |
