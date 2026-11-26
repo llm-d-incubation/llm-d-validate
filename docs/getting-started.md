@@ -93,7 +93,7 @@ The command prints a new directory under `runs/`. Each invocation creates its ow
 reusing `--local-output ROOT` preserves earlier runs. Use the printed child path below:
 
 ```sh
-export RUN='runs/<the directory printed by verify>'
+export RUN='<paste the full directory printed by verify>'
 cat "$RUN/summary.md"
 ```
 

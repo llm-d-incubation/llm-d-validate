@@ -8,8 +8,8 @@ Profiles for testing a deployment of llm-d's [precise-prefix-cache-routing](http
 
 **Validation focus: rendering and token contracts used by precise routing.** Check declared render routes, token accounting and prompt pins because the router’s cache lookup depends on tokenized input.
 
-**What a pass establishes:** the selected checks held for the declared APIs and reachable
-ingress during this run. **Coverage boundary:** Router render success, KV-event indexing and per-pod affinity require additional instrumentation.
+**What a pass establishes:** the checks that actually executed held at the reachable ingress
+during this run. Skipped checks remain coverage gaps. **Coverage boundary:** Router render success, KV-event indexing and per-pod affinity require additional instrumentation.
 
 These focused defaults are a starting point for validating a production deployment. Add coverage
 for the APIs, clients and operating conditions you rely on; see
@@ -61,39 +61,160 @@ See [selection rules](../../../docs/cli.md#test-sets-and-coverage) for smoke, fu
 
 `*` selects the whole library; `suite.*` selects a suite. Other patterns select matching cases.
 
-| Suite | Patterns |
-| --- | --- |
-| `contract` | `contract.*` |
-| `discovery` | `discovery.models_lists_declared_model`, `discovery.unknown_model_no_fallback`, `discovery.models_parses_with_openai_sdk` |
-| `openai_chat` | `openai_chat.basic_non_streaming`, `openai_chat.streaming_sse`, `openai_chat.stop_reason`, `openai_chat.configured_reasoning` |
-| `openai_completions` | `openai_completions.basic_non_streaming`, `openai_completions.streaming_matches_json`, `openai_completions.stop_reason` |
-| `anthropic_messages` | `anthropic_messages.basic_non_streaming`, `anthropic_messages.streaming_sse`, `anthropic_messages.count_tokens`, `anthropic_messages.token_count_matches_usage`, `anthropic_messages.stream_matches_message` |
-| `openai_responses` | `openai_responses.basic_non_streaming`, `openai_responses.streaming_sse`, `openai_responses.input_tokens` |
-| `streaming` | `streaming.sse_framing` |
-| `unhappy` | `unhappy.unknown_path`, `unhappy.malformed_json`, `unhappy.missing_model`, `unhappy.wrong_method`, `unhappy.error_envelope_fields`, `unhappy.context_overflow`, `unhappy.token_limit_over_context` |
-| `transport` | `transport.connection`, `transport.health_status` |
-| `tools` | `tools.auto_call`, `tools.auto_stream` |
-| `long_context` | `long_context.*` |
-| `render` | `render.*` |
-| `evolution` | `evolution.prompt_pin`, `evolution.prompt_pin_tools` |
+**contract**
+
+- `contract.*`
+
+**discovery**
+
+- `discovery.models_lists_declared_model`
+- `discovery.unknown_model_no_fallback`
+- `discovery.models_parses_with_openai_sdk`
+
+**openai_chat**
+
+- `openai_chat.basic_non_streaming`
+- `openai_chat.streaming_sse`
+- `openai_chat.stop_reason`
+- `openai_chat.configured_reasoning`
+
+**openai_completions**
+
+- `openai_completions.basic_non_streaming`
+- `openai_completions.streaming_matches_json`
+- `openai_completions.stop_reason`
+
+**anthropic_messages**
+
+- `anthropic_messages.basic_non_streaming`
+- `anthropic_messages.streaming_sse`
+- `anthropic_messages.count_tokens`
+- `anthropic_messages.token_count_matches_usage`
+- `anthropic_messages.stream_matches_message`
+
+**openai_responses**
+
+- `openai_responses.basic_non_streaming`
+- `openai_responses.streaming_sse`
+- `openai_responses.input_tokens`
+
+**streaming**
+
+- `streaming.sse_framing`
+
+**unhappy**
+
+- `unhappy.unknown_path`
+- `unhappy.malformed_json`
+- `unhappy.missing_model`
+- `unhappy.wrong_method`
+- `unhappy.error_envelope_fields`
+- `unhappy.context_overflow`
+- `unhappy.token_limit_over_context`
+
+**transport**
+
+- `transport.connection`
+- `transport.health_status`
+
+**tools**
+
+- `tools.auto_call`
+- `tools.auto_stream`
+
+**long_context**
+
+- `long_context.*`
+
+**render**
+
+- `render.*`
+
+**evolution**
+
+- `evolution.prompt_pin`
+- `evolution.prompt_pin_tools`
+
+
+</details>
+
+Counted offline by `llmdv plan`, one case per ingress and variant. Planned runs can still skip at runtime. Expand a profile for its scope counts and separate skip classes.
+
+The default is also `--all-test-sets` for these profiles.
+
+<details>
+<summary>vllm-qwen3-0.6b-inline-standalone.yaml</summary>
+
+[Open the profile](vllm-qwen3-0.6b-inline-standalone.yaml).
+
+| Scope | Selected | Planned run | Planned skip |
+| --- | ---: | ---: | ---: |
+| Default | 107 | 91 | 16 |
+| Smoke | 9 | 9 | 0 |
+| Full library | 1092 | 692 | 400 |
+
+Planned skips by class:
+
+- **Default:** 16 `undeclared`.
+- **Full library:** 400 `undeclared`.
 
 </details>
 
 <details>
-<summary>How many cases each scope selects, per profile</summary>
+<summary>vllm-qwen3-32b-ctx4k-inline-standalone.yaml</summary>
 
-Counted offline by `llmdv plan`, one per ingress and variant. *Run* cases can still skip during a run (for example `throttled`); *skip* cases are ruled out by the profile's declarations, with their skip class.
+[Open the profile](vllm-qwen3-32b-ctx4k-inline-standalone.yaml).
 
-| Profile | Default (= `--all-test-sets`) | `smoke` | `--full-suite` |
-| --- | --- | --- | --- |
-| `vllm-qwen3-0.6b-inline-standalone.yaml` | 107 selected, 91 run, 16 skip: 16 undeclared | 9 selected, 9 run | 1092 selected, 692 run, 400 skip: 400 undeclared |
-| `vllm-qwen3-32b-ctx4k-inline-standalone.yaml` | 107 selected, 81 run, 26 skip: 26 undeclared | 9 selected, 9 run | 1092 selected, 678 run, 414 skip: 414 undeclared |
-| `vllm-qwen3-32b-inline-standalone.yaml` | 107 selected, 91 run, 16 skip: 16 undeclared | 9 selected, 9 run | 1092 selected, 692 run, 400 skip: 400 undeclared |
-| `vllm-qwen3-32b-parsers-standalone.yaml` | 107 selected, 100 run, 7 skip: 7 undeclared | 9 selected, 9 run | 1092 selected, 938 run, 154 skip: 154 undeclared |
+| Scope | Selected | Planned run | Planned skip |
+| --- | ---: | ---: | ---: |
+| Default | 107 | 81 | 26 |
+| Smoke | 9 | 9 | 0 |
+| Full library | 1092 | 678 | 414 |
+
+Planned skips by class:
+
+- **Default:** 26 `undeclared`.
+- **Full library:** 414 `undeclared`.
 
 </details>
 
-Preview individual cases and skip reasons with `llmdv plan --profile <profile>`.
+<details>
+<summary>vllm-qwen3-32b-inline-standalone.yaml</summary>
+
+[Open the profile](vllm-qwen3-32b-inline-standalone.yaml).
+
+| Scope | Selected | Planned run | Planned skip |
+| --- | ---: | ---: | ---: |
+| Default | 107 | 91 | 16 |
+| Smoke | 9 | 9 | 0 |
+| Full library | 1092 | 692 | 400 |
+
+Planned skips by class:
+
+- **Default:** 16 `undeclared`.
+- **Full library:** 400 `undeclared`.
+
+</details>
+
+<details>
+<summary>vllm-qwen3-32b-parsers-standalone.yaml</summary>
+
+[Open the profile](vllm-qwen3-32b-parsers-standalone.yaml).
+
+| Scope | Selected | Planned run | Planned skip |
+| --- | ---: | ---: | ---: |
+| Default | 107 | 100 | 7 |
+| Smoke | 9 | 9 | 0 |
+| Full library | 1092 | 938 | 154 |
+
+Planned skips by class:
+
+- **Default:** 7 `undeclared`.
+- **Full library:** 154 `undeclared`.
+
+</details>
+
+Preview cases and reasons with `llmdv plan --profile <profile>`.
 
 ## Not covered
 

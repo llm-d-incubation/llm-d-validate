@@ -99,16 +99,6 @@ def plan(path: Path, flags: tuple[str, ...]) -> dict:
     }
 
 
-def describe(result: dict) -> str:
-    if "rc" in result:
-        return f"exits {result['rc']}"
-    text = f"{result['total']} selected, {result['run']} run"
-    if result["skip"]:
-        classes = ", ".join(f"{n} {name}" for name, n in result["skips"].items())
-        text += f", {result['skip']} skip: {classes}"
-    return text
-
-
 def collect() -> dict[Path, dict[Path, dict]]:
     profiles = runnable()
     jobs = [(p, scope, flags) for p in profiles for scope, flags in SCOPES.items()]
@@ -172,48 +162,51 @@ def section(folder: Path, entries: dict[Path, dict]) -> str:
         "`*` selects the whole library; `suite.*` selects a suite. "
         "Other patterns select matching cases.",
         "",
-        "| Suite | Patterns |",
-        "| --- | --- |",
     ]
     for suite, patterns in by_suite.items():
-        out.append(
-            f"| {'All suites' if suite == '*' else f'`{suite}`'} | "
-            + ", ".join(f"`{p}`" for p in patterns)
-            + " |"
-        )
+        out += [f"**{'All suites' if suite == '*' else suite}**", ""]
+        out += [f"- `{pattern}`" for pattern in patterns]
+        out.append("")
     out += [
         "",
         "</details>",
         "",
-        "<details>",
-        "<summary>How many cases each scope selects, per profile</summary>",
-        "",
-        "Counted offline by `llmdv plan`, one per ingress and variant. *Run* cases can still skip "
-        "during a run (for example `throttled`); *skip* cases are ruled out by the profile's "
-        "declarations, with their skip class.",
+        "Counted offline by `llmdv plan`, one case per ingress and variant. Planned runs can "
+        "still skip at runtime. Expand a profile for its scope counts and separate skip classes.",
         "",
     ]
-    default_header = "Default" + ("" if others else " (= `--all-test-sets`)")
-    extra = [] if not others else ["`--all-test-sets`"]
-    out += [
-        "| Profile | " + " | ".join([default_header, *extra]) + " | `smoke` | `--full-suite` |",
-        "| --- | " + " | ".join("---" for _ in [default_header, *extra]) + " | --- | --- |",
-    ]
+    scopes = [("Default", "plain"), ("Smoke", "smoke")]
+    if others:
+        scopes.append(("All profile sets", "all-test-sets"))
+    scopes.append(("Full library", "full-suite"))
+    if not others:
+        out += ["The default is also `--all-test-sets` for these profiles.", ""]
     for p in names:
         plans = entries[p]["plans"]
-        cells = [describe(plans["plain"])] + ([describe(plans["all-test-sets"])] if others else [])
-        out.append(
-            f"| `{p.name}` | "
-            + " | ".join(cells)
-            + f" | {describe(plans['smoke'])} | {describe(plans['full-suite'])} |"
-        )
-    out += [
-        "",
-        "</details>",
-        "",
-        "Preview individual cases and skip reasons with `llmdv plan --profile <profile>`.",
-        "",
-    ]
+        out += [
+            "<details>",
+            f"<summary>{p.name}</summary>",
+            "",
+            f"[Open the profile]({p.name}).",
+            "",
+            "| Scope | Selected | Planned run | Planned skip |",
+            "| --- | ---: | ---: | ---: |",
+        ]
+        for label, key in scopes:
+            result = plans[key]
+            if "rc" in result:
+                out.append(f"| {label} (exit {result['rc']}) | — | — | — |")
+            else:
+                out.append(f"| {label} | {result['total']} | {result['run']} | {result['skip']} |")
+        skip_rows = [(label, plans[key].get("skips", {})) for label, key in scopes]
+        if any(skips for _, skips in skip_rows):
+            out += ["", "Planned skips by class:", ""]
+            for label, skips in skip_rows:
+                if skips:
+                    classes = ", ".join(f"{n} `{name}`" for name, n in skips.items())
+                    out.append(f"- **{label}:** {classes}.")
+        out += ["", "</details>", ""]
+    out += ["Preview cases and reasons with `llmdv plan --profile <profile>`.", ""]
     return "\n".join(out)
 
 

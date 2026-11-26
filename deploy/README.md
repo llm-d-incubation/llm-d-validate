@@ -1,8 +1,8 @@
 # Running `llmdv` unattended
 
 Deploy `llmdv job` to a cluster, give it credentials, start runs on demand, and read what they
-left. Object storage and Slack are optional. Installing, local runs, publishing and pulling runs
-back are in [docs/getting-started.md](../docs/getting-started.md); every flag, exit code and
+left. Object storage and Slack are optional. Installation and first checks are in [Getting started](../docs/getting-started.md).
+Publishing, retrieval and local jobs are in [Running and sharing results](../docs/running.md); every flag, exit code and
 output file is in [docs/cli.md](../docs/cli.md).
 
 | Path | What it is |

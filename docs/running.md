@@ -7,6 +7,27 @@ references.
 
 Set `$P` to the profile path and load its endpoint and credential variables before these commands.
 
+[Share a finished run](#share-a-finished-run) · [Storage setup](#publish-a-run) ·
+[Pull a run back](#pull-a-run-back) · [Run unattended](#run-unattended) ·
+[Troubleshooting](#troubleshooting)
+
+## Share a finished run
+
+Use the full child directory printed by verification. These commands reuse its evidence:
+
+```sh
+RUN='<paste the printed run directory>'
+llmdv analyze "$RUN"
+llmdv publish "$RUN" --remote-output 's3://your-bucket/your-prefix' --analyze
+llmdv notify "$RUN"
+```
+
+Replace the run path and destination. Configure [storage credentials](#publish-a-run) before
+publishing. Notification is optional: load `LLMDV_NOTIFY_WEBHOOK` from your credential store
+before calling `notify`. Publish first so the notification can include the results location.
+Neither command reruns inference. To investigate the evidence, see
+[reading results](getting-started.md#read-the-results) and [reproduction](cli.md#reproducing-a-run).
+
 ## Publish a run
 
 For AWS or an S3-compatible store using access keys, install the storage extra with

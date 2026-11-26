@@ -21,10 +21,6 @@
   <a href="https://github.com/llm-d-incubation/llm-d-validate/blob/main/CONTRIBUTING.md">Contributing</a>
 </p>
 
-<p align="center">
-  <img src="https://raw.githubusercontent.com/llm-d-incubation/llm-d-validate/main/docs/images/llmdv-overview.gif" width="100%" alt="Animated overview: a profile defines the test plan; llmdv sends real requests to the gateway (end to end), the llm-d router (router and engine) and the engine alone; each layer gets a verdict; the run's evidence (results, exchanges, repro scripts, a dashboard) is bundled, published to object storage and sent as a notification. Runs launch from a workstation, CI or a cluster job.">
-</p>
-
 ## How it works
 
 `llmdv` checks deployed llm-d stacks and other OpenAI- or Anthropic-compatible services.
@@ -35,6 +31,26 @@ Comparing layers helps locate a problem; comparing runs identifies regressions.
 Validation never deploys, patches, scales or restarts the serving stack. It can read cluster
 information when granted access. Test requests do consume inference resources and may create
 API-level state; choose the profile and coverage appropriate for your deployment.
+
+Start with a [deployed llm-d guide](#quick-start-test-a-deployed-llm-d-guide) or
+[your own endpoint](docs/getting-started.md#run-your-own-stack).
+
+## What a result gives you
+
+An illustrative, abbreviated failure:
+
+```text
+case     openai_chat.basic_non_streaming
+ingress  router
+outcome  FAIL
+
+checks
+  fail   http_status = 401   expected 200
+```
+
+The case identifies the behavior tested; the ingress identifies the endpoint; the recorded
+check shows why it failed. The run includes request/response evidence, a replay script and an
+HTML dashboard. [Read a failure step by step](docs/getting-started.md#follow-one-failure).
 
 ## Quick start: test a deployed llm-d guide
 
@@ -74,7 +90,10 @@ layers are optional.
 
 The [suite catalog](docs/test-suites.md) describes the API, model behavior, error-path and
 change-detection checks, and the declarations that enable them. A profile selects applicable
-checks; a passing subset says nothing about checks it did not execute.
+checks; a passing subset says nothing about checks it did not execute. Guide defaults focus on
+the guide’s promises. Users can extend profiles, select broader suites and add cases as their
+API and production requirements grow. [Plan that progression](docs/getting-started.md#widen-coverage);
+`--full-suite` covers the existing library, not every possible API or production requirement.
 
 <p align="center">
   <img src="docs/images/llmdv-coverage.svg" width="100%" alt="Coverage by suite: APIs, model behavior, failure paths, contracts and change detection.">

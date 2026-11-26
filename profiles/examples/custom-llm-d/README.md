@@ -58,23 +58,69 @@ See [selection rules](../../../docs/cli.md#test-sets-and-coverage) for smoke, fu
 
 `*` selects the whole library; `suite.*` selects a suite. Other patterns select matching cases.
 
-| Suite | Patterns |
-| --- | --- |
-| All suites | `*` |
+**All suites**
+
+- `*`
+
+
+</details>
+
+Counted offline by `llmdv plan`, one case per ingress and variant. Planned runs can still skip at runtime. Expand a profile for its scope counts and separate skip classes.
+
+The default is also `--all-test-sets` for these profiles.
+
+<details>
+<summary>deepseek-v4.1-flash-1017.yaml</summary>
+
+[Open the profile](deepseek-v4.1-flash-1017.yaml).
+
+| Scope | Selected | Planned run | Planned skip |
+| --- | ---: | ---: | ---: |
+| Default | 1076 | 1044 | 32 |
+| Smoke | 9 | 9 | 0 |
+| Full library | 1076 | 1044 | 32 |
+
+Planned skips by class:
+
+- **Default:** 32 `undeclared`.
+- **Full library:** 32 `undeclared`.
 
 </details>
 
 <details>
-<summary>How many cases each scope selects, per profile</summary>
+<summary>glm-5.3.yaml</summary>
 
-Counted offline by `llmdv plan`, one per ingress and variant. *Run* cases can still skip during a run (for example `throttled`); *skip* cases are ruled out by the profile's declarations, with their skip class.
+[Open the profile](glm-5.3.yaml).
 
-| Profile | Default (= `--all-test-sets`) | `smoke` | `--full-suite` |
-| --- | --- | --- | --- |
-| `deepseek-v4.1-flash-1017.yaml` | 1076 selected, 1044 run, 32 skip: 32 undeclared | 9 selected, 9 run | 1076 selected, 1044 run, 32 skip: 32 undeclared |
-| `glm-5.3.yaml` | 2142 selected, 2032 run, 110 skip: 110 undeclared | 18 selected, 18 run | 2142 selected, 2032 run, 110 skip: 110 undeclared |
-| `muse-spark-open-816b-nvfp4.yaml` | 2142 selected, 2107 run, 35 skip: 35 undeclared | 18 selected, 18 run | 2142 selected, 2107 run, 35 skip: 35 undeclared |
+| Scope | Selected | Planned run | Planned skip |
+| --- | ---: | ---: | ---: |
+| Default | 2142 | 2032 | 110 |
+| Smoke | 18 | 18 | 0 |
+| Full library | 2142 | 2032 | 110 |
+
+Planned skips by class:
+
+- **Default:** 110 `undeclared`.
+- **Full library:** 110 `undeclared`.
 
 </details>
 
-Preview individual cases and skip reasons with `llmdv plan --profile <profile>`.
+<details>
+<summary>muse-spark-open-816b-nvfp4.yaml</summary>
+
+[Open the profile](muse-spark-open-816b-nvfp4.yaml).
+
+| Scope | Selected | Planned run | Planned skip |
+| --- | ---: | ---: | ---: |
+| Default | 2142 | 2107 | 35 |
+| Smoke | 18 | 18 | 0 |
+| Full library | 2142 | 2107 | 35 |
+
+Planned skips by class:
+
+- **Default:** 35 `undeclared`.
+- **Full library:** 35 `undeclared`.
+
+</details>
+
+Preview cases and reasons with `llmdv plan --profile <profile>`.
