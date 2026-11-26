@@ -7,11 +7,12 @@ changed their answer.
 ```sh
 llmdv compare --from s3://bucket/llmdv --profile qwen-router --list                # runs for this profile, oldest first
 llmdv compare --from s3://bucket/llmdv --profile qwen-router                       # latest run against the preceding matching run
-llmdv compare --from s3://bucket/llmdv --profile qwen-router --baseline <run-id>   # against a specific run, e.g. before a rollout
+llmdv compare --from s3://bucket/llmdv --profile qwen-router --baseline '<run-id>'   # against a specific run, e.g. before a rollout
 llmdv compare --from s3://bucket/llmdv --profile qwen-router --window 5            # a change counts only if the last 5 runs agreed
 llmdv compare --from file:///var/llmdv-runs --profile qwen-router --no-fail        # a local archive; suppress the regression exit
 ```
 
+Replace the example archive, profile name and run ID before using these commands.
 `--profile` is the profile's `name:`, not its path. Output reads the same in a terminal and in
 Slack:
 
@@ -122,14 +123,16 @@ A first run or a mistyped profile name exits `2`, never `0`. All codes:
 ## In CI
 
 Publish each kind of run under its own prefix, so the latest run is compared with runs of the
-same kind. `--window 3` keeps one flaky case from reading as a regression; `--no-fail` reports
-without failing the job.
+same kind. `--window 3` keeps one flaky case from reading as a regression;
+`compare --no-fail` suppresses the regression exit while retaining usage and storage errors.
 
 ## In a cluster job
 
+Set `P` to the profile path and replace the archive and optional baseline ID:
+
 ```sh
-llmdv job --profile P --remote-output s3://bucket/llmdv --compare --compare-window 3
-llmdv job --profile P --remote-output s3://bucket/llmdv --compare --compare-baseline <run-id>
+llmdv job --profile "$P" --remote-output s3://bucket/llmdv --compare --compare-window 3
+llmdv job --profile "$P" --remote-output s3://bucket/llmdv --compare --compare-baseline '<run-id>'
 ```
 
 `llmdv job --compare` judges the finishing run against published runs and writes

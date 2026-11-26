@@ -39,7 +39,7 @@ There is one profile: every topology and overlay below looks the same to a clien
 The profiles test the guide's router (the EPP). Give `llmdv` its URL:
 
 ```sh
-export LLMDV_ROUTER_URL=<your EPP's URL>
+export LLMDV_ROUTER_URL='https://your-router.example' # replace with your router's URL
 llmdv verify --profile profiles/llm-d/multimodal-serving/vllm-qwen3-vl-32b-instruct-inline-standalone.yaml
 ```
 

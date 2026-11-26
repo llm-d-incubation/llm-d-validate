@@ -5,7 +5,9 @@ them, and run the same workflow in CI. [Selection rules](cli.md#test-sets-and-co
 [comparison semantics](compare.md) and [cluster runner setup](../deploy/README.md) have their own
 references.
 
-Set `$P` to the profile path and load its endpoint and credential variables before these commands.
+For commands that start a new verification run, set `$P` to the profile path and load its
+endpoint and credential variables. Working with an existing run needs its directory and any
+storage or notification credentials required by the selected command.
 
 [Share a finished run](#share-a-finished-run) · [Storage setup](#publish-a-run) ·
 [Pull a run back](#pull-a-run-back) · [Run unattended](#run-unattended) ·
@@ -65,9 +67,10 @@ To pull a published run back:
 
 ```sh
 PREFIX="s3://$AWS_BUCKET/<prefix>"
-llmdv compare --from "$PREFIX" --profile <profile name> --list
+PROFILE_NAME='<profile name from the profile’s name: field>'
+llmdv compare --from "$PREFIX" --profile "$PROFILE_NAME" --list
 RUN_ID='<run id from the list>'
-aws s3 cp --recursive "$PREFIX/<profile name>/$RUN_ID/" "runs/$RUN_ID/"   # add --endpoint-url for an S3-compatible store
+aws s3 cp --recursive "$PREFIX/$PROFILE_NAME/$RUN_ID/" "runs/$RUN_ID/"   # add --endpoint-url for an S3-compatible store
 llmdv analyze "runs/$RUN_ID"
 ```
 

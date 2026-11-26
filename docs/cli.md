@@ -299,9 +299,13 @@ case that fails with every recorded check passing says so.
 
 ### Reproducing a run
 
+Set `RUN` to the full printed run directory. Replace `<ingress>/<case>` with the actual
+bundle path shown in the dashboard. These commands send live requests; load the endpoint
+and credential variables first.
+
 ```sh
-bash runs/<run>/failures/<ingress>/<case>/repro.sh   # replay one exchange
-cd runs/<run> && ./reproduce.sh                       # rerun the verification into a fresh directory
+bash "$RUN/failures/<ingress>/<case>/repro.sh"   # replay one exchange
+(cd "$RUN" && ./reproduce.sh)                       # rerun the verification into a fresh directory
 ```
 
 `reproduce.sh` uses the archived profile beside it. For test-set runs it reads
@@ -311,9 +315,11 @@ cd runs/<run> && ./reproduce.sh                       # rerun the verification i
 
 ### The dashboard
 
+Set `RUN` to the full path of the existing run directory:
+
 ```sh
-llmdv analyze runs/<run>                        # any run, finished, killed or fetched
-llmdv analyze runs/<run> --notes notes.json     # embed an analysis written elsewhere
+llmdv analyze "$RUN"                        # any run, finished, killed or fetched
+llmdv analyze "$RUN" --notes notes.json     # embed an analysis written elsewhere
 ```
 
 `dashboard.html` is one self-contained page: the system under test, failures grouped by their

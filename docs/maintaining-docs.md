@@ -40,6 +40,9 @@ Design specifications should identify their status and link to current user refe
   `PYTHONPATH=src python .agents/skills/writing-an-infra-profile/selection_docs.py`, then run
   it with `--check`. Edit the generator rather than hand-editing generated explanations.
 - Check local links and fragments, CLI examples, and the relevant documentation/profile tests.
+  Check fenced shell examples with `bash -n`, then inspect unquoted placeholders: `<profile>`
+  can parse as redirection even when the syntax check passes. Use quoted paths or named
+  variables, explain what to replace, and verify selectors against the declared test sets.
   Run the required repository checks before reporting the change complete.
 
 Review the result as four tasks: a first guide run, a first custom-stack run, investigating a

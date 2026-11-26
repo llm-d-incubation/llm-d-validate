@@ -28,7 +28,7 @@ access, instrumentation and load requirements.
 
 ## Pick your profile
 
-There is one profile, for the guide's `modelserver/gpu/vllm/gke` overlay (optimized-baseline's `gpu/vllm/gke` relabelled, one replica). The router values file you deployed doesn't change what a client sending one request at a time sees, so both share it.
+There is one profile, for the guide's `modelserver/gpu/vllm/gke` overlay (optimized-baseline's `gpu/vllm/gke` relabelled, one replica). Both router configurations share the API and flow-control header expectations checked by this profile. Its concurrent cancellation checks do not establish eviction or holdback policy under saturation; see [Not covered](#not-covered).
 
 | Model a client sees | Router values | Profile |
 | --- | --- | --- |
@@ -39,7 +39,7 @@ There is one profile, for the guide's `modelserver/gpu/vllm/gke` overlay (optimi
 The profiles test the guide's router (the EPP). Give `llmdv` its URL:
 
 ```sh
-export LLMDV_ROUTER_URL=<your EPP's URL>
+export LLMDV_ROUTER_URL='https://your-router.example' # replace with your router's URL
 llmdv verify --profile profiles/llm-d/async-multitenant/vllm-qwen3-32b-parsers-standalone.yaml
 ```
 
@@ -167,7 +167,7 @@ Preview cases and reasons with `llmdv plan --profile <profile>`.
 <details>
 <summary>llm-d's nightly lanes, and how each maps to a profile</summary>
 
-Both lanes run `guides/batch-serving/asynchronous-processing/multitenant/scripts/nightly-deploy-gke.sh` through `reusable-nightly-e2e-gke`, render the guide's `modelserver/gpu/vllm/gke` (optimized-baseline's `gpu/vllm/gke` relabelled, one replica), and differ only in the router values file. A client sending one request at a time cannot tell the two apart, so they share one profile and pass `--identity flavor`. Both run flow control, which a client sees as the `x-llm-d-flow-queue-duration-ms` response header on every admitted request; `parts/common.yaml` declares it `promised`.
+Both lanes run `guides/batch-serving/asynchronous-processing/multitenant/scripts/nightly-deploy-gke.sh` through `reusable-nightly-e2e-gke`, render the guide's `modelserver/gpu/vllm/gke` (optimized-baseline's `gpu/vllm/gke` relabelled, one replica), and differ only in the router values file. They share the profile’s expected API contract and use `--identity flavor` to keep their comparison histories distinct. The selected checks do not distinguish eviction from holdback policy under saturation. Both run flow control, which a client sees as the `x-llm-d-flow-queue-duration-ms` response header on every admitted request; `parts/common.yaml` declares it `promised`.
 
 | CI lane (`nightly-e2e-<lane>`) | Router values | Profile | Identity flags |
 | --- | --- | --- | --- |

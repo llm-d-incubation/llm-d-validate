@@ -44,8 +44,8 @@ On `xpu/vllm`, the guide asks you to set the router's `token-producer` `modelNam
 The profiles test the guide's router (the EPP). Give `llmdv` its URL:
 
 ```sh
-export LLMDV_ROUTER_URL=<your EPP's URL>
-llmdv verify --profile profiles/llm-d/precise-prefix-cache-routing/<profile>.yaml
+export LLMDV_ROUTER_URL='https://your-router.example' # replace with your router's URL
+llmdv verify --profile 'profiles/llm-d/precise-prefix-cache-routing/<profile>.yaml'
 ```
 
 To test a gateway or the engine as well, [add it as another ingress](../../README.md#include-a-gateway-or-engine). `--identity` flags are optional for verification. Set them when comparing deployments that share a profile, so their recorded configuration dimensions remain distinct; for example `--identity accelerator=gpu --identity provider=gke`, read off your overlay path.

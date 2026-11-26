@@ -42,8 +42,8 @@ The overlays reuse optimized-baseline's model servers, so the pods carry `llm-d.
 The profiles test the guide's router (the EPP). Give `llmdv` its URL:
 
 ```sh
-export LLMDV_ROUTER_URL=<your EPP's URL>
-llmdv verify --profile profiles/llm-d/predicted-latency-routing/<profile>.yaml
+export LLMDV_ROUTER_URL='https://your-router.example' # replace with your router's URL
+llmdv verify --profile 'profiles/llm-d/predicted-latency-routing/<profile>.yaml'
 ```
 
 To test a gateway or the engine as well, [add it as another ingress](../../README.md#include-a-gateway-or-engine). `--identity` flags are optional for verification. Set them when comparing deployments that share a profile, so their recorded configuration dimensions remain distinct; for example `--identity accelerator=amd --identity provider=base`, read off your overlay path. The NVIDIA and AMD overlays serve the same model, window and parsers, so their runs are worth comparing.

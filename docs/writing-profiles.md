@@ -20,7 +20,8 @@ through writing one; every field is in [REFERENCE.md](../profiles/REFERENCE.md).
    ([declare intended behaviour](#declare-intended-behaviour)).
 6. **Check it offline** with `llmdv profile validate`, inspect overrides with
    `llmdv profile explain`, and preview what runs with `llmdv plan`.
-7. **Run the declarations first** with `llmdv verify --full-suite -m contract`, then the full run
+7. **Run the declarations first** with `llmdv verify --full-suite -m contract`, then the coverage
+   your deployment needs
    ([validate, plan, verify](#validate-plan-verify)).
 
 ## Start from the closest example
@@ -48,7 +49,7 @@ port-forwards.
 ```yaml
 # profiles/<system>/<model>.local.yaml
 extends: <model>.yaml           # relative to this file
-vantage: in-cluster
+vantage: external              # this example reaches the engine through a local port-forward
 environment:
   namespace: my-namespace
 ingresses:
@@ -75,14 +76,15 @@ whole, with a comment naming the file that set each key.
 
 ## Inspect before running
 
+Set `P` to your local profile path, for example `P=profiles/my-stack.local.yaml`.
 These commands are offline and do not need URL or credential variables to be set:
 
 ```sh
-llmdv profile validate profiles/<system>/<model>.local.yaml
-llmdv profile explain profiles/<system>/<model>.local.yaml
-llmdv profile explain profiles/<system>/<model>.local.yaml --field 'ingresses[gateway].model'
-llmdv profile show profiles/<system>/<model>.local.yaml --yaml > /tmp/profile-expanded.yaml
-llmdv plan --profile profiles/<system>/<model>.local.yaml
+llmdv profile validate "$P"
+llmdv profile explain "$P"
+llmdv profile explain "$P" --field 'ingresses[gateway].model'
+llmdv profile show "$P" --yaml > /tmp/profile-expanded.yaml
+llmdv plan --profile "$P"
 ```
 
 `explain` shows effective values and the source assignments that led to them. The default view
@@ -105,8 +107,8 @@ variables; literals already written into a profile remain visible.
 
 ## The minimum
 
-A profile needs a model, one ingress, a URL and a key for it, the surfaces it serves, and the
-error statuses a correct stack returns:
+A profile needs a model, one ingress, its URL and authentication settings, the surfaces it
+serves, and the error statuses a correct stack returns:
 
 ```yaml
 schema: llmdv.profile/1
@@ -213,10 +215,10 @@ that the layer does not enforce that class; cite the decision when changing it.
 ## Validate, plan, verify
 
 ```sh
-llmdv profile validate profiles/<system>/<model>.local.yaml           # offline: schema and consistency
-llmdv plan --profile profiles/<system>/<model>.local.yaml             # offline: what runs, what skips
-llmdv verify --profile profiles/<system>/<model>.local.yaml --full-suite -m contract   # the declarations, live
-llmdv verify --profile profiles/<system>/<model>.local.yaml --full-suite # the full run
+llmdv profile validate "$P"           # offline: schema and consistency
+llmdv plan --profile "$P"             # offline: what runs, what skips
+llmdv verify --profile "$P" --full-suite -m contract   # the declarations, live
+llmdv verify --profile "$P"             # the default coverage
 ```
 
 `llmdv profile validate` is offline by design: no cluster, no credentials. That keeps "your
@@ -224,9 +226,11 @@ profile is wrong" (exit 2) apart from "your vantage point is wrong" (exit 3) and
 broken" (exit 1). `llmdv plan` lists the cases; `llmdv profile show <profile> --matrix` prints
 the surface matrix the profile implies, including what will skip.
 
-`--full-suite -m contract` runs only the surface and header checks, in about a minute: the quickest way to find
-a stale `surfaces` or `headers` line. Other declarations are judged by the cases that use them.
-Once it is clean, run the full suite. The [CLI reference](cli.md) covers exit codes,
+`--full-suite -m contract` selects the surface and header checks to find stale `surfaces` or
+`headers` lines; duration depends on the selected ingresses and endpoint responsiveness. Other
+declarations are judged by the cases that use them. After reviewing the results, run the
+profile’s default or another deliberately chosen scope. Use `--full-suite` when you need to
+assess all existing library cases, and review applicability skips. The [CLI reference](cli.md) covers exit codes,
 narrowing a run and what a run writes.
 
 ## Further reading

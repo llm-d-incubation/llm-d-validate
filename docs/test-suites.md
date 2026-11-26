@@ -15,15 +15,16 @@ not the same as a profile's *test set* (a named list of cases, such as `default`
 four.
 
 A run first takes its scope (the profile's `default` set, unless you name another), then `-m`
-narrows it. So to run a whole suite, widen the scope with `--full-suite` and then pick the suite:
+narrows it. Set `P` to your profile path. To run a whole suite, widen the scope with
+`--full-suite` and then pick the suite:
 
 ```sh
-llmdv verify --profile <profile> --full-suite -m openai_chat            # the whole openai_chat suite
-llmdv verify --profile <profile> --full-suite -m "tools or streaming"   # two suites
-llmdv verify --profile <profile> --full-suite -k test_completions_stream_lifecycle   # one case
-llmdv verify --profile <profile> -m openai_chat                         # only the default set's openai_chat cases
-llmdv plan --profile <profile> --full-suite -m openai_chat              # preview any of these, offline
-llmdv profile show <profile> --matrix                                   # what the profile enables, per surface and ingress
+llmdv verify --profile "$P" --full-suite -m openai_chat            # the whole openai_chat suite
+llmdv verify --profile "$P" --full-suite -m "tools or streaming"   # two suites
+llmdv verify --profile "$P" --full-suite -k test_completions_stream_lifecycle   # one case
+llmdv verify --profile "$P" -m openai_chat                         # only the default set's openai_chat cases
+llmdv plan --profile "$P" --full-suite -m openai_chat              # preview any of these, offline
+llmdv profile show "$P" --matrix                                   # what the profile enables, per surface and ingress
 ```
 
 For example, `-m openai_chat` on a guide profile keeps only its selected Chat cases;

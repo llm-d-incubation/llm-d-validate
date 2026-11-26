@@ -2,8 +2,8 @@
 
 Starting points for your own stack, one per shape of stack. [Writing a profile](../../docs/writing-profiles.md#start-from-the-closest-example)
 says which to start from; copy it to a gitignored `profiles/<system>/<model>.local.yaml` before
-filling it in. [`custom-llm-d/`](custom-llm-d/README.md) holds complete, measured profiles for three models
-on a custom llm-d deployment, built from parts.
+filling it in. [`custom-llm-d/`](custom-llm-d/README.md) provides composed profiles for a custom llm-d
+deployment, built from parts.
 
 ## What `llmdv verify` selects
 

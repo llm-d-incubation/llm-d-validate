@@ -41,8 +41,8 @@ Pick the profile for the optimized-baseline overlay you deployed and the router 
 The profiles test the guide's router (the EPP). Give `llmdv` its URL:
 
 ```sh
-export LLMDV_ROUTER_URL=<your EPP's URL>
-llmdv verify --profile profiles/llm-d/keda-epp/<profile>.yaml
+export LLMDV_ROUTER_URL='https://your-router.example' # replace with your router's URL
+llmdv verify --profile 'profiles/llm-d/keda-epp/<profile>.yaml'
 ```
 
 To test a gateway or the engine as well, [add it as another ingress](../../README.md#include-a-gateway-or-engine). `--identity` flags are optional for verification. Set them when comparing deployments that share a profile, so their recorded configuration dimensions remain distinct; for example `--identity accelerator=gpu --identity provider=gke --identity flavor=queue`, where `provider` is your overlay's `INFRA_PROVIDER` folder and `flavor` the guide's `SIGNAL` value.

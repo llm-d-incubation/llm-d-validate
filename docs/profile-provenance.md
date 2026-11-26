@@ -57,8 +57,19 @@ the placeholders `llmdv profile validate` accepts:
 | Sentinel | Placeholder |
 |---|---|
 | `prompt_pins` | `1` per pin under each surface: `{chat_completions: {conversation: 1, tools: 1}}` (no `tools` pin under `completions`) |
-| `render_pins` | 64 zeros under each declared render surface and pin: `{chat_render: {conversation: "000…0", tools: "000…0"}}` |
+| `render_pins` | A 64-zero string per pin under each declared render surface; see the copyable example below |
 | `contract_baseline` part | `{llmdv_seed: [absent]}` |
+
+A copyable render placeholder (under an ingress's `capabilities`):
+
+```yaml
+render_pins:
+  chat_render:
+    conversation: "0000000000000000000000000000000000000000000000000000000000000000"
+```
+
+Declare it only if the ingress is intended to serve `chat_render`. Add a separate `tools` pin
+when the corresponding tool capability is supported.
 
 These are authoring placeholders, not measured expectations. An undeclared pin skips; an
 ordinary run does not populate it. Use a known-good build and select only the sentinel cases
