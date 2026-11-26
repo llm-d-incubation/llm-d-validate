@@ -35,22 +35,9 @@ API-level state; choose the profile and coverage appropriate for your deployment
 Start with a [deployed llm-d guide](#quick-start-test-a-deployed-llm-d-guide) or
 [your own endpoint](docs/getting-started.md#run-your-own-stack).
 
-## What a result gives you
-
-An illustrative, abbreviated failure:
-
-```text
-case     openai_chat.basic_non_streaming
-ingress  router
-outcome  FAIL
-
-checks
-  fail   http_status = 401   expected 200
-```
-
-The case identifies the behavior tested; the ingress identifies the endpoint; the recorded
-check shows why it failed. The run includes request/response evidence, a replay script and an
-HTML dashboard. [Read a failure step by step](docs/getting-started.md#follow-one-failure).
+<p align="center">
+  <img src="docs/images/llmdv-overview.gif" width="100%" alt="Animated overview: a profile defines the test plan; llmdv sends requests to the reachable gateway, router and engine, records verdicts and evidence, and publishes results and notifications.">
+</p>
 
 ## Quick start: test a deployed llm-d guide
 
