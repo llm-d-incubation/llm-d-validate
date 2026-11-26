@@ -320,9 +320,10 @@ def _verify(args: argparse.Namespace, run: _Run) -> int:
     run_dir = run.run_dir
 
     # Copied even when invalid: a refusal only means something against what was refused. A
-    # profile that extends another is written composed, so the record stands on its own.
+    # profile that extends another is written composed, and one whose model id came from a
+    # variable with that id written in, so the record stands on its own.
     if Path(args.profile).is_file():
-        composed = loader.composed_text(args.profile)
+        composed = loader.archived_text(args.profile)
         if composed is None:
             shutil.copyfile(args.profile, run_dir / "profile.used.yaml")
         else:
@@ -915,6 +916,7 @@ def _write_reproduce(args, profile, run_dir, setup_commands) -> None:
     if selected.mode != "full-suite":
         _, chain = loader.load_with_sources(args.profile)
         document = compose.resolved(chain, standalone=True)
+        document = loader.pinned_model_ids(document, profile) or document
         document["test_sets"] = {"recorded-run": list(selected.cases)}
         profile_file = "profile.replay.yaml"
         (run_dir / profile_file).write_text(
