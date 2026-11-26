@@ -46,10 +46,10 @@ exits `3` before any case runs, naming the profile field and the observed value.
 that omits its context window is recorded as unchecked, and the run continues. A 403, a 404 or
 an unreadable model list only warns; the declared API probes still run.
 
-**`--identity key=value`** (repeatable, `verify` and `job`) declares a lane dimension
+**`--identity key=value`** (repeatable, `verify` and `job`) declares a configuration dimension
 (`accelerator`, `provider`, `llm_d_ref`, `trigger`, `flavor`) or a profile assertion (`guide`,
 `engine`, `gateway`, `model`). A mismatch or an empty value exits `2`. `trigger` defaults to
-`manual`. `flavor` names whatever else tells apart lanes that share a profile, such as
+`manual`. `flavor` names whatever else tells apart configurations that share a profile, such as
 `flavor=lmcache-connector/cpu`; a run that passes none records none. Comparison baselines come
 only from runs with matching configuration identity, flavor included. **`--label key=value`** is
 free-form, recorded in `env.json` and `outcome.json`; it cannot use an identity key.
@@ -151,7 +151,7 @@ Separating environment problems from fleet problems is the point of having more 
 
 | Code | Class | Meaning |
 | --- | --- | --- |
-| `0` | `ok` | every selected case passed (skips do not fail a run) |
+| `0` | `ok` | no executed case failed; an all-skipped run can also exit 0 |
 | `1` | `fleet` | test failures: the fleet did not behave as the profile declares |
 | `2` | `usage` | bad usage, or an invalid profile; nothing was verified |
 | `3` | `environment` | your environment, not the fleet: preflight unsatisfied (nothing was tested), a local connection lost mid-run with no fleet failure, or a results store that cannot be used as configured |
@@ -299,21 +299,30 @@ case that fails with every recorded check passing says so.
 
 ### Reproducing a run
 
+Set `RUN` to the full printed run directory. Replace `<ingress>/<case>` with the actual
+bundle path shown in the dashboard. These commands send live requests; load the endpoint
+and credential variables first.
+
 ```sh
-bash runs/<run>/failures/<ingress>/<case>/repro.sh   # replay one exchange
-cd runs/<run> && ./reproduce.sh                       # rerun the verification into a fresh directory
+bash "$RUN/failures/<ingress>/<case>/repro.sh"   # replay one exchange
+(cd "$RUN" && ./reproduce.sh)                       # rerun the verification into a fresh directory
 ```
 
 `reproduce.sh` uses the archived profile beside it. For test-set runs it reads
 `profile.replay.yaml`, which freezes the resolved patterns as `test_sets.recorded-run`; for
-`--full-suite` runs it reads `profile.used.yaml`. Other filters are retained. Use the recorded
-`llmdv` version to reproduce the same library cases. Both scripts read credentials from the environment.
+`--full-suite` runs it reads `profile.used.yaml`. Other filters are retained. If a model ID was
+supplied through `public_id_env` during the run, the archived profiles pin the resolved IDs;
+unsetting or changing that model variable does not change replay selection. Otherwise the
+original model-variable lookup declarations remain. Use the recorded `llmdv` version to
+reproduce the same library cases. Both scripts read credentials from the environment.
 
 ### The dashboard
 
+Set `RUN` to the full path of the existing run directory:
+
 ```sh
-llmdv analyze runs/<run>                        # any run, finished, killed or fetched
-llmdv analyze runs/<run> --notes notes.json     # embed an analysis written elsewhere
+llmdv analyze "$RUN"                        # any run, finished, killed or fetched
+llmdv analyze "$RUN" --notes notes.json     # embed an analysis written elsewhere
 ```
 
 `dashboard.html` is one self-contained page: the system under test, failures grouped by their

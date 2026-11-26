@@ -1,11 +1,17 @@
 # The pod-snapshot guide in standalone mode (the client reaches the EPP's own listener): vLLM
 # serving Qwen/Qwen3-32B at an 8192-token window with no parsers: inline <think>, no tool calls.
 #
+# Validate your deployment after the deploy script has finished (Pod 1 snapshotted, Pod 2 restored):
+#   export LLMDV_ROUTER_URL='https://your-router.example' # replace with your router URL
+#   llmdv profile validate profiles/llm-d/pod-snapshot/vllm-qwen3-32b-ctx8k-inline-standalone.yaml
+#   llmdv verify --profile profiles/llm-d/pod-snapshot/vllm-qwen3-32b-ctx8k-inline-standalone.yaml \
+#     --identity accelerator=gpu --identity provider=gke
+#
 # llm-d 9ca8ff0. Composed from the guide's shipped config and the API
 # references. Only the router layer has been measured (on kind, with a simulator engine; see
 # ../parts/topology/standalone.yaml).
 #
-# CI lane that deploys this configuration (llm-d's nightly-e2e-pod-snapshot-<lane> workflow; it
+# Maintainer provenance: upstream workflow for this configuration (llm-d's nightly-e2e-pod-snapshot-<workflow-suffix> workflow; it
 # runs in standalone mode):
 #   gke-acc-gpu-vllm-x                guides/pod-snapshot/scripts/nightly-deploy-gke.sh with
 #                                     MODEL_SERVER=vllm, which applies modelserver/gpu/vllm/gke:
@@ -14,12 +20,6 @@
 #                                     the guide's snapshot launcher. Two replicas once the deploy
 #                                     finishes: one cold started, one restored from the snapshot
 #
-# How a lane runs it, after the deploy script has finished (Pod 1 snapshotted, Pod 2 restored):
-#   export LLMDV_ROUTER_URL=<the EPP's URL>
-#   llmdv profile validate profiles/llm-d/pod-snapshot/vllm-qwen3-32b-ctx8k-inline-standalone.yaml
-#   llmdv verify --profile profiles/llm-d/pod-snapshot/vllm-qwen3-32b-ctx8k-inline-standalone.yaml \
-#     --identity accelerator=gpu --identity provider=gke
-
 extends:
   - ../parts/base.yaml
   - ../parts/topology/standalone.yaml

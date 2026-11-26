@@ -3,15 +3,15 @@
 Reads a local llm-d clone and this repository's `profiles/llm-d/`, and writes a Markdown report
 on stdout:
 
-- **Lanes with no profile**: a nightly lane at the newer commit that no guide folder's README
-  names. A lane of a guide with no folder here is a new Tier 3 guide.
-- **Lanes removed**: a lane a guide folder's README names that no longer exists.
+- **Workflows with no profile**: a nightly workflow at the newer commit that no guide README
+  names. A workflow of a guide with no folder here is a new Tier 3 guide.
+- **Workflows removed**: a workflow a guide folder's README names that no longer exists.
 - **Changed sources, by guide**: the files under each covered guide's directory, its nightly
   workflows and the shared recipes that changed between the two commits, grouped by the
   profile fact each kind of file owns.
 
 Read-only: it runs `git` against the clone and never writes to it, to this repository or to any
-cluster. It reports file paths and lane names only, never the values a workflow passes
+cluster. It reports file paths and workflow names only, never the values a workflow passes
 (namespaces, cluster names, buckets), which must not be copied into this repository.
 
     python .agents/skills/tracking-llm-d-guide-drift/drift.py --llm-d <clone> [--to origin/main]
@@ -35,12 +35,15 @@ PIN = re.compile(r"llm-d (?:commit )?`([0-9a-f]{7,40})`")
 UPSTREAM_DIR = re.compile(r"https://github\.com/llm-d/llm-d/tree/[^/]+/(guides/[^)\s#]+)")
 # Which profile fact each kind of upstream file owns (the profile skill's source table).
 OWNERS = (
-    (re.compile(rf"^{WORKFLOWS}/"), "lanes: which configurations get a profile"),
-    (re.compile(r"/scripts/|deploy.*\.sh$"), "lanes: the deploy scripts a lane calls"),
-    (re.compile(r"(^|/)guide\.yaml$"), "statements to check against the lanes (sources disagree)"),
+    (re.compile(rf"^{WORKFLOWS}/"), "workflows: which configurations get a profile"),
+    (re.compile(r"/scripts/|deploy.*\.sh$"), "workflows: the deploy scripts a workflow calls"),
+    (
+        re.compile(r"(^|/)guide\.yaml$"),
+        "statements to check against the workflows (sources disagree)",
+    ),
     (
         re.compile(r"(^|/)README\.md$|\.md$"),
-        "statements to check against the lanes (sources disagree)",
+        "statements to check against the workflows (sources disagree)",
     ),
     (
         re.compile(r"router|values\.ya?ml$|epp"),
@@ -93,13 +96,13 @@ def lanes_at(clone: Path, ref: str) -> set[str]:
 
 
 def owner(guides_: list[Guide], lane: str) -> Guide | None:
-    """The guide folder a lane belongs to: the longest folder name the lane starts with or holds."""
+    """The owning guide: the longest folder name contained in the workflow name."""
     matches = [g for g in guides_ if lane.startswith(g.folder + "-") or f"-{g.folder}-" in lane]
     return max(matches, key=lambda g: len(g.folder), default=None)
 
 
 def covered(guide: Guide, lane: str) -> bool:
-    """A lane is covered when the guide's README names it, in full or as its suffix."""
+    """A workflow is covered when the guide's README names it, in full or as its suffix."""
     suffix = lane.split(guide.folder + "-", 1)[-1]
     return bool({lane, LANE_PREFIX + lane, suffix} & guide.known_lanes)
 
@@ -124,7 +127,7 @@ def report(clone: Path, old: str, new: str) -> str:
         guide = owner(guides_, lane)
         if guide is None or not covered(guide, lane):
             uncovered.setdefault(guide.folder if guide else "(no guide folder)", []).append(lane)
-    out += ["## Lanes with no profile", ""]
+    out += ["## Workflows with no profile", ""]
     if not uncovered:
         out.append("None.")
     for folder, lanes in uncovered.items():
@@ -132,7 +135,7 @@ def report(clone: Path, old: str, new: str) -> str:
     out.append("")
 
     removed = sorted(before - after)
-    out += ["## Lanes removed", ""]
+    out += ["## Workflows removed", ""]
     out += [f"- `{LANE_PREFIX}{lane}`" for lane in removed] or ["None."]
     out.append("")
 

@@ -51,7 +51,7 @@
 #   7   token estimation per image and video; an image given by URL is priced at
 #       defaultResolution because the router does not fetch it (README "Token estimation")
 #       -> NOT COVERED: a router-internal estimate with no client-observable effect. The
-#          Messages image_url source would need image_url_fixture, which no lane hosts
+#          Messages image_url source would need image_url_fixture, which these profiles do not configure
 #   8   video metadata headers x-llm-d-video-fps, -duration-seconds and -resolution (README
 #       "Token estimation")
 #       -> NOT COVERED: llmdv has no video input case, and the headers are not declared in the
@@ -72,14 +72,15 @@ capabilities:
   # routing.prefix_affinity.
   cache_reuse: null
 
-# The cases this guide's lanes run by default (`llmdv verify --full-suite` runs everything). They test
-# what a lane's own deployment can get wrong: the router path, the overlay's parsers and window,
-# and what this guide changes. Engine and model conformance, the rest of the suite, depends only
-# on the engine build, model and flags, which many lanes share; it runs with `--full-suite` once per
-# configuration (profiles/llm-d/README.md, "Which lane runs everything").
+# Default validation scope: the router path, configured parsers and context window,
+# plus the serving behavior this guide introduces. These focused checks are a starting
+# point for deployment validation. Expand coverage for the APIs and operating conditions
+# you rely on; --full-suite selects the existing library before applicability gates.
+# Maintainer assignments for broader validation are in profiles/llm-d/README.md,
+# under "Broader validation assignments".
 test_sets:
   default:
-    # Every lane: the router serves each API a client uses, and refuses what it should.
+    # Every deployment: the router serves each API a client uses, and refuses what it should.
     - contract.*
     - discovery.models_lists_declared_model
     - discovery.unknown_model_no_fallback
@@ -102,15 +103,15 @@ test_sets:
     - unhappy.error_envelope_fields
     - transport.connection
     - transport.health_status
-    # Every lane: the overlay's parser flags take effect (skips where the model part has none).
+    # Every deployment: the overlay's parser flags take effect (skips where the model part has none).
     - openai_chat.configured_reasoning
     - tools.auto_call
     - tools.auto_stream
-    # Every lane: the overlay's context window is the one declared.
+    # Every deployment: the overlay's context window is the one declared.
     - long_context.*
     - unhappy.context_overflow
     - unhappy.token_limit_over_context
-    # This guide: the guide serves images; on the e-pd lane media requests pass an encode step and the
+    # This guide: the guide serves images; on the e-pd configuration media requests pass an encode step and the
     # routing sidecar.
     - images.*
     - unhappy.image_input

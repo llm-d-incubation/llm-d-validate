@@ -6,7 +6,7 @@
 # No `name` here: each combination names itself.
 #
 # The router, as this guide configures it (FROM values: G/router/
-# precise-prefix-cache-routing.values.yaml, every lane runs vLLM):
+# precise-prefix-cache-routing.values.yaml, every configuration runs vLLM):
 #   token-producer                 tokenizes every prompt before routing by calling vLLM's
 #                                  /v1/*/render on the pool's own Ready endpoints, round-robin,
 #                                  one retry on another endpoint; modelName Qwen/Qwen3-32B;
@@ -22,14 +22,14 @@
 # No configuration names an SLO admission plugin, so the topology part's `ignored` SLO headers
 # stand.
 #
-# Engine settings every lane shares (FROM values: G/modelserver/): --block-size=64 and
+# Engine settings every configuration shares (FROM values: G/modelserver/): --block-size=64 and
 # --kv-events-config, no KV connector; --enable-scale-out, which serves vLLM's render routes on
-# the inference port, on every lane except tpu/v5p (see README.md, "For maintainers").
+# the inference port, on every configuration except tpu/v5p (see README.md, "For maintainers").
 # The router's 64-token blocks match the engines' --block-size=64. Not declared as
 # cache_reuse.block_size, because cache_reuse is not declared (below).
 #
 # Render surfaces are declared in the combinations, not here: surfaces are keyed by ingress id,
-# and the lanes differ. vLLM v0.30 and later register the four render routes only with
+# and the configurations differ. vLLM v0.30 and later register the four render routes only with
 # --enable-scale-out (FROM docs: vllm@v0.31.0:vllm/entrypoints/scale_out/factories.py), so the
 # GPU, AMD and XPU combinations declare all four, with prefix_stability on chat_render and
 # messages_render, and the TPU v5p combination declares none. contract checks each both ways.
@@ -44,7 +44,7 @@
 #                  called on the pod, not through the router
 #                  -> NOT COVERED: needs a per-pod engine ingress, and a committed profile names no
 #                     pod. Through the router a client's render call reaches one replica, which
-#                     the render suite checks on the lanes that declare the surfaces (above)
+#                     the render suite checks on the configurations that declare the surfaces (above)
 #   request        /v1/completions through the EPP answers -> openai_completions.*
 #   messages       /v1/messages through the EPP, which the router renders through
 #                  /v1/messages/render -> anthropic_messages.*
@@ -57,7 +57,7 @@
 #                  new llm_d_epp_token_producer_render_failures_total across one request
 #                  -> NOT COVERED: reads the EPP's /metrics on port 9090 with a service-account
 #                     token, which needs cluster access a committed profile does not carry
-#                     (fleet.metrics, from a lane's own local file). Without it, a router whose
+#                     (fleet.metrics, from your local profile). Without it, a router whose
 #                     renders all fail still answers 200 (G/README.md, "Verify that the router
 #                     renders"), so every case here can pass while precise routing is off
 #   shared_prefix  ten requests sharing a ~2k-token prefix, 3 s apart, past the 2 s speculative-index
@@ -80,14 +80,15 @@ capabilities:
   # affinity. The guide's own affinity claim (shared_prefix above) needs routing.prefix_affinity.
   cache_reuse: null
 
-# The cases this guide's lanes run by default (`llmdv verify --full-suite` runs everything). They test
-# what a lane's own deployment can get wrong: the router path, the overlay's parsers and window,
-# and what this guide changes. Engine and model conformance, the rest of the suite, depends only
-# on the engine build, model and flags, which many lanes share; it runs with `--full-suite` once per
-# configuration (profiles/llm-d/README.md, "Which lane runs everything").
+# Default validation scope: the router path, configured parsers and context window,
+# plus the serving behavior this guide introduces. These focused checks are a starting
+# point for deployment validation. Expand coverage for the APIs and operating conditions
+# you rely on; --full-suite selects the existing library before applicability gates.
+# Maintainer assignments for broader validation are in profiles/llm-d/README.md,
+# under "Broader validation assignments".
 test_sets:
   default:
-    # Every lane: the router serves each API a client uses, and refuses what it should.
+    # Every deployment: the router serves each API a client uses, and refuses what it should.
     - contract.*
     - discovery.models_lists_declared_model
     - discovery.unknown_model_no_fallback
@@ -110,11 +111,11 @@ test_sets:
     - unhappy.error_envelope_fields
     - transport.connection
     - transport.health_status
-    # Every lane: the overlay's parser flags take effect (skips where the model part has none).
+    # Every deployment: the overlay's parser flags take effect (skips where the model part has none).
     - openai_chat.configured_reasoning
     - tools.auto_call
     - tools.auto_stream
-    # Every lane: the overlay's context window is the one declared.
+    # Every deployment: the overlay's context window is the one declared.
     - long_context.*
     - unhappy.context_overflow
     - unhappy.token_limit_over_context

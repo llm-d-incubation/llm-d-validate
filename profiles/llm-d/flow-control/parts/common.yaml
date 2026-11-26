@@ -18,22 +18,22 @@
 #                     round-robin-fairness-policy and fcfs-ordering-policy
 #   objectives        G/objectives.yaml: InferenceObjectives premium-traffic (100),
 #                     standard-traffic (0), best-effort-traffic (-10), on pool flow-control
-# CI-only changes (FROM values: G/scripts/nightly-deploy-gke.sh): maxConcurrency lowered to 4,
+# Upstream validation overrides (FROM values: G/scripts/nightly-deploy-gke.sh): maxConcurrency lowered to 4,
 # EPP --v=4, Envoy log level info, EPP metrics auth off, and the model server cut to one replica.
 # With one replica and maxConcurrency 4, the pool dispatches four requests at once and queues the
 # rest in the EPP for up to defaultRequestTTL (60s) before rejecting them.
 #
-# What that means for llmdv's own run, which sends one request at a time: flow control is
-# work-conserving, so a single request never queues, and a client sees the router as
+# For an uncontended request, flow control is work-conserving. These checks expect the
+# usual serving contract plus the flow-control header; a client sees the router as
 # optimized-baseline's but for one response header, x-llm-d-flow-queue-duration-ms, which flow
 # control adds to every request it admits (declared below). Two cases send concurrent requests:
 # scenarios.cancel_burst (eight streams at once) and the cache suite's parallel sub-agents (four;
-# not run here, since cache_reuse is not declared). Under the CI setting, four of cancel_burst's
+# not run here, since cache_reuse is not declared). With this maxConcurrency setting, four of cancel_burst's
 # streams wait in the EPP until a cancelled stream frees its slot; well inside the 60s TTL and the
 # band's 200-request limit, so a correct stack still serves them. A rejection there (429, 503 or 500
 # with x-llm-d-request-dropped-reason) is a finding, not a skip.
 #
-# Model servers: this guide keeps no modelserver/ overlay. Each lane renders optimized-baseline's
+# Model servers: this guide keeps no modelserver/ overlay. Each configuration renders optimized-baseline's
 # and relabels it (`sed s/optimized-baseline/flow-control/g`), so the model, window and parsers
 # are optimized-baseline's (the model parts list the overlays).
 #
@@ -59,7 +59,7 @@
 #   6   backpressure: past maxConcurrency x ready replicas the EPP holds requests rather than
 #       dispatching (README Use Case 2, .github/scripts/e2e/e2e-validate-flow-control.sh)
 #       -> NOT COVERED: requires_load (#23)
-#   7   strict priority: under contention best-effort waits longer than premium (the CI
+#   7   strict priority: under contention best-effort waits longer than premium (the upstream
 #       validator's QoS gap) -> NOT COVERED: requires_load (#23)
 #   8   round-robin fairness between tenants in one band, FCFS within a flow -> NOT COVERED:
 #       requires_load (#23); the guide itself scopes weighted fairness at scale to a benchmark
@@ -76,7 +76,7 @@ guide: flow-control
 
 capabilities:
   # Not declared, on purpose, as in optimized-baseline. The cache suite reads cached_tokens from
-  # each response, and neither overlay this guide's lanes render (OB/modelserver/gpu/vllm/gke,
+  # each response, and neither overlay this guide's configurations render (OB/modelserver/gpu/vllm/gke,
   # OB/modelserver/amd/vllm/base) passes vLLM's --enable-prompt-tokens-details. With no
   # cached_tokens, `affinity: routed` would fail on a correct stack for want of the field.
   cache_reuse: null
@@ -91,14 +91,15 @@ headers:
   x-llm-d-flow-queue-duration-ms:
     router: promised
 
-# The cases this guide's lanes run by default (`llmdv verify --full-suite` runs everything). They test
-# what a lane's own deployment can get wrong: the router path, the overlay's parsers and window,
-# and what this guide changes. Engine and model conformance, the rest of the suite, depends only
-# on the engine build, model and flags, which many lanes share; it runs with `--full-suite` once per
-# configuration (profiles/llm-d/README.md, "Which lane runs everything").
+# Default validation scope: the router path, configured parsers and context window,
+# plus the serving behavior this guide introduces. These focused checks are a starting
+# point for deployment validation. Expand coverage for the APIs and operating conditions
+# you rely on; --full-suite selects the existing library before applicability gates.
+# Maintainer assignments for broader validation are in profiles/llm-d/README.md,
+# under "Broader validation assignments".
 test_sets:
   default:
-    # Every lane: the router serves each API a client uses, and refuses what it should.
+    # Every deployment: the router serves each API a client uses, and refuses what it should.
     - contract.*
     - discovery.models_lists_declared_model
     - discovery.unknown_model_no_fallback
@@ -121,11 +122,11 @@ test_sets:
     - unhappy.error_envelope_fields
     - transport.connection
     - transport.health_status
-    # Every lane: the overlay's parser flags take effect (skips where the model part has none).
+    # Every deployment: the overlay's parser flags take effect (skips where the model part has none).
     - openai_chat.configured_reasoning
     - tools.auto_call
     - tools.auto_stream
-    # Every lane: the overlay's context window is the one declared.
+    # Every deployment: the overlay's context window is the one declared.
     - long_context.*
     - unhappy.context_overflow
     - unhappy.token_limit_over_context

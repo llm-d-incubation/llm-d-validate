@@ -3,11 +3,17 @@
 # and the hermes tool parser, autoscaled by KEDA on in-flight requests between one and two
 # replicas.
 #
+# Validate your deployment after the deploy script:
+#   export LLMDV_ROUTER_URL='https://your-router.example' # replace with your router URL
+#   llmdv profile validate profiles/llm-d/keda-epp/vllm-qwen3-32b-parsers-inflight-standalone.yaml
+#   llmdv verify --profile profiles/llm-d/keda-epp/vllm-qwen3-32b-parsers-inflight-standalone.yaml \
+#     --identity accelerator=gpu --identity provider=base --identity flavor=inflight
+#
 # llm-d 9ca8ff0. Composed from the guide's shipped config and the API
 # references. Only the router layer has been measured, and that with optimized-baseline's router
 # config (on kind, with a simulator engine; see ../parts/topology/standalone.yaml).
 #
-# CI lanes that deploy this configuration (llm-d's nightly-e2e-workload-autoscaling-keda-epp-<lane>
+# Maintainer provenance: upstream workflows for this configuration (llm-d's nightly-e2e-workload-autoscaling-keda-epp-<workflow-suffix>
 # workflows; standalone mode, with a custom_deploy_script):
 #   ibm-acc-gpu-vllm-x   reusable-nightly-e2e-openshift,
 #                        guides/workload-autoscaling/scripts/nightly-deploy-ocp-keda-epp.sh:
@@ -16,16 +22,10 @@
 #                        <release>-inflight-epp. The workflow also passes image_override
 #                        docker.io/vllm/vllm-openai:nightly to the reusable workflow, whose effect
 #                        is outside this repository
-# Without flow control the router adds no x-llm-d-flow-queue-duration-ms header, so this lane does
-# not share vllm-qwen3-32b-parsers-queue-standalone.yaml with the gke lane; no header is declared
+# Without flow control the router adds no x-llm-d-flow-queue-duration-ms header, so this configuration does
+# not share vllm-qwen3-32b-parsers-queue-standalone.yaml with the gke configuration; no header is declared
 # for it here, since the router's other headers are the topology part's.
 #
-# How a lane runs it, after the deploy script:
-#   export LLMDV_ROUTER_URL=<the EPP's URL>
-#   llmdv profile validate profiles/llm-d/keda-epp/vllm-qwen3-32b-parsers-inflight-standalone.yaml
-#   llmdv verify --profile profiles/llm-d/keda-epp/vllm-qwen3-32b-parsers-inflight-standalone.yaml \
-#     --identity accelerator=gpu --identity provider=base --identity flavor=inflight
-
 extends:
   - ../parts/base.yaml
   - ../parts/topology/standalone.yaml

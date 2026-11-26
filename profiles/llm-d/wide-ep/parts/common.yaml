@@ -76,7 +76,7 @@
 #       need cluster access a committed profile does not carry, and a routing case family that
 #       compares counters before and after (#27)
 #   4   the router's P/D decisions (verify.tests.router_metrics, llm_d_epp_disagg_decision_total,
-#       only with MONITORING=true) -> NOT COVERED: fleet.metrics, same reason; no lane sets
+#       only with MONITORING=true) -> NOT COVERED: fleet.metrics, same reason; no tracked upstream workflow sets
 #       MONITORING
 #   5   rollout gating keeps prefill and decode on one DisaggregatedSet revision -> NOT COVERED:
 #       needs a rollout during the run, which llmdv never causes
@@ -106,14 +106,15 @@ capabilities:
   # no sidecar and no cached_tokens.
   cache_reuse: null
 
-# The cases this guide's lanes run by default (`llmdv verify --full-suite` runs everything). They test
-# what a lane's own deployment can get wrong: the router path, the overlay's parsers and window,
-# and what this guide changes. Engine and model conformance, the rest of the suite, depends only
-# on the engine build, model and flags, which many lanes share; it runs with `--full-suite` once per
-# configuration (profiles/llm-d/README.md, "Which lane runs everything").
+# Default validation scope: the router path, configured parsers and context window,
+# plus the serving behavior this guide introduces. These focused checks are a starting
+# point for deployment validation. Expand coverage for the APIs and operating conditions
+# you rely on; --full-suite selects the existing library before applicability gates.
+# Maintainer assignments for broader validation are in profiles/llm-d/README.md,
+# under "Broader validation assignments".
 test_sets:
   default:
-    # Every lane: the router serves each API a client uses, and refuses what it should.
+    # Every deployment: the router serves each API a client uses, and refuses what it should.
     - contract.*
     - discovery.models_lists_declared_model
     - discovery.unknown_model_no_fallback
@@ -136,11 +137,11 @@ test_sets:
     - unhappy.error_envelope_fields
     - transport.connection
     - transport.health_status
-    # Every lane: the overlay's parser flags take effect (skips where the model part has none).
+    # Every deployment: the overlay's parser flags take effect (skips where the model part has none).
     - openai_chat.configured_reasoning
     - tools.auto_call
     - tools.auto_stream
-    # Every lane: the overlay's context window is the one declared.
+    # Every deployment: the overlay's context window is the one declared.
     - long_context.*
     - unhappy.context_overflow
     - unhappy.token_limit_over_context

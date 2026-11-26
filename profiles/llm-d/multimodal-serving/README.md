@@ -8,8 +8,8 @@ Profiles for testing a deployment of llm-d's [multimodal-serving](https://github
 
 **Validation focus: image understanding across the serving path.** Require answers about a freshly drawn image on Chat, Messages and Responses, so accepting image syntax alone cannot count as working vision.
 
-**What a pass establishes:** the selected checks held for the declared APIs and reachable
-ingress during this run. **Coverage boundary:** The tests do not establish encoder/prefill/decode placement or performance; topology-specific limitations remain below.
+**What a pass establishes:** the checks that actually executed held at the reachable ingress
+during this run. Skipped checks remain coverage gaps. **Coverage boundary:** The tests do not establish encoder/prefill/decode placement or performance; topology-specific limitations remain below.
 
 These focused defaults are a starting point for validating a production deployment. Add coverage
 for the APIs, clients and operating conditions you rely on; see
@@ -39,7 +39,7 @@ There is one profile: every topology and overlay below looks the same to a clien
 The profiles test the guide's router (the EPP). Give `llmdv` its URL:
 
 ```sh
-export LLMDV_ROUTER_URL=<your EPP's URL>
+export LLMDV_ROUTER_URL='https://your-router.example' # replace with your router's URL
 llmdv verify --profile profiles/llm-d/multimodal-serving/vllm-qwen3-vl-32b-instruct-inline-standalone.yaml
 ```
 
@@ -56,35 +56,100 @@ See [selection rules](../../../docs/cli.md#test-sets-and-coverage) for smoke, fu
 
 `*` selects the whole library; `suite.*` selects a suite. Other patterns select matching cases.
 
-| Suite | Patterns |
-| --- | --- |
-| `contract` | `contract.*` |
-| `discovery` | `discovery.models_lists_declared_model`, `discovery.unknown_model_no_fallback`, `discovery.models_parses_with_openai_sdk` |
-| `openai_chat` | `openai_chat.basic_non_streaming`, `openai_chat.streaming_sse`, `openai_chat.stop_reason`, `openai_chat.configured_reasoning` |
-| `openai_completions` | `openai_completions.basic_non_streaming`, `openai_completions.streaming_matches_json`, `openai_completions.stop_reason` |
-| `anthropic_messages` | `anthropic_messages.basic_non_streaming`, `anthropic_messages.streaming_sse` |
-| `openai_responses` | `openai_responses.basic_non_streaming`, `openai_responses.streaming_sse` |
-| `streaming` | `streaming.sse_framing`, `streaming.*` |
-| `unhappy` | `unhappy.unknown_path`, `unhappy.malformed_json`, `unhappy.missing_model`, `unhappy.wrong_method`, `unhappy.error_envelope_fields`, `unhappy.context_overflow`, `unhappy.token_limit_over_context`, `unhappy.image_input`, `unhappy.invalid_image` |
-| `transport` | `transport.connection`, `transport.health_status` |
-| `tools` | `tools.auto_call`, `tools.auto_stream` |
-| `long_context` | `long_context.*` |
-| `images` | `images.*` |
+**contract**
+
+- `contract.*`
+
+**discovery**
+
+- `discovery.models_lists_declared_model`
+- `discovery.unknown_model_no_fallback`
+- `discovery.models_parses_with_openai_sdk`
+
+**openai_chat**
+
+- `openai_chat.basic_non_streaming`
+- `openai_chat.streaming_sse`
+- `openai_chat.stop_reason`
+- `openai_chat.configured_reasoning`
+
+**openai_completions**
+
+- `openai_completions.basic_non_streaming`
+- `openai_completions.streaming_matches_json`
+- `openai_completions.stop_reason`
+
+**anthropic_messages**
+
+- `anthropic_messages.basic_non_streaming`
+- `anthropic_messages.streaming_sse`
+
+**openai_responses**
+
+- `openai_responses.basic_non_streaming`
+- `openai_responses.streaming_sse`
+
+**streaming**
+
+- `streaming.sse_framing`
+- `streaming.*`
+
+**unhappy**
+
+- `unhappy.unknown_path`
+- `unhappy.malformed_json`
+- `unhappy.missing_model`
+- `unhappy.wrong_method`
+- `unhappy.error_envelope_fields`
+- `unhappy.context_overflow`
+- `unhappy.token_limit_over_context`
+- `unhappy.image_input`
+- `unhappy.invalid_image`
+
+**transport**
+
+- `transport.connection`
+- `transport.health_status`
+
+**tools**
+
+- `tools.auto_call`
+- `tools.auto_stream`
+
+**long_context**
+
+- `long_context.*`
+
+**images**
+
+- `images.*`
+
 
 </details>
+
+Counted offline by `llmdv plan`, one case per ingress and variant. Planned runs can still skip at runtime. Expand a profile for its scope counts and separate skip classes.
+
+The default is also `--all-test-sets` for these profiles.
 
 <details>
-<summary>How many cases each scope selects, per profile</summary>
+<summary>vllm-qwen3-vl-32b-instruct-inline-standalone.yaml</summary>
 
-Counted offline by `llmdv plan`, one per ingress and variant. *Run* cases can still skip during a run (for example `throttled`); *skip* cases are ruled out by the profile's declarations, with their skip class.
+[Open the profile](vllm-qwen3-vl-32b-instruct-inline-standalone.yaml).
 
-| Profile | Default (= `--all-test-sets`) | `smoke` | `--full-suite` |
-| --- | --- | --- | --- |
-| `vllm-qwen3-vl-32b-instruct-inline-standalone.yaml` | 132 selected, 118 run, 14 skip: 14 undeclared | 9 selected, 9 run | 1092 selected, 659 run, 433 skip: 433 undeclared |
+| Scope | Selected | Planned run | Planned skip |
+| --- | ---: | ---: | ---: |
+| Default | 132 | 118 | 14 |
+| Smoke | 9 | 9 | 0 |
+| Full library | 1092 | 659 | 433 |
+
+Planned skips by class:
+
+- **Default:** 14 `undeclared`.
+- **Full library:** 433 `undeclared`.
 
 </details>
 
-Preview individual cases and skip reasons with `llmdv plan --profile <profile>`.
+Preview cases and reasons with `llmdv plan --profile <profile>`.
 
 ## Not covered
 
@@ -95,22 +160,22 @@ Preview individual cases and skip reasons with `llmdv plan --profile <profile>`.
 - **Token estimation and video**: the router's per-image and per-video token estimate has no client-observable effect, and `llmdv` has no video input case (nor the `x-llm-d-video-*` headers).
 - **Images by URL**: Messages `image_url` needs `image_url_fixture`, which no llm-d test deployment hosts, so it skips as `requires_instrumentation`.
 - **The cache suite**: no role passes `--enable-prompt-tokens-details`, so `cache_reuse` is not declared (see `parts/common.yaml`).
-- **Configurations llm-d does not test nightly**: the E/P/D topology, the `base` and `coreweave` providers, Intel XPU (community), the TPU v7 `gemma4` and `qwen3-5-397b` overlays, and SGLang's XPU-encode, GPU-PD profile.
+- **Configurations without a profile**: the E/P/D topology, the `base` and `coreweave` providers, Intel XPU (community), the TPU v7 `gemma4` and `qwen3-5-397b` overlays, and SGLang's XPU-encode, GPU-PD profile.
 
 ## For maintainers
 
 <details>
-<summary>llm-d's nightly lanes, and how each maps to a profile</summary>
+<summary>llm-d's nightly workflows, and how each maps to a profile</summary>
 
-Every configuration a nightly lane deploys looks the same to a client: vLLM v0.31.0 serving `Qwen/Qwen3-VL-32B-Instruct` at its own window, with no reasoning or tool parser. One combination covers the three lanes. `accelerator` is the lane's `ACCELERATOR_TYPE`, `provider` the `INFRA_PROVIDER` folder it renders, and `flavor` the guide's topology as the overlay path spells it: the topology folder, then `TOPOLOGY` where it adds a folder of its own (`aggregation`, `e-disaggregation/e-pd`). Every lane passes it; it is what tells the aggregated GPU lane and the E/PD GPU lane apart (they share accelerator and provider).
+Every configuration a nightly workflow deploys looks the same to a client: vLLM v0.31.0 serving `Qwen/Qwen3-VL-32B-Instruct` at its own window, with no reasoning or tool parser. One combination covers the three workflows. `accelerator` is the workflow's `ACCELERATOR_TYPE`, `provider` the `INFRA_PROVIDER` folder it renders, and `flavor` the guide's topology as the overlay path spells it: the topology folder, then `TOPOLOGY` where it adds a folder of its own (`aggregation`, `e-disaggregation/e-pd`). Every workflow passes it; it is what tells the aggregated GPU workflow and the E/PD GPU workflow apart (they share accelerator and provider).
 
-| CI lane (`nightly-e2e-multimodal-serving-<lane>`) | Overlay it renders | Profile | Identity flags |
+| upstream workflow (`nightly-e2e-multimodal-serving-<workflow-suffix>`) | Overlay it renders | Profile | Identity flags |
 | --- | --- | --- | --- |
 | `aggregation-gke-acc-gpu-vllm-x` | `aggregation/modelserver/gpu/vllm/gke` | `vllm-qwen3-vl-32b-instruct-inline-standalone` | `--identity accelerator=gpu --identity provider=gke --identity flavor=aggregation` |
 | `aggregation-gke-acc-tpu-vllm-x` | `aggregation/modelserver/tpu/v7/vllm/qwen3-vl` | `vllm-qwen3-vl-32b-instruct-inline-standalone` | `--identity accelerator=tpu/v7 --identity provider=qwen3-vl --identity flavor=aggregation` |
 | `e-disaggregation-gke-acc-gpu-vllm-x` | `e-disaggregation/modelserver/gpu/vllm/e-pd/gke` | `vllm-qwen3-vl-32b-instruct-inline-standalone` | `--identity accelerator=gpu --identity provider=gke --identity flavor=e-disaggregation/e-pd` |
 
-The TPU lane's `infra_provider` input is `qwen3-vl`, and the folder it renders is `tpu/v7/vllm/qwen3-vl`, so its runs are recorded as `provider=qwen3-vl`: the folder the lane renders, not the one `guide.yaml` lists (see "Where llm-d's own sources disagree" below). The E/PD lane's `infra_provider` input is `e-pd/gke`, the workflow's join of `TOPOLOGY` and `INFRA_PROVIDER`; `guide.yaml` keeps them apart, so `e-pd` goes in the flavor and the provider is `gke`.
+The TPU workflow's `infra_provider` input is `qwen3-vl`, and the folder it renders is `tpu/v7/vllm/qwen3-vl`, so its runs are recorded as `provider=qwen3-vl`: the folder the workflow renders, not the one `guide.yaml` lists (see "Where llm-d's own sources disagree" below). The E/PD workflow's `infra_provider` input is `e-pd/gke`, the workflow's join of `TOPOLOGY` and `INFRA_PROVIDER`; `guide.yaml` keeps them apart, so `e-pd` goes in the flavor and the provider is `gke`.
 
 The client calls the `<GUIDE_NAME>-epp` Service on port 80, in standalone mode.
 
@@ -121,6 +186,6 @@ The client calls the `<GUIDE_NAME>-epp` Service on port 80, in standalone mode.
 
 - `nightly-e2e-multimodal-serving-aggregation-gke-acc-tpu-vllm-x.yaml` passes `infra_provider: qwen3-vl`, which is not one of `guide.yaml`'s `INFRA_PROVIDER` values (`base`, `gke`, `coreweave`), and `guide.yaml`'s support table lists only `gke` as the provider for `tpu/v7`; the README's overlay table names `tpu/v7/vllm/gke` for TPU v7, which wraps `qwen3-vl`. The two render identically today.
 - The E/PD decode pods' routing sidecar runs `ghcr.io/llm-d/llm-d-router-disagg-sidecar:main` (`imagePullPolicy: Always`), a floating tag, so two runs of the same llm-d commit can run different sidecar builds. `e-disaggregation/modelserver/gpu/vllm/e-pd/base/kustomization.yaml` takes the `recipes/modelserver/components/images/routing-sidecar/nightly` component (tag `main`) rather than its `release` sibling (tag `v1.0.0`), while it takes the `release` vLLM image.
-- `unhappy.invalid_image` is expected to fail on the E/PD lane, and that is a finding for the team, not an excuse; the default test set is unchanged. The router's `always-disagg-multimodal-decider` (`e-disaggregation/router/vllm/e-pd-disaggregation.values.yaml:21-25`) sends media requests through the decode pod's routing sidecar, which turns an encoder's non-2xx answer, such as vLLM's 400 for a corrupt image, into its own 502 (llm-d-router main, the `:main` image above: `connector_ec_common.go:298`, `connector_ec_nixl.go:136-144`). Text requests carry no encoder header and pass through unchanged (`dispatch.go:264-285`).
+- `unhappy.invalid_image` is expected to fail on the E/PD workflow, and that is a finding for the team, not an excuse; the default test set is unchanged. The router's `always-disagg-multimodal-decider` (`e-disaggregation/router/vllm/e-pd-disaggregation.values.yaml:21-25`) sends media requests through the decode pod's routing sidecar, which turns an encoder's non-2xx answer, such as vLLM's 400 for a corrupt image, into its own 502 (llm-d-router main, the `:main` image above: `connector_ec_common.go:298`, `connector_ec_nixl.go:136-144`). Text requests carry no encoder header and pass through unchanged (`dispatch.go:264-285`).
 
 </details>

@@ -10,7 +10,8 @@ It sends nothing to any stack.
     python .agents/skills/writing-an-infra-profile/selection_docs.py --check    # exit 1 if stale
 
 It refuses to write a shared section when the profiles of one folder define different sets, or
-when a planned suite has no pattern in the default: those need a section written by hand.
+when a planned suite has no pattern in the default. An explicit "*" covers every suite.
+Inconsistent folders need a documented generator update, not an unchecked hand-edited section.
 """
 
 from __future__ import annotations
@@ -26,6 +27,8 @@ from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 import yaml
+
+from llmdv.profile import compose
 
 ROOT = Path(__file__).resolve().parents[3]
 PROFILES = ROOT / "profiles"
@@ -47,13 +50,8 @@ def runnable() -> list[Path]:
 
 
 def extends_chain(path: Path) -> list[Path]:
-    data = yaml.safe_load(path.read_text()) or {}
-    parents = data.get("extends") or []
-    parents = [parents] if isinstance(parents, str) else parents
-    chain: list[Path] = []
-    for parent in parents:
-        chain += extends_chain((path.parent / parent).resolve())
-    return chain + [path.resolve()]
+    """Use the runtime composition rules, including cycle and repeated-parent rejection."""
+    return [layer.path for layer in compose.layers(path)]
 
 
 def composed_sets(path: Path) -> tuple[dict, dict]:
@@ -99,16 +97,6 @@ def plan(path: Path, flags: tuple[str, ...]) -> dict:
     }
 
 
-def describe(result: dict) -> str:
-    if "rc" in result:
-        return f"exits {result['rc']}"
-    text = f"{result['total']} selected, {result['run']} run"
-    if result["skip"]:
-        classes = ", ".join(f"{n} {name}" for name, n in result["skips"].items())
-        text += f", {result['skip']} skip: {classes}"
-    return text
-
-
 def collect() -> dict[Path, dict[Path, dict]]:
     profiles = runnable()
     jobs = [(p, scope, flags) for p in profiles for scope, flags in SCOPES.items()]
@@ -128,9 +116,11 @@ def section(folder: Path, entries: dict[Path, dict]) -> str:
     names = sorted(entries)
     sets = entries[names[0]]["sets"]
     if any(entries[p]["sets"] != sets for p in names):
-        sys.exit(f"{folder}: its profiles define different test sets; write the section by hand")
+        sys.exit(f"{folder}: different test sets; split the folder or extend the generator")
     if "default" not in sets:
-        sys.exit(f"{folder}: a profile has no default test set; write the section by hand")
+        sys.exit(
+            f"{folder}: a profile has no default test set; declare one or extend the generator"
+        )
 
     def rel(target: Path) -> str:
         return os.path.relpath(target, folder)
@@ -143,11 +133,14 @@ def section(folder: Path, entries: dict[Path, dict]) -> str:
     else:
         own = sorted(p for p, s in sources.items() if s == p)
         inherited = sorted((p, s) for p, s in sources.items() if s != p)
-        where = "defined in " + (
-            "each profile's own `test_sets:` (the copies are identical)"
-            if len(own) > 1
-            else f"`{own[0].name}`"
-        )
+        if not own:
+            where = "inherited from separate parts with identical definitions"
+        else:
+            where = "defined in " + (
+                "each profile's own `test_sets:` (the copies are identical)"
+                if len(own) > 1
+                else f"`{own[0].name}`"
+            )
         where += "".join(f"; `{p.name}` inherits it from `{rel(s)}`" for p, s in inherited)
     others = sorted(set(sets) - {"default"})
     guide = rel(ROOT / "docs/cli.md") + "#test-sets-and-coverage"
@@ -172,48 +165,51 @@ def section(folder: Path, entries: dict[Path, dict]) -> str:
         "`*` selects the whole library; `suite.*` selects a suite. "
         "Other patterns select matching cases.",
         "",
-        "| Suite | Patterns |",
-        "| --- | --- |",
     ]
     for suite, patterns in by_suite.items():
-        out.append(
-            f"| {'All suites' if suite == '*' else f'`{suite}`'} | "
-            + ", ".join(f"`{p}`" for p in patterns)
-            + " |"
-        )
+        out += [f"**{'All suites' if suite == '*' else suite}**", ""]
+        out += [f"- `{pattern}`" for pattern in patterns]
+        out.append("")
     out += [
         "",
         "</details>",
         "",
-        "<details>",
-        "<summary>How many cases each scope selects, per profile</summary>",
-        "",
-        "Counted offline by `llmdv plan`, one per ingress and variant. *Run* cases can still skip "
-        "during a run (for example `throttled`); *skip* cases are ruled out by the profile's "
-        "declarations, with their skip class.",
+        "Counted offline by `llmdv plan`, one case per ingress and variant. Planned runs can "
+        "still skip at runtime. Expand a profile for its scope counts and separate skip classes.",
         "",
     ]
-    default_header = "Default" + ("" if others else " (= `--all-test-sets`)")
-    extra = [] if not others else ["`--all-test-sets`"]
-    out += [
-        "| Profile | " + " | ".join([default_header, *extra]) + " | `smoke` | `--full-suite` |",
-        "| --- | " + " | ".join("---" for _ in [default_header, *extra]) + " | --- | --- |",
-    ]
+    scopes = [("Default", "plain"), ("Smoke", "smoke")]
+    if others:
+        scopes.append(("All profile sets", "all-test-sets"))
+    scopes.append(("Full library", "full-suite"))
+    if not others:
+        out += ["The default is also `--all-test-sets` for these profiles.", ""]
     for p in names:
         plans = entries[p]["plans"]
-        cells = [describe(plans["plain"])] + ([describe(plans["all-test-sets"])] if others else [])
-        out.append(
-            f"| `{p.name}` | "
-            + " | ".join(cells)
-            + f" | {describe(plans['smoke'])} | {describe(plans['full-suite'])} |"
-        )
-    out += [
-        "",
-        "</details>",
-        "",
-        "Preview individual cases and skip reasons with `llmdv plan --profile <profile>`.",
-        "",
-    ]
+        out += [
+            "<details>",
+            f"<summary>{p.name}</summary>",
+            "",
+            f"[Open the profile]({p.name}).",
+            "",
+            "| Scope | Selected | Planned run | Planned skip |",
+            "| --- | ---: | ---: | ---: |",
+        ]
+        for label, key in scopes:
+            result = plans[key]
+            if "rc" in result:
+                out.append(f"| {label} (exit {result['rc']}) | — | — | — |")
+            else:
+                out.append(f"| {label} | {result['total']} | {result['run']} | {result['skip']} |")
+        skip_rows = [(label, plans[key].get("skips", {})) for label, key in scopes]
+        if any(skips for _, skips in skip_rows):
+            out += ["", "Planned skips by class:", ""]
+            for label, skips in skip_rows:
+                if skips:
+                    classes = ", ".join(f"{n} `{name}`" for name, n in skips.items())
+                    out.append(f"- **{label}:** {classes}.")
+        out += ["", "</details>", ""]
+    out += ["Preview cases and reasons with `llmdv plan --profile <profile>`.", ""]
     return "\n".join(out)
 
 

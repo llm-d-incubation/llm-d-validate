@@ -13,7 +13,7 @@
 #                               and the decode role alike
 # FROM values: guides/pd-disaggregation/modelserver/amd/vllm/moriio/, rendered with
 # `kubectl kustomize`: no parser flag and no window.
-# The same overlay, deployed by other guides' lanes:
+# The same overlay, deployed by other guides' configurations:
 #   flow-control       optimized-baseline amd/vllm/base, relabelled
 #   keda-epp           optimized-baseline amd/vllm/base
 # Also used by precise-prefix-cache-routing amd/vllm/base (vllm-openai-rocm v0.31.0), and

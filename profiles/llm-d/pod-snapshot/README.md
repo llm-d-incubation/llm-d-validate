@@ -8,8 +8,8 @@ Profiles for testing a deployment of llm-d's [pod-snapshot](https://github.com/l
 
 **Validation focus: serving correctness with restored replicas in the pool.** Exercise the API contract after restore to detect user-visible regressions in the deployed pool.
 
-**What a pass establishes:** the selected checks held for the declared APIs and reachable
-ingress during this run. **Coverage boundary:** Responses do not identify whether a cold-started or restored replica answered; snapshot creation and restore need cluster evidence.
+**What a pass establishes:** the checks that actually executed held at the reachable ingress
+during this run. Skipped checks remain coverage gaps. **Coverage boundary:** Responses do not identify whether a cold-started or restored replica answered; snapshot creation and restore need cluster evidence.
 
 These focused defaults are a starting point for validating a production deployment. Add coverage
 for the APIs, clients and operating conditions you rely on; see
@@ -40,8 +40,8 @@ Pick the profile for the engine you deployed (`MODEL_SERVER`, under `guides/pod-
 The profiles test the guide's router (the EPP). Give `llmdv` its URL:
 
 ```sh
-export LLMDV_ROUTER_URL=<your EPP's URL>
-llmdv verify --profile profiles/llm-d/pod-snapshot/<profile>.yaml
+export LLMDV_ROUTER_URL='https://your-router.example' # replace with your router's URL
+llmdv verify --profile 'profiles/llm-d/pod-snapshot/<profile>.yaml'
 ```
 
 Run it once both replicas are Ready, so the run's requests reach the cold-started one and the restored one. To test a gateway or the engine as well, [add it as another ingress](../../README.md#include-a-gateway-or-engine). `--identity` flags are optional for verification. Set them when comparing deployments that share a profile, so their recorded configuration dimensions remain distinct; for example `--identity accelerator=gpu --identity provider=gke`, read off your overlay path.
@@ -57,35 +57,111 @@ See [selection rules](../../../docs/cli.md#test-sets-and-coverage) for smoke, fu
 
 `*` selects the whole library; `suite.*` selects a suite. Other patterns select matching cases.
 
-| Suite | Patterns |
-| --- | --- |
-| `contract` | `contract.*` |
-| `discovery` | `discovery.models_lists_declared_model`, `discovery.unknown_model_no_fallback`, `discovery.models_parses_with_openai_sdk` |
-| `openai_chat` | `openai_chat.basic_non_streaming`, `openai_chat.streaming_sse`, `openai_chat.stop_reason`, `openai_chat.configured_reasoning` |
-| `openai_completions` | `openai_completions.basic_non_streaming`, `openai_completions.streaming_matches_json`, `openai_completions.stop_reason` |
-| `anthropic_messages` | `anthropic_messages.basic_non_streaming`, `anthropic_messages.streaming_sse` |
-| `openai_responses` | `openai_responses.basic_non_streaming`, `openai_responses.streaming_sse` |
-| `streaming` | `streaming.sse_framing` |
-| `unhappy` | `unhappy.unknown_path`, `unhappy.malformed_json`, `unhappy.missing_model`, `unhappy.wrong_method`, `unhappy.error_envelope_fields`, `unhappy.context_overflow`, `unhappy.token_limit_over_context` |
-| `transport` | `transport.connection`, `transport.health_status` |
-| `tools` | `tools.auto_call`, `tools.auto_stream` |
-| `long_context` | `long_context.*` |
+**contract**
+
+- `contract.*`
+
+**discovery**
+
+- `discovery.models_lists_declared_model`
+- `discovery.unknown_model_no_fallback`
+- `discovery.models_parses_with_openai_sdk`
+
+**openai_chat**
+
+- `openai_chat.basic_non_streaming`
+- `openai_chat.streaming_sse`
+- `openai_chat.stop_reason`
+- `openai_chat.configured_reasoning`
+
+**openai_completions**
+
+- `openai_completions.basic_non_streaming`
+- `openai_completions.streaming_matches_json`
+- `openai_completions.stop_reason`
+
+**anthropic_messages**
+
+- `anthropic_messages.basic_non_streaming`
+- `anthropic_messages.streaming_sse`
+
+**openai_responses**
+
+- `openai_responses.basic_non_streaming`
+- `openai_responses.streaming_sse`
+
+**streaming**
+
+- `streaming.sse_framing`
+
+**unhappy**
+
+- `unhappy.unknown_path`
+- `unhappy.malformed_json`
+- `unhappy.missing_model`
+- `unhappy.wrong_method`
+- `unhappy.error_envelope_fields`
+- `unhappy.context_overflow`
+- `unhappy.token_limit_over_context`
+
+**transport**
+
+- `transport.connection`
+- `transport.health_status`
+
+**tools**
+
+- `tools.auto_call`
+- `tools.auto_stream`
+
+**long_context**
+
+- `long_context.*`
+
+
+</details>
+
+Counted offline by `llmdv plan`, one case per ingress and variant. Planned runs can still skip at runtime. Expand a profile for its scope counts and separate skip classes.
+
+The default is also `--all-test-sets` for these profiles.
+
+<details>
+<summary>sglang-qwen3-32b-ctx8k-inline-standalone.yaml</summary>
+
+[Open the profile](sglang-qwen3-32b-ctx8k-inline-standalone.yaml).
+
+| Scope | Selected | Planned run | Planned skip |
+| --- | ---: | ---: | ---: |
+| Default | 85 | 73 | 12 |
+| Smoke | 9 | 9 | 0 |
+| Full library | 1092 | 678 | 414 |
+
+Planned skips by class:
+
+- **Default:** 12 `undeclared`.
+- **Full library:** 414 `undeclared`.
 
 </details>
 
 <details>
-<summary>How many cases each scope selects, per profile</summary>
+<summary>vllm-qwen3-32b-ctx8k-inline-standalone.yaml</summary>
 
-Counted offline by `llmdv plan`, one per ingress and variant. *Run* cases can still skip during a run (for example `throttled`); *skip* cases are ruled out by the profile's declarations, with their skip class.
+[Open the profile](vllm-qwen3-32b-ctx8k-inline-standalone.yaml).
 
-| Profile | Default (= `--all-test-sets`) | `smoke` | `--full-suite` |
-| --- | --- | --- | --- |
-| `sglang-qwen3-32b-ctx8k-inline-standalone.yaml` | 85 selected, 73 run, 12 skip: 12 undeclared | 9 selected, 9 run | 1092 selected, 678 run, 414 skip: 414 undeclared |
-| `vllm-qwen3-32b-ctx8k-inline-standalone.yaml` | 85 selected, 73 run, 12 skip: 12 undeclared | 9 selected, 9 run | 1092 selected, 678 run, 414 skip: 414 undeclared |
+| Scope | Selected | Planned run | Planned skip |
+| --- | ---: | ---: | ---: |
+| Default | 85 | 73 | 12 |
+| Smoke | 9 | 9 | 0 |
+| Full library | 1092 | 678 | 414 |
+
+Planned skips by class:
+
+- **Default:** 12 `undeclared`.
+- **Full library:** 414 `undeclared`.
 
 </details>
 
-Preview individual cases and skip reasons with `llmdv plan --profile <profile>`.
+Preview cases and reasons with `llmdv plan --profile <profile>`.
 
 ## Not covered
 
@@ -95,21 +171,21 @@ Preview individual cases and skip reasons with `llmdv plan --profile <profile>`.
 - **Single GPU, TP=1**, and the engine flags: fleet configuration rules need cluster access.
 - **SGLang's startup `/health` 503**: startup behaviour; `llmdv` runs against a Ready stack.
 - **The cache suite**: neither overlay asks its engine to report `cached_tokens`, so `cache_reuse` is not declared (see `parts/common.yaml`).
-- **Gateway mode**: `guide.yaml` has a gateway deploy step, but llm-d does not test it nightly.
+- **Gateway mode**: `guide.yaml` has a gateway deploy step, but these profiles target the standalone router.
 
 ## For maintainers
 
 <details>
-<summary>llm-d's nightly lanes, and how each maps to a profile</summary>
+<summary>llm-d's nightly workflows, and how each maps to a profile</summary>
 
-The guide has no support table; `guide.yaml` offers `MODEL_SERVER` `vllm` or `sglang`, on GKE only. Both nightly lanes deploy through `guides/pod-snapshot/scripts/nightly-deploy-gke.sh`, which applies `modelserver/gpu/<MODEL_SERVER>/gke` and finishes with two Ready replicas: one cold started and checkpointed, one restored from that snapshot. The two engines differ to a client, so each has its own combination. Both serve `Qwen/Qwen3-32B` at an 8192-token window with no parsers.
+The guide has no support table; `guide.yaml` offers `MODEL_SERVER` `vllm` or `sglang`, on GKE only. Both nightly workflows deploy through `guides/pod-snapshot/scripts/nightly-deploy-gke.sh`, which applies `modelserver/gpu/<MODEL_SERVER>/gke` and finishes with two Ready replicas: one cold started and checkpointed, one restored from that snapshot. The two engines differ to a client, so each has its own combination. Both serve `Qwen/Qwen3-32B` at an 8192-token window with no parsers.
 
-| CI lane (`nightly-e2e-pod-snapshot-<lane>`) | Overlay the deploy script applies | Profile | Identity flags |
+| upstream workflow (`nightly-e2e-pod-snapshot-<workflow-suffix>`) | Overlay the deploy script applies | Profile | Identity flags |
 | --- | --- | --- | --- |
 | `gke-acc-gpu-vllm-x` | `modelserver/gpu/vllm/gke` (vLLM v0.31.0, `--max-model-len 8192`, `--enable-sleep-mode`) | `vllm-qwen3-32b-ctx8k-inline-standalone` | `--identity accelerator=gpu --identity provider=gke` |
 | `gke-acc-gpu-sglang-x` | `modelserver/gpu/sglang/gke` (SGLang v0.5.22, `--context-length 8192`, `--enable-memory-saver --enable-weights-cpu-backup`) | `sglang-qwen3-32b-ctx8k-inline-standalone` | `--identity accelerator=gpu --identity provider=gke` |
 
-The client calls the `<GUIDE_NAME>-epp` Service on port 80 (the lanes' `gateway_host`), in standalone mode. Run `llmdv` after the deploy script returns, so the run reaches both replicas.
+The client calls the `<GUIDE_NAME>-epp` Service on port 80 (the workflows' `gateway_host`), in standalone mode. Run `llmdv` after the deploy script returns, so the run reaches both replicas.
 
 </details>
 

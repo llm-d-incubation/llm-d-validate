@@ -8,8 +8,8 @@ Profiles for testing a deployment of llm-d's [agentic-api](https://github.com/ll
 
 **Validation focus: stateless responses calls used by agentic-api.** Exercise input items, instructions, function output and streamed tool loops because the front-end depends on these router-to-engine exchanges.
 
-**What a pass establishes:** the selected checks held for the declared APIs and reachable
-ingress during this run. **Coverage boundary:** The profile reaches the router; stateful agentic-api behavior needs a separate ingress.
+**What a pass establishes:** the checks that actually executed held at the reachable ingress
+during this run. Skipped checks remain coverage gaps. **Coverage boundary:** The profile reaches the router; stateful agentic-api behavior needs a separate ingress.
 
 These focused defaults are a starting point for validating a production deployment. Add coverage
 for the APIs, clients and operating conditions you rely on; see
@@ -39,7 +39,7 @@ Pick the profile for the model-server overlay you deployed (under `guides/agenti
 The profiles test the guide's router (the EPP). Give `llmdv` its URL:
 
 ```sh
-export LLMDV_ROUTER_URL=<your EPP's URL>
+export LLMDV_ROUTER_URL='https://your-router.example' # replace with your router's URL
 llmdv verify --profile profiles/llm-d/agentic-api/vllm-qwen3-32b-parsers-standalone.yaml
 ```
 
@@ -56,34 +56,102 @@ See [selection rules](../../../docs/cli.md#test-sets-and-coverage) for smoke, fu
 
 `*` selects the whole library; `suite.*` selects a suite. Other patterns select matching cases.
 
-| Suite | Patterns |
-| --- | --- |
-| `contract` | `contract.*` |
-| `discovery` | `discovery.models_lists_declared_model`, `discovery.unknown_model_no_fallback`, `discovery.models_parses_with_openai_sdk` |
-| `openai_chat` | `openai_chat.basic_non_streaming`, `openai_chat.streaming_sse`, `openai_chat.stop_reason`, `openai_chat.configured_reasoning` |
-| `openai_completions` | `openai_completions.basic_non_streaming`, `openai_completions.streaming_matches_json`, `openai_completions.stop_reason` |
-| `anthropic_messages` | `anthropic_messages.basic_non_streaming`, `anthropic_messages.streaming_sse` |
-| `openai_responses` | `openai_responses.basic_non_streaming`, `openai_responses.streaming_sse`, `openai_responses.input_items`, `openai_responses.instructions`, `openai_responses.function_output`, `openai_responses.streamed_tool_loop`, `openai_responses.stateless_contract`, `openai_responses.previous_id_unstored`, `openai_responses.response_object`, `openai_responses.sdk_parse`, `openai_responses.input_tokens` |
-| `streaming` | `streaming.sse_framing` |
-| `unhappy` | `unhappy.unknown_path`, `unhappy.malformed_json`, `unhappy.missing_model`, `unhappy.wrong_method`, `unhappy.error_envelope_fields`, `unhappy.context_overflow`, `unhappy.token_limit_over_context` |
-| `transport` | `transport.connection`, `transport.health_status` |
-| `tools` | `tools.auto_call`, `tools.auto_stream` |
-| `long_context` | `long_context.*` |
+**contract**
+
+- `contract.*`
+
+**discovery**
+
+- `discovery.models_lists_declared_model`
+- `discovery.unknown_model_no_fallback`
+- `discovery.models_parses_with_openai_sdk`
+
+**openai_chat**
+
+- `openai_chat.basic_non_streaming`
+- `openai_chat.streaming_sse`
+- `openai_chat.stop_reason`
+- `openai_chat.configured_reasoning`
+
+**openai_completions**
+
+- `openai_completions.basic_non_streaming`
+- `openai_completions.streaming_matches_json`
+- `openai_completions.stop_reason`
+
+**anthropic_messages**
+
+- `anthropic_messages.basic_non_streaming`
+- `anthropic_messages.streaming_sse`
+
+**openai_responses**
+
+- `openai_responses.basic_non_streaming`
+- `openai_responses.streaming_sse`
+- `openai_responses.input_items`
+- `openai_responses.instructions`
+- `openai_responses.function_output`
+- `openai_responses.streamed_tool_loop`
+- `openai_responses.stateless_contract`
+- `openai_responses.previous_id_unstored`
+- `openai_responses.response_object`
+- `openai_responses.sdk_parse`
+- `openai_responses.input_tokens`
+
+**streaming**
+
+- `streaming.sse_framing`
+
+**unhappy**
+
+- `unhappy.unknown_path`
+- `unhappy.malformed_json`
+- `unhappy.missing_model`
+- `unhappy.wrong_method`
+- `unhappy.error_envelope_fields`
+- `unhappy.context_overflow`
+- `unhappy.token_limit_over_context`
+
+**transport**
+
+- `transport.connection`
+- `transport.health_status`
+
+**tools**
+
+- `tools.auto_call`
+- `tools.auto_stream`
+
+**long_context**
+
+- `long_context.*`
+
 
 </details>
+
+Counted offline by `llmdv plan`, one case per ingress and variant. Planned runs can still skip at runtime. Expand a profile for its scope counts and separate skip classes.
+
+The default is also `--all-test-sets` for these profiles.
 
 <details>
-<summary>How many cases each scope selects, per profile</summary>
+<summary>vllm-qwen3-32b-parsers-standalone.yaml</summary>
 
-Counted offline by `llmdv plan`, one per ingress and variant. *Run* cases can still skip during a run (for example `throttled`); *skip* cases are ruled out by the profile's declarations, with their skip class.
+[Open the profile](vllm-qwen3-32b-parsers-standalone.yaml).
 
-| Profile | Default (= `--all-test-sets`) | `smoke` | `--full-suite` |
-| --- | --- | --- | --- |
-| `vllm-qwen3-32b-parsers-standalone.yaml` | 107 selected, 101 run, 6 skip: 6 undeclared | 9 selected, 9 run | 1092 selected, 920 run, 172 skip: 172 undeclared |
+| Scope | Selected | Planned run | Planned skip |
+| --- | ---: | ---: | ---: |
+| Default | 107 | 101 | 6 |
+| Smoke | 9 | 9 | 0 |
+| Full library | 1092 | 920 | 172 |
+
+Planned skips by class:
+
+- **Default:** 6 `undeclared`.
+- **Full library:** 172 `undeclared`.
 
 </details>
 
-Preview individual cases and skip reasons with `llmdv plan --profile <profile>`.
+Preview cases and reasons with `llmdv plan --profile <profile>`.
 
 ## Not covered
 
@@ -92,15 +160,15 @@ Preview individual cases and skip reasons with `llmdv plan --profile <profile>`.
 ## For maintainers
 
 <details>
-<summary>llm-d's nightly lanes, and how each maps to a profile</summary>
+<summary>llm-d's nightly workflows, and how each maps to a profile</summary>
 
-| CI lane (`nightly-e2e-agentic-api-<lane>`) | Reusable workflow | Overlay it renders | Profile | Identity flags |
+| upstream workflow (`nightly-e2e-agentic-api-<workflow-suffix>`) | Reusable workflow | Overlay it renders | Profile | Identity flags |
 | --- | --- | --- | --- | --- |
 | `gke-acc-gpu-vllm-x` | `reusable-nightly-e2e-gke` | `agentic-api/modelserver/gpu/vllm/gke` (= `optimized-baseline/modelserver/gpu/vllm/gke`) | `vllm-qwen3-32b-parsers-standalone` | `--identity accelerator=gpu --identity provider=gke` |
 
-The lane's deploy script is `guides/agentic-api/scripts/nightly-deploy-gke.sh` (one model-server replica), and its validator is `.github/scripts/e2e/e2e-validate-agentic-api.sh`, which runs the guide's `verify.py` against agentic-api.
+The workflow's deploy script is `guides/agentic-api/scripts/nightly-deploy-gke.sh` (one model-server replica), and its validator is `.github/scripts/e2e/e2e-validate-agentic-api.sh`, which runs the guide's `verify.py` against agentic-api.
 
-The helm release is `agentic-api`, so the Service is `<GUIDE_NAME>-epp` on port 80 (the lane's `gateway_host`).
+The helm release is `agentic-api`, so the Service is `<GUIDE_NAME>-epp` on port 80 (the workflow's `gateway_host`).
 
 </details>
 
@@ -120,8 +188,8 @@ Until a run measures agentic-api's behaviour, nothing about it is declared.
 <details>
 <summary>Where llm-d's own sources disagree</summary>
 
-- `guide.yaml` marks only `gpu`/`vllm` `validated`, with providers `base` and `gke`; the one lane runs `gke`.
+- `guide.yaml` marks only `gpu`/`vllm` `validated`, with providers `base` and `gke`; the one workflow runs `gke`.
 - The guide's model server keeps optimized-baseline's labels (`llm-d.ai/guide: optimized-baseline`), and the router selects on that label.
-- `guide.yaml`'s support notes describe 2 replicas; the lane runs one (`nightly-deploy-gke.sh`, CI-only deviation 1).
+- `guide.yaml`'s support notes describe 2 replicas; the workflow runs one (`nightly-deploy-gke.sh`, upstream validation override 1).
 
 </details>

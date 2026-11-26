@@ -87,7 +87,7 @@ def test_the_pin_is_read_from_the_guide_readme(stack):
 def test_a_lane_no_readme_names_is_reported_under_its_guide_or_as_a_new_guide(stack):
     module, clone, old, new = stack
     text = module.report(clone, old, new)
-    uncovered = text.split("## Lanes with no profile")[1].split("##")[0]
+    uncovered = text.split("## Workflows with no profile")[1].split("##")[0]
     assert "**alpha**: `nightly-e2e-alpha-xpu`" in uncovered
     assert "**(no guide folder)**: `nightly-e2e-gamma-gke-gpu`" in uncovered
     assert "alpha-gke-gpu" not in uncovered
@@ -96,7 +96,7 @@ def test_a_lane_no_readme_names_is_reported_under_its_guide_or_as_a_new_guide(st
 
 def test_a_lane_gone_upstream_is_reported_removed(stack):
     module, clone, old, new = stack
-    removed = module.report(clone, old, new).split("## Lanes removed")[1].split("##")[0]
+    removed = module.report(clone, old, new).split("## Workflows removed")[1].split("##")[0]
     assert "`nightly-e2e-alpha-amd-rocm`" in removed
 
 
@@ -106,7 +106,7 @@ def test_changed_files_are_grouped_by_guide_and_by_the_fact_they_own(stack):
     alpha = text.split("### alpha")[1].split("###")[0]
     assert "model-server overlays" in alpha
     assert "guides/alpha/modelserver/gpu/kustomization.yaml" in alpha
-    assert "lanes: which configurations get a profile" in alpha
+    assert "workflows: which configurations get a profile" in alpha
     beta = text.split("### beta (`guides/nested/beta`)")[1].split("###")[0]
     assert "router configuration" in beta
     assert "guides/recipes/shared.yaml" in text.split("### Shared by every guide")[1]

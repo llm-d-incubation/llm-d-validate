@@ -8,8 +8,8 @@ Profiles for testing a deployment of llm-d's [wide-ep](https://github.com/llm-d/
 
 **Validation focus: api integrity through the expert-parallel serving path.** Check choices, streamed usage, errors and cancellation because the P/D sidecar can rewrite these exchanges. On XPU the same checks exercise the aggregated path.
 
-**What a pass establishes:** the selected checks held for the declared APIs and reachable
-ingress during this run. **Coverage boundary:** Expert placement and disaggregation internals need evidence beyond API responses.
+**What a pass establishes:** the checks that actually executed held at the reachable ingress
+during this run. Skipped checks remain coverage gaps. **Coverage boundary:** Expert placement and disaggregation internals need evidence beyond API responses.
 
 These focused defaults are a starting point for validating a production deployment. Add coverage
 for the APIs, clients and operating conditions you rely on; see
@@ -52,8 +52,8 @@ Read from the overlays rendered with `kubectl kustomize`:
 The profiles test the guide's router (the EPP). Give `llmdv` its URL:
 
 ```sh
-export LLMDV_ROUTER_URL=<your EPP's URL>
-llmdv verify --profile profiles/llm-d/wide-ep/<profile>.yaml
+export LLMDV_ROUTER_URL='https://your-router.example' # replace with your router's URL
+llmdv verify --profile 'profiles/llm-d/wide-ep/<profile>.yaml'
 ```
 
 To test a gateway or the engine as well, [add it as another ingress](../../README.md#include-a-gateway-or-engine). `--identity` flags are optional for verification. Set them when comparing deployments that share a profile, so their recorded configuration dimensions remain distinct; for example `--identity accelerator=gpu --identity provider=gke`, read off your overlay path.
@@ -69,52 +69,156 @@ See [selection rules](../../../docs/cli.md#test-sets-and-coverage) for smoke, fu
 
 `*` selects the whole library; `suite.*` selects a suite. Other patterns select matching cases.
 
-| Suite | Patterns |
-| --- | --- |
-| `contract` | `contract.*` |
-| `discovery` | `discovery.models_lists_declared_model`, `discovery.unknown_model_no_fallback`, `discovery.models_parses_with_openai_sdk` |
-| `openai_chat` | `openai_chat.basic_non_streaming`, `openai_chat.streaming_sse`, `openai_chat.stop_reason`, `openai_chat.configured_reasoning`, `openai_chat.streaming_include_usage`, `openai_chat.continuous_usage` |
-| `openai_completions` | `openai_completions.basic_non_streaming`, `openai_completions.streaming_matches_json`, `openai_completions.stop_reason`, `openai_completions.prompt_forms`, `openai_completions.multiple_choices` |
-| `anthropic_messages` | `anthropic_messages.basic_non_streaming`, `anthropic_messages.streaming_sse` |
-| `openai_responses` | `openai_responses.basic_non_streaming`, `openai_responses.streaming_sse` |
-| `streaming` | `streaming.sse_framing`, `streaming.*` |
-| `unhappy` | `unhappy.unknown_path`, `unhappy.malformed_json`, `unhappy.missing_model`, `unhappy.wrong_method`, `unhappy.error_envelope_fields`, `unhappy.context_overflow`, `unhappy.token_limit_over_context`, `unhappy.invalid_token_limit`, `unhappy.streaming_validation`, `unhappy.wrong_field_type` |
-| `transport` | `transport.connection`, `transport.health_status` |
-| `tools` | `tools.auto_call`, `tools.auto_stream` |
-| `long_context` | `long_context.*` |
-| `scenarios` | `scenarios.cancel_burst` |
+**contract**
+
+- `contract.*`
+
+**discovery**
+
+- `discovery.models_lists_declared_model`
+- `discovery.unknown_model_no_fallback`
+- `discovery.models_parses_with_openai_sdk`
+
+**openai_chat**
+
+- `openai_chat.basic_non_streaming`
+- `openai_chat.streaming_sse`
+- `openai_chat.stop_reason`
+- `openai_chat.configured_reasoning`
+- `openai_chat.streaming_include_usage`
+- `openai_chat.continuous_usage`
+
+**openai_completions**
+
+- `openai_completions.basic_non_streaming`
+- `openai_completions.streaming_matches_json`
+- `openai_completions.stop_reason`
+- `openai_completions.prompt_forms`
+- `openai_completions.multiple_choices`
+
+**anthropic_messages**
+
+- `anthropic_messages.basic_non_streaming`
+- `anthropic_messages.streaming_sse`
+
+**openai_responses**
+
+- `openai_responses.basic_non_streaming`
+- `openai_responses.streaming_sse`
+
+**streaming**
+
+- `streaming.sse_framing`
+- `streaming.*`
+
+**unhappy**
+
+- `unhappy.unknown_path`
+- `unhappy.malformed_json`
+- `unhappy.missing_model`
+- `unhappy.wrong_method`
+- `unhappy.error_envelope_fields`
+- `unhappy.context_overflow`
+- `unhappy.token_limit_over_context`
+- `unhappy.invalid_token_limit`
+- `unhappy.streaming_validation`
+- `unhappy.wrong_field_type`
+
+**transport**
+
+- `transport.connection`
+- `transport.health_status`
+
+**tools**
+
+- `tools.auto_call`
+- `tools.auto_stream`
+
+**long_context**
+
+- `long_context.*`
+
+**scenarios**
+
+- `scenarios.cancel_burst`
+
+
+</details>
+
+Counted offline by `llmdv plan`, one case per ingress and variant. Planned runs can still skip at runtime. Expand a profile for its scope counts and separate skip classes.
+
+The default is also `--all-test-sets` for these profiles.
+
+<details>
+<summary>vllm-deepseek-r1-0528-tools-standalone.yaml</summary>
+
+[Open the profile](vllm-deepseek-r1-0528-tools-standalone.yaml).
+
+| Scope | Selected | Planned run | Planned skip |
+| --- | ---: | ---: | ---: |
+| Default | 124 | 118 | 6 |
+| Smoke | 9 | 9 | 0 |
+| Full library | 1092 | 918 | 174 |
+
+Planned skips by class:
+
+- **Default:** 6 `undeclared`.
+- **Full library:** 174 `undeclared`.
 
 </details>
 
 <details>
-<summary>How many cases each scope selects, per profile</summary>
+<summary>vllm-deepseek-v2-lite-chat-ctx2k-inline-standalone.yaml</summary>
 
-Counted offline by `llmdv plan`, one per ingress and variant. *Run* cases can still skip during a run (for example `throttled`); *skip* cases are ruled out by the profile's declarations, with their skip class.
+[Open the profile](vllm-deepseek-v2-lite-chat-ctx2k-inline-standalone.yaml).
 
-| Profile | Default (= `--all-test-sets`) | `smoke` | `--full-suite` |
-| --- | --- | --- | --- |
-| `vllm-deepseek-r1-0528-tools-standalone.yaml` | 124 selected, 118 run, 6 skip: 6 undeclared | 9 selected, 9 run | 1092 selected, 918 run, 174 skip: 174 undeclared |
-| `vllm-deepseek-v2-lite-chat-ctx2k-inline-standalone.yaml` | 124 selected, 110 run, 14 skip: 14 undeclared | 9 selected, 9 run | 1092 selected, 659 run, 433 skip: 433 undeclared |
-| `vllm-deepseek-v3-ctx36k-inline-standalone.yaml` | 124 selected, 110 run, 14 skip: 14 undeclared | 9 selected, 9 run | 1092 selected, 659 run, 433 skip: 433 undeclared |
+| Scope | Selected | Planned run | Planned skip |
+| --- | ---: | ---: | ---: |
+| Default | 124 | 110 | 14 |
+| Smoke | 9 | 9 | 0 |
+| Full library | 1092 | 659 | 433 |
+
+Planned skips by class:
+
+- **Default:** 14 `undeclared`.
+- **Full library:** 433 `undeclared`.
 
 </details>
 
-Preview individual cases and skip reasons with `llmdv plan --profile <profile>`.
+<details>
+<summary>vllm-deepseek-v3-ctx36k-inline-standalone.yaml</summary>
+
+[Open the profile](vllm-deepseek-v3-ctx36k-inline-standalone.yaml).
+
+| Scope | Selected | Planned run | Planned skip |
+| --- | ---: | ---: | ---: |
+| Default | 124 | 110 | 14 |
+| Smoke | 9 | 9 | 0 |
+| Full library | 1092 | 659 | 433 |
+
+Planned skips by class:
+
+- **Default:** 14 `undeclared`.
+- **Full library:** 433 `undeclared`.
+
+</details>
+
+Preview cases and reasons with `llmdv plan --profile <profile>`.
 
 ## Not covered
 
-- **Overlays llm-d does not test nightly:** `gpu/vllm/base`, `amd/vllm/base` (each the same to a client as the tested overlay) and `xpu/vllm/base` (Qwen/Qwen3-235B-A22B with DP/EP across pods), and gateway mode.
+- **Overlays without a profile:** `gpu/vllm/base`, `amd/vllm/base` (each the same to a client as the tested overlay) and `xpu/vllm/base` (Qwen/Qwen3-235B-A22B with DP/EP across pods), and gateway mode.
 - **The guide's mechanism checks** (`guide.yaml` `verify.tests`): the concurrent `dp_requests` batch needs load mode (#23); per-DP-rank spread and connector prefix-cache hits (`rank_metrics`) and the router's P/D decision counter (`router_metrics`) need per-pod metric reads through cluster access a committed profile does not carry, and a routing case family (#27). Rollout gating needs a rollout during the run. Each is mapped in `parts/common.yaml`.
 - **Prefix reuse:** no overlay passes `--enable-prompt-tokens-details`, so `cache_reuse` is not declared.
 
 ## For maintainers
 
 <details>
-<summary>llm-d's nightly lanes, and how each maps to a profile</summary>
+<summary>llm-d's nightly workflows, and how each maps to a profile</summary>
 
-The guide's five nightly lanes (`nightly-e2e-wide-ep-<lane>.yaml` in llm-d, each in standalone mode with `gateway_class: epponly`) deploy three configurations that differ to a client:
+The guide's five nightly workflows (`nightly-e2e-wide-ep-<workflow-suffix>.yaml` in llm-d, each in standalone mode with `gateway_class: epponly`) deploy three configurations that differ to a client:
 
-| CI lane | Overlay it deploys (`ACCELERATOR_TYPE/MODEL_SERVER/INFRA_PROVIDER`) | Profile (`wide-ep/`) | Identity flags |
+| upstream workflow | Overlay it deploys (`ACCELERATOR_TYPE/MODEL_SERVER/INFRA_PROVIDER`) | Profile (`wide-ep/`) | Identity flags |
 | --- | --- | --- | --- |
 | `gke-acc-gpu-vllm-x` | `gpu/vllm/gke` | `vllm-deepseek-r1-0528-tools-standalone` | `--identity accelerator=gpu --identity provider=gke` |
 | `cks-acc-gpu-vllm-x` | `gpu/vllm/coreweave` | `vllm-deepseek-r1-0528-tools-standalone` | `--identity accelerator=gpu --identity provider=coreweave` |
@@ -122,7 +226,7 @@ The guide's five nightly lanes (`nightly-e2e-wide-ep-<lane>.yaml` in llm-d, each
 | `amd-ci-acc-rocm-vllm-moriio` | `amd/vllm/amd-ci` | `vllm-deepseek-v3-ctx36k-inline-standalone` | `--identity accelerator=amd --identity provider=amd-ci` |
 | `intel-acc-xpu-vllm-x` | `xpu/vllm/xpu-ci` | `vllm-deepseek-v2-lite-chat-ctx2k-inline-standalone` | `--identity accelerator=xpu --identity provider=xpu-ci` |
 
-No two lanes share an identity, so none needs `--identity flavor`.
+No two workflows share an identity, so none needs `--identity flavor`.
 
 </details>
 
@@ -141,6 +245,6 @@ Facts in llm-d that do not agree with each other:
 - `ibm-acc-gpu-vllm-x` deploys `INFRA_PROVIDER=ocp` (`guides/wide-ep/modelserver/gpu/vllm/ocp/`), but `guides/wide-ep/guide.yaml` lists only `base`, `gke` and `coreweave` as gpu providers, and its `INFRA_PROVIDER` values omit `ocp`.
 - `intel-acc-xpu-vllm-x` deploys `xpu/vllm/xpu-ci`, which serves `deepseek-ai/DeepSeek-V2-Lite-Chat` (TP2 with expert parallelism within each pod, no data parallelism; its kustomization says CI has no RDMA network), while `guide.yaml` and the README's support table advertise `Qwen/Qwen3-235B-A22B` on 16 XPUs with DP2/EP across pods and list only `base` as an xpu provider. `xpu-ci` is in `INFRA_PROVIDER`'s values but not in the xpu provider list. The xpu-ci LeaderWorkerSet keeps the name `wide-ep-xpu-qwen3-235b`.
 - The README's overview says the Intel XPU configuration uses "two plain `LeaderWorkerSet`s"; the support table and `modelserver/xpu/vllm/base/lws.yaml` have one aggregated `LeaderWorkerSet` of two pods.
-- The xpu lane is aggregated, so `guide.yaml`'s mechanism text (every request disaggregated) and `router/wide-ep.values.yaml`'s P/D plugins do not apply to it; `router/xpu.values.yaml` replaces them.
+- The xpu workflow is aggregated, so `guide.yaml`'s mechanism text (every request disaggregated) and `router/wide-ep.values.yaml`'s P/D plugins do not apply to it; `router/xpu.values.yaml` replaces them.
 
 </details>

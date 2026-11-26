@@ -109,8 +109,8 @@ A live run needs a profile and a URL for each ingress it names. A profile that d
 setup prints it with `--setup`:
 
 ```sh
-llmdv profile show <profile> --setup           # any setup the profile declares, pods resolved live
-llmdv verify --profile <profile>
+llmdv profile show '<profile>' --setup           # any setup the profile declares, pods resolved live
+llmdv verify --profile '<profile>'
 ```
 
 If you add a test case, add the corresponding defect to `tests/fakes.py` and prove the case

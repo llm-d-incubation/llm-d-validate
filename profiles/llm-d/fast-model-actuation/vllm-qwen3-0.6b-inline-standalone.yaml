@@ -2,11 +2,18 @@
 # vLLM, run by the FMA launcher and reached through the FMA requester's TCP proxy, serving
 # Qwen/Qwen3-0.6B with no parsers: inline <think>, no tool calls.
 #
+# Validate your deployment after installing the guide in standalone mode (guide.yaml deploy.standalone
+# and deploy.modelserver, through the requester rollout):
+#   export LLMDV_ROUTER_URL='https://your-router.example' # replace with your router URL
+#   llmdv profile validate profiles/llm-d/fast-model-actuation/vllm-qwen3-0.6b-inline-standalone.yaml
+#   llmdv verify --profile profiles/llm-d/fast-model-actuation/vllm-qwen3-0.6b-inline-standalone.yaml \
+#     --identity accelerator=gpu --identity provider=<INFRA_PROVIDER>
+#
 # llm-d 9ca8ff0. Composed from the guide's shipped config and the API
 # references. Only the router layer has been measured (on kind, with a simulator engine; see
 # ../parts/topology/standalone.yaml).
 #
-# CI lanes that deploy this configuration (llm-d's nightly-e2e-fast-model-actuation-<lane>
+# Maintainer provenance: upstream workflows for this configuration (llm-d's nightly-e2e-fast-model-actuation-<workflow-suffix>
 # workflows; each runs in standalone mode, gateway_class epponly):
 #   gke-acc-gpu-vllm-x                INFRA_PROVIDER=gke: platform/gke (modelserver/ plus the GKE
 #                                     component: privileged launcher with the host driver tree,
@@ -20,13 +27,6 @@
 # dockerfiles/Dockerfile.launcher.benchmark:1).
 # Not covered: fast-model-actuation-keda (its own guide.yaml, deferred); see README.md.
 #
-# How a lane runs it, after deploying the guide in standalone mode (guide.yaml deploy.standalone
-# and deploy.modelserver, through the requester rollout):
-#   export LLMDV_ROUTER_URL=<the EPP's URL>
-#   llmdv profile validate profiles/llm-d/fast-model-actuation/vllm-qwen3-0.6b-inline-standalone.yaml
-#   llmdv verify --profile profiles/llm-d/fast-model-actuation/vllm-qwen3-0.6b-inline-standalone.yaml \
-#     --identity accelerator=gpu --identity provider=<INFRA_PROVIDER>
-
 extends:
   - ../parts/base.yaml
   - ../parts/topology/standalone.yaml

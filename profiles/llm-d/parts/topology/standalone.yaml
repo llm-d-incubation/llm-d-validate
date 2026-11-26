@@ -1,6 +1,6 @@
 # Part: the standalone topology. The client reaches the endpoint picker's own HTTP listener (the
 # Envoy sidecar beside the EPP) through the `<GUIDE_NAME>-epp` Service on port 80. This is how a
-# guide is deployed by default and how today's guide lanes deploy it. Not a profile on its own;
+# guide is deployed by default and how the tracked guide overlays configure it. Not a profile on its own;
 # a combination file lists it after parts/base.yaml. Never extends anything.
 #
 # It owns everything llmdv keys by ingress id: the ingress itself, its error statuses and its
@@ -9,7 +9,7 @@
 #
 # No `setup.requires` is committed: the namespace is cluster detail, and how the EPP is reached is
 # the deployment's concern. llmdv reads its URL from the variable:
-#   export LLMDV_ROUTER_URL=<the EPP's URL>
+#   export LLMDV_ROUTER_URL='https://your-router.example' # replace with your router URL
 #
 # What is NOT declared, and why (these rows stay skip:undeclared by design):
 #   embeddings, /inference/v1/generate   routed by the EPP (FROM docs:

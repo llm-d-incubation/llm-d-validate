@@ -3,18 +3,16 @@
 # error status, capability and header the parts below declare is what that layer served, and so
 # are the change sentinels in parts/sentinels/glm-5.3.yaml.
 #
-# A plain run selects every case (test_sets.default is "*"). Point it at a deployment with
-# variables; nothing else changes:
-#
-#   export LLMDV_GATEWAY_URL=<the gateway's base URL> LLMDV_GATEWAY_KEY=<a key>
-#   export LLMDV_GATEWAY_MODEL=<the id the gateway serves>   # optional
-#   export LLMDV_ROUTER_URL=<the router's base URL>
-#   export LLMDV_ROUTER_MODEL=<the id the router serves>     # optional
-#   llmdv verify --profile <this file> --ingress litellm   # one layer; omit for both
-#
-# The client cases drive the runner image's Claude Code, 2.1.330 at /usr/local/bin/claude; these
-# layers were measured with 2.1.289. Elsewhere, install 2.1.330 there or add -m
-# "not real_clients".
+# Validation scope: the default selects the existing library before applicability gates.
+# Start with smoke at a reachable ingress, then review the default plan (see README.md).
+# Load LLMDV_GATEWAY_KEY from your credential store; do not put its value in shell history.
+#   export LLMDV_GATEWAY_URL='https://your-gateway.example'
+#   llmdv plan --profile profiles/examples/custom-llm-d/glm-5.3.yaml --ingress litellm --test-set smoke
+#   llmdv verify --profile profiles/examples/custom-llm-d/glm-5.3.yaml --ingress litellm --test-set smoke
+# LLMDV_GATEWAY_MODEL can supply the model ID that gateway serves. Configure each additional
+# ingress before omitting --ingress; README.md lists endpoint variables and client prerequisites.
+# The client pin is the runner's Claude Code 2.1.330 at /usr/local/bin/claude.
+# Original measurements used 2.1.289; current live-validation status is recorded in README.md.
 #
 # This file holds only what is this stack's own: its cache settings (block size, the settings that
 # render alike) and what each layer serves differently from the shared layer parts.

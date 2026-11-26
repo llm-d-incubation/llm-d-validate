@@ -2,22 +2,22 @@
 # listener, not agentic-api): vLLM serving Qwen/Qwen3-32B with the qwen3 reasoning parser and the
 # hermes tool parser.
 #
+# Validate your deployment after the deploy script:
+#   export LLMDV_ROUTER_URL='https://your-router.example' # replace with your router URL
+#   llmdv profile validate profiles/llm-d/agentic-api/vllm-qwen3-32b-parsers-standalone.yaml
+#   llmdv verify --profile profiles/llm-d/agentic-api/vllm-qwen3-32b-parsers-standalone.yaml \
+#     --identity accelerator=gpu --identity provider=gke
+#
 # llm-d 9ca8ff0. Composed from the guide's shipped config and the API
 # references. Only the router layer has been measured (on kind, with a simulator engine; see
 # ../parts/topology/standalone.yaml).
 #
-# CI lanes that deploy this configuration (llm-d's nightly-e2e-agentic-api-<lane> workflows;
+# Maintainer provenance: upstream workflows for this configuration (llm-d's nightly-e2e-agentic-api-<workflow-suffix> workflows;
 # standalone mode, through reusable-nightly-e2e-gke with a custom_deploy_script):
 #   gke-acc-gpu-vllm-x    guides/agentic-api/scripts/nightly-deploy-gke.sh: renders
 #                         guides/agentic-api/modelserver/gpu/vllm/gke (which is
 #                         guides/optimized-baseline/modelserver/gpu/vllm/gke), one replica
 #
-# How a lane runs it, after the deploy script:
-#   export LLMDV_ROUTER_URL=<the EPP's URL>
-#   llmdv profile validate profiles/llm-d/agentic-api/vllm-qwen3-32b-parsers-standalone.yaml
-#   llmdv verify --profile profiles/llm-d/agentic-api/vllm-qwen3-32b-parsers-standalone.yaml \
-#     --identity accelerator=gpu --identity provider=gke
-
 extends:
   - ../parts/base.yaml
   - ../parts/topology/standalone.yaml

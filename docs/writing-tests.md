@@ -166,18 +166,19 @@ a case pass.
 
 ## Run it
 
-Offline, against the fakes:
+Offline, against the fakes (replace `<area>` with the test module you added):
 
 ```sh
 source .venv/bin/activate
-python -m pytest tests/test_<area>.py -q
+python -m pytest 'tests/test_<area>.py' -q
 ```
 
-Then against a real stack. `plan` shows what would run and skip, and sends nothing:
+Then against a real stack. Set `P` to the local profile path and `CASE` to your test function
+name. `plan` shows what would run and skip, and sends nothing:
 
 ```sh
-llmdv plan --profile <profile> --full-suite -k <case>
-llmdv verify --profile <profile> --full-suite -k <case>
+llmdv plan --profile "$P" --full-suite -k "$CASE"
+llmdv verify --profile "$P" --full-suite -k "$CASE"
 ```
 
 `--full-suite` widens the scope to every case in the library, so `-k` finds your new case even
@@ -210,7 +211,7 @@ fixture shared by suites in `src/llmdv/suites/conftest.py`.
 - [ ] The suite's row in [test-suites.md](test-suites.md) says what it checks, what enables it,
       and its status. Close or edit a Gaps row if the case fills one.
 - [ ] The case is in the `test_sets.default` of every llm-d guide whose claims it tests
-      (`profiles/llm-d/<guide>/parts/common.yaml`); guide lanes run only the cases a test set
+      (`profiles/llm-d/<guide>/parts/common.yaml`); guide configurations run only the cases a test set
       names. Then plan every combination, since a test set naming a missing case id exits `2`:
       `for p in profiles/llm-d/*/*.yaml; do llmdv plan --profile "$p" -q || echo "$p"; done`.
 - [ ] Built-in and profile-defined test sets have no stale case IDs. Keep smoke small: discovery,

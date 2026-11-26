@@ -8,8 +8,8 @@ Profiles for testing a deployment of llm-d's [tiered-prefix-cache](https://githu
 
 **Validation focus: serving correctness with cache offloading configured.** Exercise shared-prefix completions and the API contract because offloading must preserve the answers seen by clients.
 
-**What a pass establishes:** the selected checks held for the declared APIs and reachable
-ingress during this run. **Coverage boundary:** Offload/load-back events and tier hits require engine metrics; ordinary responses do not prove offloading works.
+**What a pass establishes:** the checks that actually executed held at the reachable ingress
+during this run. Skipped checks remain coverage gaps. **Coverage boundary:** Offload/load-back events and tier hits require engine metrics; ordinary responses do not prove offloading works.
 
 These focused defaults are a starting point for validating a production deployment. Add coverage
 for the APIs, clients and operating conditions you rely on; see
@@ -43,8 +43,8 @@ Pick the profile for the overlay you deployed (under `guides/tiered-prefix-cache
 The profiles test the guide's router (the EPP). Give `llmdv` its URL:
 
 ```sh
-export LLMDV_ROUTER_URL=<your EPP's URL>
-llmdv verify --profile profiles/llm-d/tiered-prefix-cache/<profile>.yaml
+export LLMDV_ROUTER_URL='https://your-router.example' # replace with your router's URL
+llmdv verify --profile 'profiles/llm-d/tiered-prefix-cache/<profile>.yaml'
 ```
 
 To test a gateway or the engine as well, [add it as another ingress](../../README.md#include-a-gateway-or-engine). `--identity` flags are optional for verification. Set them when comparing deployments that share a profile, so their recorded configuration dimensions remain distinct; for example `--identity accelerator=gpu --identity provider=gke --identity flavor=native/cpu`, read off your overlay path.
@@ -60,54 +60,182 @@ See [selection rules](../../../docs/cli.md#test-sets-and-coverage) for smoke, fu
 
 `*` selects the whole library; `suite.*` selects a suite. Other patterns select matching cases.
 
-| Suite | Patterns |
-| --- | --- |
-| `contract` | `contract.*` |
-| `discovery` | `discovery.models_lists_declared_model`, `discovery.unknown_model_no_fallback`, `discovery.models_parses_with_openai_sdk` |
-| `openai_chat` | `openai_chat.basic_non_streaming`, `openai_chat.streaming_sse`, `openai_chat.stop_reason`, `openai_chat.configured_reasoning` |
-| `openai_completions` | `openai_completions.basic_non_streaming`, `openai_completions.streaming_matches_json`, `openai_completions.stop_reason`, `openai_completions.prompt_forms` |
-| `anthropic_messages` | `anthropic_messages.basic_non_streaming`, `anthropic_messages.streaming_sse` |
-| `openai_responses` | `openai_responses.basic_non_streaming`, `openai_responses.streaming_sse` |
-| `streaming` | `streaming.sse_framing` |
-| `unhappy` | `unhappy.unknown_path`, `unhappy.malformed_json`, `unhappy.missing_model`, `unhappy.wrong_method`, `unhappy.error_envelope_fields`, `unhappy.context_overflow`, `unhappy.token_limit_over_context` |
-| `transport` | `transport.connection`, `transport.health_status` |
-| `tools` | `tools.auto_call`, `tools.auto_stream` |
-| `long_context` | `long_context.*` |
+**contract**
+
+- `contract.*`
+
+**discovery**
+
+- `discovery.models_lists_declared_model`
+- `discovery.unknown_model_no_fallback`
+- `discovery.models_parses_with_openai_sdk`
+
+**openai_chat**
+
+- `openai_chat.basic_non_streaming`
+- `openai_chat.streaming_sse`
+- `openai_chat.stop_reason`
+- `openai_chat.configured_reasoning`
+
+**openai_completions**
+
+- `openai_completions.basic_non_streaming`
+- `openai_completions.streaming_matches_json`
+- `openai_completions.stop_reason`
+- `openai_completions.prompt_forms`
+
+**anthropic_messages**
+
+- `anthropic_messages.basic_non_streaming`
+- `anthropic_messages.streaming_sse`
+
+**openai_responses**
+
+- `openai_responses.basic_non_streaming`
+- `openai_responses.streaming_sse`
+
+**streaming**
+
+- `streaming.sse_framing`
+
+**unhappy**
+
+- `unhappy.unknown_path`
+- `unhappy.malformed_json`
+- `unhappy.missing_model`
+- `unhappy.wrong_method`
+- `unhappy.error_envelope_fields`
+- `unhappy.context_overflow`
+- `unhappy.token_limit_over_context`
+
+**transport**
+
+- `transport.connection`
+- `transport.health_status`
+
+**tools**
+
+- `tools.auto_call`
+- `tools.auto_stream`
+
+**long_context**
+
+- `long_context.*`
+
+
+</details>
+
+Counted offline by `llmdv plan`, one case per ingress and variant. Planned runs can still skip at runtime. Expand a profile for its scope counts and separate skip classes.
+
+The default is also `--all-test-sets` for these profiles.
+
+<details>
+<summary>sglang-qwen3-32b-ctx16k-parsers-standalone.yaml</summary>
+
+[Open the profile](sglang-qwen3-32b-ctx16k-parsers-standalone.yaml).
+
+| Scope | Selected | Planned run | Planned skip |
+| --- | ---: | ---: | ---: |
+| Default | 88 | 82 | 6 |
+| Smoke | 9 | 9 | 0 |
+| Full library | 1092 | 920 | 172 |
+
+Planned skips by class:
+
+- **Default:** 6 `undeclared`.
+- **Full library:** 172 `undeclared`.
 
 </details>
 
 <details>
-<summary>How many cases each scope selects, per profile</summary>
+<summary>sglang-qwen3-32b-parsers-standalone.yaml</summary>
 
-Counted offline by `llmdv plan`, one per ingress and variant. *Run* cases can still skip during a run (for example `throttled`); *skip* cases are ruled out by the profile's declarations, with their skip class.
+[Open the profile](sglang-qwen3-32b-parsers-standalone.yaml).
 
-| Profile | Default (= `--all-test-sets`) | `smoke` | `--full-suite` |
-| --- | --- | --- | --- |
-| `sglang-qwen3-32b-ctx16k-parsers-standalone.yaml` | 88 selected, 82 run, 6 skip: 6 undeclared | 9 selected, 9 run | 1092 selected, 920 run, 172 skip: 172 undeclared |
-| `sglang-qwen3-32b-parsers-standalone.yaml` | 88 selected, 82 run, 6 skip: 6 undeclared | 9 selected, 9 run | 1092 selected, 920 run, 172 skip: 172 undeclared |
-| `vllm-qwen3-32b-inline-standalone.yaml` | 88 selected, 76 run, 12 skip: 12 undeclared | 9 selected, 9 run | 1092 selected, 678 run, 414 skip: 414 undeclared |
-| `vllm-qwen3-32b-parsers-standalone.yaml` | 88 selected, 82 run, 6 skip: 6 undeclared | 9 selected, 9 run | 1092 selected, 920 run, 172 skip: 172 undeclared |
-| `vllm-qwen3-8b-ctx20k-inline-standalone.yaml` | 88 selected, 76 run, 12 skip: 12 undeclared | 9 selected, 9 run | 1092 selected, 678 run, 414 skip: 414 undeclared |
+| Scope | Selected | Planned run | Planned skip |
+| --- | ---: | ---: | ---: |
+| Default | 88 | 82 | 6 |
+| Smoke | 9 | 9 | 0 |
+| Full library | 1092 | 920 | 172 |
+
+Planned skips by class:
+
+- **Default:** 6 `undeclared`.
+- **Full library:** 172 `undeclared`.
 
 </details>
 
-Preview individual cases and skip reasons with `llmdv plan --profile <profile>`.
+<details>
+<summary>vllm-qwen3-32b-inline-standalone.yaml</summary>
+
+[Open the profile](vllm-qwen3-32b-inline-standalone.yaml).
+
+| Scope | Selected | Planned run | Planned skip |
+| --- | ---: | ---: | ---: |
+| Default | 88 | 76 | 12 |
+| Smoke | 9 | 9 | 0 |
+| Full library | 1092 | 678 | 414 |
+
+Planned skips by class:
+
+- **Default:** 12 `undeclared`.
+- **Full library:** 414 `undeclared`.
+
+</details>
+
+<details>
+<summary>vllm-qwen3-32b-parsers-standalone.yaml</summary>
+
+[Open the profile](vllm-qwen3-32b-parsers-standalone.yaml).
+
+| Scope | Selected | Planned run | Planned skip |
+| --- | ---: | ---: | ---: |
+| Default | 88 | 82 | 6 |
+| Smoke | 9 | 9 | 0 |
+| Full library | 1092 | 920 | 172 |
+
+Planned skips by class:
+
+- **Default:** 6 `undeclared`.
+- **Full library:** 172 `undeclared`.
+
+</details>
+
+<details>
+<summary>vllm-qwen3-8b-ctx20k-inline-standalone.yaml</summary>
+
+[Open the profile](vllm-qwen3-8b-ctx20k-inline-standalone.yaml).
+
+| Scope | Selected | Planned run | Planned skip |
+| --- | ---: | ---: | ---: |
+| Default | 88 | 76 | 12 |
+| Smoke | 9 | 9 | 0 |
+| Full library | 1092 | 678 | 414 |
+
+Planned skips by class:
+
+- **Default:** 12 `undeclared`.
+- **Full library:** 414 `undeclared`.
+
+</details>
+
+Preview cases and reasons with `llmdv plan --profile <profile>`.
 
 ## Not covered
 
-- **Configurations no lane runs:** MooncakeStore, the NVIDIA and XPU `fs` variants, TPU v6e and v7 (including multi-host and the TPU v7 `fs` tier), SGLang `fs`; gateway mode.
-- **Everything the offload does**: offload and load-back counters, the native connector's offload gate, the shared filesystem tier (a prefix primed on one pod hits on another) and the fs lanes' PVC. They need per-pod URLs, engine metrics or cluster objects a committed profile does not carry, and no response field shows a tier hit. A run of these profiles checks that the stack serves correctly with offloading on, not that offloading works.
+- **Configurations no configuration runs:** MooncakeStore, the NVIDIA and XPU `fs` variants, TPU v6e and v7 (including multi-host and the TPU v7 `fs` tier), SGLang `fs`; gateway mode.
+- **Everything the offload does**: offload and load-back counters, the native connector's offload gate, the shared filesystem tier (a prefix primed on one pod hits on another) and the fs configurations' PVC. They need per-pod URLs, engine metrics or cluster objects a committed profile does not carry, and no response field shows a tier hit. A run of these profiles checks that the stack serves correctly with offloading on, not that offloading works.
 - **`cache_reuse`**: no overlay passes `--enable-prompt-tokens-details` or `--enable-cache-report`.
 
 ## For maintainers
 
 <details>
-<summary>llm-d's nightly lanes, and how each maps to a profile</summary>
+<summary>llm-d's nightly workflows, and how each maps to a profile</summary>
 
 
-The overlay is `modelserver/<ACCELERATOR_TYPE>/<MODEL_SERVER>/<CONNECTOR>/<VARIANT>/<INFRA_PROVIDER>/`. Each workflow passes `connector` (`lmcache-connector` or `native`) and `offloading_target` (`cpu` or `fs`) to llm-d-infra's reusable workflow; `guide.yaml` says the nightlies override `CONNECTOR` and `VARIANT`, so `offloading_target` is read as `VARIANT` (inferred: the reusable workflow is not in the llm-d repository). The connector and the tier never change the model, window or parsers, so fifteen lanes (each `gateway_class: epponly`, so standalone) deploy five configurations that differ to a client.
+The overlay is `modelserver/<ACCELERATOR_TYPE>/<MODEL_SERVER>/<CONNECTOR>/<VARIANT>/<INFRA_PROVIDER>/`. Each workflow passes `connector` (`lmcache-connector` or `native`) and `offloading_target` (`cpu` or `fs`) to llm-d-infra's reusable workflow; `guide.yaml` says the nightlies override `CONNECTOR` and `VARIANT`, so `offloading_target` is read as `VARIANT` (inferred: the reusable workflow is not in the llm-d repository). The connector and the tier never change the model, window or parsers, so fifteen workflows (each `gateway_class: epponly`, so standalone) deploy five configurations that differ to a client.
 
-| CI lane | Overlay | Profile | Identity flags |
+| upstream workflow | Overlay | Profile | Identity flags |
 | --- | --- | --- | --- |
 | `cks-cpu-gpu-vllm-lmcache` | `gpu/vllm/lmcache-connector/cpu/base` | `vllm-qwen3-32b-parsers-standalone` | `--identity accelerator=gpu --identity provider=base --identity flavor=lmcache-connector/cpu` |
 | `cks-cpu-gpu-vllm-native` | `gpu/vllm/native/cpu/base` | `vllm-qwen3-32b-parsers-standalone` | `--identity accelerator=gpu --identity provider=base --identity flavor=native/cpu` |
@@ -125,16 +253,16 @@ The overlay is `modelserver/<ACCELERATOR_TYPE>/<MODEL_SERVER>/<CONNECTOR>/<VARIA
 | `gke-cpu-gpu-sglang-native` | `gpu/sglang/native/cpu/gke` | `sglang-qwen3-32b-parsers-standalone` | `--identity accelerator=gpu --identity provider=gke --identity flavor=native/cpu` |
 | `gke-cpu-tpu-sglang-native` | `tpu/v5p/sglang/native/cpu` (no provider; includes `base`) | `sglang-qwen3-32b-ctx16k-parsers-standalone` | `--identity accelerator=tpu/v5p --identity provider=base --identity flavor=native/cpu` |
 
-`accelerator` is the lane's `ACCELERATOR_TYPE` and `provider` the `INFRA_PROVIDER` folder it renders (`base` for the two TPU lanes, which set none). `flavor` is `<CONNECTOR>/<VARIANT>`, the workflow's `connector` and `offloading_target` in overlay-path order, and every lane passes it, as [../README.md](../README.md) sets out. Lanes that would otherwise share a profile, accelerator and provider need it to stay apart: the six NVIDIA vLLM lanes (two connectors per provider) and the four AMD lanes (one provider, two connectors by two tiers).
+`accelerator` is the workflow's `ACCELERATOR_TYPE` and `provider` the `INFRA_PROVIDER` folder it renders (`base` for the two TPU workflows, which set none). `flavor` is `<CONNECTOR>/<VARIANT>`, the workflow's `connector` and `offloading_target` in overlay-path order, and every workflow passes it, as [../README.md](../README.md) sets out. Workflows that would otherwise share a profile, accelerator and provider need it to stay apart: the six NVIDIA vLLM workflows (two connectors per provider) and the four AMD workflows (one provider, two connectors by two tiers).
 
 </details>
 
 <details>
 <summary>Where llm-d's own sources disagree</summary>
 
-- **Unlisted providers.** The four AMD lanes deploy `amd-ci`, which is among `guide.yaml`'s `INFRA_PROVIDER` values but not in the `amd` providers (`base` only). The two `ibm-*` lanes deploy `ocp`, which is in neither the `INFRA_PROVIDER` values (`base`, `gke`, `amd-ci`) nor the `gpu` providers.
-- **Providers of the no-provider lanes.** The two TPU lanes pass an empty provider and apply `base`; `guide.yaml` lists only `gke` for `tpu/v5p`.
+- **Unlisted providers.** The four AMD workflows deploy `amd-ci`, which is among `guide.yaml`'s `INFRA_PROVIDER` values but not in the `amd` providers (`base` only). The two `ibm-*` workflows deploy `ocp`, which is in neither the `INFRA_PROVIDER` values (`base`, `gke`, `amd-ci`) nor the `gpu` providers.
+- **Providers of the no-provider workflows.** The two TPU workflows pass an empty provider and apply `base`; `guide.yaml` lists only `gke` for `tpu/v5p`.
 - **The XPU support row names one model for two.** `guide.yaml` gives `Qwen/Qwen3-32B` for `xpu`, and its notes and `MODEL` comment say the `lmcache-connector` overlay serves `Qwen/Qwen3-8B` (rendered: `--max-model-len 20480`, one XPU). The guide's own `model` check fails a run that leaves `MODEL` at the default.
-- **Router CPU-tier capacity is sized for one overlay.** `router/single-host/tiered-prefix-cache-cpu.values.yaml` sets `lruCapacityPerServer: 19200`, sized for the NVIDIA native overlay's 300 GiB CPU tier; the AMD and XPU native overlays give 100 GiB and the LMCache overlays 100 GB (20 GB on XPU), and every lane uses the same router values. This affects routing quality, not what a client sees.
+- **Router CPU-tier capacity is sized for one overlay.** `router/single-host/tiered-prefix-cache-cpu.values.yaml` sets `lruCapacityPerServer: 19200`, sized for the NVIDIA native overlay's 300 GiB CPU tier; the AMD and XPU native overlays give 100 GiB and the LMCache overlays 100 GB (20 GB on XPU), and every workflow uses the same router values. This affects routing quality, not what a client sees.
 
 </details>

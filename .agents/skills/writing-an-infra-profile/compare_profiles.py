@@ -5,8 +5,10 @@ profile-wide fields that ingress runs under.
 
 Both profiles are loaded as llmdv loads them, with `extends` composed and per-ingress overrides
 applied, so a public profile plus its local overlay can be compared with the private profile it
-came from. Addresses, credentials, setup and the change sentinels (pins and baselines) are left
-out, and so are the profile's name, its `environment` block (cluster detail) and where it was
+came from. This is not a lossless-refactor checker: compare complete loaded Profiles when
+reorganizing parts, including their sentinels. Addresses, credentials, setup and the change
+sentinels (pins and baselines) are left out, and so are the profile's name, its `environment`
+block (cluster detail) and where it was
 loaded from: they are expected to differ. Run it from the repository root with llmdv importable
 (`PYTHONPATH=src`), and with the variables the profiles name set to any value.
 """

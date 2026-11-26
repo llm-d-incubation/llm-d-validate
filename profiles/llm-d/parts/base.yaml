@@ -24,24 +24,25 @@
 #   cache_reuse                  a guide decision; see guides/
 #   model_info                   GET /v1/model/info is a LiteLLM route; no layer here serves it
 #   header_probe, header_rewrites   need the header-echo instrument deployed behind the router,
-#                                which no lane does
+#                                which no configuration does
 #   effort_rendering, answer_max_tokens   model facts nobody has measured; see models/
 #   client_reuse                 needs cache_reuse on messages, which this guide leaves undeclared
-#   image_url_fixture            needs an image hosted where the deployment can fetch it; no lane
+#   image_url_fixture            needs an image hosted where the deployment can fetch it; no configuration
 #                                hosts one, so messages_features.image_url skips as
 #                                requires_instrumentation
 #   client_sessions multi_file_fix   executes model-written code on the operator's machine
 #   fleet (config, metrics, logs)   needs cluster access, which a committed profile does not
-#                                carry; a lane adds an `environment` block in its own local file
+#                                carry; the operator adds an `environment` block in a local profile
 
 schema: llmdv.profile/1
 
-# INTENT: a lane runs llmdv from outside the cluster and reaches the router by a URL. A lane that
-# runs llmdv in a pod overrides this with `in-cluster` in its own local file.
+# INTENT: verification reaches the router by URL from outside the cluster. If you run
+# llmdv inside the cluster, set vantage: in-cluster in your local profile.
 vantage: external
 
-# INTENT: a guide lane deploys the guide for the run and tears it down, so nobody else depends on
-# it and the disruptive families (malformed input, disconnects, long context) run.
+# INTENT: run all eligible checks within the selected validation scope, including cases
+# marked disruptive for their request behavior or resource use. This policy does not
+# expand test selection or grant permission to modify deployed infrastructure.
 fleet_policy: dedicated
 
 capabilities:
@@ -227,7 +228,7 @@ capabilities:
   # INTENT: every opt-in Messages check. parallel_tool_calls needs a tool parser and effort_effect
   # needs Messages efforts; each skips where the model part declares neither.
   messages_checks: [block_forms, context_management, count_tokens_parts, effort_effect, error_types, incremental_streaming, max_tokens_limit, mid_conversation_system, parallel_tool_calls, prompt_accounting, response_shape, stop_sequences, tool_result_error]
-  # INTENT: every Messages feature accepted. image_url needs image_url_fixture, which no lane
+  # INTENT: every Messages feature accepted. image_url needs image_url_fixture, which no configuration
   # hosts, so it skips as requires_instrumentation.
   messages_features:
     assistant_prefill: accepted

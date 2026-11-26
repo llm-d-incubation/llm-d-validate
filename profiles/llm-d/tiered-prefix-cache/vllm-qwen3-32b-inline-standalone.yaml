@@ -1,11 +1,18 @@
 # The tiered-prefix-cache guide in standalone mode (the client reaches the EPP's own
 # listener):
 # vLLM serving Qwen/Qwen3-32B with no parsers: inline <think>, no tool calls, offloading KV
-# cache to CPU RAM (and on some lanes a shared filesystem).
+# cache to CPU RAM (and on some configurations a shared filesystem).
+#
+# Validate your deployment after installing the guide in standalone mode (guide.yaml deploy.standalone)
+# with one of the overlays listed below (GUIDE_NAME=tiered-prefix-cache):
+#   export LLMDV_ROUTER_URL='https://your-router.example' # replace with your router URL
+#   llmdv profile validate profiles/llm-d/tiered-prefix-cache/vllm-qwen3-32b-inline-standalone.yaml
+#   llmdv verify --profile profiles/llm-d/tiered-prefix-cache/vllm-qwen3-32b-inline-standalone.yaml \
+#     <the matching identity flags below>
 #
 # llm-d 9ca8ff0.
 #
-# CI lanes that deploy this configuration (llm-d's nightly-e2e-tiered-prefix-cache-<lane>
+# Maintainer provenance: upstream workflows for this configuration (llm-d's nightly-e2e-tiered-prefix-cache-<workflow-suffix>
 # workflows; each runs in standalone mode, gateway_class epponly):
 #   amd-cpu-rocm-vllm-lmcache         amd/vllm/lmcache-connector/cpu/amd-ci
 #   amd-cpu-rocm-vllm-native          amd/vllm/native/cpu/amd-ci
@@ -14,7 +21,7 @@
 #   gke-cpu-tpu-vllm-native           tpu/v5p/vllm/native/cpu (no provider: applies `base`)
 #   intel-acc-xpu-vllm-native         xpu/vllm/native/cpu/base
 # (overlays as ACCELERATOR_TYPE/MODEL_SERVER/CONNECTOR/VARIANT/INFRA_PROVIDER)
-# Identity flags per lane:
+# Comparison identity by deployment configuration:
 #   amd-cpu-rocm-vllm-lmcache         --identity accelerator=amd --identity provider=amd-ci --identity flavor=lmcache-connector/cpu
 #   amd-cpu-rocm-vllm-native          --identity accelerator=amd --identity provider=amd-ci --identity flavor=native/cpu
 #   amd-fs-rocm-vllm-lmcache          --identity accelerator=amd --identity provider=amd-ci --identity flavor=lmcache-connector/fs
@@ -23,17 +30,10 @@
 #   intel-acc-xpu-vllm-native         --identity accelerator=xpu --identity provider=base --identity flavor=native/cpu
 #
 # vllm-openai-rocm v0.31.0 (AMD), vllm-tpu v0.31.0 with TPUOffloadConnector (TPU v5p) and
-# llm-d-xpu v1.0.0 (Intel XPU, one replica). Every lane passes `flavor` (CONNECTOR/VARIANT);
-# only the four AMD lanes share an accelerator and a provider, so only they need it to stay
+# llm-d-xpu v1.0.0 (Intel XPU, one replica). Use `flavor` for every configuration (CONNECTOR/VARIANT);
+# only the four AMD configurations share an accelerator and a provider, so only they need it to stay
 # apart.
 #
-# How a lane runs it, after deploying the guide in standalone mode (guide.yaml deploy.standalone)
-# with one of the overlays above (GUIDE_NAME=tiered-prefix-cache):
-#   export LLMDV_ROUTER_URL=<the EPP's URL>
-#   llmdv profile validate profiles/llm-d/tiered-prefix-cache/vllm-qwen3-32b-inline-standalone.yaml
-#   llmdv verify --profile profiles/llm-d/tiered-prefix-cache/vllm-qwen3-32b-inline-standalone.yaml \
-#     <the lane's identity flags above>
-
 extends:
   - ../parts/base.yaml
   - ../parts/topology/standalone.yaml

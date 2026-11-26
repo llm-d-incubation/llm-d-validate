@@ -5,7 +5,30 @@ them, and run the same workflow in CI. [Selection rules](cli.md#test-sets-and-co
 [comparison semantics](compare.md) and [cluster runner setup](../deploy/README.md) have their own
 references.
 
-Set `$P` to the profile path and load its endpoint and credential variables before these commands.
+For commands that start a new verification run, set `$P` to the profile path and load its
+endpoint and credential variables. Working with an existing run needs its directory and any
+storage or notification credentials required by the selected command.
+
+[Share a finished run](#share-a-finished-run) · [Storage setup](#publish-a-run) ·
+[Pull a run back](#pull-a-run-back) · [Run unattended](#run-unattended) ·
+[Troubleshooting](#troubleshooting)
+
+## Share a finished run
+
+Use the full child directory printed by verification. These commands reuse its evidence:
+
+```sh
+RUN='<paste the printed run directory>'
+llmdv analyze "$RUN"
+llmdv publish "$RUN" --remote-output 's3://your-bucket/your-prefix' --analyze
+llmdv notify "$RUN"
+```
+
+Replace the run path and destination. Configure [storage credentials](#publish-a-run) before
+publishing. Notification is optional: load `LLMDV_NOTIFY_WEBHOOK` from your credential store
+before calling `notify`. Publish first so the notification can include the results location.
+Neither command reruns inference. To investigate the evidence, see
+[reading results](getting-started.md#read-the-results) and [reproduction](cli.md#reproducing-a-run).
 
 ## Publish a run
 
@@ -30,7 +53,7 @@ llmdv verify --profile "$P" --analyze --evidence all \
 ```
 
 Labels are free-form `key=value` pairs recorded in `outcome.json` and on the dashboard.
-Use `--identity` for baseline matching; a label does not isolate a comparison lane.
+Use `--identity` for baseline matching; a label does not isolate a comparison history.
 
 A published run lives at `<prefix>/<profile name>/<run id>/` and is complete once its
 `MANIFEST.json` is there. A local archive uses the same layout: pass
@@ -44,9 +67,10 @@ To pull a published run back:
 
 ```sh
 PREFIX="s3://$AWS_BUCKET/<prefix>"
-llmdv compare --from "$PREFIX" --profile <profile name> --list
+PROFILE_NAME='<profile name from the profile’s name: field>'
+llmdv compare --from "$PREFIX" --profile "$PROFILE_NAME" --list
 RUN_ID='<run id from the list>'
-aws s3 cp --recursive "$PREFIX/<profile name>/$RUN_ID/" "runs/$RUN_ID/"   # add --endpoint-url for an S3-compatible store
+aws s3 cp --recursive "$PREFIX/$PROFILE_NAME/$RUN_ID/" "runs/$RUN_ID/"   # add --endpoint-url for an S3-compatible store
 llmdv analyze "runs/$RUN_ID"
 ```
 
@@ -93,8 +117,9 @@ or prefix from your other runs.
 
 - **One live run at a time per gateway.** Cache and session cases depend on what earlier requests
   left behind, and a key is usually rate-limited.
-- **Never pass `-n`.** Live runs are always one case at a time; `llmdv verify` refuses it.
-- **Keep comparison lanes distinct.** Set `--identity trigger=nightly` for scheduled runs;
+- **Never pass `-n`.** Cases run sequentially; an individual case can send concurrent requests.
+  `llmdv verify` refuses parallel pytest workers.
+- **Keep comparison histories distinct.** Set `--identity trigger=nightly` for scheduled runs;
   manual runs default to `trigger=manual`. Free-form labels do not isolate baselines.
 - **Keep the machine awake.** A sleeping laptop stalls requests, and the cases in flight fail on
   the stream-idle timeout.

@@ -2,11 +2,20 @@
 # vLLM serving Qwen/Qwen3-VL-32B-Instruct, which reads images, with no parsers: no reasoning, no
 # tool calls.
 #
+# Validate your deployment after installing the guide in standalone mode (guide.yaml deploy.standalone)
+# with one of the overlays listed below:
+#   export LLMDV_ROUTER_URL='https://your-router.example' # replace with your router URL
+#   llmdv profile validate profiles/llm-d/multimodal-serving/vllm-qwen3-vl-32b-instruct-inline-standalone.yaml
+#   llmdv verify --profile profiles/llm-d/multimodal-serving/vllm-qwen3-vl-32b-instruct-inline-standalone.yaml \
+#     --identity accelerator=<ACCELERATOR_TYPE> --identity provider=<INFRA_PROVIDER> \
+#     --identity flavor=<aggregation|e-disaggregation/e-pd>
+# The exact flags per configuration are in README.md beside this file.
+#
 # llm-d 9ca8ff0. Composed from the guide's shipped config and the API
 # references. Only the router layer has been measured (on kind, with a simulator engine; see
 # ../parts/topology/standalone.yaml).
 #
-# CI lanes that deploy this configuration (llm-d's nightly-e2e-multimodal-serving-<lane>
+# Maintainer provenance: upstream workflows for this configuration (llm-d's nightly-e2e-multimodal-serving-<workflow-suffix>
 # workflows; each runs in standalone mode, gateway_class epponly):
 #   aggregation-gke-acc-gpu-vllm-x      TOPOLOGY=aggregation, gpu/vllm/gke
 #                                       (aggregation/modelserver/gpu/vllm/gke): 8 replicas, TP=2
@@ -22,15 +31,6 @@
 # parser, so they look the same to a client. The E/PD routing sidecar sits in the client's path
 # on the decode pods; its own error envelopes have not been measured.
 #
-# How a lane runs it, after deploying the guide in standalone mode (guide.yaml deploy.standalone)
-# with one of the overlays above:
-#   export LLMDV_ROUTER_URL=<the EPP's URL>
-#   llmdv profile validate profiles/llm-d/multimodal-serving/vllm-qwen3-vl-32b-instruct-inline-standalone.yaml
-#   llmdv verify --profile profiles/llm-d/multimodal-serving/vllm-qwen3-vl-32b-instruct-inline-standalone.yaml \
-#     --identity accelerator=<ACCELERATOR_TYPE> --identity provider=<INFRA_PROVIDER> \
-#     --identity flavor=<aggregation|e-disaggregation/e-pd>
-# The exact flags per lane are in README.md beside this file.
-
 extends:
   - ../parts/base.yaml
   - ../parts/topology/standalone.yaml

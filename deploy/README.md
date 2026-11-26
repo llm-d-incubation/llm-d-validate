@@ -1,8 +1,8 @@
 # Running `llmdv` unattended
 
 Deploy `llmdv job` to a cluster, give it credentials, start runs on demand, and read what they
-left. Object storage and Slack are optional. Installing, local runs, publishing and pulling runs
-back are in [docs/getting-started.md](../docs/getting-started.md); every flag, exit code and
+left. Object storage and Slack are optional. Installation and first checks are in [Getting started](../docs/getting-started.md).
+Publishing, retrieval and local jobs are in [Running and sharing results](../docs/running.md); every flag, exit code and
 output file is in [docs/cli.md](../docs/cli.md).
 
 | Path | What it is |
@@ -19,6 +19,8 @@ Real overlays carry cluster detail: keep them with the fleet's manifests or in a
 
 ## Deploying
 
+Replace the quoted placeholders below with your overlay, namespace and image values.
+
 1. Choose an existing CI-published image from
    `ghcr.io/llm-d-incubation/llm-d-validate`: a `vX.Y.Z` release tag or a `sha-<short sha>`
    tag from a successful main build. Set the example overlay's `newTag` to that exact tag;
@@ -31,8 +33,8 @@ Real overlays carry cluster detail: keep them with the fleet's manifests or in a
 4. `kubectl apply -k <overlay>`.
 5. Run it once by hand before trusting the schedule, and check the bucket and Slack:
    ```sh
-   job="$(deploy/trigger.sh -n <namespace> --trigger manual --id first-run)" &&
-   kubectl -n <namespace> logs -f "job/$job"
+   job="$(deploy/trigger.sh -n '<namespace>' --trigger manual --id first-run)" &&
+   kubectl -n '<namespace>' logs -f "job/$job"
    ```
 
 For a custom image, build and push from the repository root, then set both `newName` and
@@ -40,8 +42,8 @@ For a custom image, build and push from the repository root, then set both `newN
 
 ```sh
 podman build -f Containerfile --build-arg LLMDV_GIT_SHA="$(git rev-parse HEAD)" \
-    -t <registry>/<org>/llmdv:"$(git rev-parse --short HEAD)" .
-podman push <registry>/<org>/llmdv:"$(git rev-parse --short HEAD)"
+    -t '<registry>/<org>/llmdv':"$(git rev-parse --short HEAD)" .
+podman push '<registry>/<org>/llmdv':"$(git rev-parse --short HEAD)"
 ```
 
 ### Infrastructure smoke test
@@ -52,9 +54,9 @@ suspended (the profile ConfigMap must exist if mounted; the probe never loads it
 Bash and `jq`:
 
 ```sh
-smoke_job="$(bash deploy/infra-smoke.sh -n <namespace> --cronjob llmdv)" &&
-kubectl -n <namespace> logs -f "job/$smoke_job" --pod-running-timeout=180s &&
-kubectl -n <namespace> wait --for=condition=complete "job/$smoke_job" --timeout=300s
+smoke_job="$(bash deploy/infra-smoke.sh -n '<namespace>' --cronjob llmdv)" &&
+kubectl -n '<namespace>' logs -f "job/$smoke_job" --pod-running-timeout=180s &&
+kubectl -n '<namespace>' wait --for=condition=complete "job/$smoke_job" --timeout=300s
 ```
 
 On OpenShift pass `--cli oc`. The Job runs `infra-smoke.py` from the CronJob's pod spec with a
@@ -73,9 +75,9 @@ reference is optional, so the pod starts without it. Nothing creates it for you.
 2. Create or update the Secret. Repeat after editing to rotate; new pods get the new values,
    running pods keep theirs.
    ```sh
-   kubectl --context <context> -n <namespace> create secret generic llmdv-secrets \
+   kubectl --context '<context>' -n '<namespace>' create secret generic llmdv-secrets \
        --from-env-file=/secure/path/llmdv-secrets.env --dry-run=client -o yaml |
-       kubectl --context <context> -n <namespace> apply -f -
+       kubectl --context '<context>' -n '<namespace>' apply -f -
    ```
 3. Keep nonsecret settings (`LLMDV_RESULTS_URI`, region, `AWS_ENDPOINT_URL`) in the overlay's
    `llmdv-settings`. The S3 identity needs object-write access under the destination, including
@@ -175,9 +177,9 @@ To use a fallback PVC you already have, uncomment the patch in
 the Job's name, and returns:
 
 ```sh
-deploy/trigger.sh -n <namespace> --trigger manual --id "$RUN_ID" -- --compare
-deploy/trigger.sh -n <namespace> --id "$ROLLOUT_ID" -- --client agent --label deployment="$IMAGE_DIGEST"
-deploy/trigger.sh -n <namespace> --trigger manual --profile-file /secure/path/profile.yaml -- --full-suite -m contract
+deploy/trigger.sh -n '<namespace>' --trigger manual --id "$RUN_ID" -- --compare
+deploy/trigger.sh -n '<namespace>' --id "$ROLLOUT_ID" -- --client agent --label deployment="$IMAGE_DIGEST"
+deploy/trigger.sh -n '<namespace>' --trigger manual --profile-file /secure/path/profile.yaml -- --full-suite -m contract
 ```
 
 | Option | Default | Meaning |
@@ -260,7 +262,7 @@ Claude startup as UID 10001 with a read-only root filesystem and no network. To 
 a locally built Docker image:
 
 ```sh
-bash .github/scripts/smoke-image.sh <image> linux/amd64   # or linux/arm64
+bash .github/scripts/smoke-image.sh '<image>' linux/amd64   # or linux/arm64
 ```
 
 ## Claude Code in the runner
@@ -281,7 +283,8 @@ clients:
         executable: /usr/local/bin/claude
 ```
 
-Start with `--client claude-code -k test_claude_code_smoke`. Tool-using sessions execute
+Start with `--full-suite --client claude-code -k test_claude_code_smoke` so the case is
+available even when the profile’s default test set omits real clients. Tool-using sessions execute
 model-generated code: run them only in a disposable pod, and size the memory limit for them; the
 base's 1 GiB is for the ordinary runner.
 
@@ -291,7 +294,7 @@ To check the executable under the same restrictions, without calling a model:
 podman run --rm --network none --read-only --user 10001:0 \
     --cap-drop ALL --security-opt no-new-privileges \
     --tmpfs /work:rw,mode=1777 --tmpfs /tmp:rw,mode=1777 \
-    --entrypoint /usr/local/bin/claude <image> --version
+    --entrypoint /usr/local/bin/claude '<image>' --version
 ```
 
 `--user 10001:0` is deliberate: like OpenShift, it runs as a UID the image does not know, with
@@ -328,7 +331,9 @@ the image.
 - A lost node, an image-pull failure or a Job that never starts leaves nothing to publish. Use
   platform alerts for failed Jobs and missed schedules.
 - `/work` is an `emptyDir`: without S3, copy artifacts out before the pod goes, or mount
-  persistent storage. `outcome.json` always survives in the job log.
+  persistent storage. A finishing `llmdv job` prints `outcome.json` to the job log; an abrupt
+  termination can prevent that, so retain logs and use persistent storage when the evidence
+  must survive pod loss.
 - The image carries neither `kubectl` nor `oc`, so pod logs are not collected; the run says
   `no pod logs: neither kubectl nor oc is on PATH`. To collect them, add a CLI and a Role
   granting `get`/`list` on pods and `get` on `pods/log`.

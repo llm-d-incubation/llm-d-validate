@@ -1,26 +1,41 @@
 # Documentation
 
-Start with the task you want to complete. You need a deployed endpoint; `llmdv` tests it and
-does not deploy or manage the serving stack.
+`llmdv` tests already-deployed model endpoints. Start with your task.
+
+## Run tests
 
 | I want to… | Read |
 | --- | --- |
-| Run my first check and understand its result | [Getting started](getting-started.md) |
+| Run my first check | [Getting started](getting-started.md) |
 | Find a profile for my deployment | [Choose a profile](../profiles/README.md) |
-| Create or adapt a profile | [Writing a profile](writing-profiles.md) |
-| Seed baselines or maintain shared profile configurations | [Profile evidence and provenance](profile-provenance.md) |
-| Choose which tests run | [Selection and coverage](cli.md#test-sets-and-coverage) |
+| Understand a guide's checks and their purpose | [Guide catalog](../profiles/llm-d/README.md) |
+| Choose which tests or ingresses run | [Selection and coverage](cli.md#test-sets-and-coverage) |
+| Grow coverage toward production | [Widen coverage](getting-started.md#widen-coverage) |
+
+## Understand and share results
+
+| I want to… | Read |
+| --- | --- |
 | Understand a failure or a skip | [Read the results](getting-started.md#read-the-results) |
-| Publish results or run unattended | [Publishing and running unattended](running.md) |
-| Compare results with an earlier run | [Comparing runs](compare.md) |
-| Look up a command or exit code | [Command reference](cli.md) |
-| Look up a profile field | [Profile reference](../profiles/REFERENCE.md) |
+| Reproduce a failure | [Reproduction commands](cli.md#reproducing-a-run) |
+| Publish an existing run or notify others | [Share a finished run](running.md#share-a-finished-run) |
+| Compare with an earlier run | [Comparing runs](compare.md) |
+| Run unattended | [Job workflow](running.md#run-unattended) |
+| Resolve an endpoint or delivery problem | [Troubleshooting](running.md#troubleshooting) |
+
+## Customize and contribute
+
+| I want to… | Read |
+| --- | --- |
+| Create or adapt a profile | [Writing a profile](writing-profiles.md) |
+| Seed baselines or maintain shared configurations | [Profile evidence and provenance](profile-provenance.md) |
 | See what the library can check | [Test suites](test-suites.md) |
 | Add a test case | [Writing tests](writing-tests.md) |
 | Add a surface, client or capability | [Extending llmdv](extending.md) |
 | Understand the implementation | [Architecture](architecture.md) |
 
-Guide-specific configuration mappings and coverage limits live beside the
-[llm-d profiles](../profiles/llm-d/README.md). The [contributor guide](../CONTRIBUTING.md)
-covers development, reviews and releases. [Agent skills](../.agents/skills/README.md) are
-operational checklists for coding agents.
+## References
+
+[Commands and exit codes](cli.md) · [Profile fields](../profiles/REFERENCE.md) ·
+[Cluster runner setup](../deploy/README.md) · [Contributor process](../CONTRIBUTING.md) ·
+[Documentation maintenance](maintaining-docs.md) · [Agent checklists](../.agents/skills/README.md)

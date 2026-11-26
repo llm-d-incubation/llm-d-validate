@@ -17,10 +17,10 @@
 # producer's, so the engine default applies. None is declared, because cache_reuse is not
 # declared (below).
 #
-# How the lanes deploy it (FROM values: G/scripts/nightly-deploy-gke.sh, read, not run): the
+# How the upstream scripts deploy it (FROM values: G/scripts/nightly-deploy-gke.sh, read, not run): the
 # router in standalone mode, the PodSnapshotStorageConfig and PodSnapshotPolicy, then one replica
 # that cold starts and is checkpointed (Pod 1), then a scale to two, whose second replica is
-# restored from the snapshot (Pod 2). Both replicas run under gVisor, one GPU each. A lane runs
+# restored from the snapshot (Pod 2). Both replicas run under gVisor, one GPU each. A configuration runs
 # llmdv once both are Ready, so its requests reach a cold-started and a restored replica alike.
 #
 # The guide's claims (G/README.md, G/guide.yaml) and where each one lands:
@@ -44,7 +44,7 @@
 #   7   gVisor isolates each pod's localhost ("gVisor Localhost Isolation", README)
 #       -> not llmdv's concern: llmdv takes the EPP's URL as the deployment provides it
 #   8   gateway mode (guide.yaml deploy.gateway)
-#       -> NOT COVERED: no lane runs it (the workflows pass gateway_host `<GUIDE_NAME>-epp`)
+#       -> NOT COVERED: no tracked upstream workflow runs it (the workflows pass gateway_host `<GUIDE_NAME>-epp`)
 
 guide: pod-snapshot
 
@@ -56,14 +56,15 @@ capabilities:
   # stack for want of the field, not for want of affinity.
   cache_reuse: null
 
-# The cases this guide's lanes run by default (`llmdv verify --full-suite` runs everything). They test
-# what a lane's own deployment can get wrong: the router path, the overlay's parsers and window,
-# and what this guide changes. Engine and model conformance, the rest of the suite, depends only
-# on the engine build, model and flags, which many lanes share; it runs with `--full-suite` once per
-# configuration (profiles/llm-d/README.md, "Which lane runs everything").
+# Default validation scope: the router path, configured parsers and context window,
+# plus the serving behavior this guide introduces. These focused checks are a starting
+# point for deployment validation. Expand coverage for the APIs and operating conditions
+# you rely on; --full-suite selects the existing library before applicability gates.
+# Maintainer assignments for broader validation are in profiles/llm-d/README.md,
+# under "Broader validation assignments".
 test_sets:
   default:
-    # Every lane: the router serves each API a client uses, and refuses what it should.
+    # Every deployment: the router serves each API a client uses, and refuses what it should.
     - contract.*
     - discovery.models_lists_declared_model
     - discovery.unknown_model_no_fallback
@@ -86,11 +87,11 @@ test_sets:
     - unhappy.error_envelope_fields
     - transport.connection
     - transport.health_status
-    # Every lane: the overlay's parser flags take effect (skips where the model part has none).
+    # Every deployment: the overlay's parser flags take effect (skips where the model part has none).
     - openai_chat.configured_reasoning
     - tools.auto_call
     - tools.auto_stream
-    # Every lane: the overlay's context window is the one declared.
+    # Every deployment: the overlay's context window is the one declared.
     - long_context.*
     - unhappy.context_overflow
     - unhappy.token_limit_over_context

@@ -8,8 +8,8 @@ Profiles for testing a deployment of llm-d's [optimized-baseline](https://github
 
 **Validation focus: the baseline router-to-model api contract.** Check advertised models, generation, streaming, parsers and errors because later guide configurations depend on this serving contract.
 
-**What a pass establishes:** the selected checks held for the declared APIs and reachable
-ingress during this run. **Coverage boundary:** API correctness does not establish prefix affinity, throughput or backend placement.
+**What a pass establishes:** the checks that actually executed held at the reachable ingress
+during this run. Skipped checks remain coverage gaps. **Coverage boundary:** API correctness does not establish prefix affinity, throughput or backend placement.
 
 These focused defaults are a starting point for validating a production deployment. Add coverage
 for the APIs, clients and operating conditions you rely on; see
@@ -48,8 +48,8 @@ Pick the profile for the overlay you deployed (under `guides/optimized-baseline/
 The profiles test the guide's router (the EPP). Give `llmdv` its URL:
 
 ```sh
-export LLMDV_ROUTER_URL=<your EPP's URL>
-llmdv verify --profile profiles/llm-d/optimized-baseline/<profile>.yaml
+export LLMDV_ROUTER_URL='https://your-router.example' # replace with your router's URL
+llmdv verify --profile 'profiles/llm-d/optimized-baseline/<profile>.yaml'
 ```
 
 To test a gateway or the engine as well, [add it as another ingress](../../README.md#include-a-gateway-or-engine). `--identity` flags are optional for verification. Set them when comparing deployments that share a profile, so their recorded configuration dimensions remain distinct; for example `--identity accelerator=gpu --identity provider=gke`, read off your overlay path (`provider=base` if you applied the accelerator folder's own kustomization).
@@ -65,45 +65,225 @@ See [selection rules](../../../docs/cli.md#test-sets-and-coverage) for smoke, fu
 
 `*` selects the whole library; `suite.*` selects a suite. Other patterns select matching cases.
 
-| Suite | Patterns |
-| --- | --- |
-| `contract` | `contract.*` |
-| `discovery` | `discovery.models_lists_declared_model`, `discovery.unknown_model_no_fallback`, `discovery.models_parses_with_openai_sdk` |
-| `openai_chat` | `openai_chat.basic_non_streaming`, `openai_chat.streaming_sse`, `openai_chat.stop_reason`, `openai_chat.configured_reasoning` |
-| `openai_completions` | `openai_completions.basic_non_streaming`, `openai_completions.streaming_matches_json`, `openai_completions.stop_reason`, `openai_completions.prompt_forms` |
-| `anthropic_messages` | `anthropic_messages.basic_non_streaming`, `anthropic_messages.streaming_sse` |
-| `openai_responses` | `openai_responses.basic_non_streaming`, `openai_responses.streaming_sse` |
-| `streaming` | `streaming.sse_framing`, `streaming.*` |
-| `unhappy` | `unhappy.unknown_path`, `unhappy.malformed_json`, `unhappy.missing_model`, `unhappy.wrong_method`, `unhappy.error_envelope_fields`, `unhappy.context_overflow`, `unhappy.token_limit_over_context` |
-| `transport` | `transport.connection`, `transport.health_status` |
-| `tools` | `tools.auto_call`, `tools.auto_stream` |
-| `long_context` | `long_context.*` |
+**contract**
+
+- `contract.*`
+
+**discovery**
+
+- `discovery.models_lists_declared_model`
+- `discovery.unknown_model_no_fallback`
+- `discovery.models_parses_with_openai_sdk`
+
+**openai_chat**
+
+- `openai_chat.basic_non_streaming`
+- `openai_chat.streaming_sse`
+- `openai_chat.stop_reason`
+- `openai_chat.configured_reasoning`
+
+**openai_completions**
+
+- `openai_completions.basic_non_streaming`
+- `openai_completions.streaming_matches_json`
+- `openai_completions.stop_reason`
+- `openai_completions.prompt_forms`
+
+**anthropic_messages**
+
+- `anthropic_messages.basic_non_streaming`
+- `anthropic_messages.streaming_sse`
+
+**openai_responses**
+
+- `openai_responses.basic_non_streaming`
+- `openai_responses.streaming_sse`
+
+**streaming**
+
+- `streaming.sse_framing`
+- `streaming.*`
+
+**unhappy**
+
+- `unhappy.unknown_path`
+- `unhappy.malformed_json`
+- `unhappy.missing_model`
+- `unhappy.wrong_method`
+- `unhappy.error_envelope_fields`
+- `unhappy.context_overflow`
+- `unhappy.token_limit_over_context`
+
+**transport**
+
+- `transport.connection`
+- `transport.health_status`
+
+**tools**
+
+- `tools.auto_call`
+- `tools.auto_stream`
+
+**long_context**
+
+- `long_context.*`
+
+
+</details>
+
+Counted offline by `llmdv plan`, one case per ingress and variant. Planned runs can still skip at runtime. Expand a profile for its scope counts and separate skip classes.
+
+The default is also `--all-test-sets` for these profiles.
+
+<details>
+<summary>atom-qwen3-32b-ctxunknown-inline-standalone.yaml</summary>
+
+[Open the profile](atom-qwen3-32b-ctxunknown-inline-standalone.yaml).
+
+| Scope | Selected | Planned run | Planned skip |
+| --- | ---: | ---: | ---: |
+| Default | 106 | 94 | 12 |
+| Smoke | 9 | 9 | 0 |
+| Full library | 1092 | 678 | 414 |
+
+Planned skips by class:
+
+- **Default:** 12 `undeclared`.
+- **Full library:** 414 `undeclared`.
 
 </details>
 
 <details>
-<summary>How many cases each scope selects, per profile</summary>
+<summary>sglang-qwen3-32b-ctx16k-parsers-standalone.yaml</summary>
 
-Counted offline by `llmdv plan`, one per ingress and variant. *Run* cases can still skip during a run (for example `throttled`); *skip* cases are ruled out by the profile's declarations, with their skip class.
+[Open the profile](sglang-qwen3-32b-ctx16k-parsers-standalone.yaml).
 
-| Profile | Default (= `--all-test-sets`) | `smoke` | `--full-suite` |
-| --- | --- | --- | --- |
-| `atom-qwen3-32b-ctxunknown-inline-standalone.yaml` | 106 selected, 94 run, 12 skip: 12 undeclared | 9 selected, 9 run | 1092 selected, 678 run, 414 skip: 414 undeclared |
-| `sglang-qwen3-32b-ctx16k-parsers-standalone.yaml` | 106 selected, 100 run, 6 skip: 6 undeclared | 9 selected, 9 run | 1092 selected, 920 run, 172 skip: 172 undeclared |
-| `sglang-qwen3-32b-inline-standalone.yaml` | 106 selected, 94 run, 12 skip: 12 undeclared | 9 selected, 9 run | 1092 selected, 678 run, 414 skip: 414 undeclared |
-| `sglang-qwen3-32b-parsers-standalone.yaml` | 106 selected, 100 run, 6 skip: 6 undeclared | 9 selected, 9 run | 1092 selected, 920 run, 172 skip: 172 undeclared |
-| `sim-qwen3-32b-standalone.yaml` | 106 selected, 92 run, 14 skip: 14 undeclared | 9 selected, 9 run | 1092 selected, 648 run, 444 skip: 444 undeclared |
-| `vllm-qwen3-0.6b-inline-standalone.yaml` | 106 selected, 94 run, 12 skip: 12 undeclared | 9 selected, 9 run | 1092 selected, 678 run, 414 skip: 414 undeclared |
-| `vllm-qwen3-32b-inline-standalone.yaml` | 106 selected, 94 run, 12 skip: 12 undeclared | 9 selected, 9 run | 1092 selected, 678 run, 414 skip: 414 undeclared |
-| `vllm-qwen3-32b-parsers-standalone.yaml` | 106 selected, 100 run, 6 skip: 6 undeclared | 9 selected, 9 run | 1092 selected, 920 run, 172 skip: 172 undeclared |
+| Scope | Selected | Planned run | Planned skip |
+| --- | ---: | ---: | ---: |
+| Default | 106 | 100 | 6 |
+| Smoke | 9 | 9 | 0 |
+| Full library | 1092 | 920 | 172 |
+
+Planned skips by class:
+
+- **Default:** 6 `undeclared`.
+- **Full library:** 172 `undeclared`.
 
 </details>
 
-Preview individual cases and skip reasons with `llmdv plan --profile <profile>`.
+<details>
+<summary>sglang-qwen3-32b-inline-standalone.yaml</summary>
+
+[Open the profile](sglang-qwen3-32b-inline-standalone.yaml).
+
+| Scope | Selected | Planned run | Planned skip |
+| --- | ---: | ---: | ---: |
+| Default | 106 | 94 | 12 |
+| Smoke | 9 | 9 | 0 |
+| Full library | 1092 | 678 | 414 |
+
+Planned skips by class:
+
+- **Default:** 12 `undeclared`.
+- **Full library:** 414 `undeclared`.
+
+</details>
+
+<details>
+<summary>sglang-qwen3-32b-parsers-standalone.yaml</summary>
+
+[Open the profile](sglang-qwen3-32b-parsers-standalone.yaml).
+
+| Scope | Selected | Planned run | Planned skip |
+| --- | ---: | ---: | ---: |
+| Default | 106 | 100 | 6 |
+| Smoke | 9 | 9 | 0 |
+| Full library | 1092 | 920 | 172 |
+
+Planned skips by class:
+
+- **Default:** 6 `undeclared`.
+- **Full library:** 172 `undeclared`.
+
+</details>
+
+<details>
+<summary>sim-qwen3-32b-standalone.yaml</summary>
+
+[Open the profile](sim-qwen3-32b-standalone.yaml).
+
+| Scope | Selected | Planned run | Planned skip |
+| --- | ---: | ---: | ---: |
+| Default | 106 | 92 | 14 |
+| Smoke | 9 | 9 | 0 |
+| Full library | 1092 | 648 | 444 |
+
+Planned skips by class:
+
+- **Default:** 14 `undeclared`.
+- **Full library:** 444 `undeclared`.
+
+</details>
+
+<details>
+<summary>vllm-qwen3-0.6b-inline-standalone.yaml</summary>
+
+[Open the profile](vllm-qwen3-0.6b-inline-standalone.yaml).
+
+| Scope | Selected | Planned run | Planned skip |
+| --- | ---: | ---: | ---: |
+| Default | 106 | 94 | 12 |
+| Smoke | 9 | 9 | 0 |
+| Full library | 1092 | 678 | 414 |
+
+Planned skips by class:
+
+- **Default:** 12 `undeclared`.
+- **Full library:** 414 `undeclared`.
+
+</details>
+
+<details>
+<summary>vllm-qwen3-32b-inline-standalone.yaml</summary>
+
+[Open the profile](vllm-qwen3-32b-inline-standalone.yaml).
+
+| Scope | Selected | Planned run | Planned skip |
+| --- | ---: | ---: | ---: |
+| Default | 106 | 94 | 12 |
+| Smoke | 9 | 9 | 0 |
+| Full library | 1092 | 678 | 414 |
+
+Planned skips by class:
+
+- **Default:** 12 `undeclared`.
+- **Full library:** 414 `undeclared`.
+
+</details>
+
+<details>
+<summary>vllm-qwen3-32b-parsers-standalone.yaml</summary>
+
+[Open the profile](vllm-qwen3-32b-parsers-standalone.yaml).
+
+| Scope | Selected | Planned run | Planned skip |
+| --- | ---: | ---: | ---: |
+| Default | 106 | 100 | 6 |
+| Smoke | 9 | 9 | 0 |
+| Full library | 1092 | 920 | 172 |
+
+Planned skips by class:
+
+- **Default:** 6 `undeclared`.
+- **Full library:** 172 `undeclared`.
+
+</details>
+
+Preview cases and reasons with `llmdv plan --profile <profile>`.
 
 ## Not covered
 
-No nightly lane covers these configurations, so no profile here covers them: the community
+These configurations have no profile: the community
 overlays (TPU v6e and v7, TPU v7 dynamic slicing, Rebellions NPU, CPU, Iluvatar, MetaX, Biren,
 Enflame, Moore Threads, TensorRT-LLM, and SGLang on Intel XPU), gateway mode, and agentgateway
 as the standalone sidecar proxy.
@@ -113,13 +293,13 @@ For library-wide limitations, see the [shared guide gaps](../README.md#not-cover
 ## For maintainers
 
 <details>
-<summary>llm-d's nightly lanes, and how each maps to a profile</summary>
+<summary>llm-d's nightly workflows, and how each maps to a profile</summary>
 
-Lanes share a profile when their model, context window, parsers and engine match. Provider-only node, cache and NCCL settings do not require another profile. These lanes use no `flavor` dimension.
+Workflows share a profile when their model, context window, parsers and engine match. Provider-only node, cache and NCCL settings do not require another profile. These workflows use no `flavor` dimension.
 
-Every lane runs standalone: the client calls the `<GUIDE_NAME>-epp` Service on port 80 (the lanes' `gateway_host`). Lanes that share a profile are told apart by `--identity`; the provider value is the overlay's `INFRA_PROVIDER` folder, and `base` for a lane that sets none, which applies the `base` overlay.
+Every workflow runs standalone: the client calls the `<GUIDE_NAME>-epp` Service on port 80 (the workflows' `gateway_host`). Workflows that share a profile are told apart by `--identity`; the provider value is the overlay's `INFRA_PROVIDER` folder, and `base` for a workflow that sets none, which applies the `base` overlay.
 
-| CI lane (`nightly-e2e-optimized-baseline-<lane>`) | Overlay it deploys (`ACCELERATOR_TYPE/MODEL_SERVER/INFRA_PROVIDER`) | Profile | Identity flags |
+| upstream workflow (`nightly-e2e-optimized-baseline-<workflow-suffix>`) | Overlay it deploys (`ACCELERATOR_TYPE/MODEL_SERVER/INFRA_PROVIDER`) | Profile | Identity flags |
 | --- | --- | --- | --- |
 | `cks-acc-gpu-vllm-x` | `gpu/vllm/base` | `vllm-qwen3-32b-parsers-standalone` | `--identity accelerator=gpu --identity provider=base` |
 | `gke-acc-gpu-vllm-x` | `gpu/vllm/gke` | `vllm-qwen3-32b-parsers-standalone` | `--identity accelerator=gpu --identity provider=gke` |
@@ -132,8 +312,8 @@ Every lane runs standalone: the client calls the `<GUIDE_NAME>-epp` Service on p
 | `amd-acc-rocm-sglang-x` | `amd/sglang/amd-ci` | `sglang-qwen3-32b-inline-standalone` | `--identity accelerator=amd --identity provider=amd-ci` |
 | `amd-acc-rocm-atom-x` | `amd/atom/amd-ci` | `atom-qwen3-32b-ctxunknown-inline-standalone` | `--identity accelerator=amd --identity provider=amd-ci` |
 
-`sim-qwen3-32b-standalone` is not a lane: it runs the guide's router in front of llm-d-inference-sim, for kind or CI without accelerators.
+`sim-qwen3-32b-standalone` is not a workflow: it runs the guide's router in front of llm-d-inference-sim, for local or automated testing without accelerators.
 
-These lanes run the guide's `test_sets.default` (`parts/common.yaml`). The lanes that run every case with `--full-suite`, one per configuration, are listed in [Which lane runs the full suite](../README.md#for-maintainers).
+These workflows run the guide's `test_sets.default` (`parts/common.yaml`). The workflows that run every case with `--full-suite`, one per configuration, are listed in [Broader validation assignments](../README.md#for-maintainers).
 
 </details>

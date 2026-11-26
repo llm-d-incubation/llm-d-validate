@@ -1,6 +1,10 @@
 # Profile reference: `llmdv.profile/1`
 
-Every key a profile accepts, block by block. For how to write a profile, start with the [profile guide](README.md). The `fleet` block's rules are in [fleet](#fleet).
+Every key a profile accepts, block by block. For how to write a profile, start with the [profile authoring guide](../docs/writing-profiles.md). The `fleet` block's rules are in [fleet](#fleet).
+
+[Model](#model) · [Ingresses](#ingresses) · [Capabilities](#capabilities) ·
+[Test sets](#test_sets) · [Clients](#clients) · [Known failures](#known_failures) ·
+[Fleet observations](#fleet)
 
 Conventions:
 
@@ -32,7 +36,6 @@ Conventions:
 | `fleet_policy` | `dedicated` \| `shared` | `dedicated` | `shared` means other people depend on this fleet: cases marked `disruptive` skip as `excluded_by_policy`. Cheap well-formed refusals (a bad token limit, an unknown path, a bad credential) still run. Declared, never inferred. |
 | `fleet` | mapping | none | Configuration and metrics rules read from the cluster. See [fleet](#fleet). |
 | `known_failures` | list | none | Failures already filed and traced to a pending fix. Labels, never excuses. See [known_failures](#known_failures). |
-
 | `test_sets` | mapping of names to non-empty lists of strings | `{}` | Saved case-ID patterns. A plain run requires `default`; explicit flags choose other scopes. See [test_sets](#test_sets). |
 
 ## extends
@@ -64,7 +67,13 @@ Two values are not merged, because they depend on which file is which:
 
 Each file is checked on its own before it is merged: an unknown top-level key, an ingress with no `id`, or an `id` named twice in one file's `ingresses` is an error in that file.
 
-The composed profile is what is validated, digested and written to `profile.used.yaml`, with a comment block naming the file that set each key. That file stands on its own: it holds the name and each client executable as an absolute path, so a run from it loads the same profile and records the same digest. A problem, at load or from validation, is reported against the file that set the value at fault. A missing parent, a chain that leads back to a file already in it, a file reached by two routes, an `extends` with no value, an empty list, or a list that names a file twice is an invalid profile (exit 2), and the error names the entry, such as `extends[1]`.
+The composed profile is what is validated and digested.
+
+### Archived profiles
+
+The archived `profile.used.yaml` stands on its own: it holds the name and each client executable as an absolute path. Normally it includes source-assignment comments. When a `public_id_env` variable supplied a model ID, the archive instead writes the resolved IDs into standalone YAML and disables those lookups; it does not retain the per-field source comments. When no model variable supplies an ID, the archive retains the original lookup declarations. Pinning preserves model selection, but the normalized declarations and digest can differ from the source profile. Keep the source files for authoring and provenance.
+
+A problem, at load or from validation, is reported against the file that set the value at fault. A missing parent, a chain that leads back to a file already in it, a file reached by two routes, an `extends` with no value, an empty list, or a list that names a file twice is an invalid profile (exit 2), and the error names the entry, such as `extends[1]`.
 
 ## environment
 
@@ -86,7 +95,7 @@ The profile-wide model. Each ingress inherits it and may override any field (see
 | --- | --- | --- | --- |
 | `public_id` | string | **required** | The model id clients request, as `/v1/models` advertises it at the ingress. |
 | `aliases` | list of string | `[]` | Further ids that must also be advertised. |
-| `public_id_env` | string or `null` | not declared | A variable that, when set and not empty, supplies the model id instead of `public_id`, which stays the default. One profile can then test a gateway that serves the model under its own name (an alias, a staging suffix): `export` the id with the URL. Declare it on an ingress's `model` to give each layer its own; `null` on an ingress stops it inheriting the profile's. A run archives the id it tested in `profile.used.yaml`, so `reproduce.sh` replays that id whatever its shell exports. |
+| `public_id_env` | string or `null` | not declared | A variable that, when set and not empty, supplies the model id instead of `public_id`, which stays the default. One profile can then test a gateway that serves the model under its own name (an alias, a staging suffix): `export` the id with the URL. Declare it on an ingress's `model` to give each layer its own; `null` on an ingress stops it inheriting the profile's. See [archived profiles](#archived-profiles) for model-ID pinning during replay. |
 | `max_model_len` | int or `null` | none | Context length. Without it, the context-overflow case skips as `undeclared`. |
 | `answer_max_tokens` | positive int or `null` | none | Opts into the Chat and Messages answer-budget cases, using exactly this output cap in the default reasoning mode. It is also the least output budget any other case asks with, so a model that reasons long by default still answers; a case whose own budget is larger keeps it. |
 | `reasoning` | mapping | see below | How reasoning text reaches the client. |
@@ -285,29 +294,29 @@ Optional features within the declared surfaces. Whether a route is served at all
 | `cache_reuse` | mapping or `null` | `null` | Native prefix-cache probes. See [cache_reuse](#cache_reuse). |
 | `chat_fields` | mapping | `{}` | Chat field probe to `accepted`, `ignored` or `rejected`. Names are `CHAT_FIELDS` in `schema.py`. |
 | `chat_options` | list | `[]` | Chat `n` and/or `logprobs`. |
-| `chat_quiet_efforts` | list | `[]` | Chat efforts answered with no reasoning. Disjoint from `chat_reasoning_efforts`. The cases that turn reasoning off send the first, else `none` from `chat_reasoning_efforts`, else the lowest declared Chat effort, recorded as reasoning that stays on. |
+| `chat_quiet_efforts` | list | `[]` | Chat efforts that disable reasoning; disjoint from `chat_reasoning_efforts`. [Details](#capability-chat_quiet_efforts). |
 | `chat_reasoning_efforts` | list | `[]` | Chat `reasoning_effort` values the fleet supports. |
-| `chat_repeats` | list | `[]` | `seed` (same seed, same text), `greedy` (temperature 0 repeats; also enables stream-against-JSON parity) and/or `fresh` (sampled requests differ). The seed and greedy cases record how many repeats agree and pass either way, unless `deterministic_repeats` is declared. |
+| `chat_repeats` | list | `[]` | Which repeatability and stream-parity probes to run. [Details](#capability-chat_repeats). |
 | `client_model_names` | list of string | `[]` | Model names clients send by default. Names in `public_id` or `aliases` must be served; every other must be refused as `unknown_model` with no generation. |
 | `client_reuse` | bool | `false` | The pinned client's three-turn cache case. Needs a pinned binary and `cache_reuse` on `messages`. |
 | `client_sessions` | list | `[]` | Real Claude Code sessions to run. See [Claude Code clients](#claude-code-clients). |
 | `completions_fields` | mapping | `{}` | Completions field probe to `accepted`, `ignored` or `rejected`. Names are `COMPLETIONS_FIELDS` in `schema.py`. |
 | `contract_baseline` | mapping | `{}` | Declared key paths and JSON types of responses, streams and errors, per surface. See [Change sentinels](#change-sentinels). |
 | `count_tokens` | bool | `false` | `/v1/messages/count_tokens` cases, on ingresses serving `messages`. |
-| `deterministic_repeats` | bool | `false` | The configuration promises identical repeats, as an engine in batch-invariant mode does. Then the `seed` and `greedy` repeat cases fail when their [samples](#samples) rule does not hold; without it they only measure agreement, since OpenAI documents `seed` as best effort and vLLM does not promise identical repeats across batches. |
+| `deterministic_repeats` | bool | `false` | Whether repeatability probes assert deterministic output. [Details](#capability-deterministic_repeats). |
 | `effort_rendering` | mapping or `null` | `null` | The effort marker the template renders for each requested effort, read back through `prompt_logprobs`. See [effort_rendering](#effort_rendering). |
 | `forward_compat` | mapping | `{}` | Declared outcome of each unknown request element. See [Change sentinels](#change-sentinels). |
 | `header_probe` | bool | `false` | An operator-run header instrument is reachable. See [headers](#headers). |
 | `header_rewrites` | mapping | `{}` | Non-credential header to the value the instrument must see. |
 | `json_object` | surface list | `false` | JSON-object mode on Chat and Responses. |
-| `image_url_fixture` | `https://` URL | none | An image (PNG, JPEG, GIF or WebP) hosted online that the deployment can fetch, sent as the Messages `url` image source by `messages_features.image_url`, as Anthropic documents that source. Undeclared, that feature skips as `requires_instrumentation` when declared `accepted`; declared `rejected`, it sends the fixture when one is declared, so a 4xx proves a policy rather than a failed fetch, and an unreachable URL otherwise. A deployment that refuses the source or fails to fetch the declared image fails. |
+| `image_url_fixture` | `https://` URL | none | A reachable image URL used to check Messages URL-image support. [Details](#capability-image_url_fixture). |
 | `messages_checks` | list | `[]` | Opt-in Messages cases. See [Opt-in checks](#opt-in-checks). |
 | `messages_efforts` | list | `[]` | Messages output efforts the fleet supports. Declaring any also checks an invalid effort is refused. |
 | `messages_features` | mapping | `{}` | Messages request feature to `accepted` or `rejected`. Undeclared features are not sent. |
 | `messages_thinking` | list | `[]` | Thinking modes the fleet supports. |
-| `model_info` | mapping or `null` | `{}` | Field to the value the gateway's `GET /v1/model/info` entry must report for the model. Values are booleans, numbers, strings or string lists; booleans match exactly, so `null` never satisfies `false`. Use `null` on an ingress that does not serve the route. |
+| `model_info` | mapping or `null` | `{}` | Expected fields from the gateway’s `/v1/model/info` response. [Details](#capability-model_info). |
 | `model_retrieval` | bool or `null` | `null` | `true`: `GET /v1/models/{id}` returns the model. `false`: it is refused with a 4xx. |
-| `openai_contract` | bool or list | `false` | Spec-derived Chat and Completions cases: every documented field, nullable fields as null, token limits, stop strings, message shapes, stream parity and body fidelity. A list selects `chat_completions` and/or `completions`. |
+| `openai_contract` | bool or list | `false` | Spec-derived Chat and Completions cases; optionally restrict to either surface. [Details](#capability-openai_contract). |
 | `prefix_stability` | surface list | `false` | Synthetic token-prefix checks on render surfaces. |
 | `prompt_pins` | mapping | `{}` | Input token count of a fixed conversation, per surface. See [Change sentinels](#change-sentinels). |
 | `reasoning_tokens` | surface list | `false` | Native reasoning token accounting on Chat and Responses. Declare only where the parser provides it. |
@@ -325,6 +334,32 @@ Optional features within the declared surfaces. Whether a route is served at all
 | `structured_output_streaming` | surface list | `false` | The streamed JSON Schema case, alongside `structured_output`. |
 | `vision` | surface list | `false` | The model reads images: the image cases run on the selected surfaces. Each sends a freshly drawn picture and requires the answer to describe it. |
 | `extension_options` | list of string | `[]` | Request-body extension fields the fleet accepts, such as vLLM's. See [Vocabularies](#vocabularies). |
+
+### Capability details
+
+#### capability-chat_quiet_efforts
+
+Chat efforts answered with no reasoning. Disjoint from `chat_reasoning_efforts`. The cases that turn reasoning off send the first, else `none` from `chat_reasoning_efforts`, else the lowest declared Chat effort, recorded as reasoning that stays on.
+
+#### capability-chat_repeats
+
+`seed` (same seed, same text), `greedy` (temperature 0 repeats; also enables stream-against-JSON parity) and/or `fresh` (sampled requests differ). The seed and greedy cases record how many repeats agree and pass either way, unless `deterministic_repeats` is declared.
+
+#### capability-deterministic_repeats
+
+The configuration promises identical repeats, as an engine in batch-invariant mode does. Then the `seed` and `greedy` repeat cases fail when their [samples](#samples) rule does not hold; without it they only measure agreement, since OpenAI documents `seed` as best effort and vLLM does not promise identical repeats across batches.
+
+#### capability-image_url_fixture
+
+An image (PNG, JPEG, GIF or WebP) hosted online that the deployment can fetch, sent as the Messages `url` image source by `messages_features.image_url`, as Anthropic documents that source. Undeclared, that feature skips as `requires_instrumentation` when declared `accepted`; declared `rejected`, it sends the fixture when one is declared, so a 4xx proves a policy rather than a failed fetch, and an unreachable URL otherwise. A deployment that refuses the source or fails to fetch the declared image fails.
+
+#### capability-model_info
+
+Field to the value the gateway's `GET /v1/model/info` entry must report for the model. Values are booleans, numbers, strings or string lists; booleans match exactly, so `null` never satisfies `false`. Use `null` on an ingress that does not serve the route.
+
+#### capability-openai_contract
+
+Spec-derived Chat and Completions cases: every documented field, nullable fields as null, token limits, stop strings, message shapes, stream parity and body fidelity. A list selects `chat_completions` and/or `completions`.
 
 ### Vocabularies
 
