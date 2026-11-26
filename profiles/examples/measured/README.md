@@ -28,20 +28,13 @@ name, such as a provider prefix or a staging suffix; preflight refuses a run who
 endpoint does not serve, and says so. A deployment that differs in a measured setting (another
 error status, another path) is a short file that `extends` the profile and changes only that.
 
-**Claude Code.** The client cases drive Claude Code 2.1.289, the version these layers were measured
-with, and the profiles expect it at `/opt/claude-code/2.1.289/claude`. The runner image installs
-a different version at `/usr/local/bin/claude`, so install this one beside it (Linux; use
-`linux-arm64` on ARM):
-
-```bash
-sudo mkdir -p /opt/claude-code/2.1.289
-sudo curl --fail --location -o /opt/claude-code/2.1.289/claude \
-  https://downloads.claude.ai/claude-code-releases/2.1.289/linux-x64/claude
-sudo chmod 755 /opt/claude-code/2.1.289/claude
-```
-
-Check it against the release's `manifest.json` checksum, as the `Containerfile` does. Without it,
-leave the client cases out with `-m "not real_clients"`.
+**Claude Code.** The client cases drive the Claude Code the runner image installs, 2.1.330 at
+`/usr/local/bin/claude`, the same pin as every other committed profile. These layers were measured
+with 2.1.289, so a client case that fails on a first run with 2.1.330 may be the version change
+rather than the deployment. Outside the image, install 2.1.330 at that path as the
+[deploy guide](../../../deploy/README.md) describes, checked against the release's `manifest.json`
+checksum as the `Containerfile` does. Without it, leave the client cases out with
+`-m "not real_clients"`.
 
 **Muse's contract baselines are not seeded.** GLM-5.3's and DeepSeek's `contract_baseline` hold
 the response shapes measured on their deployments; Muse's holds the `llmdv_seed` placeholder in

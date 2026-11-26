@@ -88,15 +88,17 @@ def _image_claude_code_version() -> str:
 
 
 @pytest.mark.parametrize("path", FILES, ids=lambda p: str(p.relative_to(PROFILES)))
-def test_a_client_at_the_images_path_pins_the_images_version(path):
-    """The runner image installs one Claude Code at /usr/local/bin/claude. A profile that pins
-    another version there fails every client case in that image before it checks anything, so
-    it must name the image's version, or point at its own install path."""
+def test_every_committed_client_pins_the_images_claude_code(path):
+    """The runner image installs one Claude Code at /usr/local/bin/claude, and every committed
+    profile drives that one. A profile that pins another version there fails every client case
+    in that image before it checks anything; one that pins another install path needs a binary
+    the image does not have. A local profile may pin what its machine has."""
     raw = yaml.safe_load(path.read_text()) or {}
+    image = ("/usr/local/bin/claude", _image_claude_code_version())
     for client in raw.get("clients") or []:
         for binary in client.get("binaries") or []:
-            if binary.get("executable") == "/usr/local/bin/claude":
-                assert str(binary.get("version")) == _image_claude_code_version(), (
-                    f"{client.get('id')}: pins {binary.get('version')} at /usr/local/bin/claude, "
-                    f"where the image installs {_image_claude_code_version()}"
-                )
+            pinned = (binary.get("executable"), str(binary.get("version")))
+            assert pinned == image, (
+                f"{client.get('id')}: pins {pinned[1]} at {pinned[0]}, where the image installs "
+                f"{image[1]} at {image[0]}"
+            )

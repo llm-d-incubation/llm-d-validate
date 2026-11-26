@@ -4,9 +4,9 @@
 # prompt_pins and render_pins are the values measured there. The contract_baseline is not seeded
 # yet: each part holds the llmdv_seed placeholder, so the contract-drift cases compare against
 # nothing until a run of a healthy deployment seeds them (see README.md).
-# The client cases drive Claude Code 2.1.289, the version these layers were measured with, from
-# /opt/claude-code/2.1.289/claude; the runner image's /usr/local/bin/claude is another version.
-# Install it there (see README.md), or leave the client cases out with -m "not real_clients".
+# The client cases drive the runner image's Claude Code, 2.1.330 at /usr/local/bin/claude; these
+# layers were measured with 2.1.289. Outside the image, install 2.1.330 there (see README.md), or
+# leave the client cases out with -m "not real_clients".
 # A plain run selects every case (test_sets.default is "*"). Point it at any deployment of
 # the model, production or staging, with variables; nothing else changes:
 #
@@ -266,7 +266,7 @@ clients:
   surfaces: [messages]
   needs: [streaming]
   binaries:
-  - {version: 2.1.289, executable: /opt/claude-code/2.1.289/claude}
+  - {version: "2.1.330", executable: /usr/local/bin/claude}
 test_sets:
   default: ['*']
 known_failures:
