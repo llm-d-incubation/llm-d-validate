@@ -22,4 +22,4 @@ FROM $base
 COPY tests /opt/fake/tests
 ENTRYPOINT ["python", "/opt/fake/tests/e2e_llm_d_nightly/fake_router.py", "serve"]
 EOF
-"$engine" build -q -t "$tag" "$context"
+"$engine" build -q -f "$context/Containerfile" -t "$tag" "$context"
