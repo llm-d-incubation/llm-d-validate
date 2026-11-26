@@ -17,14 +17,14 @@ The static page draws no conclusions. That is your job, and it must stay visibly
 ## Steps
 
 1. **Get the run directory onto this machine.** A local run needs nothing. To pull a published one, follow running-and-comparing-live-runs ("Pull a run back"); the run's `outcome.json` gives its `publication.location`. Without bucket access, ask someone who has it for the run directory.
-2. **Build the static page** from the repository root, with every `auth.key_env` variable the run's `profile.used.yaml` names exported, so the credential scan checks their exact values. Load them as [`.agents/ENVIRONMENT.md`](../../ENVIRONMENT.md) describes (ask where the person keeps the key; never echo it), under the profile's names:
+2. **Build the static page** using the installed `llmdv` selected through [`.agents/ENVIRONMENT.md`](../../ENVIRONMENT.md), with every `auth.key_env` variable the run's `profile.used.yaml` names exported, so the credential scan checks their exact values. Load them as [`.agents/ENVIRONMENT.md`](../../ENVIRONMENT.md) describes (ask where the person keeps the key; never echo it), under the profile's names:
    ```sh
    export <auth.key_env>="$<their key variable>"
-   .venv/bin/llmdv analyze runs/<run_id>
+   llmdv analyze <run_dir>
    ```
-   A router-direct profile has no key; nothing needs exporting.
+   `<run_dir>` is the actual local run path; neither a repository-root working directory nor a `.venv` in the checkout is required. Use that path in the remaining steps. A router-direct profile has no key; nothing needs exporting.
    It prints the counts and every failure group by name; those names are the keys for group notes. If the user asked only for the dashboard, stop here and hand over the path.
-3. **Write an intent for every case in the run,** passing ones included: a request body alone does not say what the test was proving. Collect the distinct case ids from `results.jsonl`; each record's `nodeid` names the test function. Read it, its docstring, and the helpers and assertions it calls, then write two or three sentences a reader who has not seen the code can follow:
+3. **Write an intent for every case in the run,** passing ones included: a request body alone does not say what the test was proving. Collect the distinct case ids from `results.jsonl`; each record's `nodeid` names the test function. Use source matching the run’s `llmdv` version in `env.json` (and source revision, if known); if the exact source is unavailable, state that limitation. Read the function, its docstring, and the helpers and assertions it calls, then write two or three sentences a reader who has not seen the code can follow:
    - what the case sends, in plain words (the body fields that matter, streamed or not, how many requests);
    - the property it checks;
    - what a pass means.

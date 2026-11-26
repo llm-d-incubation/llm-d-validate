@@ -9,8 +9,10 @@ came from. This is not a lossless-refactor checker: compare complete loaded Prof
 reorganizing parts, including their sentinels. Addresses, credentials, setup and the change
 sentinels (pins and baselines) are left out, and so are the profile's name, its `environment`
 block (cluster detail) and where it was
-loaded from: they are expected to differ. Run it from the repository root with llmdv importable
-(`PYTHONPATH=src`), and with the variables the profiles name set to any value.
+loaded from: they are expected to differ. Use the Python interpreter from the environment where
+llmdv is installed, with a matching profile checkout and the variables the profiles name set
+to any value. Profile arguments may be absolute paths or relative to the working directory.
+Use `PYTHONPATH=src` from the repository root only when intentionally checking source changes.
 """
 
 from __future__ import annotations

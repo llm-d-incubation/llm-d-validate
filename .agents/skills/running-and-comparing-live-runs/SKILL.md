@@ -55,5 +55,4 @@ from the verification verdict.
 ## Then
 
 Use [reporting-a-run](../reporting-a-run/SKILL.md) for an annotated dashboard,
-[triaging-a-run](../triaging-a-run/SKILL.md) for investigation and
-[filing-a-fleet-finding](../filing-a-fleet-finding/SKILL.md) for an authorized issue report.
+[triaging-a-run](../triaging-a-run/SKILL.md) for investigation.
