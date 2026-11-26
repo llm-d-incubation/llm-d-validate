@@ -67,7 +67,13 @@ Two values are not merged, because they depend on which file is which:
 
 Each file is checked on its own before it is merged: an unknown top-level key, an ingress with no `id`, or an `id` named twice in one file's `ingresses` is an error in that file.
 
-The composed profile is what is validated, digested and written to `profile.used.yaml`, with a comment block naming the file that set each key. That file stands on its own: it holds the name and each client executable as an absolute path, so a run from it loads the same profile and records the same digest. A problem, at load or from validation, is reported against the file that set the value at fault. A missing parent, a chain that leads back to a file already in it, a file reached by two routes, an `extends` with no value, an empty list, or a list that names a file twice is an invalid profile (exit 2), and the error names the entry, such as `extends[1]`.
+The composed profile is what is validated and digested.
+
+### Archived profiles
+
+The archived `profile.used.yaml` stands on its own: it holds the name and each client executable as an absolute path. Normally it includes source-assignment comments. When a `public_id_env` variable supplied a model ID, the archive instead writes the resolved IDs into standalone YAML and disables those lookups; it does not retain the per-field source comments. When no model variable supplies an ID, the archive retains the original lookup declarations. Pinning preserves model selection, but the normalized declarations and digest can differ from the source profile. Keep the source files for authoring and provenance.
+
+A problem, at load or from validation, is reported against the file that set the value at fault. A missing parent, a chain that leads back to a file already in it, a file reached by two routes, an `extends` with no value, an empty list, or a list that names a file twice is an invalid profile (exit 2), and the error names the entry, such as `extends[1]`.
 
 ## environment
 
@@ -89,7 +95,7 @@ The profile-wide model. Each ingress inherits it and may override any field (see
 | --- | --- | --- | --- |
 | `public_id` | string | **required** | The model id clients request, as `/v1/models` advertises it at the ingress. |
 | `aliases` | list of string | `[]` | Further ids that must also be advertised. |
-| `public_id_env` | string or `null` | not declared | A variable that, when set and not empty, supplies the model id instead of `public_id`, which stays the default. One profile can then test a gateway that serves the model under its own name (an alias, a staging suffix): `export` the id with the URL. Declare it on an ingress's `model` to give each layer its own; `null` on an ingress stops it inheriting the profile's. A run archives the id it tested in `profile.used.yaml`, so `reproduce.sh` replays that id whatever its shell exports. |
+| `public_id_env` | string or `null` | not declared | A variable that, when set and not empty, supplies the model id instead of `public_id`, which stays the default. One profile can then test a gateway that serves the model under its own name (an alias, a staging suffix): `export` the id with the URL. Declare it on an ingress's `model` to give each layer its own; `null` on an ingress stops it inheriting the profile's. See [archived profiles](#archived-profiles) for model-ID pinning during replay. |
 | `max_model_len` | int or `null` | none | Context length. Without it, the context-overflow case skips as `undeclared`. |
 | `answer_max_tokens` | positive int or `null` | none | Opts into the Chat and Messages answer-budget cases, using exactly this output cap in the default reasoning mode. It is also the least output budget any other case asks with, so a model that reasons long by default still answers; a case whose own budget is larger keeps it. |
 | `reasoning` | mapping | see below | How reasoning text reaches the client. |

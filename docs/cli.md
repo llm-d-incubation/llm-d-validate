@@ -310,8 +310,11 @@ bash "$RUN/failures/<ingress>/<case>/repro.sh"   # replay one exchange
 
 `reproduce.sh` uses the archived profile beside it. For test-set runs it reads
 `profile.replay.yaml`, which freezes the resolved patterns as `test_sets.recorded-run`; for
-`--full-suite` runs it reads `profile.used.yaml`. Other filters are retained. Use the recorded
-`llmdv` version to reproduce the same library cases. Both scripts read credentials from the environment.
+`--full-suite` runs it reads `profile.used.yaml`. Other filters are retained. If a model ID was
+supplied through `public_id_env` during the run, the archived profiles pin the resolved IDs;
+unsetting or changing that model variable does not change replay selection. Otherwise the
+original model-variable lookup declarations remain. Use the recorded `llmdv` version to
+reproduce the same library cases. Both scripts read credentials from the environment.
 
 ### The dashboard
 

@@ -71,8 +71,10 @@ extends: [../parts/base.yaml, ../parts/engines/vllm.yaml, ../parts/models/<model
 Mappings merge, lists and other values replace, `null` clears a value, and ingresses are keyed by
 `id`, so they merge like mappings; [REFERENCE.md](../profiles/REFERENCE.md#extends) has the rules. A `name` is
 not inherited: a file that sets none is named after itself. `llmdv profile show` and
-`llmdv profile validate` check the composed result, and a run's `profile.used.yaml` holds it
-whole, with a comment naming the file that set each key.
+`llmdv profile validate` check the composed result. A run archives standalone declarations
+in `profile.used.yaml`; when a model ID came from an environment variable, it pins the resolved
+IDs for replay. See [archive semantics](../profiles/REFERENCE.md#extends). Keep the source files
+for editing and use `profile explain` to inspect where each setting came from.
 
 ## Inspect before running
 
