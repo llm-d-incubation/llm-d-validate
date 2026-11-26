@@ -12,7 +12,7 @@ import subprocess
 import sys
 import tempfile
 import time
-from collections import Counter, defaultdict
+from collections import defaultdict
 from pathlib import Path
 
 import yaml
@@ -137,9 +137,8 @@ def _stage(directory, stage, shards, common, slugs, nodes, parent_fd):
 
 def _order(path, order, *, results, scratch=None):
     """Atomically restore plan order with one line in memory, keeping original timestamps."""
-    seen = Counter()
     if not path.is_file():
-        return seen
+        return
     offsets = defaultdict(list)
     with path.open("rb") as source:
         while True:
@@ -152,9 +151,10 @@ def _order(path, order, *, results, scratch=None):
                 log.warning("incomplete final row in %s", path.name)
                 break
             node = json.loads(line)["nodeid"]
-            seen[node] += 1
             offsets[node].append(offset)
-        if set(seen) - order.keys() or (results and any(count != 1 for count in seen.values())):
+        if offsets.keys() - order.keys() or (
+            results and any(len(rows) > 1 for rows in offsets.values())
+        ):
             raise RuntimeError(f"unexpected or duplicate case in {path.name}")
         with tempfile.NamedTemporaryFile(dir=scratch or path.parent, delete=False) as dest:
             try:
@@ -167,15 +167,24 @@ def _order(path, order, *, results, scratch=None):
                 os.replace(dest.name, path)
             finally:
                 Path(dest.name).unlink(missing_ok=True)
-    return seen
+
+
+def _result_ids(path):
+    """Only newline-terminated verdicts count when a worker dies during a write."""
+    if not path.is_file():
+        return set()
+    with path.open("rb") as source:
+        return {json.loads(line)["nodeid"] for line in source if line.endswith(b"\n")}
 
 
 def _reconcile(run_dir, execution, db):
     """Put complete evidence rows in plan order and account for the whole pytest protocol."""
     order = {node: i for i, node in enumerate(execution["pending_plan"])}
     scratch = run_dir / RUN_STATE
-    seen = _order(run_dir / "results.jsonl", order, results=True, scratch=scratch)
+    results = run_dir / "results.jsonl"
+    _order(results, order, results=True, scratch=scratch)
     _order(run_dir / "exchanges.jsonl", order, results=False, scratch=scratch)
+    seen = _result_ids(results)
     finished = {row[0] for row in db.execute("SELECT node FROM finished")} if db else set()
     unfinished = [node for node in order if node not in finished or node not in seen]
     execution["unfinished"] = unfinished
@@ -186,7 +195,7 @@ def _reconcile(run_dir, execution, db):
         if teardown:
             execution["teardown_errors"] = teardown
     del execution["pending_plan"]
-    return bool(finished - seen.keys())
+    return bool(finished - seen)
 
 
 def recover(run_dir, execution):
@@ -204,6 +213,12 @@ def recover(run_dir, execution):
         if state.is_file():
             db = stack.enter_context(contextlib.closing(sqlite3.connect(state)))
         _reconcile(run_dir, execution, db)
+
+
+def clear_receipts(run_dir):
+    scratch = run_dir / RUN_STATE
+    (scratch / "state").unlink(missing_ok=True)
+    (scratch / "report.lock").unlink(missing_ok=True)
 
 
 def run(args, run, argv, cases, nodes, profile):
@@ -262,6 +277,5 @@ def run(args, run, argv, cases, nodes, profile):
             run.outcome.write(run.run_dir)
         if db.execute("SELECT 1 FROM failures LIMIT 1").fetchone():
             code = max(code, 1)
-    state.unlink()
-    (scratch / "report.lock").unlink(missing_ok=True)
+    clear_receipts(run.run_dir)
     return code

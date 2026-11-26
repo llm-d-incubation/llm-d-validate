@@ -9,7 +9,7 @@ import threading
 import time
 import xml.etree.ElementTree as ET
 from collections import Counter, defaultdict
-from contextlib import contextmanager
+from contextlib import ExitStack, contextmanager
 
 import pytest
 import yaml
@@ -488,6 +488,66 @@ def pytest_runtest_teardown(item):
         assert ("unfinished" if fault == "crash" else "teardown error") in (
             run / "summary.md"
         ).read_text()
+
+
+@pytest.mark.parametrize(
+    ("boundary", "signum", "missing_receipt"),
+    [
+        ("_order", signal.SIGTERM, False),
+        ("_order", signal.SIGTERM, True),
+        ("_reconcile", signal.SIGINT, False),
+    ],
+)
+def test_signal_during_finalization_uses_worker_receipts(
+    tmp_path, monkeypatch, boundary, signum, missing_receipt
+):
+    root = tmp_path / "runs"
+    if missing_receipt:
+        reconcile = concurrent._reconcile
+
+        def lose_receipt(run_dir, execution, db):
+            # The first case recorded its verdict, but never finished teardown.
+            node = execution["pending_plan"][0]
+            db.execute("DELETE FROM finished WHERE node = ?", (node,))
+            return reconcile(run_dir, execution, db)
+
+        monkeypatch.setattr(concurrent, "_reconcile", lose_receipt)
+
+    original = getattr(concurrent, boundary)
+
+    def interrupt(*args, **kwargs):
+        signal.raise_signal(signum)
+        return original(*args, **kwargs)
+
+    monkeypatch.setattr(concurrent, boundary, interrupt)
+    monkeypatch.setattr(verify_cmd, "_SIGNALLED", threading.Event())
+    monkeypatch.setattr(verify_cmd.log_setup, "configure", lambda **kwargs: None)
+    monkeypatch.setattr(verify_cmd.log_setup, "close_run_log", lambda: None)
+    with FakeFleet() as fleet, ExitStack() as restore:
+        for sig in (signal.SIGTERM, signal.SIGINT):
+            restore.callback(signal.signal, sig, signal.getsignal(sig))
+        path = profile(tmp_path, fleet, ELIGIBLE[:2])
+        args = build_parser().parse_args(
+            [
+                "verify",
+                "--profile",
+                str(path),
+                "--local-output",
+                str(root),
+                "--concurrency",
+                "2",
+                "--skip-preflight",
+                "--pod-logs",
+                "off",
+            ]
+        )
+        assert verify_cmd.cmd_verify(args) == 6
+    run = only_run(root)
+    outcome = json.loads((run / "outcome.json").read_text())
+    assert outcome["verification"]["class"] == "interrupted"
+    records = rows(run)
+    assert outcome["execution"]["unfinished"] == ([records[0]["nodeid"]] if missing_receipt else [])
+    assert [r["case_id"] for r in records if r["outcome"] == "pass"] == list(ELIGIBLE[:2])
 
 
 @pytest.mark.parametrize("signum", [signal.SIGINT, signal.SIGTERM])

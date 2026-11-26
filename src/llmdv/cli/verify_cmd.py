@@ -557,7 +557,19 @@ def _finish(args: argparse.Namespace, run: _Run, code: int) -> int:
     # A second signal must not cut publication short.
     signal.signal(signal.SIGTERM, signal.SIG_IGN)
     run_dir, outcome = run.run_dir, run.outcome
-    # A preflight interrupt can reach finalization before the scheduler reconciles the plan.
+    if run.ran_pytest and "pending_plan" in outcome.execution:
+        from . import concurrent
+
+        # A signal may have interrupted the scheduler while it was ordering completed rows.
+        signal.signal(signal.SIGINT, signal.SIG_IGN)
+        try:
+            concurrent.recover(run_dir, outcome.execution)
+        except Exception:  # noqa: BLE001 -- publish the readable evidence of a damaged run
+            log.exception("could not reconcile planned cases")
+        else:
+            outcome.write(run_dir)
+            concurrent.clear_receipts(run_dir)
+    # Before dispatch or after failed recovery, the saved plan is all we can account for.
     if "pending_plan" in outcome.execution:
         outcome.execution["unfinished"] = outcome.execution.pop("pending_plan")
     if run.ran_pytest and not run.records:
