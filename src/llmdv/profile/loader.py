@@ -157,6 +157,55 @@ def composed_text(path: str | Path) -> str | None:
     return compose.render(chain) if len(chain) > 1 else None
 
 
+def archived_text(path: str | Path) -> str | None:
+    """What a run archives for `path` when a plain copy would not replay it.
+
+    `composed_text`, unless a variable supplied a model id: then the whole profile, with each id
+    this run tested written in. None when a copy of the file is the record.
+    """
+    try:
+        profile, chain = load_with_sources(path)
+    except ProfileError:
+        return composed_text(path)
+    pinned = pinned_model_ids(compose.resolved(chain, standalone=True), profile)
+    if pinned is None:
+        return composed_text(path)
+    return (
+        "# Archived by llmdv: each model id a public_id_env variable supplied is written in, so a\n"
+        "# replay tests the names this run tested whatever its shell exports.\n"
+        + yaml.safe_dump(pinned, sort_keys=False)
+    )
+
+
+def pinned_model_ids(document: dict[str, Any], profile: Profile) -> dict[str, Any] | None:
+    """`document` with the model ids `profile` resolved written in, or None if no variable set one.
+
+    `profile` is what `document` loaded to. Every ingress gets its id and stops reading a variable,
+    not only those that read one: an ingress that opted out of the profile's variable would
+    otherwise inherit the id written in at the top.
+    """
+    models = (profile.model, *(ingress.model for ingress in profile.ingresses))
+    if not any(m.public_id_env and os.environ.get(m.public_id_env, "").strip() for m in models):
+        return None
+    top = {k: v for k, v in (document.get("model") or {}).items() if k != "public_id_env"}
+    ids = {ingress.id: ingress.model.public_id for ingress in profile.ingresses}
+    return {
+        **document,
+        "model": {**top, "public_id": profile.model.public_id},
+        "ingresses": [
+            {
+                **entry,
+                "model": {
+                    **(entry.get("model") or {}),
+                    "public_id": ids[entry["id"]],
+                    "public_id_env": None,
+                },
+            }
+            for entry in document["ingresses"]
+        ],
+    }
+
+
 def _layers(path: str | Path) -> list[compose.Layer]:
     """The chain `path` names, each file checked for what composing would hide."""
     chain = compose.layers(path)
