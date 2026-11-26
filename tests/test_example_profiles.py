@@ -22,13 +22,8 @@ from llmdv.profile import compose, loader
 ROOT = Path(__file__).resolve().parents[1]
 PROFILES = ROOT / "profiles"
 EXAMPLES = sorted((PROFILES / "examples").glob("*.yaml"))
-# Every committed file, at any depth. Local variants are gitignored and never checked here, and a
-# dotfile (`llm-d/.overlays.yaml`) is data beside the profiles, never a profile.
-FILES = sorted(
-    p
-    for p in PROFILES.rglob("*.yaml")
-    if not p.name.endswith(".local.yaml") and not p.name.startswith(".")
-)
+# Every committed file, at any depth. Local variants are gitignored and never checked here.
+FILES = sorted(p for p in PROFILES.rglob("*.yaml") if not p.name.endswith(".local.yaml"))
 # A part is a file another file extends that is not a profile on its own: it lacks a model or an
 # ingress (a model part has no ingress, a topology part no model). It is checked through every
 # profile that extends it, never alone. A complete parent, such as an example a staging variant

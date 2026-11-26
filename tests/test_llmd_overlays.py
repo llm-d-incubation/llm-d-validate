@@ -1,6 +1,6 @@
-"""`profiles/llm-d/.overlays.yaml`: the profile llm-d's nightly runs for each overlay.
+"""`deploy/llm-d-nightly/overlays.yaml`: the profile llm-d's nightly runs for each overlay.
 
-The file is data for llm-d's CI, kept beside the profiles it names. Each guide it lists must say
+The file is read by `deploy/llm-d-nightly/smoke-step.sh`. Each guide it lists must say
 exactly what that guide's README says under "Pick your profile", in both directions, so a row can
 never point at another profile than a reader would choose, and an overlay the README covers is
 never silently left out. An overlay that is not listed has no profile; the nightly skips it.
@@ -8,7 +8,6 @@ never silently left out. An overlay that is not listed has no profile; the night
 
 from __future__ import annotations
 
-import importlib.util
 import re
 from pathlib import Path
 
@@ -19,7 +18,7 @@ from llmdv.profile import loader
 
 ROOT = Path(__file__).resolve().parents[1]
 LLMD = ROOT / "profiles" / "llm-d"
-OVERLAYS = LLMD / ".overlays.yaml"
+OVERLAYS = ROOT / "deploy" / "llm-d-nightly" / "overlays.yaml"
 # An overlay is a path under guides/<guide>/modelserver/: segments with no empty one, no slash at
 # either end and no whitespace (`gpu/vllm/gke`, `tpu/v5p/vllm`, `xpu/vllm`).
 OVERLAY = re.compile(r"[A-Za-z0-9._-]+(?:/[A-Za-z0-9._-]+)+")
@@ -41,7 +40,7 @@ def _readme_map(guide: str) -> dict[str, str]:
     header, body = rows[0], rows[2:]
     assert header[1] in ("Overlay", "Overlays"), (
         f"{guide}: 'Pick your profile' column 2 is {header[1]!r}, not the overlays a lane deploys; "
-        "a guide whose profiles are not chosen by overlay cannot be listed in .overlays.yaml"
+        "a guide whose profiles are not chosen by overlay cannot be listed in overlays.yaml"
     )
     found: dict[str, str] = {}
     for cells in body:
@@ -55,7 +54,7 @@ def _readme_map(guide: str) -> dict[str, str]:
 
 def test_the_file_is_a_mapping_of_guides_to_overlays_to_profile_names():
     data = _overlays()
-    assert data, ".overlays.yaml lists no guide"
+    assert data, "overlays.yaml lists no guide"
     for guide, rows in data.items():
         assert (LLMD / guide).is_dir(), f"{guide}: no such guide folder under profiles/llm-d/"
         assert isinstance(rows, dict) and rows, f"{guide}: expected overlay: profile rows"
@@ -81,15 +80,3 @@ def test_each_listed_profile_exists_and_loads(guide, overlay, profile, monkeypat
     for name in ("LLMDV_ROUTER_URL", "LLMDV_GATEWAY_URL"):
         monkeypatch.setenv(name, "http://example.invalid")
     loader.load(path)
-
-
-def test_the_overlay_file_is_never_taken_for_a_profile():
-    """Every walk over profiles/**/*.yaml skips dotfiles: the suite's and the docs generator's."""
-    from tests import test_example_profiles
-
-    assert OVERLAYS not in test_example_profiles.FILES
-    script = ROOT / ".agents/skills/writing-an-infra-profile/selection_docs.py"
-    spec = importlib.util.spec_from_file_location("selection_docs", script)
-    selection_docs = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(selection_docs)
-    assert OVERLAYS not in selection_docs.runnable()

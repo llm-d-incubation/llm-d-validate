@@ -129,7 +129,7 @@ def test_cli_export_explain_and_usage_errors(tmp_path):
 
 def test_all_complete_examples_can_be_explained_and_exported(tmp_path):
     for path in Path("profiles").rglob("*.yaml"):
-        if "parts" in path.parts or path.name.endswith(".local.yaml") or path.name.startswith("."):
+        if "parts" in path.parts or path.name.endswith(".local.yaml"):
             continue
         profile, chain = loader.load_with_sources(path)
         assert inspection.explain_text(profile, chain)

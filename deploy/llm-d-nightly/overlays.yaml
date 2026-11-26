@@ -1,9 +1,9 @@
-# Read by llm-d's nightly CI to pick a profile for the overlay a lane deployed. To choose a
-# profile yourself, see the guide's README.md, "Pick your profile".
+# The profile smoke-step.sh runs for each overlay a guide's nightly workflows deploy (the path
+# under guides/<guide>/modelserver/). An overlay that is not listed has no profile and is
+# skipped. Each guide here says exactly what its README's "Pick your profile" table says, which
+# tests/test_llmd_overlays.py enforces; to choose a profile yourself, read that table.
 #
-# <guide>: {<overlay under guides/<guide>/modelserver/>: <profile file name, without .yaml>}
-# An overlay that is not listed has no profile, and llm-d's nightly skips llm-d-validate for it.
-# tests/test_llmd_overlays.py keeps this file equal to each listed guide's "Pick your profile".
+# <guide>: {<overlay>: <profile file under profiles/llm-d/<guide>/, without .yaml>}
 optimized-baseline:
   gpu/vllm/base: vllm-qwen3-32b-parsers-standalone
   gpu/vllm/gke: vllm-qwen3-32b-parsers-standalone

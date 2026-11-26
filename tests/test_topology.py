@@ -55,11 +55,7 @@ def _depth_reading(record: dict, column: dict[str, dict]) -> tuple[dict, str]:
 
 ROOT = Path(__file__).resolve().parents[1]
 CANDIDATES = sorted(
-    [
-        p
-        for p in (ROOT / "profiles").rglob("*.yaml")
-        if not p.name.endswith(".local.yaml") and not p.name.startswith(".")
-    ]
+    [p for p in (ROOT / "profiles").rglob("*.yaml") if not p.name.endswith(".local.yaml")]
     + [ROOT / "deploy" / "overlays" / "example" / "profile.yaml"]
 )
 OUTCOMES = ("pass", "fail", "error")
