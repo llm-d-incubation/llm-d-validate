@@ -39,8 +39,8 @@ expectations only after triage; do not copy a failing response into the expected
 
 **Claude Code.** The client cases drive the Claude Code the runner image installs, 2.1.330 at
 `/usr/local/bin/claude`, the same pin as every other committed profile. These layers were measured
-with 2.1.289; the client cases have not yet been validated live with 2.1.330. Include the
-client version when investigating a failure. Outside the image, install 2.1.330 at that path. The
+with 2.1.289. The deployment operator has since confirmed a successful live run with 2.1.330.
+Include the client version when investigating a failure. Outside the image, install 2.1.330 at that path. The
 [Containerfile](../../../Containerfile) shows the download and release-manifest checksum
 verification steps. Without it, leave the client cases out with
 `-m "not real_clients"`.
