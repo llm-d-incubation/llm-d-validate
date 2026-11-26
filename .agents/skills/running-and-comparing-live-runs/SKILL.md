@@ -40,7 +40,7 @@ To publish it, add:
 --identity trigger=manual --label "actor=$USER"
 ```
 
-A plain run requires `test_sets.default` (every llm-d guide profile has one) and runs only the cases it names; `llmdv plan --profile <profile>` says how many it leaves out. One lane per configuration runs `--full-suite` (`profiles/llm-d/README.md`, "Which lane runs everything"), as does a lane whose engine build changed. Use a `*.local.yaml` copy for machine-specific changes, and keep the machine awake. A multi-ingress profile runs every ingress; `--ingress <id>` (repeatable) restricts it, and `llmdv profile show <profile> --setup` prints any port-forwards it needs.
+A plain run requires `test_sets.default` (every llm-d guide profile has one) and runs only the cases it names; `llmdv plan --profile <profile>` says how many it leaves out. One lane per configuration runs `--full-suite` (`profiles/llm-d/README.md`, "Which lane runs everything"), as does a lane whose engine build changed. Use a `*.local.yaml` copy for machine-specific changes, and keep the machine awake. A multi-ingress profile runs every ingress; `--ingress <id or position>` (comma-separated or repeated, such as `--ingress gateway,router`) restricts it, and `llmdv profile show <profile> --setup` prints any port-forwards it needs.
 
 **Unattended** (`llmdv job`, e.g. as a CronJob or a CI step):
 
