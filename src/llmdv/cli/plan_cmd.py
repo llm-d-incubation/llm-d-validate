@@ -66,17 +66,25 @@ class _Planner:
 
     def __init__(self, concurrency: int = 1) -> None:
         self.concurrency = concurrency
+        self.diagnostic = False
         self.rows: list[dict] = []
         self.left_out = 0
         self.excluded = []
         self.filtered = 0
 
     @pytest.hookimpl(tryfirst=True)
-    def pytest_load_initial_conftests(self, early_config):
+    def pytest_load_initial_conftests(self, early_config, args):
+        # Read the caller's options before adding the planner's own collection-only flag.
+        options = early_config.known_args_namespace
+        args.append("--collect-only")
         if self.concurrency == 1:
             return
+        self.diagnostic = (
+            options.collectonly
+            or getattr(options, "setuponly", False)
+            or getattr(options, "setupplan", False)
+        )
         # Includes addopts from the environment and ini, before pytest opens its debug trace.
-        options = early_config.known_args_namespace
         if getattr(options, "xmlpath", None):
             raise pytest.UsageError("--junitxml needs a single pytest session; use --concurrency 1")
         log_file = early_config.pluginmanager.hasplugin("logging") and (
@@ -124,7 +132,7 @@ def cmd_plan(args: argparse.Namespace, private_output: Path | None = None) -> in
     if bad:
         return USAGE
 
-    argv = suite_pytest_args() + ["--llmdv-profile", args.profile, "--collect-only", "-q"]
+    argv = suite_pytest_args() + ["--llmdv-profile", args.profile, "-q"]
     argv += ["--no-header", "-p", "no:xdist", "-p", "no:cacheprovider"]
     if not _plugin_is_registered():
         argv[1:1] = ["-p", "llmdv.plugin"]
@@ -140,6 +148,7 @@ def cmd_plan(args: argparse.Namespace, private_output: Path | None = None) -> in
     document = _document(profile.name, args, planner.rows, selected, planner.left_out)
     document["coverage"].update(excluded=planner.excluded, excluded_by_filters=planner.filtered)
     if private_output is not None:
+        document["diagnostic"] = planner.diagnostic
         private_output.write_text(json.dumps(document), encoding="utf-8")
     elif args.json:
         emit(json.dumps(document, indent=2))

@@ -5,7 +5,10 @@ from __future__ import annotations
 import contextlib
 import json
 import os
+import selectors
+import shutil
 import signal
+import socket
 import sqlite3
 import stat
 import subprocess
@@ -67,72 +70,107 @@ def _slugs(cases):
     return slugs
 
 
-def _stop(children, directory):
-    # A leader can die leaving a client in its process group. Signal the groups even
-    # when poll() already observed the leader's exit.
-    for proc in children:
-        with contextlib.suppress(ProcessLookupError):
-            os.killpg(proc.pid, signal.SIGTERM)
-    deadline = time.monotonic() + 3
-    for proc in children:
-        with contextlib.suppress(subprocess.TimeoutExpired):
-            proc.wait(timeout=max(0, deadline - time.monotonic()))
-    for proc in children:
-        with contextlib.suppress(ProcessLookupError):
-            os.killpg(proc.pid, signal.SIGKILL)
-        proc.wait(timeout=5)
+def _signal_group(proc, signum):
+    if proc.returncode is None:
+        # macOS returns EPERM for an exiting group with only zombies. The bounded
+        # wait in _reap still detects a live worker that could not be stopped.
+        with contextlib.suppress(ProcessLookupError, PermissionError):
+            os.killpg(proc.pid, signum)
+
+
+def _reap(proc, directory):
+    # The leader still reserves its PID. Stop any descendants before releasing it.
+    _signal_group(proc, signal.SIGKILL)
+    try:
+        code = proc.wait(timeout=5)
+    finally:
         stop_worker_clients(directory, proc.pid)
+    (directory / f"stopping-{proc.pid}").unlink(missing_ok=True)
+    return code
 
 
-def _stage(directory, stage, shards, common, slugs, nodes, parent_fd):
+def _stop(children, directory):
+    for proc in children.values():
+        _signal_group(proc, signal.SIGTERM)
+    deadline = time.monotonic() + 3
+    first_timeout = None
+    for channel, proc in children.items():
+        with contextlib.suppress(OSError):
+            channel.settimeout(max(0, deadline - time.monotonic()))
+            channel.recv(1)
+        try:
+            _reap(proc, directory)
+        except subprocess.TimeoutExpired as exc:
+            first_timeout = first_timeout or exc
+    if first_timeout is not None:
+        raise first_timeout
+
+
+def _stage(directory, stage, shards, common, slugs, nodes, secrets_fd):
     children = {}
     failed = False
-    try:
-        for index, rows in enumerate(shards):
-            path = directory / f"{stage}-{index}.json"
-            job = dict(common, stage=stage, slugs={r["nodeid"]: slugs[r["nodeid"]] for r in rows})
-            job["nodes"] = {node: nodes[node] for node in job["slugs"]}
-            job["argv"] = [
-                *common["argv"],
-                "-p",
-                "no:cacheprovider",
-                "--basetemp",
-                str(directory / f"tmp-{stage}-{index}"),
-            ]
-            with os.fdopen(
-                os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600), "w"
-            ) as stream:
-                json.dump(job, stream)
-            # Record ownership before handling a signal delivered during spawn.
-            mask = signal.pthread_sigmask(signal.SIG_BLOCK, {signal.SIGINT, signal.SIGTERM})
-            try:
-                proc = subprocess.Popen(
-                    [sys.executable, "-m", "llmdv.cli.live_worker", str(path), str(parent_fd)],
-                    pass_fds=(parent_fd,),
-                    start_new_session=True,
-                )  # noqa: S603 -- our interpreter and private assignment
-                children[proc] = path
-            finally:
-                signal.pthread_sigmask(signal.SIG_SETMASK, mask)
-        pending = dict(children)
-        while pending:
-            for proc, path in list(pending.items()):
-                code = proc.poll()
-                if code is None:
-                    continue
-                receipt = path.with_suffix(".done")
-                if code not in (0, 1) or not receipt.is_file() or receipt.read_text() != str(code):
-                    log.error(
-                        "verification worker stopped without a successful session (status %s)", code
-                    )
-                    return 3  # pytest internal error
-                failed |= code == 1
-                del pending[proc]
-            if pending:
-                time.sleep(0.05)
-        return int(failed)
-    finally:
-        _stop(children, directory)
+    with selectors.DefaultSelector() as ready, contextlib.ExitStack() as channels:
+        try:
+            for index, rows in enumerate(shards):
+                path = directory / f"{stage}-{index}.json"
+                job = dict(
+                    common, stage=stage, slugs={r["nodeid"]: slugs[r["nodeid"]] for r in rows}
+                )
+                job["nodes"] = {node: nodes[node] for node in job["slugs"]}
+                job["argv"] = [
+                    *common["argv"],
+                    "-p",
+                    "no:cacheprovider",
+                    "--basetemp",
+                    str(directory / f"tmp-{stage}-{index}"),
+                ]
+                with os.fdopen(
+                    os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600), "w"
+                ) as stream:
+                    json.dump(job, stream)
+                channel, peer = socket.socketpair()
+                channels.enter_context(channel)
+                with peer:
+                    ready.register(channel, selectors.EVENT_READ, path)
+                    # Record ownership before handling a signal delivered during spawn.
+                    mask = signal.pthread_sigmask(signal.SIG_BLOCK, {signal.SIGINT, signal.SIGTERM})
+                    try:
+                        children[channel] = subprocess.Popen(
+                            [
+                                sys.executable,
+                                "-m",
+                                "llmdv.cli.live_worker",
+                                str(path),
+                                str(peer.fileno()),
+                                str(secrets_fd),
+                            ],
+                            pass_fds=(peer.fileno(), secrets_fd),
+                            start_new_session=True,
+                        )  # noqa: S603 -- our interpreter and private assignment
+                    finally:
+                        signal.pthread_sigmask(signal.SIG_SETMASK, mask)
+            while children:
+                # Neither side sends data: readability means the worker exited. Unlike
+                # Popen.poll(), observing EOF does not reap the process-group leader.
+                for key, _ in ready.select():
+                    code = _reap(children[key.fileobj], directory.parent)
+                    del children[key.fileobj]
+                    ready.unregister(key.fileobj)
+                    receipt = key.data.with_suffix(".done")
+                    if (
+                        code not in (0, 1)
+                        or not receipt.is_file()
+                        or receipt.read_text() != str(code)
+                    ):
+                        log.error(
+                            "verification worker stopped without a successful session (status %s)",
+                            code,
+                        )
+                        return 3  # pytest internal error
+                    failed |= code == 1
+            return int(failed)
+        finally:
+            _stop(children, directory.parent)
 
 
 def _order(path, order, *, results, scratch=None):
@@ -181,6 +219,10 @@ def _reconcile(run_dir, execution, db):
     """Put complete evidence rows in plan order and account for the whole pytest protocol."""
     order = {node: i for i, node in enumerate(execution["pending_plan"])}
     scratch = run_dir / RUN_STATE
+    # Both a drained stage and recovery after coordinator death have finished using these inputs.
+    workers = scratch / "workers"
+    if workers.exists():
+        shutil.rmtree(workers)
     results = run_dir / "results.jsonl"
     _order(results, order, results=True, scratch=scratch)
     _order(run_dir / "exchanges.jsonl", order, results=False, scratch=scratch)
@@ -221,9 +263,15 @@ def clear_receipts(run_dir):
     (scratch / "report.lock").unlink(missing_ok=True)
 
 
-def run(args, run, argv, cases, nodes, profile):
+def run(args, run, argv, cases, profile):
+    nodes = public_nodes(cases)
     if len(nodes) != len(cases) or any(row["stage"] not in STAGES for row in cases):
         raise ValueError("invalid or duplicate case in the verification plan")
+    # Preflight can register another secret that occurs in a planned node ID.
+    plan = list(nodes.values())
+    if plan != run.outcome.execution["pending_plan"]:
+        run.outcome.execution["pending_plan"] = plan
+        run.outcome.write(run.run_dir)
     slugs = _slugs(cases)
     common = dict(
         setup=run.setup_commands,
@@ -236,8 +284,11 @@ def run(args, run, argv, cases, nodes, profile):
         no_color=args.no_color,
         profile_digest=run.outcome.identity.get("profile_digest"),
     )
-    with tempfile.TemporaryDirectory(prefix="llmdv-") as temporary, contextlib.ExitStack() as stack:
-        directory = Path(temporary)
+    scratch = run.run_dir / RUN_STATE
+    scratch.mkdir(mode=0o700, exist_ok=True)
+    directory = scratch / "workers"
+    directory.mkdir(mode=0o700)
+    with contextlib.ExitStack() as stack:
         # Freeze the same declarations preflight used, including names and relative client
         # paths. Credentials are still resolved by the normal profile loader from the environment.
         frozen = directory / "profile.yaml"
@@ -246,8 +297,6 @@ def run(args, run, argv, cases, nodes, profile):
         argv = list(argv)
         argv[argv.index("--llmdv-profile") + 1] = str(frozen)
         common["argv"] = argv
-        scratch = run.run_dir / RUN_STATE
-        scratch.mkdir(mode=0o700, exist_ok=True)
         state = scratch / "state"
         db = stack.enter_context(contextlib.closing(sqlite3.connect(state, isolation_level=None)))
         db.executescript("""
@@ -256,14 +305,18 @@ def run(args, run, argv, cases, nodes, profile):
             CREATE TABLE failures (node TEXT, phase TEXT, reason TEXT);
             CREATE TABLE stopped (stop INTEGER PRIMARY KEY);
         """)
-        read_fd, write_fd = os.pipe()
-        stack.callback(os.close, write_fd)
-        stack.callback(os.close, read_fd)
+        # Preflight may register credentials obtained from a service, absent from the profile.
+        secrets = stack.enter_context(tempfile.TemporaryFile())
+        secrets.write(json.dumps(sorted(redact.known_secrets())).encode())
+        secrets.flush()
         code = 0
         stopped = False
         try:
             for stage, shards in assignments(cases, args.concurrency):
-                code = max(code, _stage(directory, stage, shards, common, slugs, nodes, read_fd))
+                code = max(
+                    code,
+                    _stage(directory, stage, shards, common, slugs, nodes, secrets.fileno()),
+                )
                 stopped = bool(db.execute("SELECT 1 FROM stopped").fetchone())
                 if code > 1 or stopped:
                     break

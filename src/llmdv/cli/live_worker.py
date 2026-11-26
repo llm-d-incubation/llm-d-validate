@@ -8,6 +8,7 @@ import json
 import logging
 import os
 import signal
+import socket
 import sqlite3
 import sys
 import threading
@@ -138,22 +139,32 @@ class Assignment:
         self.session_finished = True
 
 
-def main(path: Path, parent_fd: int) -> int:
-    process.worker_directory = path.parent
+def _watch_parent(parent, scratch):
+    # EOF or a broken socket means the coordinator can no longer stop this worker.
+    try:
+        with contextlib.suppress(OSError):
+            parent.recv(1)
+        process.stop_worker_clients(scratch, os.getpid())
+    finally:
+        os.killpg(os.getpgrp(), signal.SIGKILL)
 
-    def watch_parent():
-        # Even SIGKILL of the coordinator closes the pipe. Stop a worker that would
-        # otherwise keep sending traffic while job recovers the completed evidence.
-        os.read(parent_fd, 1)
-        try:
-            process.stop_worker_clients(path.parent, os.getpid())
-        finally:
-            os.killpg(os.getpgrp(), signal.SIGKILL)
 
-    threading.Thread(target=watch_parent, daemon=True).start()
+def main(path: Path, parent_fd: int, secrets_fd: int) -> int:
+    parent = socket.socket(fileno=parent_fd)
+    parent.set_inheritable(False)
+    os.register_at_fork(after_in_child=parent.close)
+    # Workers share an open file description. pread leaves the offset untouched for peers.
+    with os.fdopen(secrets_fd, "rb") as secrets:
+        redact.install_secrets(
+            json.loads(os.pread(secrets.fileno(), os.fstat(secrets_fd).st_size, 0))
+        )
+    job = json.loads(path.read_text())
+    scratch = Path(job["run_dir"]) / RUN_STATE
+    process.worker_directory = scratch
+
+    threading.Thread(target=_watch_parent, args=(parent, scratch), daemon=True).start()
     signal.signal(signal.SIGTERM, signal.default_int_handler)
     signal.pthread_sigmask(signal.SIG_UNBLOCK, {signal.SIGTERM, signal.SIGINT})
-    job = json.loads(path.read_text())
     style.force_plain(job["no_color"])
     setup.configure(
         level=job["level"],
@@ -165,7 +176,6 @@ def main(path: Path, parent_fd: int) -> int:
     for name in (setup.ROOT, setup.OUTPUT):
         for handler in logging.getLogger(name).handlers:
             handler.addFilter(label_case)
-    scratch = Path(job["run_dir"]) / RUN_STATE
     with (
         contextlib.closing(sqlite3.connect(scratch / "state", isolation_level=None)) as db,
         (scratch / "report.lock").open("ab") as lock,
@@ -180,4 +190,4 @@ def main(path: Path, parent_fd: int) -> int:
 
 
 if __name__ == "__main__":
-    sys.exit(main(Path(sys.argv[1]), int(sys.argv[2])))
+    sys.exit(main(Path(sys.argv[1]), int(sys.argv[2]), int(sys.argv[3])))

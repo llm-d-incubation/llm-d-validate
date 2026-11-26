@@ -444,12 +444,13 @@ def _verify(args: argparse.Namespace, run: _Run) -> int:
         return code
     run.outcome.coverage = planned["coverage"]
     cases = planned["cases"]
-    run.outcome.execution = {"concurrency": args.concurrency, "planned": len(cases)}
-    if args.concurrency > 1:
+    # Collection and setup diagnostics have no live calls or call verdicts to reconcile.
+    concurrency = 1 if planned.get("diagnostic") else args.concurrency
+    run.outcome.execution = {"concurrency": concurrency, "planned": len(cases)}
+    if concurrency > 1:
         from . import concurrent
 
-        nodes = concurrent.public_nodes(cases)
-        run.outcome.execution["pending_plan"] = list(nodes.values())
+        run.outcome.execution["pending_plan"] = list(concurrent.public_nodes(cases).values())
     run.outcome.write(run_dir)
     run.profile = profile
 
@@ -514,11 +515,11 @@ def _verify(args: argparse.Namespace, run: _Run) -> int:
     log.debug("pytest argv: %s", " ".join(pytest_argv))
 
     run.ran_pytest = True
-    if args.concurrency == 1:
+    if concurrency == 1:
         code = _run_pytest(pytest_argv, raw=args.raw_pytest, setup_commands=run.setup_commands)
     else:
         code = concurrent.run(
-            args, run, pytest_argv, cases, nodes, compose.resolved(chain, standalone=True)
+            args, run, pytest_argv, cases, compose.resolved(chain, standalone=True)
         )
 
     # Preserve the completed work before any supporting evidence or report can fail.

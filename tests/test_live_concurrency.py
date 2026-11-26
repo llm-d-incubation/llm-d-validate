@@ -5,11 +5,14 @@ from __future__ import annotations
 import json
 import os
 import signal
+import subprocess
 import threading
 import time
 import xml.etree.ElementTree as ET
 from collections import Counter, defaultdict
 from contextlib import ExitStack, contextmanager
+from pathlib import Path
+from unittest.mock import Mock
 
 import pytest
 import yaml
@@ -20,7 +23,14 @@ from llmdv.cli.main import build_parser
 from llmdv.compare.diff import compare_window
 from llmdv.http import redact
 from tests.fakes import SRC, FakeFleet, FakeS3, FakeSlack, only_run, profile_yaml, run_llmdv, s3_env
-from tests.fleet_fakes import LOGS_INGRESS_YAML, fake_kubectl, fleet_state, kubectl_calls
+from tests.fleet_fakes import (
+    LOGS_INGRESS_YAML,
+    FakePrometheus,
+    fake_kubectl,
+    fleet_state,
+    kubectl_calls,
+    metrics_environment,
+)
 
 pytestmark = pytest.mark.skipif(os.name != "posix", reason="concurrent live workers require POSIX")
 
@@ -124,6 +134,76 @@ def test_serial_junit_keeps_every_case_and_failure(tmp_path):
     records = rows(run)
     assert len(report.findall(".//testcase")) == len(records) == 2
     assert len(report.findall(".//failure")) == sum(r["outcome"] == "fail" for r in records)
+
+
+@pytest.mark.parametrize("option", ["--setup-only", "--setupplan", "--co"])
+def test_diagnostic_modes_match_the_serial_session(tmp_path, option):
+    with FakeFleet() as fleet:
+        path = profile(tmp_path, fleet, [*ELIGIBLE[:2], "logs.signatures"])
+        skips = []
+        for width in (1, 2):
+            extra = ["--", option] if option == "--setup-only" else []
+            env = {} if extra else {"PYTEST_ADDOPTS": option}
+            result, run = verify(tmp_path, path, width, "--skip-preflight", *extra, env=env)
+            assert result.returncode == 0, result.stderr
+            assert "unfinished" not in json.loads((run / "outcome.json").read_text())["execution"]
+            skips.append([(r["nodeid"], r["outcome"], r["skip_class"]) for r in rows(run)])
+        assert not fleet.seen
+    assert skips[0] == skips[1]
+    if option == "--setup-only":
+        assert skips[0] and all(outcome == "skip" for _, outcome, _ in skips[0])
+
+
+def test_stage_never_signals_a_reaped_worker(tmp_path, monkeypatch):
+    workers = {}
+
+    def spawn(argv, **kwargs):
+        proc = Mock(pid=len(workers) + 1, returncode=None)
+        workers[proc.pid] = proc
+
+        def reap(*args, **kwargs):
+            proc.returncode = 0
+            return 0
+
+        proc.poll.side_effect = proc.wait.side_effect = reap
+        Path(argv[3]).with_suffix(".done").write_text("0")
+        return proc
+
+    def signal_group(pid, signum):
+        assert workers[pid].returncode is None, "the OS can already reuse this PID"
+
+    monkeypatch.setattr(concurrent.subprocess, "Popen", spawn)
+    monkeypatch.setattr(os, "killpg", signal_group)
+    directory = tmp_path / "workers"
+    directory.mkdir()
+    nodes = {"a": "a", "b": "b"}
+    shards = [[{"nodeid": node}] for node in nodes]
+    assert concurrent._stage(directory, "eligible", shards, {"argv": []}, nodes, nodes, -1) == 0
+    assert all(proc.returncode == 0 for proc in workers.values())
+
+
+def test_stop_reaps_peers_after_a_worker_timeout(tmp_path, monkeypatch):
+    stuck = Mock(pid=1, returncode=None)
+    stuck.wait.side_effect = subprocess.TimeoutExpired("worker", 5)
+    peer = Mock(pid=2, returncode=None)
+    monkeypatch.setattr(os, "killpg", Mock())
+    with pytest.raises(subprocess.TimeoutExpired) as error:
+        concurrent._stop({Mock(): stuck, Mock(): peer}, tmp_path)
+    assert error.value is stuck.wait.side_effect
+    assert (tmp_path / "stopping-1").exists()
+    peer.wait.assert_called_once_with(timeout=5)
+
+
+def test_broken_parent_socket_stops_worker_and_clients(tmp_path, monkeypatch):
+    from llmdv.cli import live_worker
+
+    parent = Mock()
+    parent.recv.side_effect = ConnectionResetError()
+    kill = Mock()
+    monkeypatch.setattr(os, "killpg", kill)
+    live_worker._watch_parent(parent, tmp_path)
+    assert (tmp_path / f"stopping-{os.getpid()}").is_file()
+    kill.assert_called_once_with(os.getpgrp(), signal.SIGKILL)
 
 
 def test_policy_covers_catalog_and_fails_closed():
@@ -410,6 +490,8 @@ def pytest_runtest_teardown(item):
             timeout=90,
         )
     assert result.returncode == 137, result.stderr
+    assert not list(tmp_path.glob("llmdv-*/profile.yaml"))
+    assert not (only_run(tmp_path / "work") / ".llmdv-started" / "workers").exists()
     [manifest] = dest.rglob("MANIFEST.json")
     assert not any(".llmdv-started" in p.parts for p in manifest.parent.rglob("*"))
     for run in (only_run(tmp_path / "work"), manifest.parent):
@@ -605,6 +687,41 @@ def test_connection_loss_reaches_later_stage(tmp_path):
     )
 
 
+def test_log_scan_redacts_preflight_credentials_in_publication(tmp_path):
+    pytest.importorskip("boto3")
+    token = "test_signatures"  # Also occurs in the log cases' parametrized node IDs.
+    with FakeFleet() as fleet, FakePrometheus({}, token=token) as prom, FakeS3() as store:
+        path = profile(tmp_path, fleet, ["logs.signatures"])
+        raw = yaml.safe_load(path.read_text())
+        raw.update(yaml.safe_load(metrics_environment(prom.base_url, "METRICS_KEY")))
+        raw["environment"]["namespace"] = "fleet"
+        raw["ingresses"][0].update(yaml.safe_load(LOGS_INGRESS_YAML))
+        path.write_text(yaml.safe_dump(raw))
+        env = s3_env(store)
+        storage_key = env["AWS_SECRET_ACCESS_KEY"]
+        state = fleet_state()
+        for source in state["logs"]:
+            state["logs"][source] += f"INFO x-api-key={token} storage-key={storage_key}\n"
+        result, run = verify(
+            tmp_path,
+            path,
+            2,
+            "--remote-output",
+            "s3://results/run",
+            env={**env, **fake_kubectl(tmp_path / "bin", state), "METRICS_KEY": token},
+        )
+    assert result.returncode == 0, result.stderr
+    logs = [p.read_bytes() for p in (run / "log-scan").glob("*.log")]
+    published = [body for key, body in store.objects.items() if "/log-scan/" in key]
+    assert len(logs) == len(published) == 3
+    expected = f"x-api-key={redact.SENTINEL} storage-key={redact.SENTINEL}".encode()
+    assert all(expected in body for body in logs + published)
+    assert all(
+        token.encode() not in body and storage_key.encode() not in body
+        for body in store.objects.values()
+    )
+
+
 def test_cross_ingress_evidence_and_log_window(tmp_path):
     key = "llmdv-test-only-secret-210"
     with FakeFleet(
@@ -714,14 +831,15 @@ def test_delivery_failure_keeps_fleet_exit_and_replay(tmp_path):
     assert failures and all(any(not c["ok"] for c in r["checks"]) for r in failures)
 
 
-def test_crashed_worker_cleans_its_trusted_client_group(tmp_path):
+@pytest.mark.parametrize("client_group", ["worker", "separate"])
+def test_crashed_worker_cleans_its_client_group(tmp_path, client_group):
     import fcntl
 
     locked = tmp_path / "client.lock"
     plugin = worker_plugin(
         tmp_path,
         """
-import os, sys, time
+import os, subprocess, sys, time
 from pathlib import Path
 from llmdv.clients import process
 
@@ -733,7 +851,6 @@ def pytest_runtest_setup(item):
             child = spawn(*args, **kwargs)
             time.sleep(10)
             return child
-        process.subprocess.Popen = slow_return
         child = '''
 import fcntl, os, signal, sys, time
 with open(sys.argv[1], 'w') as file:
@@ -741,14 +858,23 @@ with open(sys.argv[1], 'w') as file:
     os.kill(os.getppid(), signal.SIGKILL)
     time.sleep(30)
 '''
-        process.run_process([sys.executable, '-c', child, os.environ['CLIENT_LOCK']],
-                            cwd=Path.cwd(), env={}, timeout=40)
+        argv = [sys.executable, '-c', child, os.environ['CLIENT_LOCK']]
+        if os.environ['CLIENT_GROUP'] == 'worker':
+            subprocess.run(argv, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        else:
+            process.subprocess.Popen = slow_return
+            process.run_process(argv, cwd=Path.cwd(), env={}, timeout=40)
 """,
     )
     with FakeFleet() as fleet:
         path = profile(tmp_path, fleet, [ELIGIBLE[0]])
         result, _ = verify(
-            tmp_path, path, 2, "-p", "session_fault", env={**plugin, "CLIENT_LOCK": str(locked)}
+            tmp_path,
+            path,
+            2,
+            "-p",
+            "session_fault",
+            env={**plugin, "CLIENT_LOCK": str(locked), "CLIENT_GROUP": client_group},
         )
     assert result.returncode == 4, result.stderr
     assert "no case results recorded" in result.stdout
