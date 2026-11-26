@@ -32,8 +32,19 @@ Flags whose behaviour needs more than `--help`:
   `analyze`, `publish`, `notify`, and reproduction scripts. `job --work-dir` uses the same
   local layout. Recorded run IDs and the remote `<profile>/<run-id>/` layout are unchanged,
   so existing comparison history remains usable.
-- **`-n` is refused.** `verify` exits `2` on `-n`, `--numprocesses`, `--maxprocesses`, `--dist`
-  and `--tx`: live cases depend on order, and a rate-limited key must not be multiplied.
+- **`--concurrency N`** on `verify` or `job` sets the maximum number of independent live
+  cases in flight across all selected ingresses. The default of 1 preserves serial order.
+  For example, add `--concurrency 2` to the same verification command to overlap eligible
+  cases in pairs. Preflight runs once. Contract and discovery finish first, eligible cases
+  drain before exclusive cases start, and log checks scan the original run window last.
+  Each case keeps its request order and may generate its own concurrent requests.
+  `plan --json` lists each variant's stage and reason. If a worker crashes, verification
+  stops its peers and keeps the evidence already recorded. With pytest's `-x` or
+  `--maxfail`, cases already in flight can finish. Interrupted and fail-fast runs list
+  unfinished parametrized pytest node IDs in `outcome.json` under `execution.unfinished`
+  in concurrent mode.
+- **`-n` is refused.** `verify` exits `2` on `-n`, `--numprocesses`, `--maxprocesses`, `--dist`,
+  `--tx`, `--px` and `-d`. The live scheduler controls case isolation and evidence collection.
 - **`--evidence all`** writes a bundle for every case, not only failures, so a pass can be
   audited.
 - **`--analyze`** builds `dashboard.html` before publishing, so it is uploaded with the run.

@@ -2,10 +2,12 @@
 
 from __future__ import annotations
 
+import contextlib
 import os
 import selectors
 import signal
 import subprocess
+import sys
 import time
 from dataclasses import dataclass
 from pathlib import Path
@@ -15,6 +17,20 @@ from ..http.redact import scrub
 # How long a leader that refused the group kill may take to finish exiting. Measured on macOS
 # under load, an exiting leader became reapable within 0.1 s; this only bounds a real failure.
 EXIT_GRACE_SECONDS = 5.0
+
+
+# Only isolated pytest workers set this. Trusted clients have their own process
+# groups for timeouts, so killing the worker group alone cannot stop them.
+worker_directory: Path | None = None
+
+
+def stop_worker_clients(directory: Path, worker: int) -> None:
+    (directory / f"stopping-{worker}").touch()
+    for marker in directory.glob(f"client-{worker}-*"):
+        group = int(marker.name.rsplit("-", 1)[1])
+        with contextlib.suppress(ProcessLookupError):
+            os.killpg(group, signal.SIGKILL)
+        marker.unlink(missing_ok=True)
 
 
 @dataclass(frozen=True)
@@ -31,6 +47,18 @@ def run_process(
     buffers = {"stdout": bytearray(), "stderr": bytearray()}
     problem = None
     started = time.monotonic()
+    if worker_directory:
+        # The client has a separate process group for its own timeout. Register
+        # it from inside the new group, before exec, even if this worker dies.
+        launcher = Path(__file__).with_name("_worker_exec.py")
+        argv = [
+            sys.executable,
+            "-IS",
+            str(launcher),
+            str(worker_directory),
+            str(os.getpid()),
+            *argv,
+        ]
     process = subprocess.Popen(
         argv,
         cwd=cwd,
@@ -40,6 +68,7 @@ def run_process(
         stderr=subprocess.PIPE,
         start_new_session=True,
     )  # noqa: S603 -- explicit operator-pinned executable
+    marker = worker_directory / f"client-{os.getpid()}-{process.pid}" if worker_directory else None
     try:
         with selectors.DefaultSelector() as selector:
             for name in buffers:
@@ -92,6 +121,8 @@ def run_process(
         process.wait()
         process.stdout.close()
         process.stderr.close()
+        if marker:
+            marker.unlink(missing_ok=True)
     return ProcessResult(
         process.returncode,
         scrub(buffers["stdout"].decode("utf-8", "replace")),

@@ -109,6 +109,11 @@ expected)` redacts the values, records a not-ok check and raises in one call.
 
 Every skip carries one of the [six skip classes](cli.md#skip-classes): `undeclared`,
 `not_implemented`, `requires_instrumentation`, `requires_load`, `excluded_by_policy`, `throttled`.
+Record each shipped case ID and its scheduling reason in `src/llmdv/execution.py`.
+Review the requests of every variant before marking a case eligible. Hold cache observations,
+timing budgets, shared counters, cancellation, repeatability and disruptive cases exclusive.
+New extension IDs run exclusively by default.
+
 Never write a bare `pytest.skip`. The markers above classify their own skips; a skip you raise in
 the case body starts its reason with the class in brackets, which the plugin reads:
 

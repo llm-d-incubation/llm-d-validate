@@ -26,6 +26,10 @@ Slack:
 *Existing passing*: 2
 ```
 
+Comparisons report changes in the case concurrency limit and execution stage in the text report
+and in `comparison.json` under `execution_changes`. Earlier runs use the serial default.
+Case matching and regression rules use the same ingress, case ID and variant across both modes.
+
 ## How a baseline is chosen
 
 A run is listed or used only when both `results.jsonl` and `MANIFEST.json` exist. Run ids begin

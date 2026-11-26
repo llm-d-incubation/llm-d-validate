@@ -100,9 +100,10 @@ ruff format --check src/ tests/               # the pre-commit hook gates on thi
 The repo pins `ruff` exactly, in `pyproject.toml` and in `.pre-commit-config.yaml`, which must
 stay in sync. `ruff check` alone is not the whole gate: formatting is enforced by a
 `ruff-format` pre-commit hook, so a change that lints clean can still be rejected on commit.
-`./install.sh --dev` installs both tools, and `pytest-xdist` for `-n auto`. Parallel is for
-`llmdv`'s own offline tests only: `llmdv verify` and `llmdv job` refuse `-n` and always run live
-cases one at a time, so never try to parallelize a run against a fleet.
+`./install.sh --dev` installs both tools, and `pytest-xdist` for `-n auto`. Use `-n` only for
+offline tests. `llmdv verify` and `llmdv job` own their live scheduler: serial by default,
+with `--concurrency N` for reviewed independent cases. Exclusive cases run alone across all
+ingresses in the run.
 
 A live run needs a profile and a URL for each ingress it names. A profile that declares local
 setup prints it with `--setup`:

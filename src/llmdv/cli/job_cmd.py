@@ -24,7 +24,7 @@ from .compare_cmd import compare_run
 from .exit_codes import NOT_DELIVERED, OK, PREFLIGHT, TEST_FAILURES, USAGE
 from .notify_cmd import WEBHOOK_ENV, notify_run
 from .publish_cmd import publish_run, record_verdict
-from .verify_cmd import output_profile_name
+from .verify_cmd import add_concurrency, output_profile_name
 
 log = get_logger("cli.job")
 
@@ -78,6 +78,7 @@ def add_parser(subparsers, parents) -> None:
         help="seconds before the run is stopped and published (env LLMDV_RUN_BUDGET; "
         "default 3000). Keep it below the Job's activeDeadlineSeconds",
     )
+    add_concurrency(command)
     _add_analyze_flag(command)
     _add_compare_flags(command)
 
@@ -343,6 +344,7 @@ def _verify(args: argparse.Namespace, run_dir: Path, passthrough: list[str]) -> 
         "--run-dir", str(run_dir),
         "--log-level", args.log_level,
         "--log-format", args.log_format,
+        "--concurrency", str(args.concurrency),
         *(["--remote-output", args.remote_output] if args.remote_output else []),
         *(["--no-color"] if args.no_color else []),
         *(["-v"] * args.verbose),

@@ -47,6 +47,7 @@ def as_record(
             "changes": list(delta.coverage_changes),
             "outside": list(delta.outside_coverage),
         },
+        "execution_changes": list(delta.execution_changes),
         "regressed": delta.regressed,
         "transient": list(delta.transient),
         "known": {
@@ -120,6 +121,9 @@ def render(delta: Delta, profile: str, before_id: str, after_id: str) -> str:
         )
         lines += [f"  `{line}`" for line in delta.mixed_stack]
         lines.append("")
+
+    if delta.execution_changes:
+        lines += ["*Case execution conditions changed.*", *delta.execution_changes, ""]
 
     if delta.coverage_changes:
         lines.append(

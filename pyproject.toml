@@ -54,8 +54,8 @@ s3 = ["boto3>=1.36"]
 # the only module that imports it -- an AWS-credentialled install should not carry it.
 ibm-cos = ["ibm-cos-sdk>=2.16.2"]
 # Keep Ruff in sync with the version pinned in .pre-commit-config.yaml. pytest-xdist runs
-# llmdv's own offline tests in parallel (`pytest tests -n auto`); it is only for developers, and
-# `llmdv verify` blocks it, so live verification stays serial wherever it is installed.
+# llmdv's own offline tests in parallel (`pytest tests -n auto`); it is only for developers.
+# Live verification blocks xdist and schedules eligible cases through its own coordinator.
 dev = ["ruff==0.16.9", "pre-commit>=4.1", "pytest-xdist>=3.6"]
 
 [project.urls]
