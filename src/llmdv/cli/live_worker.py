@@ -11,6 +11,7 @@ import signal
 import sqlite3
 import sys
 import threading
+from functools import partial
 from pathlib import Path
 
 import pytest
@@ -19,15 +20,16 @@ from ..clients import process
 from ..evidence import journal
 from ..http import redact
 from ..log import setup
+from ..output.local import RUN_STATE
 from . import style
 from .verify_cmd import _run_pytest
 
 
-def _label_case(record: logging.LogRecord) -> bool:
-    """Keep interleaved HTTP and SDK diagnostics attributable in the chronological log."""
+def _label_case(record: logging.LogRecord, *, nodes: dict[str, str]) -> bool:
+    """Keep interleaved progress and diagnostics attributable to the public case ID."""
     case = journal.current()
     if case is not None and not getattr(record, "llmdv_case", None):
-        record.llmdv_case = redact.scrub(case.nodeid)
+        record.llmdv_case = nodes[case.nodeid]
         record.msg = f"[{record.llmdv_case}] {record.getMessage()}"
         record.args = ()
     return True
@@ -68,6 +70,7 @@ class Assignment:
         config._llmdv_stage = self.job["stage"]
         config._llmdv_profile_digest = self.job["profile_digest"]
         config._llmdv_slugs = self.job["slugs"]
+        config._llmdv_public_nodes = self.job["nodes"]
         self.maxfail = config.option.maxfail
 
     @pytest.hookimpl(hookwrapper=True, tryfirst=True)
@@ -98,7 +101,11 @@ class Assignment:
         if report.failed:
             self.db.execute(
                 "INSERT INTO failures VALUES (?, ?, ?)",
-                (report.nodeid, report.when, redact.scrub(str(report.longrepr))[-2000:]),
+                (
+                    self.job["nodes"][report.nodeid],
+                    report.when,
+                    redact.scrub(str(report.longrepr))[-2000:],
+                ),
             )
             if (
                 self.maxfail
@@ -107,7 +114,7 @@ class Assignment:
                 self.db.execute("INSERT OR IGNORE INTO stopped VALUES (1)")
 
     def pytest_runtest_logfinish(self, nodeid):
-        self.db.execute("INSERT INTO finished VALUES (?)", (nodeid,))
+        self.db.execute("INSERT INTO finished VALUES (?)", (self.job["nodes"][nodeid],))
 
     @pytest.hookimpl(hookwrapper=True, tryfirst=True)
     def pytest_runtest_makereport(self):
@@ -154,12 +161,14 @@ def main(path: Path, parent_fd: int) -> int:
         run_log=Path(job["run_dir"]) / "llmdv.log",
         log_file=Path(job["log_file"]) if job["log_file"] else None,
     )
-    for handler in logging.getLogger(setup.ROOT).handlers:
-        if isinstance(handler, logging.FileHandler):
-            handler.addFilter(_label_case)
+    label_case = partial(_label_case, nodes=job["nodes"])
+    for name in (setup.ROOT, setup.OUTPUT):
+        for handler in logging.getLogger(name).handlers:
+            handler.addFilter(label_case)
+    scratch = Path(job["run_dir"]) / RUN_STATE
     with (
-        contextlib.closing(sqlite3.connect(path.parent / "state", isolation_level=None)) as db,
-        (path.parent / "report.lock").open("ab") as lock,
+        contextlib.closing(sqlite3.connect(scratch / "state", isolation_level=None)) as db,
+        (scratch / "report.lock").open("ab") as lock,
     ):
         assignment = Assignment(job, db, lock)
         code = _run_pytest(job["argv"], job["raw"], job["setup"], plugins=(assignment,))

@@ -7,6 +7,7 @@ import os
 import signal
 import threading
 import time
+import xml.etree.ElementTree as ET
 from collections import Counter, defaultdict
 from contextlib import contextmanager
 
@@ -17,8 +18,11 @@ from llmdv import execution
 from llmdv.cli import concurrent
 from llmdv.cli.main import build_parser
 from llmdv.compare.diff import compare_window
+from llmdv.http import redact
 from tests.fakes import SRC, FakeFleet, FakeS3, FakeSlack, only_run, profile_yaml, run_llmdv, s3_env
 from tests.fleet_fakes import LOGS_INGRESS_YAML, fake_kubectl, fleet_state, kubectl_calls
+
+pytestmark = pytest.mark.skipif(os.name != "posix", reason="concurrent live workers require POSIX")
 
 ELIGIBLE = (
     "openai_chat.basic_non_streaming",
@@ -77,6 +81,41 @@ def test_positive_integer_required(command, value):
     with pytest.raises(SystemExit) as exc:
         parser.parse_args([command, "--profile", "unused", "--concurrency", value])
     assert exc.value.code == 2
+
+
+@pytest.mark.parametrize("option", ["--junitxml", "--junit-xml", "log_file", "--debug"])
+def test_shared_pytest_output_is_refused_before_preflight(tmp_path, option):
+    output = tmp_path / "ci-output"
+    output.write_text("previous report")
+    # Exercise the parsed pytest configuration, including aliases and environment options.
+    env = {}
+    extra = []
+    if option == "--junit-xml":
+        env["PYTEST_ADDOPTS"] = f'--junit-xml "{output}"'
+    elif option == "log_file":
+        extra = ["-o", f"log_file={output}"]
+    else:
+        extra = [f"{option}={output}"]
+    with FakeFleet() as fleet:
+        path = profile(tmp_path, fleet, ELIGIBLE[:2])
+        result, _ = verify(tmp_path, path, 2, *extra, env=env)
+        assert result.returncode == 2, result.stderr
+        assert "--concurrency 1" in result.stderr
+        assert fleet.seen == []
+    if option != "--debug":  # pytest starts its own debug trace during argument parsing.
+        assert output.read_text() == "previous report"
+
+
+def test_serial_junit_keeps_every_case_and_failure(tmp_path):
+    output = tmp_path / "ci.xml"
+    with FakeFleet(abort_finish_reason=True) as fleet:
+        path = profile(tmp_path, fleet, ELIGIBLE[:2])
+        result, run = verify(tmp_path, path, 1, f"--junitxml={output}")
+    assert result.returncode == 1, result.stderr
+    report = ET.parse(output)
+    records = rows(run)
+    assert len(report.findall(".//testcase")) == len(records) == 2
+    assert len(report.findall(".//failure")) == sum(r["outcome"] == "fail" for r in records)
 
 
 def test_policy_covers_catalog_and_fails_closed():
@@ -139,6 +178,46 @@ def test_shard_boundaries_and_unique_evidence_paths():
     ]
     assert stages[2][1][0] == [cases[0], cases[4]]
     assert len(set(v.casefold() for v in concurrent._slugs(cases).values())) == len(cases)
+
+
+def test_public_ids_remain_distinct_after_redaction(monkeypatch):
+    monkeypatch.setattr(redact, "_SECRETS", {"first-key", "second-key"})
+    nodes = ["case[first-key]", "case[second-key]", "case[second-key]#1"]
+    public = concurrent._public_nodes([{"nodeid": node} for node in nodes])
+    assert list(public) == nodes
+    assert len(set(public.values())) == len(nodes)
+    assert all(redact.SENTINEL in value and "-key" not in value for value in public.values())
+
+
+def test_short_bearer_key_keeps_assignments_evidence_and_verbose_output(tmp_path):
+    with FakeFleet(auth_header=("authorization", "Bearer test")) as fleet:
+        path = profile(tmp_path, fleet, ELIGIBLE[:2])
+        raw = yaml.safe_load(path.read_text())
+        raw["ingresses"][0]["auth"] = {"type": "bearer", "key_env": "FAKE_KEY"}
+        path.write_text(yaml.safe_dump(raw))
+        result, run = verify(
+            tmp_path,
+            path,
+            2,
+            "--skip-preflight",
+            "-v",
+            "--evidence",
+            "all",
+            env={"FAKE_KEY": "test"},
+        )
+    assert result.returncode == 0, result.stderr
+    records = rows(run)
+    assert [r["case_id"] for r in records] == list(ELIGIBLE[:2])
+    assert json.loads((run / "outcome.json").read_text())["execution"]["unfinished"] == []
+    exchanges = rows(run, "exchanges.jsonl")
+    assert {e["nodeid"] for e in exchanges} == {r["nodeid"] for r in records}
+    for record in records:
+        node = record["nodeid"]
+        assert record["outcome"] == "pass" and "test_" not in node
+        assert json.loads((run / record["evidence"] / "meta.json").read_text())["nodeid"] == node
+        lines = [line for line in result.stderr.splitlines() if f"[{node}]" in line]
+        assert any("basic_non_streaming" in line.split(f"[{node}]")[1] for line in lines)
+        assert any(f"ok: {record['checks'][0]['name']}=" in line for line in lines)
 
 
 def test_real_overlap_preflight_barriers_and_evidence(tmp_path):
@@ -253,6 +332,63 @@ def test_real_overlap_preflight_barriers_and_evidence(tmp_path):
 def worker_plugin(tmp_path, body):
     (tmp_path / "session_fault.py").write_text(body)
     return {"PYTHONPATH": os.pathsep.join([str(SRC), str(tmp_path)])}
+
+
+def test_job_recovers_plan_order_and_incomplete_teardown_after_coordinator_kill(tmp_path):
+    # The eligible cases run first, but follow Chat in the presented plan. Kill after the
+    # exclusive call has a result and before teardown can record successful completion.
+    plugin = worker_plugin(
+        tmp_path,
+        """
+import os, signal, time
+def pytest_runtest_teardown(item):
+    if item.config._llmdv_stage == 'exclusive':
+        os.kill(os.getppid(), signal.SIGKILL)
+        time.sleep(30)
+""",
+    )
+    exclusive = "openai_chat.greedy_repeat"
+    completed = [ELIGIBLE[1], ELIGIBLE[3]]
+    dest = tmp_path / "published"
+    with FakeFleet() as fleet:
+        path = profile(tmp_path, fleet, [exclusive, *completed, "logs.signatures"])
+        raw = yaml.safe_load(path.read_text())
+        raw["capabilities"]["chat_repeats"] = ["greedy"]
+        path.write_text(yaml.safe_dump(raw))
+        result = run_llmdv(
+            "job",
+            "--profile",
+            str(path),
+            "--concurrency",
+            "2",
+            "--work-dir",
+            str(tmp_path / "work"),
+            "--remote-output",
+            dest.as_uri(),
+            "--pod-logs",
+            "off",
+            "-p",
+            "session_fault",
+            env={**plugin, "TMPDIR": str(tmp_path)},
+            timeout=90,
+        )
+    assert result.returncode == 137, result.stderr
+    [manifest] = dest.rglob("MANIFEST.json")
+    assert not any(".llmdv-started" in p.parts for p in manifest.parent.rglob("*"))
+    for run in (only_run(tmp_path / "work"), manifest.parent):
+        outcome = json.loads((run / "outcome.json").read_text())
+        assert outcome["verification"]["class"] == "crashed"
+        records = rows(run)
+        assert [r["case_id"] for r in records] == [exclusive, *completed]
+        assert [*dict.fromkeys(e["case_id"] for e in rows(run, "exchanges.jsonl"))] == [
+            exclusive,
+            *completed,
+        ]
+        unfinished = outcome["execution"]["unfinished"]
+        assert unfinished[0] == records[0]["nodeid"]
+        assert len(unfinished) > 1 and all("test_signatures" in node for node in unfinished[1:])
+        assert outcome["execution"]["planned"] == len(completed) + len(unfinished)
+        assert "pending_plan" not in outcome["execution"]
 
 
 @pytest.mark.parametrize(("fault", "expected"), [("crash", 4), ("setup", 1), ("teardown", 1)])
@@ -397,13 +533,17 @@ def test_cross_ingress_evidence_and_log_window(tmp_path):
         for ingress in raw["ingresses"]:
             ingress["auth"] = {"type": "bearer", "key_env": "FAKE_KEY"}
         path.write_text(yaml.safe_dump(raw))
-        env = fake_kubectl(tmp_path / "bin", fleet_state())
+        state = fleet_state()
+        state["logs"]["engine-0/vllm"] += f"INFO x-api-key={key}\n"
+        env = fake_kubectl(tmp_path / "bin", state)
         dest = tmp_path / "published"
         result, run = verify(
             tmp_path,
             path,
             2,
             "--skip-preflight",
+            "--pod-logs",
+            "all",
             "--evidence",
             "all",
             "--remote-output",
@@ -412,6 +552,9 @@ def test_cross_ingress_evidence_and_log_window(tmp_path):
         )
     assert result.returncode == 0, result.stderr
     assert key not in result.stderr + result.stdout
+    assert any(
+        f"x-api-key={redact.SENTINEL}" in p.read_text() for p in (run / "logs").glob("*.log")
+    )
     assert all(key.encode() not in p.read_bytes() for p in dest.rglob("*") if p.is_file())
     records = rows(run)
     checked = [

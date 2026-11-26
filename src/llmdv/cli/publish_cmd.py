@@ -150,6 +150,15 @@ def record_verdict(run_dir: Path, body: dict, exit_code: int | None) -> list[str
     if verification.get("exit_code") is not None:
         return None
     unreadable: list[str] = []
+    execution = body.get("execution") or {}
+    if "pending_plan" in execution:
+        from .concurrent import recover
+
+        try:
+            recover(run_dir, execution)
+        except Exception as exc:  # noqa: BLE001 -- retain readable evidence from a damaged run
+            unreadable.append(f"could not reconcile planned cases: {scrub(str(exc))}")
+            execution["unfinished"] = execution.pop("pending_plan")
     counts, skips, failures = summarise(read_results(run_dir, unreadable))
     verification.update(
         exit_code=exit_code, **{"class": class_of(exit_code)}, counts=counts, skips=skips,

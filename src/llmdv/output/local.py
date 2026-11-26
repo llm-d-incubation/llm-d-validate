@@ -11,6 +11,9 @@ from ..results.record import new_run_id
 # Not "output.*": that would nest under the primary-output logger, printing to stdout.
 log = get_logger("sink.local")
 
+# Local reservation and crash-recovery state. Excluded from publication.
+RUN_STATE = ".llmdv-started"
+
 
 def default_run_dir(root: Path | None = None, profile_name: str = "run") -> Path:
     # A display label, never a path supplied by the profile. The recorded profile name and
@@ -44,7 +47,7 @@ def claim_run_dir(path: Path) -> Path:
         raise FileExistsError(f"the job's reserved run directory must exist and be empty: {path}")
     # The emptiness check is diagnostic; exclusive mkdir is the actual claim. Two children
     # may both observe an empty reservation, but only one can create this marker.
-    (path / ".llmdv-started").mkdir()
+    (path / RUN_STATE).mkdir(mode=0o700)
     return path
 
 

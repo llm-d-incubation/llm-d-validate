@@ -19,7 +19,9 @@ import yaml
 
 from ..clients.process import stop_worker_clients
 from ..evidence.bundle import case_slug
+from ..http import redact
 from ..log.setup import get_logger
+from ..output.local import RUN_STATE
 
 log = get_logger("cli.verify")
 STAGES = ("initial", "eligible", "exclusive", "logs")
@@ -34,6 +36,20 @@ def assignments(cases, concurrency):
             yield stage, [rows[i::width] for i in range(width)]
 
 
+def _public_nodes(cases):
+    """Keep redacted evidence identities unique even when two names scrub to the same text."""
+    nodes = {}
+    used = set()
+    for index, row in enumerate(cases):
+        node = row["nodeid"]
+        public = redact.scrub(node)
+        while public in used:
+            public += f"#{index}"
+        used.add(public)
+        nodes[node] = public
+    return nodes
+
+
 def _slugs(cases):
     # Preserve established paths wherever possible. Sanitizing and truncating can make
     # different parametrizations identical, even on a case-insensitive filesystem.
@@ -43,7 +59,7 @@ def _slugs(cases):
         base = case_slug(
             row["ingress"] or "noingress", row["case_id"] or row["nodeid"], row["variant"]
         )
-        slug = base
+        slug = redact.scrub(base)
         while slug.casefold() in used:
             slug += f"--{index}"
         used.add(slug.casefold())
@@ -68,13 +84,14 @@ def _stop(children, directory):
         stop_worker_clients(directory, proc.pid)
 
 
-def _stage(directory, stage, shards, common, slugs, parent_fd):
+def _stage(directory, stage, shards, common, slugs, nodes, parent_fd):
     children = {}
     failed = False
     try:
         for index, rows in enumerate(shards):
             path = directory / f"{stage}-{index}.json"
             job = dict(common, stage=stage, slugs={r["nodeid"]: slugs[r["nodeid"]] for r in rows})
+            job["nodes"] = {node: nodes[node] for node in job["slugs"]}
             job["argv"] = [
                 *common["argv"],
                 "-p",
@@ -118,7 +135,7 @@ def _stage(directory, stage, shards, common, slugs, parent_fd):
         _stop(children, directory)
 
 
-def _order(path, order, *, results):
+def _order(path, order, *, results, scratch=None):
     """Atomically restore plan order with one line in memory, keeping original timestamps."""
     seen = Counter()
     if not path.is_file():
@@ -139,7 +156,7 @@ def _order(path, order, *, results):
             offsets[node].append(offset)
         if set(seen) - order.keys() or (results and any(count != 1 for count in seen.values())):
             raise RuntimeError(f"unexpected or duplicate case in {path.name}")
-        with tempfile.NamedTemporaryFile(dir=path.parent, delete=False) as dest:
+        with tempfile.NamedTemporaryFile(dir=scratch or path.parent, delete=False) as dest:
             try:
                 for node in sorted(offsets, key=lambda n: order.get(n, len(order))):
                     for offset in offsets[node]:
@@ -153,9 +170,45 @@ def _order(path, order, *, results):
     return seen
 
 
+def _reconcile(run_dir, execution, db):
+    """Put complete evidence rows in plan order and account for the whole pytest protocol."""
+    order = {node: i for i, node in enumerate(execution["pending_plan"])}
+    scratch = run_dir / RUN_STATE
+    seen = _order(run_dir / "results.jsonl", order, results=True, scratch=scratch)
+    _order(run_dir / "exchanges.jsonl", order, results=False, scratch=scratch)
+    finished = {row[0] for row in db.execute("SELECT node FROM finished")} if db else set()
+    unfinished = [node for node in order if node not in finished or node not in seen]
+    execution["unfinished"] = unfinished
+    if unfinished:
+        log.warning("%d planned cases did not finish; see outcome.json", len(unfinished))
+    if db:
+        teardown = dict(db.execute("SELECT node, reason FROM failures WHERE phase='teardown'"))
+        if teardown:
+            execution["teardown_errors"] = teardown
+    del execution["pending_plan"]
+    return bool(finished - seen.keys())
+
+
+def recover(run_dir, execution):
+    """Freeze any report in flight before the job or a later publish reads a killed run."""
+    import fcntl
+
+    scratch = run_dir / RUN_STATE
+    scratch.mkdir(mode=0o700, exist_ok=True)
+    with (scratch / "report.lock").open("ab") as lock, contextlib.ExitStack() as stack:
+        fcntl.flock(lock, fcntl.LOCK_EX)
+        lock.write(b"1")  # Prevent another writer from starting after recovery releases the lock.
+        lock.flush()
+        db = None
+        state = scratch / "state"
+        if state.is_file():
+            db = stack.enter_context(contextlib.closing(sqlite3.connect(state)))
+        _reconcile(run_dir, execution, db)
+
+
 def run(args, run, argv, cases, profile):
-    order = {row["nodeid"]: i for i, row in enumerate(cases)}
-    if len(order) != len(cases) or any(row["stage"] not in STAGES for row in cases):
+    nodes = _public_nodes(cases)
+    if len(nodes) != len(cases) or any(row["stage"] not in STAGES for row in cases):
         raise ValueError("invalid or duplicate case in the verification plan")
     slugs = _slugs(cases)
     common = dict(
@@ -179,15 +232,18 @@ def run(args, run, argv, cases, profile):
         argv = list(argv)
         argv[argv.index("--llmdv-profile") + 1] = str(frozen)
         common["argv"] = argv
-        db = stack.enter_context(
-            contextlib.closing(sqlite3.connect(directory / "state", isolation_level=None))
-        )
+        scratch = run.run_dir / RUN_STATE
+        scratch.mkdir(mode=0o700, exist_ok=True)
+        state = scratch / "state"
+        db = stack.enter_context(contextlib.closing(sqlite3.connect(state, isolation_level=None)))
         db.executescript("""
             CREATE TABLE lost (ingress TEXT PRIMARY KEY, detail TEXT);
             CREATE TABLE finished (node TEXT PRIMARY KEY);
             CREATE TABLE failures (node TEXT, phase TEXT, reason TEXT);
             CREATE TABLE stopped (stop INTEGER PRIMARY KEY);
         """)
+        run.outcome.execution["pending_plan"] = list(nodes.values())
+        run.outcome.write(run.run_dir)
         read_fd, write_fd = os.pipe()
         stack.callback(os.close, write_fd)
         stack.callback(os.close, read_fd)
@@ -195,30 +251,20 @@ def run(args, run, argv, cases, profile):
         stopped = False
         try:
             for stage, shards in assignments(cases, args.concurrency):
-                code = max(code, _stage(directory, stage, shards, common, slugs, read_fd))
+                code = max(code, _stage(directory, stage, shards, common, slugs, nodes, read_fd))
                 stopped = bool(db.execute("SELECT 1 FROM stopped").fetchone())
                 if code > 1 or stopped:
                     break
         except KeyboardInterrupt:
             code = 2  # pytest's interrupted exit; verify collects logs and publishes
         finally:
-            seen = _order(run.run_dir / "results.jsonl", order, results=True)
-            _order(run.run_dir / "exchanges.jsonl", order, results=False)
-            finished = {row[0] for row in db.execute("SELECT node FROM finished")}
-            unfinished = [node for node in order if node not in finished or node not in seen]
-            run.outcome.execution["unfinished"] = unfinished
-            if finished - seen.keys():
-                # Fail-fast only excuses cases pytest never finished. A finished case
-                # without a result is always lost evidence.
-                if code != 2:
-                    code = 3
-            if unfinished:
-                log.warning("%d planned cases did not finish; see outcome.json", len(unfinished))
-                if not stopped and code != 2:
-                    code = 3
-            teardown = dict(db.execute("SELECT node, reason FROM failures WHERE phase='teardown'"))
-            if teardown:
-                run.outcome.execution["teardown_errors"] = teardown
+            missing = _reconcile(run.run_dir, run.outcome.execution, db)
+            if code != 2 and (missing or (run.outcome.execution["unfinished"] and not stopped)):
+                code = 3
+            # Once this snapshot is durable, recovery no longer needs the local receipts.
+            run.outcome.write(run.run_dir)
         if db.execute("SELECT 1 FROM failures LIMIT 1").fetchone():
             code = max(code, 1)
-        return code
+    state.unlink()
+    (scratch / "report.lock").unlink(missing_ok=True)
+    return code

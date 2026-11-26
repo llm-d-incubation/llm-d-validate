@@ -24,6 +24,7 @@ import shutil
 import signal
 import subprocess
 import sys
+import tempfile
 import threading
 import time
 from dataclasses import asdict, dataclass, field
@@ -44,6 +45,7 @@ from ..evidence.outcome import (
     read_results,
 )
 from ..evidence.stack import stack_from_run
+from ..http import redact
 from ..kube import KubeContext
 from ..log import setup as log_setup
 from ..log.setup import emit, get_logger
@@ -184,7 +186,8 @@ def add_concurrency(parser: argparse.ArgumentParser) -> None:
         default=1,
         metavar="N",
         help="run up to N reviewed independent cases concurrently across the run (default: 1); "
-        "cache, timing and disruptive cases always run exclusively",
+        "cache, timing and disruptive cases run exclusively. N > 1 requires POSIX. "
+        "Use 1 for pytest JUnit output",
     )
 
 
@@ -362,6 +365,10 @@ def _verify(args: argparse.Namespace, run: _Run) -> int:
         )
         return USAGE
 
+    if args.concurrency > 1 and os.name != "posix":
+        log.error("--concurrency above 1 requires POSIX process groups; use --concurrency 1 here")
+        return USAGE
+
     try:
         lane_identity = identity.parse(args.identity)
     except identity.IdentityError as exc:
@@ -379,6 +386,7 @@ def _verify(args: argparse.Namespace, run: _Run) -> int:
     except loader.ProfileError as exc:
         log.error("%s", exc)
         return USAGE
+    redact.install_secrets(list(loader.resolve_all_secrets(profile).values()))
     run.outcome.profile["name"] = profile.name
     run.outcome.identity = identity.build(
         profile, lane_identity, loader.contract_digest(args.profile)
@@ -1037,37 +1045,37 @@ def _unknown_selectors(profile, args) -> list[str]:
 
 def _validate_scope(args: argparse.Namespace) -> tuple[int, dict | None, str]:
     """Resolve and collect offline before preflight, including zero-case and filter errors."""
-    command = [
-        sys.executable,
-        "-m",
-        "llmdv.cli.main",
-        "plan",
-        "--profile",
-        str(args.profile),
-        "--json",
-    ]
-    for name in getattr(args, "test_set", ()):
-        command += ["--test-set", name]
-    if args.all_test_sets:
-        command += ["--all-test-sets"]
-    if args.full_suite:
-        command += ["--full-suite"]
-    for flag, values in (
-        ("--ingress", args.ingress),
-        ("--client", args.client),
-        ("--surface", args.surface),
-    ):
-        for value in values:
-            command += [flag, value]
-    if args.keyword:
-        command += ["-k", args.keyword]
-    if args.marker:
-        command += ["-m", args.marker]
-    command += [item for item in (getattr(args, "pytest_args", None) or []) if item != "--"]
-    result = subprocess.run(command, capture_output=True, text=True, check=False)  # noqa: S603
-    if result.returncode != OK:
-        return result.returncode, None, result.stderr.strip() or "Coverage planning failed"
-    return OK, json.loads(result.stdout), ""
+    selection = {
+        key: getattr(args, key)
+        for key in (
+            "profile",
+            "ingress",
+            "client",
+            "surface",
+            "test_set",
+            "all_test_sets",
+            "full_suite",
+            "keyword",
+            "marker",
+            "pytest_args",
+            "concurrency",
+        )
+        if hasattr(args, key)
+    }
+    # Public plan output is redacted. Collection identities used to schedule work must
+    # survive even when a credential coincides with part of a test name.
+    with tempfile.TemporaryDirectory(prefix="llmdv-plan-") as directory:
+        path = Path(directory) / "plan.json"
+        result = subprocess.run(  # noqa: S603 -- private planner, our own interpreter
+            [sys.executable, "-m", "llmdv.cli.plan_cmd", str(path)],
+            input=json.dumps(selection, default=os.fspath),
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        if result.returncode != OK:
+            return result.returncode, None, result.stderr.strip() or "Coverage planning failed"
+        return OK, json.loads(path.read_bytes()), ""
 
 
 # pytest's own exit codes. Collapsing these into "tests failed" would report a llmdv defect or a

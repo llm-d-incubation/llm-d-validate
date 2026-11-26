@@ -4,13 +4,24 @@ from __future__ import annotations
 
 import argparse
 import importlib.util
+from types import SimpleNamespace
 
 import pytest
 
 from llmdv.cli import verify_cmd
+from llmdv.cli.main import build_parser
+from llmdv.evidence.outcome import Outcome
 from tests.fakes import FakeFleet, profile_yaml, run_llmdv
 
 HAS_XDIST = importlib.util.find_spec("xdist") is not None
+
+
+def test_non_posix_concurrency_is_a_usage_error_before_planning(tmp_path, monkeypatch, caplog):
+    args = build_parser().parse_args(["verify", "--profile", "unused.yaml", "--concurrency", "2"])
+    monkeypatch.setattr(verify_cmd, "os", SimpleNamespace(name="nt", environ={}))
+    monkeypatch.setattr(verify_cmd.log, "handlers", [caplog.handler])
+    assert verify_cmd._verify(args, verify_cmd._Run(tmp_path, Outcome("run"))) == 2
+    assert "requires POSIX" in caplog.text and "--concurrency 1" in caplog.text
 
 
 @pytest.mark.parametrize(

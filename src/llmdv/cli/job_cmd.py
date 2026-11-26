@@ -183,6 +183,12 @@ def cmd_job(args: argparse.Namespace) -> int:
         return PREFLIGHT
     verify_code = _verify(args, run_dir, passthrough)
 
+    # Recover a killed coordinator before comparison, alerts or the dashboard reads its rows.
+    body = outcome.read(run_dir)
+    if body and "pending_plan" in (body.get("execution") or {}):
+        if record_verdict(run_dir, body, verify_code) is not None:
+            outcome.write_dict(run_dir, body)
+
     # Compare BEFORE publishing, so comparison.md is part of the upload rather than a file
     # written into a pod's temporary directory after the upload has already gone. The
     # finishing run is read from run_dir, so the archive only has to supply the baseline --

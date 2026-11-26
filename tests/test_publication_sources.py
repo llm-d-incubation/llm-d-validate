@@ -11,6 +11,7 @@ import pytest
 
 from llmdv.cli import publish_cmd
 from llmdv.output import manifest
+from llmdv.output.local import RUN_STATE
 from llmdv.output.remote import IncompletePublication, parse_remote_uri, sink_for
 from llmdv.output.s3 import S3Sink
 
@@ -85,6 +86,8 @@ def test_contained_source_links_preserve_names_bytes_and_manifest(tmp_path, publ
     (run / "nested" / "evidence.txt").write_bytes(content)
     (run / "linked.txt").symlink_to("nested/evidence.txt")
     (run / "linked-dir").symlink_to("nested", target_is_directory=True)
+    (run / RUN_STATE).mkdir()
+    (run / RUN_STATE / "state").write_bytes(b"private recovery receipts")
     sink, objects = publication
 
     sink.publish(run, "profile/run")
@@ -96,6 +99,18 @@ def test_contained_source_links_preserve_names_bytes_and_manifest(tmp_path, publ
     for entry in body["files"]:
         assert entry["size"] == len(content)
         assert entry["sha256"] == hashlib.sha256(content).hexdigest()
+
+
+def test_link_cannot_publish_private_worker_receipts(tmp_path, publication):
+    run = tmp_path / "run"
+    private = run / RUN_STATE
+    private.mkdir(parents=True)
+    (private / "state").write_bytes(b"private recovery receipts")
+    (run / "alias").symlink_to(private / "state")
+    sink, objects = publication
+    with pytest.raises(ValueError, match="private run state"):
+        sink.publish(run, "profile/run")
+    assert objects() == {}
 
 
 def test_replaced_source_is_rechecked_before_upload(tmp_path, publication, monkeypatch):
