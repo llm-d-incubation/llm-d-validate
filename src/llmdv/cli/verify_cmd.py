@@ -1063,11 +1063,23 @@ def _map_pytest_exit(code: int, interrupted: bool = False) -> int:
     return INTERNAL
 
 
+def suite_pytest_args() -> list[str]:
+    """Keep collection independent of the caller's checkout and profile location."""
+    return [
+        str(SUITES_DIR),
+        "--rootdir",
+        str(SUITES_DIR),
+        "-c",
+        str(SUITES_DIR / "pytest.ini"),
+        "--confcutdir",
+        str(SUITES_DIR),
+    ]
+
+
 def _build_pytest_argv(
     args: argparse.Namespace, run_dir: Path, run_id: str, started_at: str | None = None
 ) -> list[str]:
-    argv = [
-        str(SUITES_DIR),
+    argv = suite_pytest_args() + [
         "--llmdv-profile",
         args.profile,
         "--llmdv-run-dir",

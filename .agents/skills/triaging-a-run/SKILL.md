@@ -145,7 +145,7 @@ Write `runs/<run_id>/triage.md`, one row per cause (not per check), largest firs
 
 **Evidence** is the observation that decided the row (the split, the log line, the A/B); **Next** is the action and who owns it (rerun after a fix, file, comment on an issue, ask the owner).
 
-Lead with what changed against a baseline run of the same profile (running-and-comparing-live-runs for published runs; for local runs, join the two `results.jsonl` on `nodeid`): new causes, fixed ones, and cases a new cause now hides (a case that fails earlier for the new reason says nothing about its old one). Then what is real and whose, and what is noise. Hand the per-group notes to reporting-a-run for the dashboard. Keep hostnames out of anything shared.
+Lead with what changed against a baseline run of the same profile (running-and-comparing-live-runs for published runs; for local runs, use `llmdv.compare.diff.key` to match the two `results.jsonl` files on `(ingress or "-", case_id or nodeid or "?", variant or surface or "")`; never join on `nodeid` alone, whose file prefix can differ across older runs): new causes, fixed ones, and cases a new cause now hides (a case that fails earlier for the new reason says nothing about its old one). Then what is real and whose, and what is noise. Hand the per-group notes to reporting-a-run for the dashboard. Keep hostnames out of anything shared.
 
 ## Red flags
 
