@@ -28,6 +28,11 @@ python -m pip install 'llm-d-validate==0.1.1'
 llmdv --version
 ```
 
+Check `python3 --version` first. If it is older than 3.10, as macOS's built-in `python3` is,
+create the environment with a newer interpreter, for example `python3.12 -m venv .venv`. With
+an older one, pip reports `No matching distribution found for llm-d-validate==0.1.1` instead of
+naming the Python version.
+
 Run the remaining examples from the checkout root with the virtual environment active.
 The release checkout is detached at its tag; use gitignored `*.local.yaml` overlays for local
 profile changes. Editing a profile takes effect immediately; editing `src/` does not change the

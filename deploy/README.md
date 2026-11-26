@@ -33,8 +33,10 @@ mkdir -p runs
 
 Choose the profile matching your deployment. Mount the complete `profiles/` tree read-only so
 relative `extends` paths resolve. The following Linux/macOS example uses your host UID/GID so
-local run files remain writable. Override the image's default `llmdv job` entrypoint to call
-`plan` or `verify` directly:
+local run files remain writable. With rootless Podman, run it as `podman run` and add
+`--userns=keep-id`: without it, the host UID is remapped inside the container, and `verify` stops
+with `Permission denied` and exit 3 creating its run directory. Override the image's default
+`llmdv job` entrypoint to call `plan` or `verify` directly:
 
 ```sh
 docker run --rm --user "$(id -u):$(id -g)" --entrypoint llmdv \
