@@ -30,8 +30,13 @@ def write(
     argv: list[str],
     setup_commands: dict[str, list[str]],
     key_envs: list[str],
+    url_envs: list[str] = (),
 ) -> Path:
-    """Write reproduce.sh into the run directory and return its path."""
+    """Write reproduce.sh into the run directory and return its path.
+
+    `url_envs` are the base_url_env variables of the ingresses the run selected: a replay without
+    one fails preflight, so the script says which before it starts.
+    """
     lines = [
         "#!/usr/bin/env bash",
         "#",
@@ -45,6 +50,11 @@ def write(
         'cd "$(dirname "$0")"',
         "",
     ]
+
+    if url_envs:
+        lines += ["# Addresses are read from the environment, as the profile names them."]
+        lines += [f': "${{{name}:?set {name} before running this script}}"' for name in url_envs]
+        lines.append("")
 
     if key_envs:
         lines += ["# Credentials are read from the environment; none is stored here."]

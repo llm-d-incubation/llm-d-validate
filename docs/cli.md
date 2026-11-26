@@ -314,7 +314,9 @@ bash "$RUN/failures/<ingress>/<case>/repro.sh"   # replay one exchange
 supplied through `public_id_env` during the run, the archived profiles pin the resolved IDs;
 unsetting or changing that model variable does not change replay selection. Otherwise the
 original model-variable lookup declarations remain. Use the recorded `llmdv` version to
-reproduce the same library cases. Both scripts read credentials from the environment.
+reproduce the same library cases. Both scripts read credentials from the environment, and
+`reproduce.sh` also the URL variable (`base_url_env`) of each ingress the run selected; it stops
+before running anything while one is unset.
 
 ### The dashboard
 
