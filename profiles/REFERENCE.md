@@ -86,6 +86,7 @@ The profile-wide model. Each ingress inherits it and may override any field (see
 | --- | --- | --- | --- |
 | `public_id` | string | **required** | The model id clients request, as `/v1/models` advertises it at the ingress. |
 | `aliases` | list of string | `[]` | Further ids that must also be advertised. |
+| `public_id_env` | string or `null` | not declared | A variable that, when set and not empty, supplies the model id instead of `public_id`, which stays the default. One profile can then test a gateway that serves the model under its own name (an alias, a staging suffix): `export` the id with the URL. Declare it on an ingress's `model` to give each layer its own; `null` on an ingress stops it inheriting the profile's. |
 | `max_model_len` | int or `null` | none | Context length. Without it, the context-overflow case skips as `undeclared`. |
 | `answer_max_tokens` | positive int or `null` | none | Opts into the Chat and Messages answer-budget cases, using exactly this output cap in the default reasoning mode. Other cases' budgets do not change. |
 | `reasoning` | mapping | see below | How reasoning text reaches the client. |

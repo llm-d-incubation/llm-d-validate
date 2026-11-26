@@ -815,7 +815,9 @@ def _nullable_string(value: Any, where: str) -> str | None:
 
 
 def _ingress_model(override: Any, defaults: dict[str, Any], where: str) -> Model:
-    _check_override_keys(override, Model, where, nullable=("max_model_len", "answer_max_tokens"))
+    _check_override_keys(
+        override, Model, where, nullable=("max_model_len", "answer_max_tokens", "public_id_env")
+    )
     _check_override_keys(
         override.get("reasoning", {}),
         Reasoning,
@@ -895,12 +897,22 @@ def _ingress_capabilities(override: Any, defaults: dict[str, Any], where: str) -
     return _capability_block(compose.merge(defaults, kept), where, problems)
 
 
+def _public_id(raw: dict[str, Any], where: str) -> str:
+    """`public_id`, or the value of the variable `public_id_env` names when it is set."""
+    default = parse.string(raw.get("public_id", ""), f"{where}.public_id")
+    env = _nullable_string(raw.get("public_id_env"), f"{where}.public_id_env")
+    return (os.environ.get(env, "").strip() if env else "") or default
+
+
 def _model(raw: dict[str, Any], where: str = "model") -> Model:
     reasoning_raw = raw.get("reasoning") or {}
     tools_raw = raw.get("tools") or {}
     return Model(
         **_each(
-            public_id=lambda: parse.string(raw.get("public_id", ""), f"{where}.public_id"),
+            public_id=lambda: _public_id(raw, where),
+            public_id_env=lambda: _nullable_string(
+                raw.get("public_id_env"), f"{where}.public_id_env"
+            ),
             aliases=lambda: parse.strings(raw.get("aliases", ()), f"{where}.aliases"),
             max_model_len=lambda: _max_model_len(raw.get("max_model_len"), where),
             answer_max_tokens=lambda: _opt_positive_int(

@@ -275,6 +275,9 @@ class Model:
     tools: Tools = field(default_factory=Tools)
     # Opt-in sufficiency contract for a simple prompt in the deployed default reasoning mode.
     answer_max_tokens: int | None = None
+    # A variable that, when set, supplies the id instead: one profile can then test a gateway
+    # that serves the model under its own name (an alias, a staging suffix) without a copy.
+    public_id_env: str | None = None
 
     @property
     def all_names(self) -> tuple[str, ...]:
