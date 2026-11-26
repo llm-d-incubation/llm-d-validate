@@ -10,7 +10,7 @@ does not deploy or manage the serving stack.
 | Create or adapt a profile | [Writing a profile](writing-profiles.md) |
 | Choose which tests run | [Selection and coverage](cli.md#test-sets-and-coverage) |
 | Understand a failure or a skip | [Read the results](getting-started.md#read-the-results) |
-| Publish results or run unattended | [Publish a run](getting-started.md#publish-a-run) |
+| Publish results or run unattended | [Publishing and running unattended](running.md) |
 | Compare results with an earlier run | [Comparing runs](compare.md) |
 | Look up a command or exit code | [Command reference](cli.md) |
 | Look up a profile field | [Profile reference](../profiles/REFERENCE.md) |

@@ -6,7 +6,7 @@ changed their answer.
 
 ```sh
 llmdv compare --from s3://bucket/llmdv --profile qwen-router --list                # runs for this profile, oldest first
-llmdv compare --from s3://bucket/llmdv --profile qwen-router                       # the latest run against the one before it
+llmdv compare --from s3://bucket/llmdv --profile qwen-router                       # latest run against the preceding matching run
 llmdv compare --from s3://bucket/llmdv --profile qwen-router --baseline <run-id>   # against a specific run, e.g. before a rollout
 llmdv compare --from s3://bucket/llmdv --profile qwen-router --window 5            # a change counts only if the last 5 runs agreed
 llmdv compare --from file:///var/llmdv-runs --profile qwen-router --no-fail        # a local archive; report but exit 0
@@ -30,23 +30,29 @@ Slack:
 A run is listed or used only when both `results.jsonl` and `MANIFEST.json` exist. Run ids begin
 with a UTC timestamp, so runs order by start time.
 
-**Identity.** Without an explicit baseline, `llmdv job --compare` picks runs whose guide,
+**Current run.** Standalone `llmdv compare` judges the latest complete run of the profile under
+`--from`. It has no selector for the current run's trigger or flavor. `llmdv job --compare`
+judges the job's own finishing run, even when another run was published more recently.
+
+**Identity.** Without an explicit baseline, both commands pick earlier runs whose guide,
 accelerator, engine, provider, gateway, model, trigger and flavor match
 ([run identity](architecture.md#run-identity)). A run without an identity is never picked, but
 can be named. `--identity trigger=nightly` marks a scheduled lane (default `manual`);
 `--identity flavor=<value>` separates lanes that share a profile, such as `lmcache-connector/cpu`
-and `native/cpu` offload. A run without a flavor matches only runs without one. A different
+and `native/cpu` offload. A run without a flavor matches only runs without one. Labels do not affect matching.
+An explicit baseline can select legacy runs without identity; when both identities are present,
+a configuration mismatch is rejected. A different
 llm-d ref, `llmdv` version or profile digest is a note.
 
 **Digest.** Every result carries its `profile_digest`, a hash of the parsed declarations:
-comments, `known_failures` and `test_sets.default` do not move it. Runs under another digest are dropped
+comments, `known_failures` and the entire `test_sets` mapping do not move it. Runs under another digest are dropped
 from the window and counted. When the two runs differ, the report first says **the profile
 changed** and names the declarations that moved. Runs recorded before this rule hashed the file
 bytes, so the first comparison after it reports one change with nothing listed; so does a
-profile with a `test_sets.default`, once.
+profile whose older digest included test-set declarations, once.
 
 **Window.** `--window N` (`--compare-window N` on `llmdv job`) is how many earlier runs must
-agree; the default, `1`, is the run before. A case is newly failing only when every run of the
+agree; the default, `1`, is the preceding matching run. A case is newly failing only when every run of the
 window passed it; a mixed history is flaky. A skip is not a verdict, so a throttled night does
 not dilute a window. Each case is read against the newest run of the window that holds it.
 
