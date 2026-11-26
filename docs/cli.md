@@ -56,119 +56,63 @@ free-form, recorded in `env.json` and `outcome.json`; it cannot use an identity 
 
 ## Selecting what runs
 
-```sh
-llmdv verify --profile P --client agent        # the cases a client depends on
-llmdv verify --profile P --surface responses   # one API surface
-llmdv verify --profile P --ingress litellm     # one layer, by its id
-llmdv verify --profile P --ingress litellm,router   # several layers, comma-separated
-llmdv verify --profile P -m "not disruptive"   # leave the fleet alone
-llmdv verify --profile P -k discovery          # a pytest keyword expression
-llmdv verify --profile P --full-suite          # every case in the library, before other filters narrow it
-```
-
-Repeating `--ingress`, `--client` or `--surface` is a union; different selectors intersect.
-`--ingress` also takes a comma-separated list of ingress ids. So one profile can declare every
-layer of a stack, and each run picks the layers it can reach: preflight and the cases touch only
-the selected ones. Without `--ingress`, every declared ingress runs. A value that names no
-id (empty, spaces or only commas, as from an unset shell variable) or an id the profile does not
-declare exits 2 before any request; it never falls back to every ingress. `-k` and `-m` narrow the chosen scope
-but never widen it. The ingress id is the parametrisation id, so `-k router` keeps one column.
-
-`-m` takes one marker per suite package under `src/llmdv/suites/`: `anthropic_messages`,
-`cache`, `contract`, `discovery`, `evolution`, `field_options`, `fleet`, `images`,
-`long_context`, `openai_chat`, `openai_completions`, `openai_responses`, `real_clients`,
-`render`, `scenarios`, `streaming`, `tools`, `transport`, `unhappy`
-([test-suites.md](test-suites.md#suites)). A case whose `case_id` starts with another suite's name
-carries that marker too: `-m openai_chat` selects `openai_chat.disconnect_recovery`, which lives
-in `streaming/`. Cases also carry `disruptive`, `surface`, `surface_generic`, `case_id`, `needs`
-and `samples`. An unknown marker exits `2` and lists the real ones, rather than deselecting
-everything and reporting `PASSED`.
-
 ### Test sets and coverage
 
-Four words name what `llmdv` can run, and they are easy to mix up:
+Choose a scope, then narrow it with filters. These rules apply to `plan`, `verify` and `job`.
 
-| Word | What it is | How you pick it |
-| --- | --- | --- |
-| **case** | one check, named by its case ID, such as `openai_chat.stop_reason`. It runs once per ingress, and once per variant where it has them | `-k <name>` |
-| **suite** | a group of cases on one topic: one of the 19 folders under `src/llmdv/suites/`, such as `openai_chat` or `tools` ([test-suites.md](test-suites.md)) | `-m <suite>` |
-| **test set** | a named list of case IDs or patterns. A profile defines its own under `test_sets` (always `default`, plus any you add), and every profile also has the built-in `smoke` | `--test-set <name>` |
-| **full suite** | every case in every suite. Despite the name, it is the whole library, not one suite | `--full-suite` |
-
-**Two steps decide what runs.**
-
-1. **The scope** says which cases are candidates. It is exactly one of: the profile's `default`
-   set (no flag), one or more named sets (`--test-set`, repeatable), every set the profile defines
-   (`--all-test-sets`), or the full suite (`--full-suite`).
-2. **Filters** narrow the scope and never widen it: `-m`, `-k`, `--surface`, `--client` and
-   `--ingress`. `-m openai_chat` on its own keeps only the `openai_chat` cases the default set
-   already contains; to run that whole suite, widen the scope first with `--full-suite`.
-
-After that, the profile decides what can apply: a selected case whose surface, capability or
-fleet policy the profile does not allow skips, with its [skip class](#skip-classes). `plan` shows
-the result before anything is sent. `--identity` labels a run and never changes what it selects.
-
-| To run | Use |
+| Term | Meaning |
 | --- | --- |
-| what the profile is meant to run | `llmdv verify --profile P` (its `default` set) |
-| a quick check that every API answers | `llmdv verify --profile P --test-set smoke` |
-| everything the library has | `llmdv verify --profile P --full-suite` |
-| one whole suite | `llmdv verify --profile P --full-suite -m openai_chat` |
-| only the default set's cases in one suite | `llmdv verify --profile P -m openai_chat` |
-| one case, whether or not a set lists it | `llmdv verify --profile P --full-suite -k <case>` |
-| the declarations against the live stack, in about a minute | `llmdv verify --profile P --full-suite -m contract` |
-| your own subset | add it under `test_sets`, then `--test-set <name>` |
-| several sets together | `--test-set default --test-set tools` |
-| every set the profile defines | `--all-test-sets` (never includes `smoke`) |
+| Case | One named test, possibly with several ingress/surface variants |
+| Suite | Cases on one topic, such as `tools` or `openai_chat` |
+| Test set | A profile-defined list of case-ID patterns; `smoke` is built in |
+| Full suite | Every verification case in the library, before filters and applicability gates |
 
-Put `plan` in place of `verify` in any of these to see what would run and skip, offline. The same
-flags work on `job`. A plain invocation of a profile with no `default` set exits 2 and lists the
-choices; it never falls back to a larger run.
+| To select | Command |
+| --- | --- |
+| The profile's default coverage | `llmdv verify --profile P` |
+| Basic discovery and generation | `llmdv verify --profile P --test-set smoke` |
+| Named sets, combined | `llmdv verify --profile P --test-set default --test-set tools` |
+| All profile-defined sets | `llmdv verify --profile P --all-test-sets` |
+| Every library case | `llmdv verify --profile P --full-suite` |
+| One whole suite | `llmdv verify --profile P --full-suite -m openai_chat` |
+| A case within the whole library | `llmdv verify --profile P --full-suite -k <case>` |
 
-The commands, in one place:
+A plain invocation requires `test_sets.default`. The three explicit modes (`--test-set`,
+`--all-test-sets`, `--full-suite`) replace that default and are mutually exclusive. Repeat
+`--test-set` to combine names; overlapping cases run once. `--all-test-sets` includes `default`
+and excludes built-ins. Set names must be exact: `--test-set '*'` is invalid.
 
-```sh
-llmdv profile show P --test-sets
-llmdv plan --profile P --test-set smoke
-llmdv verify --profile P --test-set quick-api --test-set tools
-llmdv verify --profile P --all-test-sets
-llmdv verify --profile P --full-suite
-```
+**Filters only narrow the chosen scope:**
 
-Repeated `--test-set` flags combine named sets and deduplicate cases. `--all-test-sets` combines
-all profile-defined sets, including `default`, but excludes built-ins. `--full-suite` selects
-all library verification cases. These three modes are mutually exclusive. Each replaces the
-default; ingress, client, surface, keyword and marker filters still narrow the chosen scope.
-`job` accepts the same arguments. There are no CLI set-name wildcards: `--test-set '*'` is an
-error; use `--all-test-sets` instead.
+| Filter | Restricts to |
+| --- | --- |
+| `--ingress router,engine` | Named ingress IDs; repeat flags for a union |
+| `--surface messages` | A surface; repeat flags for a union |
+| `--client agent` | Cases the declared client depends on; repeat flags for a union |
+| `-m tools` | A suite marker or pytest marker expression |
+| `-k discovery` | A pytest keyword expression |
 
-```yaml
-test_sets:
-  default:
-    - contract.*
-    - discovery.models_lists_declared_model
-    - openai_chat.basic_non_streaming
-  quick-api:
-    - openai_chat.basic_non_streaming
-    - openai_chat.streaming_sse
-  tools:
-    - tools.*
-```
+Different filters intersect. Without `--ingress`, all declared ingresses are tested. Explicit
+empty, whitespace-only or comma-only values and unknown IDs exit 2 before requests; they never
+select every layer as a fallback. `-m openai_chat` without `--full-suite` keeps only the matching
+cases already in the chosen set. [Test suites](test-suites.md#suites) lists available suite
+markers. An unknown marker exits 2.
 
-`smoke` is a reserved built-in set: discovery, basic generation and streaming for Chat
-Completions, Completions, Responses and Messages. Undeclared APIs skip normally. A smoke pass
-covers only those checks, not tools, reasoning-specific behavior, quality, load, long context,
-cache or fleet invariants. Preflight still runs and runtime depends on the model and ingresses.
+**Selected does not mean executed.** Surface, capability and policy gates can skip a selected
+case. Runtime conditions such as throttling can skip it later. See [skip classes](#skip-classes).
+A case excluded by scope or filters is not a skip. An all-skipped run provides no executed
+checks. `--identity` and free-form labels never change selection.
 
-Unknown names, an empty profile with `--all-test-sets`, unmatched patterns in a chosen set and
-zero cases after filters exit 2 before preflight. Patterns in unchosen sets are not matched
-against the suite. Empty lists are invalid declarations. See [test_sets](../profiles/REFERENCE.md#test_sets).
+Smoke reuses discovery, non-streaming and streaming checks for Chat Completions, Completions,
+Responses and Messages. It excludes exhaustive contract checks, tools, reasoning-specific
+behavior, cache, long context and fleet checks. Undeclared APIs skip, and preflight still runs.
+It is available even when the profile has no sets and cannot be redefined.
 
-Plan JSON and `outcome.json` use `coverage`: `mode` (`default`, `named`, `all-test-sets`, or
-`full-suite`), resolved `sets` (name, source, patterns), deduplicated `cases` patterns, `filters`,
-and recorded exclusions. Comparisons read coverage to distinguish omitted checks from suite
-changes. Plan text distinguishes exclusions from skips and warns if the resolved default omits
-contract checks. A run where all cases skip provides no executed checks.
+Define custom sets with [the profile schema](../profiles/REFERENCE.md#test_sets). Empty set
+lists and reserved names are invalid. Unknown requested sets, unmatched patterns in a chosen
+set, no sets for `--all-test-sets`, and filters leaving zero cases exit 2 before preflight.
+Unchosen patterns are not matched against the inventory. Planning warns when a default omits
+contract checks; it does not reject an intentionally small default.
 
 ### See what will run
 

@@ -30,12 +30,13 @@ Nothing beyond the base tests every guide gets (each API, error handling and the
 
 ## What `llmdv verify` selects
 
-A plain `llmdv verify` runs the `default` test set, defined once in [`parts/common.yaml`](parts/common.yaml) and used unchanged by every profile here. `--test-set smoke` runs the [built-in smoke checks](../../README.md#what-a-verification-command-selects), and `--full-suite` runs every case in the library. There are no other sets, so `--all-test-sets` is the same as the default. Filters such as `-k` only narrow the run, and `--identity` never changes it.
+The default is defined once in [`parts/common.yaml`](parts/common.yaml) and used unchanged by every profile here.
+See [selection rules](../../../docs/cli.md#test-sets-and-coverage) for smoke, full-library coverage and filters.
 
 <details>
-<summary>The default's case-ID patterns, in 11 suites</summary>
+<summary>The default's case-ID patterns</summary>
 
-`suite.*` takes the whole suite; any other pattern names one case. The rest of each suite is not selected.
+`*` selects the whole library; `suite.*` selects a suite. Other patterns select matching cases.
 
 | Suite | Patterns |
 | --- | --- |
@@ -60,12 +61,13 @@ Counted offline by `llmdv plan`, one per ingress and variant. *Run* cases can st
 
 | Profile | Default (= `--all-test-sets`) | `smoke` | `--full-suite` |
 | --- | --- | --- | --- |
-| `sglang-qwen3-32b-ctx8k-inline-standalone.yaml` | 85 selected, 73 run, 12 skip: 12 undeclared | 9 selected, 9 run | 1082 selected, 677 run, 405 skip: 405 undeclared |
-| `vllm-qwen3-32b-ctx8k-inline-standalone.yaml` | 85 selected, 73 run, 12 skip: 12 undeclared | 9 selected, 9 run | 1082 selected, 677 run, 405 skip: 405 undeclared |
+| `sglang-qwen3-32b-ctx8k-inline-standalone.yaml` | 85 selected, 73 run, 12 skip: 12 undeclared | 9 selected, 9 run | 1092 selected, 678 run, 414 skip: 414 undeclared |
+| `vllm-qwen3-32b-ctx8k-inline-standalone.yaml` | 85 selected, 73 run, 12 skip: 12 undeclared | 9 selected, 9 run | 1092 selected, 678 run, 414 skip: 414 undeclared |
 
 </details>
 
-To see every case and why one skips: `llmdv plan --profile <profile>` (add `--test-set smoke` or `--full-suite` for the other scopes), and `llmdv profile show <profile> --test-sets` for the definitions.
+Preview individual cases and skip reasons with `llmdv plan --profile <profile>`.
+
 ## Not covered
 
 - **Snapshot and restore** (a PodSnapshot reaches Ready; Pod 2 restores rather than cold starts; GPU memory is released before the checkpoint and woken after): cluster state and pod logs, which a committed profile does not read. `llmdv` never scales or restarts a deployment, so it cannot drive a restore either.

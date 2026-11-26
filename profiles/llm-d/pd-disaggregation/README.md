@@ -33,12 +33,13 @@ The base tests every guide gets (each API, error handling, streaming, the parser
 
 ## What `llmdv verify` selects
 
-A plain `llmdv verify` runs the `default` test set, defined once in [`parts/common.yaml`](parts/common.yaml) and used unchanged by every profile here. `--test-set smoke` runs the [built-in smoke checks](../../README.md#what-a-verification-command-selects), and `--full-suite` runs every case in the library. There are no other sets, so `--all-test-sets` is the same as the default. Filters such as `-k` only narrow the run, and `--identity` never changes it.
+The default is defined once in [`parts/common.yaml`](parts/common.yaml) and used unchanged by every profile here.
+See [selection rules](../../../docs/cli.md#test-sets-and-coverage) for smoke, full-library coverage and filters.
 
 <details>
-<summary>The default's case-ID patterns, in 11 suites</summary>
+<summary>The default's case-ID patterns</summary>
 
-`suite.*` takes the whole suite; any other pattern names one case. The rest of each suite is not selected.
+`*` selects the whole library; `suite.*` selects a suite. Other patterns select matching cases.
 
 | Suite | Patterns |
 | --- | --- |
@@ -63,15 +64,16 @@ Counted offline by `llmdv plan`, one per ingress and variant. *Run* cases can st
 
 | Profile | Default (= `--all-test-sets`) | `smoke` | `--full-suite` |
 | --- | --- | --- | --- |
-| `sglang-gpt-oss-120b-inline-standalone.yaml` | 121 selected, 107 run, 14 skip: 14 undeclared | 9 selected, 9 run | 1082 selected, 658 run, 424 skip: 424 undeclared |
-| `vllm-gpt-oss-120b-parsers-standalone.yaml` | 121 selected, 115 run, 6 skip: 6 undeclared | 9 selected, 9 run | 1082 selected, 911 run, 171 skip: 171 undeclared |
-| `vllm-qwen3-0.6b-ctx32000-inline-standalone.yaml` | 121 selected, 109 run, 12 skip: 12 undeclared | 9 selected, 9 run | 1082 selected, 677 run, 405 skip: 405 undeclared |
-| `vllm-qwen3-32b-ctx9k-parsers-standalone.yaml` | 121 selected, 115 run, 6 skip: 6 undeclared | 9 selected, 9 run | 1082 selected, 911 run, 171 skip: 171 undeclared |
-| `vllm-qwen3-32b-inline-standalone.yaml` | 121 selected, 109 run, 12 skip: 12 undeclared | 9 selected, 9 run | 1082 selected, 677 run, 405 skip: 405 undeclared |
+| `sglang-gpt-oss-120b-inline-standalone.yaml` | 121 selected, 107 run, 14 skip: 14 undeclared | 9 selected, 9 run | 1092 selected, 659 run, 433 skip: 433 undeclared |
+| `vllm-gpt-oss-120b-parsers-standalone.yaml` | 121 selected, 115 run, 6 skip: 6 undeclared | 9 selected, 9 run | 1092 selected, 920 run, 172 skip: 172 undeclared |
+| `vllm-qwen3-0.6b-ctx32000-inline-standalone.yaml` | 121 selected, 109 run, 12 skip: 12 undeclared | 9 selected, 9 run | 1092 selected, 678 run, 414 skip: 414 undeclared |
+| `vllm-qwen3-32b-ctx9k-parsers-standalone.yaml` | 121 selected, 115 run, 6 skip: 6 undeclared | 9 selected, 9 run | 1092 selected, 920 run, 172 skip: 172 undeclared |
+| `vllm-qwen3-32b-inline-standalone.yaml` | 121 selected, 109 run, 12 skip: 12 undeclared | 9 selected, 9 run | 1092 selected, 678 run, 414 skip: 414 undeclared |
 
 </details>
 
-To see every case and why one skips: `llmdv plan --profile <profile>` (add `--test-set smoke` or `--full-suite` for the other scopes), and `llmdv profile show <profile> --test-sets` for the definitions.
+Preview individual cases and skip reasons with `llmdv plan --profile <profile>`.
+
 ## Not covered
 
 - **That requests are actually split** (prefill counters grow on prefill pods, `vllm:external_prefix_cache_hits_total` on decode pods, the router's `llm_d_epp_disagg_decision_total`): no response says which pod prefilled it, and a decode sidecar can serve a request on its own. These need per-role pod and EPP metrics read before and after, which need replica sets and cluster reads a committed profile does not carry (#24).

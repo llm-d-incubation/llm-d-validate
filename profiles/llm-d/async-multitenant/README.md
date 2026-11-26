@@ -29,12 +29,13 @@ The llm-d router only, in standalone mode (through `../parts/topology/standalone
 
 ## What `llmdv verify` selects
 
-A plain `llmdv verify` runs the `default` test set, defined once in [`parts/common.yaml`](parts/common.yaml) and used unchanged by every profile here. `--test-set smoke` runs the [built-in smoke checks](../../README.md#what-a-verification-command-selects), and `--full-suite` runs every case in the library. There are no other sets, so `--all-test-sets` is the same as the default. Filters such as `-k` only narrow the run, and `--identity` never changes it.
+The default is defined once in [`parts/common.yaml`](parts/common.yaml) and used unchanged by every profile here.
+See [selection rules](../../../docs/cli.md#test-sets-and-coverage) for smoke, full-library coverage and filters.
 
 <details>
-<summary>The default's case-ID patterns, in 12 suites</summary>
+<summary>The default's case-ID patterns</summary>
 
-`suite.*` takes the whole suite; any other pattern names one case. The rest of each suite is not selected.
+`*` selects the whole library; `suite.*` selects a suite. Other patterns select matching cases.
 
 | Suite | Patterns |
 | --- | --- |
@@ -60,11 +61,12 @@ Counted offline by `llmdv plan`, one per ingress and variant. *Run* cases can st
 
 | Profile | Default (= `--all-test-sets`) | `smoke` | `--full-suite` |
 | --- | --- | --- | --- |
-| `vllm-qwen3-32b-parsers-standalone.yaml` | 95 selected, 89 run, 6 skip: 6 undeclared | 9 selected, 9 run | 1084 selected, 913 run, 171 skip: 171 undeclared |
+| `vllm-qwen3-32b-parsers-standalone.yaml` | 95 selected, 89 run, 6 skip: 6 undeclared | 9 selected, 9 run | 1094 selected, 922 run, 172 skip: 172 undeclared |
 
 </details>
 
-To see every case and why one skips: `llmdv plan --profile <profile>` (add `--test-set smoke` or `--full-suite` for the other scopes), and `llmdv profile show <profile> --test-sets` for the definitions.
+Preview individual cases and skip reasons with `llmdv plan --profile <profile>`.
+
 ## Not covered
 
 - **Eviction, holdback, priority and fairness under saturation** (`requires_load`, #23). llm-d's own validation runs an inference-perf experiment with realtime and async traffic at 20/80/90/100 % of the router's capacity; `llmdv` has no load mode. The objective and fairness headers are declared `consumed` in the topology part and skip as `requires_load`.

@@ -25,50 +25,18 @@ through writing one; every field is in [REFERENCE.md](../profiles/REFERENCE.md).
 
 ## Start from the closest example
 
-The examples are templates with placeholders. Each validates offline; none runs as-is.
-
-| Example | Shape |
-| --- | --- |
-| [example-minimal.yaml](../profiles/examples/example-minimal.yaml) | One endpoint, model id, URL/key variables and expected error statuses. Start here and add the features your stack promises. |
-| [example-engine-only.yaml](../profiles/examples/example-engine-only.yaml) | One vLLM `engine` reached directly, such as `vllm serve`, with nothing in front and no cluster access. |
-| [example-gateway-only.yaml](../profiles/examples/example-gateway-only.yaml) | One LiteLLM `gateway` and no cluster access: the shape you get when a URL and a key are all you have. |
-| [example-two-ingress.yaml](../profiles/examples/example-two-ingress.yaml) | An llm-d fleet without LiteLLM: a vLLM `engine` and the llm-d `router`. Measured on a live stack; environment and Service names are placeholders. |
-| [example-three-ingress.yaml](../profiles/examples/example-three-ingress.yaml) | LiteLLM in front of the router and engine, including header dispositions. Replace deployment facts with yours; choose behavior from the intended API contract. |
-| [example-two-ingress-staging.yaml](../profiles/examples/example-two-ingress-staging.yaml) | The two-ingress stack in a second namespace, written with [`extends`](#reuse-a-profile-with-extends) as only its changes. |
-| [custom-llm-d/](../profiles/examples/custom-llm-d/README.md) | A deployment that follows none of llm-d's guides (a LiteLLM gateway, the llm-d router, vLLM), measured for GLM-5.3, DeepSeek-V4.1-Flash-1017 and Muse-Spark-Open and built from parts. Point a profile at any deployment with variables and pick layers with `--ingress`; a plain run selects every case. |
-
-In `custom-llm-d/`, run [glm-5.3.yaml](../profiles/examples/custom-llm-d/glm-5.3.yaml) or
-[muse-spark-open-816b-nvfp4.yaml](../profiles/examples/custom-llm-d/muse-spark-open-816b-nvfp4.yaml)
-(the gateway and the router) or [deepseek-v4.1-flash-1017.yaml](../profiles/examples/custom-llm-d/deepseek-v4.1-flash-1017.yaml)
-(the gateway only). `parts/` holds what they list: what all three share (`base.yaml`), the LiteLLM
-layer, the router layer, and per model its model part, known failures and change sentinels; parts
-never run on their own. Its values were measured on one deployment of each stack; compare yours
-and triage differences before adopting those expectations. Put your URLs, keys and the model ids
-your gateway serves in variables, or in a gitignored `*.local.yaml` that extends one of the three.
-
-For a first profile, copy the minimal starter under a `.local.yaml` name so git ignores it.
-Use a fuller example when you need its setup, routing or model-specific declarations:
+[Choose a profile](../profiles/README.md#your-own-stack) lists the examples by deployment shape,
+including [measured profiles](../profiles/examples/custom-llm-d/README.md). Copy the minimal starter
+for a first profile, or reuse a matching profile through `extends`:
 
 ```sh
-mkdir -p profiles/<system>
-cp profiles/examples/example-minimal.yaml profiles/<system>/<model>.local.yaml
+cp profiles/examples/example-minimal.yaml profiles/my-stack.local.yaml
 ```
 
-Then replace every `<...>` placeholder. The comments in the example explain each choice.
-
-```
-profiles/
-  <system>/                 one folder per system you test
-    <model>.yaml            a committed profile: URL and key named by variable
-    *.local.yaml            your variants, anywhere under profiles/; gitignored
-```
-
-One file covers one fleet from one place. An external profile and an in-cluster profile for the
-same fleet differ only in `base_url`, `vantage` and `setup`.
-
-To commit a real profile, drop the `.local` suffix, name the URL and the key by variable
-(`base_url_env`, `auth.key_env`) so no hostname or key enters the repository, and add a short
-guide beside it on how to run it.
+Replace the placeholders and inspect the intended APIs. Local `*.local.yaml` files are
+ignored by Git. A committed profile names URLs and credentials by variable and contains no
+cluster-identifying values. For the first live run, follow
+[Getting started](getting-started.md#run-your-own-stack).
 
 ## Reuse a profile with `extends`
 
@@ -187,17 +155,10 @@ cases within the chosen test sets or full suite; it does not expand the scope.
 
 ## Choose how much to run
 
-A profile's declarations say how a correct stack behaves; its `test_sets` only choose which cases
-run. Keep the two apart: to run less, pick a smaller set rather than removing declarations.
-
-- **`default`** is what a plain `verify` runs, and a profile needs one for a plain run to work.
-- **Other names under `test_sets`** are subsets you run on request, with `--test-set <name>`.
-  Naming a set replaces the default; name both to combine them.
-- **`smoke`** is built in: discovery plus one plain and one streaming request per API.
-- **`--full-suite`** runs every case in the library, whatever the sets say.
-
-`-m <suite>` and `-k <case>` then narrow whichever you chose. Preview any of these with `llmdv plan`
-and the same flags. [cli.md](cli.md#test-sets-and-coverage) has the details and examples.
+Keep expected behavior and coverage separate. To run less, choose a smaller test set instead of
+removing a promised capability. Define sets using [the schema](../profiles/REFERENCE.md#test_sets)
+and select them using [the CLI rules](cli.md#test-sets-and-coverage). Preview with `plan` before
+sending requests.
 
 ## Declarations are verified, not trusted
 
