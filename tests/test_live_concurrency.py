@@ -658,7 +658,7 @@ def pytest_runtest_setup(item):
             "session_fault",
             "--remote-output",
             dest.as_uri(),
-            env={**plugin, "SIGNUM": str(signum)},
+            env={**plugin, "SIGNUM": str(int(signum))},
         )
     assert result.returncode == 6, result.stderr
     assert "INTERRUPTED (exit 6" in result.stdout and "PASSED" not in result.stdout
@@ -673,8 +673,11 @@ def test_global_fail_fast_preserves_failure(tmp_path):
         path = profile(tmp_path, fleet, [*ELIGIBLE, "unhappy.invalid_token_limit"])
         result, run = verify(tmp_path, path, 2, "-x")
     assert result.returncode == 1, result.stderr
-    assert any(r["case_id"] == ELIGIBLE[0] and r["outcome"] == "fail" for r in rows(run))
-    assert all(r["stage"] == "eligible" for r in rows(run))
+    records = rows(run)
+    # Either worker can fail first, and a case already in flight can finish.
+    assert 1 <= len(records) <= 2
+    assert all(r["case_id"] in ELIGIBLE and r["outcome"] == "fail" for r in records)
+    assert all(r["stage"] == "eligible" for r in records)
     assert json.loads((run / "outcome.json").read_text())["execution"]["unfinished"]
 
 
