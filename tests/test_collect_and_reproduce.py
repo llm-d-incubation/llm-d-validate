@@ -8,11 +8,13 @@ verification against the declarations it was actually made with.
 from __future__ import annotations
 
 import json
+import subprocess
 import textwrap
 from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
+import yaml
 
 from llmdv.cli import banner, verify_cmd
 from llmdv.collect import KubectlLogCollector, NoopCollector
@@ -22,6 +24,7 @@ from llmdv.kube import READ_VERBS, KubeContext, KubeError
 from llmdv.output import Offloader
 from llmdv.preflight import Report
 from llmdv.profile import loader
+from tests.fakes import FakeFleet, profile_yaml, run_llmdv
 
 PROFILE = """
 schema: llmdv.profile/1
@@ -342,3 +345,47 @@ def test_script_is_runnable_and_carries_no_credential(tmp_path):
     assert "port-forward pod/x 1:2" in text
     assert "LLMDV_RERUN_OUT" in text  # fresh output directory
     assert "--profile profile.used.yaml" in text
+
+
+def test_script_requires_the_url_variables_it_names(tmp_path):
+    path = reproduce.write(
+        tmp_path,
+        profile_name="fleet",
+        profile_digest=None,
+        argv=["llmdv", "verify", "--profile", "profile.used.yaml"],
+        setup_commands={},
+        key_envs=[],
+        url_envs=["LLMDV_GATEWAY_URL"],
+    )
+    assert "LLMDV_GATEWAY_URL:?set LLMDV_GATEWAY_URL before running this script" in path.read_text()
+
+
+def test_a_run_reproduces_only_after_its_selected_urls_are_set(tmp_path):
+    """reproduce.sh names the URL variable of each selected ingress, and stops before llmdv when
+    one is unset; an ingress the run left out is not required, as preflight does not need it."""
+    with FakeFleet() as fleet:
+        config = yaml.safe_load(profile_yaml(fleet.base_url))
+        selected = config["ingresses"][0]
+        del selected["base_url"]
+        selected["base_url_env"] = "LLMDV_TEST_FAKE_URL"
+        config["ingresses"].append(
+            {**selected, "id": "other", "base_url_env": "LLMDV_TEST_OTHER_URL"}
+        )
+        path = tmp_path / "profile.yaml"
+        path.write_text(yaml.safe_dump(config))
+        result = run_llmdv(
+            "verify", "--profile", str(path), "--full-suite", "--ingress", "fake",
+            "--local-output", str(tmp_path / "out"), "--pod-logs", "off",
+            "-k", "test_models_lists_declared_model",
+            env={"LLMDV_TEST_FAKE_URL": fleet.base_url},
+        )  # fmt: skip
+    assert result.returncode == 0, result.stdout + result.stderr
+    script = next((tmp_path / "out").glob("*/reproduce.sh"))
+    text = script.read_text()
+    assert "LLMDV_TEST_FAKE_URL:?set" in text
+    assert "LLMDV_TEST_OTHER_URL" not in text
+    replay = subprocess.run(  # noqa: S603 - the script llmdv just wrote
+        ["bash", str(script)], capture_output=True, text=True, env={"PATH": "/usr/bin:/bin"}
+    )
+    assert replay.returncode != 0
+    assert "LLMDV_TEST_FAKE_URL" in replay.stderr

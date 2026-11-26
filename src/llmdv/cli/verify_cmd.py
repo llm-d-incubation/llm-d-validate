@@ -910,6 +910,11 @@ def _write_reproduce(args, profile, run_dir, setup_commands) -> None:
     key_envs = sorted(
         {ingress.auth.key_env for ingress in profile.ingresses if ingress.auth.key_env}
     )
+    # Only the selected ingresses' addresses: preflight needs no other, and neither does a replay.
+    chosen = set(args.ingress or profile.ingress_ids)
+    url_envs = sorted(
+        {i.base_url_env for i in profile.ingresses if i.id in chosen and i.base_url_env}
+    )
     selected = resolve_coverage(profile, args)
     argv = ["llmdv", *sys.argv[1:]]
     profile_file = "profile.used.yaml"
@@ -931,6 +936,7 @@ def _write_reproduce(args, profile, run_dir, setup_commands) -> None:
         argv=argv,
         setup_commands=setup_commands,
         key_envs=key_envs,
+        url_envs=url_envs,
     )
 
 
