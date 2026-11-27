@@ -38,6 +38,11 @@ lanes:
 EOF
 python3 "$root/tests/e2e_llm_d_nightly/fake_router.py" profile \
   > "$release/profiles/llm-d/optimized-baseline/fake-router.yaml"
+# Give this synthetic fixture checkout a source identity, as a real release has.
+git init -q "$release"
+git -C "$release" add .
+git -C "$release" -c user.name=fixture -c user.email=fixture@example.invalid \
+  -c core.hooksPath=/dev/null commit -q --no-gpg-sign -m 'Synthetic smoke fixture'
 
 namespace() {
   local ns="$prefix-$1"
@@ -92,13 +97,18 @@ check() { # <label> <condition description> <test command...>
 # Runs the step as the nightly would for overlay gpu/<backend>/<provider>, and records its exit.
 step() { # <namespace> <infra provider>
   rm -rf "$work/runner" && mkdir -p "$work/runner"
-  env LLMDV_VERSION="$LLMDV_VERSION" LLMDV_IMAGE="$LLMDV_IMAGE" RUNNER_TEMP="$work/runner" \
-    LLMDV_READY_TIMEOUT=300 LLMDV_TIMEOUT="${SMOKE_CASE_TIMEOUT:-300}" \
-    LLMDBENCH_CICD_NS="$1" LLMDBENCH_CICD_SCENARIO=optimized-baseline \
-    LLMDBENCH_CICD_ACCELERATOR=gpu LLMDBENCH_CICD_BACKEND=vllm LLMDBENCH_CICD_CONNECTOR= \
-    LLMDBENCH_CICD_OFFLOADING_TARGET= LLMDBENCH_CICD_INFRA_PROVIDER="$2" \
-    bash "$release/deploy/llm-d-nightly/smoke-step.sh" > "$work/step.log" 2>&1
-  echo $? > "$work/step.exit"
+  : > "$work/step.log"
+  local phase code=0
+  for phase in prepare verify finalize; do
+    env LLMDV_VERSION="$LLMDV_VERSION" LLMDV_IMAGE="$LLMDV_IMAGE" RUNNER_TEMP="$work/runner" \
+      LLMDV_READY_TIMEOUT=300 LLMDV_TIMEOUT="${SMOKE_CASE_TIMEOUT:-300}" \
+      LLMDBENCH_CICD_NS="$1" LLMDBENCH_CICD_SCENARIO=optimized-baseline \
+      LLMDBENCH_CICD_ACCELERATOR=gpu LLMDBENCH_CICD_BACKEND=vllm LLMDBENCH_CICD_CONNECTOR= \
+      LLMDBENCH_CICD_OFFLOADING_TARGET= LLMDBENCH_CICD_INFRA_PROVIDER="$2" \
+      bash "$release/deploy/llm-d-nightly/smoke-step.sh" "$phase" >> "$work/step.log" 2>&1
+    code=$?
+  done
+  echo "$code" > "$work/step.exit"
   sed 's/^/        | /' "$work/step.log" | grep -E "llmdv:|warning|PASSED|FAILED" || true
 }
 exit_is() { [ "$(cat "$work/step.exit")" = "$1" ]; }
