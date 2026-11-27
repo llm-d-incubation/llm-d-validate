@@ -36,7 +36,7 @@ For AWS or an S3-compatible store using access keys, add the storage extra to yo
 release environment:
 
 ```sh
-python -m pip install 'llm-d-validate[s3]==0.1.2'
+python -m pip install 'llm-d-validate[s3]==0.1.3'
 ```
 
 Match the version to your [installed release](getting-started.md#install). For a source install,
@@ -45,7 +45,7 @@ Load credentials through the SDK's credential chain (including a session
 token for temporary credentials), and set `$AWS_BUCKET` to your bucket. For a non-AWS endpoint,
 set `AWS_ENDPOINT_URL_S3` (or `AWS_ENDPOINT_URL` when the first is unset).
 
-For IBM IAM authentication, install `python -m pip install 'llm-d-validate[ibm-cos]==0.1.2'`
+For IBM IAM authentication, install `python -m pip install 'llm-d-validate[ibm-cos]==0.1.3'`
 (or `python -m pip install -e '.[ibm-cos]'` for source development), set
 `LLMDV_S3_AUTH=ibm-iam`, and export `IBM_COS_ENDPOINT`, `IBM_COS_API_KEY` and
 `IBM_COS_SERVICE_INSTANCE_ID`. [IBM authentication details](../deploy/README.md#credentials)
