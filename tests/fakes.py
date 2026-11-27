@@ -23,6 +23,7 @@ import threading
 import time
 from copy import deepcopy
 from dataclasses import dataclass
+from functools import wraps
 from http.server import BaseHTTPRequestHandler
 from pathlib import Path
 from urllib.parse import parse_qs, unquote, urlsplit
@@ -1268,6 +1269,7 @@ class FakeFleet:
         completions_end_at_once: bool = False,
         serve_missing_model: bool = False,
         openai_reasons: bool = False,
+        request_window=None,
     ) -> None:
         self.model = model
         # A generic tool-calling model for the tools suite; see tests/tool_engine.py.
@@ -1477,6 +1479,17 @@ class FakeFleet:
 
         fleet = self
 
+        def observed(method):
+            if request_window is None:
+                return method
+
+            @wraps(method)
+            def handle(handler):
+                with request_window(handler.headers.get("x-llmdv-case-id"), handler.path):
+                    return method(handler)
+
+            return handle
+
         class Handler(BaseHTTPRequestHandler):
             protocol_version = "HTTP/1.1"
             # Pinned rather than inherited: the `server` header is a build signal llmdv records,
@@ -1563,6 +1576,7 @@ class FakeFleet:
                 presented = self.headers.get(header)
                 return presented != expected and not (fleet.accept_missing_auth and not presented)
 
+            @observed
             def do_GET(self):
                 if transport_fakes.get(fleet, self):
                     return None
@@ -1960,6 +1974,7 @@ class FakeFleet:
                     self.wfile.write(b"data: [DONE]\n\n")
                 self.wfile.flush()
 
+            @observed
             def do_POST(self):
                 if fleet.delay_s:
                     time.sleep(fleet.delay_s)

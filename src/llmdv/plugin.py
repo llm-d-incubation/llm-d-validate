@@ -31,7 +31,7 @@ from typing import Any
 
 import pytest
 
-from . import __version__, preflight
+from . import __version__, execution, preflight
 from . import surfaces as surfaces_pkg
 from .assertions import samples as sampling
 from .cli import style
@@ -503,6 +503,14 @@ def _phase_sort_key(item: pytest.Item, order: dict[str, int] | None = None) -> t
     return (PHASE_ORDER.get(phase, len(PHASE_ORDER)), phase, rank, ingress_id, item.nodeid)
 
 
+def _execution_policy(item: pytest.Item) -> tuple[str, str]:
+    disruptive = item.get_closest_marker("disruptive")
+    reason = None
+    if disruptive:
+        reason = str(disruptive.args[0]) if disruptive.args else "Disruptive traffic"
+    return execution.policy(_case_id(item), _suite_of(item), reason)
+
+
 def pytest_itemcollected(item: pytest.Item) -> None:
     """Tag each case with its suite, and with the suite its case_id prefix names.
 
@@ -516,6 +524,7 @@ def pytest_itemcollected(item: pytest.Item) -> None:
     """
     suite = _suite_of(item)
     if suite:
+        _execution_policy(item)
         item.add_marker(suite)
         prefix = _prefix_of(item)
         if prefix and prefix != suite and prefix in suite_markers():
@@ -919,6 +928,7 @@ def plan_row(item: pytest.Item) -> dict[str, Any]:
     rule = sampling.rule_for(item, ingress)
     case_marker = item.get_closest_marker("case_id")
     selectable = known_markers()
+    stage, policy_reason = _execution_policy(item)
     return {
         "nodeid": item.nodeid,
         "case_id": case_marker.args[0] if case_marker and case_marker.args else None,
@@ -927,6 +937,8 @@ def plan_row(item: pytest.Item) -> dict[str, Any]:
         "variant": _variant(item),
         "surface": surface_of(item),
         "samples": rule.n if rule is not None else None,
+        "stage": stage,
+        "stage_reason": policy_reason,
         "markers": sorted({mark.name for mark in item.iter_markers()} & selectable),
         "outcome": "skip" if reason is not None else "run",
         "skip_class": skip_class,
@@ -950,13 +962,14 @@ def _skip_if_connection_lost(request: pytest.FixtureRequest) -> None:
         target = request.getfixturevalue("ingress")
     else:
         target = _ingress_from_params(request.node, getattr(request.config, "_llmdv_profile", None))
-    if target is None or target.id not in lost or not _still_lost(request.config, target):
+    prior = lost.get(target.id) if target is not None else None
+    if prior is None or not _still_lost(request.config, target):
         return
     _ACTIVE.setdefault(request.node.nodeid, {})["connection_lost"] = target.id
     _mark_skip(request.node, SkipClass.REQUIRES_INSTRUMENTATION)
     pytest.skip(
         f"[{SkipClass.REQUIRES_INSTRUMENTATION.value}] the local connection to ingress "
-        f"{target.id!r} was lost at case {lost[target.id]['case']!r}; not run"
+        f"{target.id!r} was lost at case {prior['case']!r}; not run"
     )
 
 
@@ -968,7 +981,7 @@ def _still_lost(config: Any, target: Ingress) -> bool:
     """
     if preflight.refuses_connections(target):
         return True
-    del config._llmdv_connection_lost[target.id]
+    config._llmdv_connection_lost.pop(target.id, None)
     log.info("the local port of ingress %s accepts connections again; resuming", target.id)
     return False
 
@@ -994,7 +1007,9 @@ def _connection_lost(
     answer are what a crashing server looks like, and what a pod that died behind a live
     port-forward looks like. llmdv cannot tell those two apart, so it does not guess.
     """
-    lost: dict[str, dict[str, Any]] = config._llmdv_connection_lost  # type: ignore[attr-defined]
+    # Another worker may have recorded this same loss while the request was in flight.
+    # In a serial session the gate already handled known losses.
+    lost = config._llmdv_connection_lost if getattr(config, "_llmdv_concurrency", 1) == 1 else {}
     client_ingresses = state.get("client_ingresses", {})
     probed: set[str] = set()
     for recorded in state.get("clients") or ([http] if http is not None else []):
@@ -1160,6 +1175,10 @@ def mark_skip_current(skip_class: SkipClass) -> None:
 # ------------------------------------------------------------------ reporting
 
 
+def _public_nodeid(config: pytest.Config, item: pytest.Item) -> str:
+    return getattr(config, "_llmdv_public_nodes", {}).get(item.nodeid, item.nodeid)
+
+
 @pytest.hookimpl(hookwrapper=True)
 def pytest_runtest_makereport(item: pytest.Item, call: pytest.CallInfo):
     outcome = yield
@@ -1249,6 +1268,10 @@ def pytest_runtest_makereport(item: pytest.Item, call: pytest.CallInfo):
                 slugged_case = case_slug(
                     owner.id if owner else "noingress", case_name, _variant(item)
                 )
+                if hasattr(config, "_llmdv_slugs"):
+                    # A cross-ingress case owns all of its transcripts, including those
+                    # recorded by a second client that reaches another case's primary ingress.
+                    slugged_case = config._llmdv_slugs[item.nodeid]
                 relpath = f"transcripts/{slugged_case}/{offload_seq}.sse"
                 offload = config._llmdv_offloader.store(  # type: ignore[attr-defined]
                     relpath, data
@@ -1279,7 +1302,7 @@ def pytest_runtest_makereport(item: pytest.Item, call: pytest.CallInfo):
         evidence_ref = write_evidence(
             run_dir,
             FailureContext(
-                nodeid=item.nodeid,
+                nodeid=_public_nodeid(config, item),
                 case_id=case_marker.args[0] if case_marker and case_marker.args else None,
                 ingress=ingress,
                 surface=surface,
@@ -1289,6 +1312,9 @@ def pytest_runtest_makereport(item: pytest.Item, call: pytest.CallInfo):
                     for exchange in recorded.exchanges
                 ],
                 artifacts=dict(state.get("artifacts") or {}),
+                bundle_slug=getattr(config, "_llmdv_slugs", {}).get(item.nodeid),
+                concurrency=getattr(config, "_llmdv_concurrency", 1),
+                stage=getattr(config, "_llmdv_stage", "serial"),
                 served_by=served,
                 setup_commands=getattr(config, "_llmdv_setup_commands", {}).get(
                     ingress.id if ingress else "", []
@@ -1308,7 +1334,7 @@ def pytest_runtest_makereport(item: pytest.Item, call: pytest.CallInfo):
         writer.append(
             ResultRecord(
                 run_id=getattr(config, "_llmdv_run_id", "unknown"),
-                nodeid=item.nodeid,
+                nodeid=_public_nodeid(config, item),
                 outcome=verdict,
                 profile=profile.name,
                 profile_digest=getattr(config, "_llmdv_profile_digest", None),
@@ -1327,6 +1353,8 @@ def pytest_runtest_makereport(item: pytest.Item, call: pytest.CallInfo):
                 evidence=evidence_ref,
                 known_failure=known_failure,
                 partial_evidence=partial_evidence,
+                concurrency=getattr(config, "_llmdv_concurrency", 1),
+                stage=getattr(config, "_llmdv_stage", "serial"),
                 connection_lost=state.get("connection_lost"),
             )
         )
@@ -1453,7 +1481,7 @@ def _write_exchanges(
                 redact.redact_value(
                     {
                         "run_id": getattr(config, "_llmdv_run_id", None),
-                        "nodeid": item.nodeid,
+                        "nodeid": _public_nodeid(config, item),
                         "case_id": case_marker.args[0]
                         if case_marker and case_marker.args
                         else None,

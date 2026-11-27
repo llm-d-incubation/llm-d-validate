@@ -89,6 +89,9 @@ class ResultRecord:
     # stopped answering mid-run: these rows say nothing about the fleet.
     connection_lost: str | None = None
 
+    concurrency: int = 1
+    stage: str = "serial"
+
     def __post_init__(self) -> None:
         if not self.ts:
             self.ts = datetime.now(timezone.utc).isoformat(timespec="milliseconds")

@@ -19,10 +19,12 @@ import json
 import logging
 import os
 import re
+import shlex
 import shutil
 import signal
 import subprocess
 import sys
+import tempfile
 import threading
 import time
 from dataclasses import asdict, dataclass, field
@@ -43,6 +45,8 @@ from ..evidence.outcome import (
     read_results,
 )
 from ..evidence.stack import stack_from_run
+from ..fleet.prometheus import token_for
+from ..http import redact
 from ..kube import KubeContext
 from ..log import setup as log_setup
 from ..log.setup import emit, get_logger
@@ -86,6 +90,7 @@ def add_parser(subparsers, parents) -> None:
         help="run functional tests against a deployed fleet",
     )
     add_selection_arguments(verify)
+    add_concurrency(verify)
     verify.add_argument(
         "--local-output",
         default=None,
@@ -167,6 +172,24 @@ def add_parser(subparsers, parents) -> None:
     # routed llmdv's own --local-output into the pytest argv and made a bad --client look like a
     # pytest usage error instead of a llmdv one.
     verify.set_defaults(func=cmd_verify)
+
+
+def add_concurrency(parser: argparse.ArgumentParser) -> None:
+    def positive(value):
+        number = int(value)
+        if number < 1:
+            raise argparse.ArgumentTypeError("concurrency must be a positive integer")
+        return number
+
+    parser.add_argument(
+        "--concurrency",
+        type=positive,
+        default=1,
+        metavar="N",
+        help="run up to N reviewed independent cases concurrently across the run (default: 1); "
+        "cache, timing and disruptive cases run exclusively. N > 1 requires POSIX. "
+        "Use 1 for pytest JUnit output",
+    )
 
 
 def add_selection_arguments(parser: argparse.ArgumentParser) -> None:
@@ -329,14 +352,22 @@ def _verify(args: argparse.Namespace, run: _Run) -> int:
         else:
             (run_dir / "profile.used.yaml").write_text(composed, encoding="utf-8")
 
-    parallel = _parallel_args(getattr(args, "pytest_args", None) or [])
+    try:
+        environment_args = shlex.split(os.environ.get("PYTEST_ADDOPTS", ""))
+    except ValueError as exc:
+        log.error("invalid PYTEST_ADDOPTS: %s", exc)
+        return USAGE
+    parallel = _parallel_args([*environment_args, *(getattr(args, "pytest_args", None) or [])])
     if parallel:
         log.error(
-            "refusing %s: live verification runs one case at a time by design (cache reuse, "
-            "sessions and rate limits depend on order); parallel workers are for llmdv's own "
-            "offline tests only",
+            "refusing %s: llmdv manages live workers; use --concurrency N. Exclusive cases "
+            "run one case at a time across all ingresses",
             " ".join(parallel),
         )
+        return USAGE
+
+    if args.concurrency > 1 and os.name != "posix":
+        log.error("--concurrency above 1 requires POSIX process groups; use --concurrency 1 here")
         return USAGE
 
     try:
@@ -352,10 +383,14 @@ def _verify(args: argparse.Namespace, run: _Run) -> int:
         return USAGE
 
     try:
-        profile = loader.load(args.profile)
+        profile, chain = loader.load_with_sources(args.profile)
     except loader.ProfileError as exc:
         log.error("%s", exc)
         return USAGE
+    redact.install_secrets(list(loader.resolve_all_secrets(profile).values()))
+    if profile.environment.metrics is not None:
+        # Register the declared token before workers inherit the coordinator's redactions.
+        token_for(profile.environment.metrics)
     run.outcome.profile["name"] = profile.name
     run.outcome.identity = identity.build(
         profile, lane_identity, loader.contract_digest(args.profile)
@@ -411,7 +446,15 @@ def _verify(args: argparse.Namespace, run: _Run) -> int:
     if code != OK:
         log.error("%s", message)
         return code
-    run.outcome.coverage = planned
+    run.outcome.coverage = planned["coverage"]
+    cases = planned["cases"]
+    # Collection and setup diagnostics have no live calls or call verdicts to reconcile.
+    concurrency = 1 if planned.get("diagnostic") else args.concurrency
+    run.outcome.execution = {"concurrency": concurrency, "planned": len(cases)}
+    if concurrency > 1:
+        from . import concurrent
+
+        run.outcome.execution["pending_plan"] = list(concurrent.public_nodes(cases).values())
     run.outcome.write(run_dir)
     run.profile = profile
 
@@ -476,7 +519,12 @@ def _verify(args: argparse.Namespace, run: _Run) -> int:
     log.debug("pytest argv: %s", " ".join(pytest_argv))
 
     run.ran_pytest = True
-    code = _run_pytest(pytest_argv, raw=args.raw_pytest, setup_commands=run.setup_commands)
+    if concurrency == 1:
+        code = _run_pytest(pytest_argv, raw=args.raw_pytest, setup_commands=run.setup_commands)
+    else:
+        code = concurrent.run(
+            args, run, pytest_argv, cases, compose.resolved(chain, standalone=True)
+        )
 
     # Preserve the completed work before any supporting evidence or report can fail.
     records = run.records = _read_records(run_dir)
@@ -491,12 +539,17 @@ def _verify(args: argparse.Namespace, run: _Run) -> int:
         run.preflight_report,
         run.outcome.run_id,
     )
-    run.records, run.table = _summarise(run_dir, records, run.collected, run.profile)
     code = _map_pytest_exit(code, _SIGNALLED.is_set())
     # Every failure was a local connection lost mid-run, its local port refusing connections:
     # the vantage point, not the fleet. A single real failure anywhere keeps exit 1.
-    if code == TEST_FAILURES and environment_only(records):
-        return PREFLIGHT
+    if (
+        code == TEST_FAILURES
+        and environment_only(records)
+        and not run.outcome.execution.get("teardown_errors")
+    ):
+        code = PREFLIGHT
+    session_status = _session_status(code, run.outcome.execution, records)
+    _, run.table = _summarise(run_dir, records, run.collected, run.profile, session_status)
     return code
 
 
@@ -509,6 +562,21 @@ def _finish(args: argparse.Namespace, run: _Run, code: int) -> int:
     # A second signal must not cut publication short.
     signal.signal(signal.SIGTERM, signal.SIG_IGN)
     run_dir, outcome = run.run_dir, run.outcome
+    if run.ran_pytest and "pending_plan" in outcome.execution:
+        from . import concurrent
+
+        # A signal may have interrupted the scheduler while it was ordering completed rows.
+        signal.signal(signal.SIGINT, signal.SIG_IGN)
+        try:
+            concurrent.recover(run_dir, outcome.execution)
+        except Exception:  # noqa: BLE001 -- publish the readable evidence of a damaged run
+            log.exception("could not reconcile planned cases")
+        else:
+            outcome.write(run_dir)
+            concurrent.clear_receipts(run_dir)
+    # Before dispatch or after failed recovery, the saved plan is all we can account for.
+    if "pending_plan" in outcome.execution:
+        outcome.execution["unfinished"] = outcome.execution.pop("pending_plan")
     if run.ran_pytest and not run.records:
         # pytest itself, or the strict normal read, may have stopped before handing records
         # back. Recover complete readable rows as publish does for a killed run; a torn final
@@ -577,6 +645,7 @@ def _finish(args: argparse.Namespace, run: _Run, code: int) -> int:
             run.collected,
             layer_order(run.records, run.profile),
             known_unmatched=outcome.known.get("unmatched"),
+            session_status=_session_status(code, outcome.execution, run.records),
         )
     for lost in outcome.connection_lost:
         emit(f"  {_lost_line(lost)}")
@@ -1000,37 +1069,37 @@ def _unknown_selectors(profile, args) -> list[str]:
 
 def _validate_scope(args: argparse.Namespace) -> tuple[int, dict | None, str]:
     """Resolve and collect offline before preflight, including zero-case and filter errors."""
-    command = [
-        sys.executable,
-        "-m",
-        "llmdv.cli.main",
-        "plan",
-        "--profile",
-        str(args.profile),
-        "--json",
-    ]
-    for name in getattr(args, "test_set", ()):
-        command += ["--test-set", name]
-    if args.all_test_sets:
-        command += ["--all-test-sets"]
-    if args.full_suite:
-        command += ["--full-suite"]
-    for flag, values in (
-        ("--ingress", args.ingress),
-        ("--client", args.client),
-        ("--surface", args.surface),
-    ):
-        for value in values:
-            command += [flag, value]
-    if args.keyword:
-        command += ["-k", args.keyword]
-    if args.marker:
-        command += ["-m", args.marker]
-    command += [item for item in (getattr(args, "pytest_args", None) or []) if item != "--"]
-    result = subprocess.run(command, capture_output=True, text=True, check=False)  # noqa: S603
-    if result.returncode != OK:
-        return result.returncode, None, result.stderr.strip() or "Coverage planning failed"
-    return OK, json.loads(result.stdout)["coverage"], ""
+    selection = {
+        key: getattr(args, key)
+        for key in (
+            "profile",
+            "ingress",
+            "client",
+            "surface",
+            "test_set",
+            "all_test_sets",
+            "full_suite",
+            "keyword",
+            "marker",
+            "pytest_args",
+            "concurrency",
+        )
+        if hasattr(args, key)
+    }
+    # Public plan output is redacted. Collection identities used to schedule work must
+    # survive even when a credential coincides with part of a test name.
+    with tempfile.TemporaryDirectory(prefix="llmdv-plan-") as directory:
+        path = Path(directory) / "plan.json"
+        result = subprocess.run(  # noqa: S603 -- private planner, our own interpreter
+            [sys.executable, "-m", "llmdv.cli.plan_cmd", str(path)],
+            input=json.dumps(selection, default=os.fspath),
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        if result.returncode != OK:
+            return result.returncode, None, result.stderr.strip() or "Coverage planning failed"
+        return OK, json.loads(path.read_bytes()), ""
 
 
 # pytest's own exit codes. Collapsing these into "tests failed" would report a llmdv defect or a
@@ -1094,7 +1163,7 @@ def _build_pytest_argv(
         "-o",
         "console_output_style=classic",
     ]
-    # Never parallel, even where pytest-xdist is installed (the `dev` extra installs it for
+    # Keep each session serial, even where pytest-xdist is installed (the `dev` extra is for
     # llmdv's own offline tests). Blocking the plugin also turns an -n smuggled in through
     # PYTEST_ADDOPTS into a usage error rather than concurrent requests against a live fleet.
     argv += ["-p", "no:xdist"]
@@ -1150,7 +1219,7 @@ def selection_argv(args: argparse.Namespace) -> list[str]:
 
 
 # pytest-xdist's options that would start workers or choose how cases are spread over them.
-_PARALLEL_OPTIONS = ("--numprocesses", "--maxprocesses", "--dist", "--tx")
+_PARALLEL_OPTIONS = ("--numprocesses", "--maxprocesses", "--dist", "--tx", "--px", "-d")
 
 
 def _parallel_args(extra: list[str]) -> list[str]:
@@ -1337,8 +1406,37 @@ def layer_order(records: list[dict], profile: Profile | None = None) -> list[str
     return declared + [name for name in seen if name not in declared]
 
 
+def _session_status(code: int, execution: dict, records: list[dict]) -> str | None:
+    """Session failures can outlive a passing call or precede the first result."""
+    if code == OK:
+        return None
+    details = []
+    if unfinished := len(execution.get("unfinished", ())):
+        details.append(f"{unfinished} planned {'case' if unfinished == 1 else 'cases'} unfinished")
+    if teardown := len(execution.get("teardown_errors", ())):
+        details.append(f"{teardown} teardown {'error' if teardown == 1 else 'errors'}")
+    if (
+        code == TEST_FAILURES
+        and not details
+        and any(r["outcome"] in ("error", "fail") for r in records)
+    ):
+        return None  # The ordinary failure headline already counts and explains the failed cases.
+    label = {
+        TEST_FAILURES: "FAILED",
+        INTERNAL: "INTERNAL ERROR",
+        INTERRUPTED: "INTERRUPTED",
+        USAGE: "USAGE ERROR",
+        PREFLIGHT: "ENVIRONMENT ERROR",
+    }[code]
+    return f"{label} ({', '.join([f'exit {code}', *details])})"
+
+
 def _summarise(
-    run_dir: Path, records: list[dict], collection=None, profile: Profile | None = None
+    run_dir: Path,
+    records: list[dict],
+    collection=None,
+    profile: Profile | None = None,
+    session_status: str | None = None,
 ) -> tuple[list[dict], list[str]]:
     """Write summary.md and return (records, the rendered table) for the closing banner.
 
@@ -1348,7 +1446,14 @@ def _summarise(
     there is no second column to compare, and for a run whose profile declares fewer than two of
     the ingresses that reported, where the order between them is unknown.
     """
+    title = ["# llmdv run summary", ""]
+    if session_status:
+        title += [session_status, ""]
     if not records:
+        if session_status:
+            (run_dir / "summary.md").write_text(
+                "\n".join([*title, "No case results recorded.", ""]), encoding="utf-8"
+            )
         return [], []
 
     ingresses = layer_order(records, profile)
@@ -1392,8 +1497,7 @@ def _summarise(
         counts[record["outcome"]] = counts.get(record["outcome"], 0) + 1
 
     lines = [
-        "# llmdv run summary",
-        "",
+        *title,
         f"profile: {records[0].get('profile')}",
         f"digest:  {records[0].get('profile_digest')}",
         f"run_id:  {records[0].get('run_id')}",

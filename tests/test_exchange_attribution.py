@@ -102,7 +102,9 @@ def test_sdk_recording_captures_correlation_and_response_identity():
 def test_exchange_metadata_is_attributable_and_identity_headers_are_redacted(tmp_path):
     path = tmp_path / "exchanges.jsonl"
     handle = path.open("w", encoding="utf-8")
-    config = SimpleNamespace(_llmdv_exchanges=handle, _llmdv_run_id="run-c")
+    config = SimpleNamespace(
+        _llmdv_exchanges=handle, _llmdv_run_id="run-c", _llmdv_public_nodes={"test_node": "public"}
+    )
     item = SimpleNamespace(nodeid="test_node")
     marker = SimpleNamespace(args=("case-c",))
     exchanges = [
@@ -131,6 +133,7 @@ def test_exchange_metadata_is_attributable_and_identity_headers_are_redacted(tmp
         )
         handle.close()
         payload = json.loads(path.read_text())
+        assert payload["nodeid"] == "public"
         assert payload["ingress"] == "edge"
         assert payload["ingress_kind"] == "router"
         assert payload["case_id"] == "case-c"

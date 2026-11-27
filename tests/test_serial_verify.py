@@ -1,22 +1,27 @@
-"""Live verification runs one case at a time, even where pytest-xdist is installed.
-
-The `dev` extra installs pytest-xdist so llmdv's own offline tests can run in parallel. The
-shipped suites must not: cache reuse and session cases depend on what an earlier request left
-behind, and a rate-limited or metered key must not be multiplied. `llmdv verify` forwards unknown
-arguments to pytest, so without a guard `llmdv verify ... -n 4` would fan out against a live fleet.
-"""
+"""Only the llmdv scheduler may run live cases concurrently, even with xdist installed."""
 
 from __future__ import annotations
 
 import argparse
 import importlib.util
+from types import SimpleNamespace
 
 import pytest
 
 from llmdv.cli import verify_cmd
+from llmdv.cli.main import build_parser
+from llmdv.evidence.outcome import Outcome
 from tests.fakes import FakeFleet, profile_yaml, run_llmdv
 
 HAS_XDIST = importlib.util.find_spec("xdist") is not None
+
+
+def test_non_posix_concurrency_is_a_usage_error_before_planning(tmp_path, monkeypatch, caplog):
+    args = build_parser().parse_args(["verify", "--profile", "unused.yaml", "--concurrency", "2"])
+    monkeypatch.setattr(verify_cmd, "os", SimpleNamespace(name="nt", environ={}))
+    monkeypatch.setattr(verify_cmd.log, "handlers", [caplog.handler])
+    assert verify_cmd._verify(args, verify_cmd._Run(tmp_path, Outcome("run"))) == 2
+    assert "requires POSIX" in caplog.text and "--concurrency 1" in caplog.text
 
 
 @pytest.mark.parametrize(
@@ -30,6 +35,8 @@ HAS_XDIST = importlib.util.find_spec("xdist") is not None
         ["--dist=loadscope"],
         ["--maxprocesses", "2"],
         ["--tx", "popen"],
+        ["-d"],
+        ["--px", "id=local"],
     ],
 )
 def test_parallel_arguments_are_recognised(extra):
@@ -56,7 +63,8 @@ def _verify(tmp_path, fleet, *extra, env=None):
     profile.write_text(profile_yaml(fleet.base_url, fleet.model))
     return run_llmdv(
         "verify", "--profile", str(profile), "--local-output", str(tmp_path / "run"),
-        "--pod-logs", "off", "-k", "discovery", *extra, env=env,
+        "--pod-logs", "off", "-k", "discovery", *extra,
+        env={"TMPDIR": str(tmp_path), **(env or {})},
     )  # fmt: skip
 
 

@@ -61,6 +61,7 @@ class Outcome:
     # What the traffic said about each layer: see evidence/stack.py. Filled when the run ends.
     stack: dict[str, Any] = field(default_factory=dict)
     partial_evidence: int = 0
+    execution: dict[str, Any] = field(default_factory=dict)
 
     def record_results(self, records: list[dict[str, Any]], entries: Iterable = ()) -> None:
         """Fold results.jsonl records into counts, skip classes and failures. `entries` are the
@@ -129,6 +130,8 @@ def connection_lost(records: list[dict[str, Any]]) -> list[dict[str, Any]]:
     `cases_skipped` how many later cases were not run because of it.
     """
     found: dict[str, dict[str, Any]] = {}
+    if any(r.get("concurrency", 1) > 1 for r in records):
+        records = sorted(records, key=lambda r: r.get("ts") or "")
     for index, record in enumerate(records):
         ingress = record.get("connection_lost")
         if not ingress:

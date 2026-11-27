@@ -224,6 +224,7 @@ def finish(
     collected: Any = None,
     layers: list[str] | None = None,
     known_unmatched: list[dict] | None = None,
+    session_status: str | None = None,
 ) -> None:
     """Print the outcome table, the counts, every failure, and where it all landed."""
     pal = _palette()
@@ -246,10 +247,10 @@ def finish(
     # is the most dangerous output this tool could produce: it is a green verdict over an empty
     # set, and in CI it would read as coverage.
     if not records:
-        emit(
-            f"  {pal.paint('NO CASES RAN', pal.yellow + pal.bold)}{sep}"
-            f"nothing matched the selection{sep}{elapsed_s:.1f}s"
-        )
+        headline = session_status or "NO CASES RAN"
+        detail = "no case results recorded" if session_status else "nothing matched the selection"
+        colour = pal.red if session_status else pal.yellow
+        emit(f"  {pal.paint(headline, colour + pal.bold)}{sep}{detail}{sep}{elapsed_s:.1f}s")
         _rule()
         emit("")
         _kv("results", str(run_dir), pal)
@@ -280,6 +281,10 @@ def finish(
         shape = f"{total - skipped_total} of {total} {noun} passed, {skipped_total} skipped"
     else:
         shape = f"{total} {noun} passed"
+    if session_status:
+        headline, colour = session_status, pal.red
+        if not failed:
+            shape = f"{total} case {'result' if total == 1 else 'results'} recorded"
     emit(f"  {pal.paint(headline, colour + pal.bold)}{sep}{shape}{sep}{elapsed_s:.1f}s")
     _rule()
     emit("")

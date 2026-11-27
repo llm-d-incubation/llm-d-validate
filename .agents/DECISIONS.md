@@ -240,3 +240,32 @@ is a usage error. Repeated `--test-set` chooses a union, `--all-test-sets` combi
 sets, and `--full-suite` explicitly requests the library. Built-in names are reserved; wildcard
 syntax stays inside YAML case patterns. Each `--test-set` takes one name so it cannot swallow pytest arguments. Coverage is recorded separately from the deployment contract and does not
 change its digest. The migration removes the former selection keys and flags outright.
+
+## Live concurrency is opt-in and bounded by case
+
+A whole case owns its pytest fixtures, journal and sequence of exchanges in one process.
+The scheduler uses the collected node IDs and the exact case-ID policy in
+`src/llmdv/execution.py`. All ingresses share the same stage barriers. Worker count 1
+retains the original pytest session and order. Separate processes can recreate session
+fixtures without duplicating preflight requests. The metrics stage stays exclusive because a
+shared counter can move in response to another case. A query scoped to a request ID could
+qualify for a narrower policy after individual review.
+
+Baseline inventory at `9399f8654df6d4d7114f73e81a8c08dccfcd3e4d`, using
+`llmdv plan --profile profiles/examples/example-two-ingress.yaml --ingress vllm,router --full-suite --json`:
+
+| Stage | Selected | Would run | Planned skips |
+|---|---:|---:|---:|
+| Contract and discovery | 36 | 36 | 0 |
+| Eligible | 514 | 306 | 208 |
+| Exclusive | 1,599 | 780 | 819 |
+| Final log scan | 1 | 0 | 1 |
+| Total | 2,150 | 1,122 | 1,028 |
+
+The plan now includes `stage` and `stage_reason` for recounting this inventory.
+A completed serial sample on `FakeFleet(delay_s=0.2)` selected the four
+`basic_non_streaming` cases on one ingress. Their call durations totaled 0.865 s.
+At width 2, round-robin assignment projects 0.453 s and longest-first assignment
+projects 0.451 s, excluding collection, process startup and finalization. This sample
+supports starting with fixed shards. An authorized deployment benchmark comparing full
+wall time, skips, throttling and timeouts at widths 1 and 2 is required for a default change.

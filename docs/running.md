@@ -126,8 +126,11 @@ or prefix from your other runs.
 
 - **One live run at a time per gateway.** Cache and session cases depend on what earlier requests
   left behind, and a key is usually rate-limited.
-- **Never pass `-n`.** Cases run sequentially; an individual case can send concurrent requests.
-  `llmdv verify` refuses parallel pytest workers.
+- **Use `--concurrency 2` for an initial bounded trial.** The default is 1. Compare elapsed
+  time, skip classes, throttling and timeouts on the same selection. Exclusivity covers every
+  ingress in this run. Other runs and external traffic can still affect the backend.
+- A per-case replay or curl reproduces its own requests. To investigate interference, use the
+  original selection and concurrency recorded in the run's `reproduce.sh`.
 - **Keep comparison histories distinct.** Set `--identity trigger=nightly` for scheduled runs;
   manual runs default to `trigger=manual`. Free-form labels do not isolate baselines.
 - **Keep the machine awake.** A sleeping laptop stalls requests, and the cases in flight fail on

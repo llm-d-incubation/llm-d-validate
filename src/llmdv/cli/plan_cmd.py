@@ -14,12 +14,15 @@ from __future__ import annotations
 
 import argparse
 import json
+import sys
 from collections import Counter
 from pathlib import Path
 
-from ..log.setup import emit, get_logger
+import pytest
+
+from ..log.setup import configure, emit, get_logger
 from ..profile import loader
-from .exit_codes import OK, USAGE
+from .exit_codes import INTERNAL, OK, USAGE
 from .verify_cmd import (
     _map_pytest_exit,
     _plugin_is_registered,
@@ -61,11 +64,42 @@ def add_parser(subparsers, parents) -> None:
 class _Planner:
     """Records each collected case's planned outcome once collection has settled."""
 
-    def __init__(self) -> None:
+    def __init__(self, concurrency: int = 1) -> None:
+        self.concurrency = concurrency
+        self.collect_or_setup_only = False
+        self.entered_runtestloop = False
         self.rows: list[dict] = []
         self.left_out = 0
         self.excluded = []
         self.filtered = 0
+
+    @pytest.hookimpl(tryfirst=True)
+    def pytest_load_initial_conftests(self, early_config, args):
+        # Read the caller's options before adding the planner's own collection-only flag.
+        options = early_config.known_args_namespace
+        args.append("--collect-only")
+        self.collect_or_setup_only = (
+            options.collectonly
+            or getattr(options, "setuponly", False)
+            or getattr(options, "setupplan", False)
+        )
+        if self.concurrency == 1:
+            return
+        # Includes addopts from the environment and ini, before pytest opens its debug trace.
+        if getattr(options, "xmlpath", None):
+            raise pytest.UsageError("--junitxml needs a single pytest session; use --concurrency 1")
+        log_file = early_config.pluginmanager.hasplugin("logging") and (
+            options.log_file or early_config.getini("log_file")
+        )
+        if options.debug or log_file:
+            raise pytest.UsageError(
+                "pytest output files need a single session; use --concurrency 1"
+            )
+
+    @pytest.hookimpl(tryfirst=True)
+    def pytest_runtestloop(self) -> None:
+        # Fixture inspections collect items without entering pytest's test loop.
+        self.entered_runtestloop = True
 
     def pytest_collection_finish(self, session) -> None:
         from ..plugin import plan_row
@@ -86,7 +120,7 @@ class _Planner:
         )
 
 
-def cmd_plan(args: argparse.Namespace) -> int:
+def cmd_plan(args: argparse.Namespace, private_output: Path | None = None) -> int:
     try:
         profile = loader.load(args.profile)
     except loader.ProfileError as exc:
@@ -104,14 +138,14 @@ def cmd_plan(args: argparse.Namespace) -> int:
     if bad:
         return USAGE
 
-    argv = suite_pytest_args() + ["--llmdv-profile", args.profile, "--collect-only", "-q"]
+    argv = suite_pytest_args() + ["--llmdv-profile", args.profile, "-q"]
     argv += ["--no-header", "-p", "no:xdist", "-p", "no:cacheprovider"]
     if not _plugin_is_registered():
         argv[1:1] = ["-p", "llmdv.plugin"]
     argv += selection_argv(args)
     log.debug("pytest argv: %s", " ".join(argv))
 
-    planner = _Planner()
+    planner = _Planner(getattr(args, "concurrency", 1))
     code = _map_pytest_exit(_run_pytest(argv, raw=False, setup_commands={}, plugins=(planner,)))
     if code != OK:
         return code
@@ -119,7 +153,10 @@ def cmd_plan(args: argparse.Namespace) -> int:
     selected = resolve_coverage(profile, args)
     document = _document(profile.name, args, planner.rows, selected, planner.left_out)
     document["coverage"].update(excluded=planner.excluded, excluded_by_filters=planner.filtered)
-    if args.json:
+    if private_output is not None:
+        document["diagnostic"] = planner.collect_or_setup_only or not planner.entered_runtestloop
+        private_output.write_text(json.dumps(document), encoding="utf-8")
+    elif args.json:
         emit(json.dumps(document, indent=2))
     else:
         for line in _text(document, counts_only=args.quiet):
@@ -204,3 +241,14 @@ def _strip_class(reason: str | None) -> str:
     """The reason without its leading `[class]`, which the line already shows."""
     text = reason or ""
     return text.split("] ", 1)[1] if text.startswith("[") and "] " in text else text
+
+
+if __name__ == "__main__":
+    # Private subprocess of verify, with the same parsed selectors and a private result file.
+    configure()
+    try:
+        code = cmd_plan(argparse.Namespace(**json.load(sys.stdin)), Path(sys.argv[1]))
+    except Exception:  # noqa: BLE001 -- a planner defect must keep its verification exit class
+        log.exception("coverage planning failed")
+        code = INTERNAL
+    sys.exit(code)

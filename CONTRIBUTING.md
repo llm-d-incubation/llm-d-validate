@@ -79,9 +79,9 @@ ruff check src/ tests/ && ruff format --check src/ tests/
 pre-commit install                             # formats with ruff on every commit
 ```
 
-Parallel is for these offline tests only. `llmdv verify` refuses `-n`, `--numprocesses`,
-`--maxprocesses`, `--dist` and `--tx` with exit `2`, because live cases depend on order and a
-rate-limited key must not be multiplied.
+Use pytest-xdist for offline tests only. Live verification refuses pytest worker flags with exit
+`2`. Its own `--concurrency N` option overlaps reviewed independent cases and keeps exclusive
+cases serial across all ingresses. The default is 1.
 
 **Ruff is pinned exactly**, in `pyproject.toml` (the `dev` extra) and in
 `.pre-commit-config.yaml`; keep the two in sync. `ruff check` alone is not the whole gate: the

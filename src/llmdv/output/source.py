@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from .local import RUN_STATE
+
 
 class UnsafeSource(ValueError):
     """A run contains a source path that cannot safely be published."""
@@ -23,6 +25,8 @@ def source_path(run_dir: Path, relative: str) -> Path:
         raise UnsafeSource(f"unreadable publication source: {relative!r}") from exc
     if not target.is_relative_to(root) or target == root:
         raise UnsafeSource(f"publication source escapes the run directory: {relative!r}")
+    if target.is_relative_to(root / RUN_STATE) != (Path(relative).parts[0] == RUN_STATE):
+        raise UnsafeSource(f"publication source links across private run state: {relative!r}")
     return target
 
 
@@ -39,7 +43,8 @@ def source_files(run_dir: Path) -> list[str]:
         relative = path.relative_to(root).as_posix()
         target = source_path(root, relative)
         if target.is_file():
-            files.append(relative)
+            if path.relative_to(root).parts[0] != RUN_STATE:
+                files.append(relative)
         elif not target.is_dir():
             raise UnsafeSource(f"publication source is not a regular file: {relative!r}")
     return files

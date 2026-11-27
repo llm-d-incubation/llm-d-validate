@@ -13,7 +13,7 @@ Use [Getting started](../../../docs/getting-started.md) for a first check,
 
 1. Read [ENVIRONMENT.md](../../ENVIRONMENT.md) and establish tools, access and credential sources.
    Ask only for missing information. Never print credentials or cluster-identifying values.
-2. Check for competing live runs. Run one case at a time; never pass `-n` or retry test requests.
+2. Check for competing live runs. Use the default serial mode or the requested `--concurrency N`. Never pass `-n` or retry test requests.
 3. Validate and preview the requested selection. For a newly authored profile, check its
    declarations with `--full-suite -m contract` before broader verification. A first-user smoke
    check has the narrower purpose described in Getting started.

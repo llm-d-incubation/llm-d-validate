@@ -70,6 +70,7 @@ class Delta:
     # not change and the fleet did not either, so it is never a regression or a new failure.
     coverage_changes: list[str] = field(default_factory=list)
     outside_coverage: list[str] = field(default_factory=list)
+    execution_changes: list[str] = field(default_factory=list)
     flaky: list[str] = field(default_factory=list)
     # Newly failing cases that got no HTTP answer at all: a timeout, a dropped connection, a
     # broken stream. Still counted as regressions -- an outage must not be filed under "flaky"
@@ -193,6 +194,17 @@ def compare_window(
     for run in runs:
         latest.update(run)
     seen_before = set(latest)
+
+    conditions = set()
+    for run in runs:
+        for k in run.keys() & new.keys():
+            before = (run[k].get("concurrency", 1), run[k].get("stage", "serial"))
+            after_mode = (new[k].get("concurrency", 1), new[k].get("stage", "serial"))
+            if before != after_mode:
+                conditions.add(
+                    f"concurrency {before[0]} ({before[1]}) → {after_mode[0]} ({after_mode[1]})"
+                )
+    d.execution_changes = sorted(conditions)
 
     for k in sorted(new.keys() - seen_before):
         d.appeared.append(label(k))

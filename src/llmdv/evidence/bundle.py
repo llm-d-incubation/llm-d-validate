@@ -58,6 +58,9 @@ class FailureContext:
     artifacts: dict[str, str] = field(default_factory=dict)
     # What the profile's `known_failures` said about this result, if anything.
     known_failure: dict[str, Any] | None = None
+    bundle_slug: str | None = None
+    concurrency: int = 1
+    stage: str = "serial"
 
 
 def slug(text: str) -> str:
@@ -92,7 +95,7 @@ def write(run_dir: Path, context: FailureContext) -> str:
     # before you read a single case name, and `failures/<layer>/` isolates one. Always nested,
     # even for a single-ingress run -- a path you can predict without knowing the run's shape
     # is worth more than saving a level.
-    relative = Path(bucket) / case_slug(where, case, context.variant)
+    relative = Path(bucket) / (context.bundle_slug or case_slug(where, case, context.variant))
     target = run_dir / relative
     target.mkdir(parents=True, exist_ok=True)
 
@@ -234,6 +237,8 @@ def write(run_dir: Path, context: FailureContext) -> str:
         "surface": context.surface,
         "served_by": context.served_by,
         "setup_commands": context.setup_commands,
+        "concurrency": context.concurrency,
+        "stage": context.stage,
         "elapsed_s": round(primary.elapsed_s, 4) if primary else None,
         "partial_evidence": partial_evidence,
     }
