@@ -91,11 +91,17 @@ cannot run on.
    period before collecting. Copies the run directory with up to three attempts and checks
    finalized outcome, JSONL completeness, counts, and required artifacts before accepting it.
    Keeps available diagnostics and partial files if collection fails, then the finalizer cleans up the pod
-   and ConfigMap. An abrupt runner kill can still prevent collection.
+   and ConfigMap, reserving deletion time for each. Abnormal verification exits and
+   terminated containers are detected without waiting for the verification timeout;
+   diagnostics retain the process exit or container termination reason. Unhandled
+   SIGINT/SIGTERM exits are interruptions; other abnormal exits are tool failures,
+   never a passing run or a guide failure. An abrupt runner kill can still prevent collection.
 6. Writes `integration.json`, GitHub step outputs, and a job summary that distinguish the
    verification verdict from setup and collection failures. The private virtual environment
    is removed before upload. Collection success means files reached the runner; the workflow
-   must separately report whether artifact upload succeeded.
+   must separately report whether artifact upload succeeded. Report and log write failures
+   do not prevent evidence collection or cleanup. Resource identity must be saved before
+   creation; later recovery-state writes are best effort so storage errors cannot block cleanup.
 
 `llmdv` itself changes nothing in the cluster. The pod and the ConfigMap are created and deleted
 by the nightly's CI, as its own endpoint check and benchmark harness pods are.
