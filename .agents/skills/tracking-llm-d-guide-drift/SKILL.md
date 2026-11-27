@@ -36,10 +36,10 @@ The guide profiles are built from llm-d at one commit, which `profiles/llm-d/REA
 
 3. **Workflows with no profile.**
    - **Under `(no guide folder)`:** a new Tier 3 guide. Confirm the guide has a `guide.yaml` and that the workflow is scheduled (`on: schedule` in the workflow), then build its folder with the profile skill at the new commit. One issue per new guide, titled with the guide's name.
-   - **Under a guide:** a new workflow of a covered guide. Render the overlay it applies at the new commit. If a client sees the same model, window, parsers and engine as an existing combination, add the workflow to the guide README's workflow table with its `--identity` flags. Otherwise it is a new combination.
+   - **Under a guide:** a new workflow of a covered guide. Render the overlay it applies at the new commit. If a client sees the same model, window, parsers and engine as an existing combination, add the workflow to the guide README's workflow table with its `--identity` flags. Otherwise it is a new combination. Either way, the new workflow also goes into `deploy/llm-d-nightly/overlays.yaml` in the same commit: under `lanes`, keyed by its scenario and overlay, with the profile and `--identity` flags of its README row, or under `not_run` when it does not use llm-d-infra's reusable nightly workflow (`tests/test_llmd_overlays.py` holds the map equal to the README tables).
    - **Already listed under "Not covered"** in `profiles/llm-d/README.md` (fast-model-actuation-keda, #130): leave it. The report lists it every time, by design, until it is covered.
 
-4. **Workflows removed.** Drop the workflow's row from the guide README. Delete a combination no workflow uses any more, and update the workflow counts in `profiles/llm-d/README.md`'s coverage table.
+4. **Workflows removed.** Drop the workflow's row from the guide README. Delete a combination no workflow uses any more, and update the workflow counts in `profiles/llm-d/README.md`'s coverage table. Drop it from `deploy/llm-d-nightly/overlays.yaml` in the same commit.
 
 5. **Changed sources.** Read each file's diff (`git -C "$D" diff <old> <new> -- <path>`). By owner:
 
@@ -79,3 +79,8 @@ The guide profiles are built from llm-d at one commit, which `profiles/llm-d/REA
 - Changing a profile from `guide.yaml` or a README alone, without the workflow and its rendered overlay.
 - Rendering with `kubectl apply`, `--dry-run=server`, or anything else that talks to a cluster.
 - Dropping a workflow listed under "Not covered" to make the report empty.
+
+When changing a mapped workflow's input defaults, refresh the representative public-input
+fixtures in `tests/fixtures/llmd_nightly_inputs.json` when that workflow is covered there.
+Record the upstream commit in that fixture; never copy namespaces, credentials, or runner
+settings. The map test checks those inputs independently of the README tables.
