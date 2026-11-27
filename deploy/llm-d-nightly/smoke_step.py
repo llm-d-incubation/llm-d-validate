@@ -6,6 +6,7 @@ separately expose setup, interruption and delivery failures, including when noth
 
 from __future__ import annotations
 
+import argparse
 import json
 import os
 import shutil
@@ -18,6 +19,7 @@ from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
 ROOT = HERE.parents[1]
+COMMAND_DEADLINE = None
 
 
 class IntegrationError(Exception):
@@ -28,10 +30,15 @@ class Cancelled(Exception):
     """Unwind a running kubectl/setup command so cancellation can collect evidence."""
 
 
-def command(argv, *, timeout=60, input=None):
+def command(argv, *, timeout=60, input=None, env=None):
+    if COMMAND_DEADLINE is not None:
+        remaining = COMMAND_DEADLINE - time.monotonic()
+        if remaining <= 0:
+            raise IntegrationError("integration phase exhausted its time budget")
+        timeout = min(timeout, remaining)
     try:
         result = subprocess.run(
-            argv, input=input, text=True, capture_output=True, timeout=timeout, check=False
+            argv, input=input, text=True, capture_output=True, timeout=timeout, check=False, env=env
         )
     except (OSError, subprocess.TimeoutExpired) as exc:
         raise IntegrationError(f"{argv[0]} could not complete: {type(exc).__name__}") from exc
@@ -49,9 +56,49 @@ def overlay_key(env):
     )
 
 
+def profile_root(env):
+    return Path(env.get("LLMDV_PROFILE_ROOT") or ROOT).resolve()
+
+
+def contained(root, path):
+    resolved = (root / path).resolve()
+    if not resolved.is_relative_to(root) or not resolved.is_file():
+        raise IntegrationError("profile files must stay within the profile checkout")
+    return resolved
+
+
+def validate_inheritance(root, path, seen=None):
+    # Check containment before opening each parent, including symlinks. The installed
+    # runtime remains responsible for schema, composition and capability validation.
+    seen = set() if seen is None else seen
+    path = contained(root, path)
+    if path in seen:
+        raise IntegrationError("profile inheritance repeats a file")
+    seen.add(path)
+    body = json.loads(command(["yq", "-o=json", ".", str(path)]))
+    if not isinstance(body, dict):
+        raise IntegrationError("profile must be a mapping")
+    parents = body.get("extends", [])
+    if isinstance(parents, str):
+        parents = [parents]
+    if not isinstance(parents, list) or not all(isinstance(p, str) for p in parents):
+        raise IntegrationError("invalid profile inheritance")
+    for parent in parents:
+        validate_inheritance(root, path.parent / parent, seen)
+
+
 def lookup(env):
     # Parse the whole map before lookup: an unreadable map or broken yq is not an absent row.
-    document = json.loads(command(["yq", "-o=json", ".", str(HERE / "overlays.yaml")]))
+    document = json.loads(
+        command(
+            [
+                "yq",
+                "-o=json",
+                ".",
+                str(contained(profile_root(env), "deploy/llm-d-nightly/overlays.yaml")),
+            ]
+        )
+    )
     if not isinstance(document, dict) or not isinstance(document.get("lanes"), dict):
         raise IntegrationError("overlays.yaml must contain a lanes mapping")
     scenario = env["LLMDBENCH_CICD_SCENARIO"]
@@ -114,6 +161,10 @@ class SmokeStep:
         self.ready_timeout = int(env.get("LLMDV_READY_TIMEOUT", "600"))
         self.timeout = int(env.get("LLMDV_TIMEOUT", "900"))
         self.grace = int(env.get("LLMDV_FINALIZE_TIMEOUT", "60"))
+        self.state = Path(env["RUNNER_TEMP"]) / "llmdv-state.json"
+        self.source = {}
+        self.phase = "run"
+        self.cancellation_recovery = False
 
     def note(self, message, warning=False):
         sys.stdout.write(("::warning::llmdv: " if warning else "llmdv: ") + message + "\n")
@@ -163,7 +214,7 @@ class SmokeStep:
         ).strip()
         if version != self.env["LLMDV_VERSION"]:
             raise IntegrationError("installed runner version differs from LLMDV_VERSION")
-        return [python, "-m", "llmdv.cli.main"]
+        return [python, "-I", "-m", "llmdv.cli.main"]
 
     def setup(self):
         for key in ("LLMDV_VERSION", "LLMDBENCH_CICD_NS", "LLMDBENCH_CICD_SCENARIO"):
@@ -171,7 +222,8 @@ class SmokeStep:
                 raise IntegrationError(f"missing {key}")
         if min(self.timeout, self.ready_timeout, self.grace) <= 0:
             raise IntegrationError("timeouts must be positive")
-        row = lookup(self.env)
+        explicit = self.env.get("LLMDV_PROFILE", "")
+        row = {"profile": explicit, "identity": []} if explicit else lookup(self.env)
         if row is None:
             self.status = "skipped"
             self.note("no llm-d-validate profile for this overlay; skipped")
@@ -191,21 +243,54 @@ class SmokeStep:
         if port is None:
             raise IntegrationError("router Service has no usable port")
         url = f"http://{service}:{port['port']}"
-        exported = command(
-            [
-                *self.runner(),
-                "profile",
-                "show",
-                str(ROOT / "profiles/llm-d" / (row["profile"] + ".yaml")),
-                "--yaml",
-            ]
-        )
+        root = profile_root(self.env)
+        selected = explicit or "profiles/llm-d/" + row["profile"] + ".yaml"
+        selected = contained(root, selected)
+        validate_inheritance(root, selected)
+        runner = self.runner()
+        exported = command([*runner, "profile", "show", str(selected), "--yaml"])
         profile = self.runs / "profile.yaml"
         profile.write_text(exported)
+        document = json.loads(command(["yq", "-o=json", ".", str(profile)]))
+        router = next((i for i in document.get("ingresses", []) if i.get("id") == "router"), {})
+        if (
+            router.get("base_url_env") != "LLMDV_ROUTER_URL"
+            or router.get("base_url")
+            or router.get("kind") != "router"
+        ):
+            raise IntegrationError("profile must bind its router ingress through LLMDV_ROUTER_URL")
+        # An override must be runnable by this installed runtime before creating a pod.
+        # Restrict it to the CI router; never test an unrelated ingress from the fork.
+        command(
+            [
+                *runner,
+                "plan",
+                "--profile",
+                str(profile),
+                "--ingress",
+                "router",
+                "--test-set",
+                "smoke",
+                "-q",
+            ],
+            env={**self.env, "LLMDV_ROUTER_URL": url},
+        )
+        self.source = {
+            "runtime_version": self.env["LLMDV_VERSION"],
+            "runtime_commit": command(["git", "-C", str(ROOT), "rev-parse", "HEAD"]).strip(),
+            "repository": self.env.get("LLMDV_PROFILE_REPOSITORY")
+            or "llm-d-incubation/llm-d-validate",
+            "ref": self.env.get("LLMDV_PROFILE_REF") or "v" + self.env["LLMDV_VERSION"],
+            "commit": command(["git", "-C", str(root), "rev-parse", "HEAD"]).strip(),
+            "path": selected.relative_to(root).as_posix(),
+            "selection": "explicit" if explicit else "mapped",
+        }
+        (self.runs / "profile-source.json").write_text(json.dumps(self.source, indent=2) + "\n")
         if self.cancelled:
             return False
         # Cleanup also runs when a create request succeeded but its response was lost.
         self.created = True
+        self.checkpoint()  # Persist object identity before the first cluster write.
         self.kube(
             "create",
             "configmap",
@@ -213,7 +298,7 @@ class SmokeStep:
             f"--from-file=profile.yaml={profile}",
             f"--from-file=pod_runner.py={HERE / 'pod_runner.py'}",
         )
-        argv = ["llmdv", "verify", "--profile", "/etc/llmdv/profile.yaml"]
+        argv = ["llmdv", "verify", "--profile", "/etc/llmdv/profile.yaml", "--ingress", "router"]
         for flag in row["identity"]:
             argv.extend(["--identity", flag])
         argv.extend(
@@ -289,6 +374,8 @@ class SmokeStep:
 
     def wait(self, seconds, *, cancellable=True):
         end = time.monotonic() + seconds
+        if COMMAND_DEADLINE is not None:
+            end = min(end, COMMAND_DEADLINE)
         while time.monotonic() < end:
             if cancellable and self.cancelled:
                 return False
@@ -303,6 +390,7 @@ class SmokeStep:
                 ).strip()
                 if value in {str(n) for n in range(7)}:
                     self.rc = int(value)
+                    self.checkpoint()  # Preserve a verdict before collection or cleanup.
                     return True
             except IntegrationError:
                 pass
@@ -321,6 +409,7 @@ class SmokeStep:
             "-c",
             "import os,signal; from pathlib import Path; "
             "os.kill(int(Path('/work/verify.pid').read_text()),signal.SIGTERM)",
+            timeout=10,
         )
         if not self.wait(self.grace, cancellable=False):
             self.note(
@@ -328,21 +417,24 @@ class SmokeStep:
             )
 
     def collect(self):
+        if self.collection == "complete":
+            validate_collection(self.runs / "runs")
+            return
+        self.collection = "failed"
         try:
-            (self.runs / "console.txt").write_text(self.kube("logs", self.pod))
+            (self.runs / "console.txt").write_text(self.kube("logs", self.pod, timeout=15))
         except IntegrationError as exc:
             self.note(f"could not collect console: {exc}", True)
-        partial = self.runs / "runs.partial"
         for attempt in range(3):
-            shutil.rmtree(partial, ignore_errors=True)
+            partial = self.runs / f"runs.partial-{uuid.uuid4().hex[:8]}"
             try:
-                self.kube("cp", f"{self.pod}:/work/runs", str(partial))
+                self.kube("cp", f"{self.pod}:/work/runs", str(partial), timeout=60)
                 validate_collection(partial)
                 partial.replace(self.runs / "runs")
                 self.collection = "complete"
                 self.note("finalized run directory collected for artifact upload")
                 return
-            except (IntegrationError, OSError, ValueError, KeyError) as exc:
+            except (IntegrationError, OSError, ValueError, KeyError, TypeError) as exc:
                 self.note(f"collection attempt {attempt + 1} failed: {exc}", True)
                 if attempt < 2:
                     time.sleep(2)
@@ -351,29 +443,128 @@ class SmokeStep:
             "run collection failed; only available diagnostics/partial files can be uploaded", True
         )
 
-    def finish(self):
-        self.finalizing = True
-        if self.created:
-            for kind in ("pod", "configmap"):
-                try:
-                    self.kube("delete", kind, self.pod, "--wait=false", "--ignore-not-found")
-                except IntegrationError as exc:
-                    self.note(f"cleanup failed: {exc}", True)
-        shutil.rmtree(self.runs / ".runner-venv", ignore_errors=True)
+    def checkpoint(self):
+        body = {
+            key: getattr(self, key)
+            for key in (
+                "pod",
+                "created",
+                "ready",
+                "rc",
+                "status",
+                "collection",
+                "warnings",
+                "ns",
+                "ready_timeout",
+                "timeout",
+                "grace",
+                "source",
+            )
+        }
+        pending = self.state.with_suffix(".tmp")
+        pending.write_text(json.dumps(body) + "\n")
+        pending.replace(self.state)
+        self.report()
+
+    def restore(self):
+        body = json.loads(self.state.read_text())
+        for key in (
+            "pod",
+            "created",
+            "ready",
+            "rc",
+            "status",
+            "collection",
+            "warnings",
+            "ns",
+            "ready_timeout",
+            "timeout",
+            "grace",
+            "source",
+        ):
+            setattr(self, key, body[key])
+
+    def report(self):
         body = {
             "status": self.status,
             "verification_exit": self.rc,
             "collection_status": self.collection,
             "warnings": self.warnings,
         }
-        (self.runs / "integration.json").write_text(json.dumps(body, indent=2) + "\n")
+        pending = self.runs / "integration.tmp"
+        pending.write_text(json.dumps(body, indent=2) + "\n")
+        pending.replace(self.runs / "integration.json")
         if self.env.get("GITHUB_OUTPUT"):
             with Path(self.env["GITHUB_OUTPUT"]).open("a") as stream:
                 for key in ("status", "verification_exit", "collection_status"):
                     stream.write(f"{key}={body[key] if body[key] is not None else ''}\n")
+
+    def finish(self):
+        global COMMAND_DEADLINE
+        if self.phase == "finalize":
+            COMMAND_DEADLINE = time.monotonic() + (20 if self.cancellation_recovery else 40)
+        self.finalizing = True
+        self.checkpoint()
+        if self.created:
+            for kind in ("pod", "configmap"):
+                try:
+                    self.kube(
+                        "delete", kind, self.pod, "--wait=false", "--ignore-not-found", timeout=20
+                    )
+                except IntegrationError as exc:
+                    self.note(f"cleanup failed: {exc}", True)
+        shutil.rmtree(self.runs / ".runner-venv", ignore_errors=True)
+        self.checkpoint()
         self.note(
             f"integration {self.status}; verification exit {self.rc}; collection {self.collection}"
         )
+
+    def staged(self, phase):
+        global COMMAND_DEADLINE
+        self.phase = phase
+        if phase != "prepare":
+            self.restore()
+        self.cancellation_recovery = phase == "finalize" and (
+            self.env.get("LLMDV_CANCELLED") == "true"
+            or self.status == "interrupted"
+            or (self.status == "prepared" and self.ready)
+        )
+        if self.cancellation_recovery:
+            # Actions force-stops cancelled workflows after five minutes. Leave most
+            # of that window for the guide's existing teardown and artifact delivery.
+            COMMAND_DEADLINE = time.monotonic() + 60
+            self.grace = min(self.grace, 20)
+        self.checkpoint()
+        try:
+            if phase == "prepare":
+                if self.setup():
+                    self.status = "prepared"
+            elif phase == "verify":
+                if self.ready:
+                    self.status = "completed" if self.wait(self.timeout) else "timed_out"
+            elif phase == "finalize":
+                self.finalizing = True
+                if self.created:
+                    if self.rc is None:
+                        if self.status in ("prepared", "setup_error"):
+                            self.status = "interrupted"
+                        try:
+                            self.stop()
+                        except IntegrationError as exc:
+                            self.note(f"could not interrupt verification: {exc}", True)
+                        # A partial prepare can already have started the pod's test process.
+                    self.collect()
+        except Cancelled:
+            # Runner cancellation has only a short grace. Persist and exit immediately;
+            # a separate always() step owns stopping, collection and cleanup.
+            self.status = "interrupted"
+        except (IntegrationError, OSError, ValueError, KeyError, TypeError) as exc:
+            self.note(f"integration failed, not a guide failure: {exc}", True)
+        finally:
+            self.checkpoint()
+            if phase == "finalize":
+                self.finish()
+        return 1 if self.rc == 1 else 0
 
     def run(self):
         try:
@@ -409,6 +600,16 @@ class SmokeStep:
 
 
 def main():
+    global COMMAND_DEADLINE
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "phase", nargs="?", choices=("run", "prepare", "verify", "finalize"), default="run"
+    )
+    args = parser.parse_args()
+    if args.phase != "run":
+        COMMAND_DEADLINE = (
+            time.monotonic() + {"prepare": 900, "verify": 910, "finalize": 180}[args.phase]
+        )
     try:
         step = SmokeStep(os.environ)
     except (OSError, ValueError, KeyError) as exc:
@@ -416,7 +617,7 @@ def main():
         return 0
     signal.signal(signal.SIGINT, step.interrupt)
     signal.signal(signal.SIGTERM, step.interrupt)
-    return step.run()
+    return step.run() if args.phase == "run" else step.staged(args.phase)
 
 
 if __name__ == "__main__":

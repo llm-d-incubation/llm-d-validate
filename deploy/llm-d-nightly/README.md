@@ -7,8 +7,27 @@ from a clone of the llm-d-validate release it should use:
 
 ```sh
 git clone -q --depth 1 --branch "v$V" https://github.com/llm-d-incubation/llm-d-validate.git "$RUNNER_TEMP/llmdv"
-LLMDV_VERSION="$V" bash "$RUNNER_TEMP/llmdv/deploy/llm-d-nightly/smoke-step.sh"
+LLMDV_VERSION="$V" bash "$RUNNER_TEMP/llmdv/deploy/llm-d-nightly/smoke-step.sh" prepare
+bash "$RUNNER_TEMP/llmdv/deploy/llm-d-nightly/smoke-step.sh" verify
+# In GitHub Actions this must be a separate always() step, including after cancellation:
+bash "$RUNNER_TEMP/llmdv/deploy/llm-d-nightly/smoke-step.sh" finalize
 ```
+
+The separate phases require a release containing this change; v0.1.3 supports only
+the single-process entrypoint. No-argument mode remains available for local callers,
+but Actions must use separate
+`prepare`, `verify`, and `finalize` steps and invoke each with `exec` so signals reach Python.
+
+State is atomically saved to `$RUNNER_TEMP/llmdv-state.json` before cluster writes and when
+a verdict arrives. It is runner-local recovery state, outside the uploaded `llmdv-runs`
+directory. Preparation and verification exit promptly on cancellation; the independent
+finalizer owns stopping, collection, and deletion. It preserves partial copy attempts and
+records verdicts before cleanup. Recovery is bounded to roughly four minutes, with cleanup
+reserved separately, rather than depending on the runner's ten-second signal window.
+Actions passes `LLMDV_CANCELLED=true` to shorten recovery to roughly 80 seconds during
+workflow cancellation, leaving time for guide teardown before artifact upload.
+A dead runner or forced cancellation can still prevent recovery; the pod deadline stops
+abandoned work but cannot delete its Kubernetes objects.
 
 The design and the reasons for it are in
 [#230](https://github.com/llm-d-incubation/llm-d-validate/issues/230).
@@ -30,11 +49,24 @@ The variables the nightly job already sets, plus the release and optional test s
 | `LLMDBENCH_CICD_NS` | the namespace the guide is deployed in |
 | `RUNNER_TEMP` | where results are written: `$RUNNER_TEMP/llmdv-runs` |
 | `LLMDV_VERSION` | the release: the PyPI package used on the runner and the image used in the pod |
+| `LLMDV_PROFILE_ROOT` (optional) | a separate profile checkout; defaults to the runtime checkout |
+| `LLMDV_PROFILE` (optional) | explicit YAML path relative to that checkout; bypasses the map and its identity flags |
+| `LLMDV_PROFILE_REPOSITORY`, `LLMDV_PROFILE_REF` (optional) | source labels for provenance; commit IDs are resolved from the actual checkouts |
 | `LLMDV_IMAGE`, `LLMDV_PACKAGE` (optional) | test image and local wheel; the installed wheel must match `LLMDV_VERSION` |
 | `LLMDV_READY_TIMEOUT`, `LLMDV_TIMEOUT`, `LLMDV_FINALIZE_TIMEOUT` (optional) | seconds allowed for pod startup (600), verification (900), and graceful finalization (60) |
 
+An independent profile checkout supplies YAML only, never executable integration code.
+The whole inheritance chain must stay in that checkout, including symlink targets. The
+profile must bind its `router` ingress with `base_url_env: LLMDV_ROUTER_URL`; an
+inline URL or another variable is refused to avoid testing an unrelated deployment. The
+pinned runtime exports and plans the selected `router` ingress and `smoke` set offline
+before creating a pod; incompatible capabilities or selection errors report setup failure.
+`profile-source.json` records the selected path, requested ref, resolved source commit,
+and runtime version/commit. An explicit profile uses its own identity, not flags copied
+from an unrelated map row. Without an explicit path, the map comes from the profile checkout.
+
 The lane map, [`overlays.yaml`](overlays.yaml) beside the script, and the profiles come from the
-checkout the script sits in, so the data, the script and the image are one version. The map lists
+profile checkout. By default it is the runtime checkout, so all parts use one release. The map lists
 every lane the guide READMEs name: under `lanes`, by scenario and overlay, with the profile and
 `--identity` flags of the lane's row in its README's maintainers' table; under `not_run`, the lanes
 that deploy with their own steps rather than llm-d-infra's reusable workflow, which this step
@@ -58,7 +90,7 @@ cannot run on.
 5. On timeout or cancellation, asks verification to stop and gives it a bounded finalization
    period before collecting. Copies the run directory with up to three attempts and checks
    finalized outcome, JSONL completeness, counts, and required artifacts before accepting it.
-   Keeps available diagnostics and partial files if collection fails, then cleans up the pod
+   Keeps available diagnostics and partial files if collection fails, then the finalizer cleans up the pod
    and ConfigMap. An abrupt runner kill can still prevent collection.
 6. Writes `integration.json`, GitHub step outputs, and a job summary that distinguish the
    verification verdict from setup and collection failures. The private virtual environment
@@ -79,7 +111,7 @@ The shell entrypoint delegates bounded subprocess handling to `smoke_step.py`. T
 keeps the verification exit and files available until collection. All cluster writes remain
 in this CI wrapper, outside llmdv's read-only core.
 
-`integration.json` and `$GITHUB_OUTPUT` expose `status` (`completed`, `skipped`, `setup_error`,
+`integration.json` and `$GITHUB_OUTPUT` expose `status` (`prepared`, `completed`, `skipped`, `setup_error`,
 `timed_out`, or `interrupted`), `verification_exit` (empty/null if no exit was collected), and
 `collection_status` (`not_attempted`, `complete`, or `failed`). A green non-blocking job does
 not mean verification passed: consumers must use these fields.

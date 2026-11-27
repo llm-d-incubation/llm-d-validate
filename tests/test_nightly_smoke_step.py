@@ -14,6 +14,11 @@ smoke = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(smoke)
 
 
+@pytest.fixture(autouse=True)
+def reset_deadline(monkeypatch):
+    monkeypatch.setattr(smoke, "COMMAND_DEADLINE", None)
+
+
 @pytest.fixture
 def step(tmp_path, monkeypatch):
     monkeypatch.setattr(smoke.time, "sleep", lambda _: None)
@@ -264,3 +269,222 @@ def test_timeout_racing_completion_does_not_signal_reaped_pid(step, monkeypatch)
     monkeypatch.setattr(step, "kube", unexpected)
     step.stop()
     assert step.rc == 1
+
+
+def test_staged_cancellation_leaves_resources_for_recovery(step, monkeypatch):
+    def setup():
+        step.created = True
+        step.checkpoint()
+        step.interrupt(15, None)
+
+    monkeypatch.setattr(step, "setup", setup)
+    monkeypatch.setattr(
+        step, "finish", lambda: pytest.fail("cancelled preparation must not clean up")
+    )
+    assert step.staged("prepare") == 0
+    recovered = smoke.SmokeStep(step.env)
+    recovered.restore()
+    assert recovered.pod == step.pod
+    assert recovered.created
+    assert recovered.status == "interrupted"
+    calls = []
+    monkeypatch.setattr(recovered, "stop", lambda: calls.append("stop"))
+    monkeypatch.setattr(recovered, "collect", lambda: calls.append("collect"))
+    monkeypatch.setattr(recovered, "kube", lambda *a, **k: calls.append(a[0]))
+    assert recovered.staged("finalize") == 0
+    assert calls == ["stop", "collect", "delete", "delete"]
+    assert recovered.cancellation_recovery
+    assert recovered.grace <= 20
+    assert smoke.COMMAND_DEADLINE - smoke.time.monotonic() <= 20
+
+
+def test_saved_verdict_survives_failing_cleanup(step, monkeypatch):
+    step.created = True
+    step.rc = 1
+    step.checkpoint()
+    recovered = smoke.SmokeStep(step.env)
+    monkeypatch.setattr(recovered, "collect", lambda: setattr(recovered, "collection", "failed"))
+
+    def fail(*a, **k):
+        raise smoke.IntegrationError("cleanup unavailable")
+
+    monkeypatch.setattr(recovered, "kube", fail)
+    assert recovered.staged("finalize") == 1
+    saved = json.loads((recovered.runs / "integration.json").read_text())
+    assert saved["verification_exit"] == 1
+    assert saved["collection_status"] == "failed"
+    assert len(saved["warnings"]) == 2
+
+
+def test_real_signal_to_verify_process_exits_promptly_and_saves_state(step, tmp_path):
+    import os
+    import signal
+    import subprocess
+    import sys
+    import time
+
+    step.ready = step.created = True
+    step.status = "prepared"
+    step.checkpoint()
+    binary = tmp_path / "bin"
+    binary.mkdir()
+    ready = tmp_path / "command-ready"
+    fake = binary / "kubectl"
+    fake.write_text(
+        f"#!{sys.executable}\nfrom pathlib import Path\nimport time\n"
+        f"Path({str(ready)!r}).touch()\ntime.sleep(60)\n"
+    )
+    fake.chmod(0o755)
+    process = subprocess.Popen(
+        [sys.executable, str(PATH), "verify"],
+        env={**os.environ, **step.env, "PATH": str(binary)},
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+    )
+    try:
+        deadline = time.monotonic() + 5
+        while not ready.exists() and time.monotonic() < deadline:
+            time.sleep(0.02)
+        assert ready.exists()
+        started = time.monotonic()
+        process.send_signal(signal.SIGINT)
+        _, error = process.communicate(timeout=3)
+        assert process.returncode == 0, error
+        assert time.monotonic() - started < 3
+        recovered = smoke.SmokeStep(step.env)
+        recovered.restore()
+        assert recovered.status == "interrupted"
+        assert recovered.created and recovered.pod == step.pod
+    finally:
+        if process.poll() is None:
+            process.kill()
+            process.wait()
+
+
+def test_profile_inheritance_stays_in_checkout(tmp_path, monkeypatch):
+    root = tmp_path / "profiles"
+    root.mkdir()
+    leaf = root / "leaf.yaml"
+    parent = root / "parent.yaml"
+    leaf.write_text("leaf")
+    parent.write_text("parent")
+    seen = []
+
+    def read(argv):
+        path = Path(argv[-1])
+        seen.append(path)
+        return json.dumps({"extends": "parent.yaml"} if path == leaf else {})
+
+    monkeypatch.setattr(smoke, "command", read)
+    smoke.validate_inheritance(root, leaf)
+    assert seen == [leaf, parent]
+    outside = tmp_path / "outside.yaml"
+    outside.write_text("private")
+    parent.unlink()
+    parent.symlink_to(outside)
+    seen.clear()
+    with pytest.raises(smoke.IntegrationError, match="within"):
+        smoke.validate_inheritance(root, leaf)
+    assert seen == [leaf]  # Refused before reading outside content.
+
+
+@pytest.mark.parametrize("binding", ["valid", "inline", "other_env"])
+def test_explicit_profile_uses_runtime_validation_and_no_mapped_identity(
+    step, tmp_path, monkeypatch, binding
+):
+    root = tmp_path / "source"
+    root.mkdir()
+    (root / "custom.yaml").write_text("{}")
+    step.env.update(
+        LLMDV_PROFILE_ROOT=str(root),
+        LLMDV_PROFILE="custom.yaml",
+        LLMDV_PROFILE_REF="my-branch",
+        LLMDV_PROFILE_REPOSITORY="example/profiles",
+    )
+    monkeypatch.setattr(smoke, "lookup", lambda _: pytest.fail("explicit profile must bypass map"))
+    monkeypatch.setattr(step, "runner", lambda: ["pinned-runtime"])
+    commands = []
+
+    def command(argv, **kwargs):
+        commands.append(argv)
+        if argv[0] == "yq":
+            return (
+                json.dumps(
+                    {
+                        "ingresses": [
+                            {
+                                "id": "router",
+                                "kind": "router",
+                                "base_url_env": "OTHER_URL"
+                                if binding == "other_env"
+                                else "LLMDV_ROUTER_URL",
+                                **(
+                                    {"base_url": "http://unrelated.invalid"}
+                                    if binding == "inline"
+                                    else {}
+                                ),
+                            }
+                        ]
+                    }
+                )
+                if Path(argv[-1]).name == "profile.yaml"
+                else "{}"
+            )
+        if argv[0] == "git":
+            return "a" * 40
+        if "show" in argv:
+            return "ingresses: []"
+        if "plan" in argv:
+            assert kwargs["env"]["LLMDV_ROUTER_URL"].startswith("http://")
+        return ""
+
+    monkeypatch.setattr(smoke, "command", command)
+    pods = []
+
+    def kube(*args, **kwargs):
+        if args[0] == "get":
+            return '{"spec":{"ports":[{"port":80}]}}'
+        if args[0] == "apply":
+            assert json.loads(step.state.read_text())["created"]
+            pods.append(json.loads(kwargs["input"]))
+        return ""
+
+    monkeypatch.setattr(step, "kube", kube)
+    assert step.staged("prepare") == 0
+    if binding != "valid":
+        assert step.status == "setup_error"
+        assert not pods and not step.created
+        return
+    assert step.status == "prepared"
+    argv = json.loads(pods[0]["spec"]["containers"][0]["env"][1]["value"])
+    assert "--identity" not in argv
+    assert argv[argv.index("--ingress") + 1] == "router"
+    assert any("plan" in cmd for cmd in commands)
+    source = json.loads((step.runs / "profile-source.json").read_text())
+    assert source["commit"] == "a" * 40
+    assert source["path"] == "custom.yaml"
+    assert source["selection"] == "explicit"
+
+
+def test_incompatible_profile_is_rejected_before_creating_resources(step, tmp_path, monkeypatch):
+    (tmp_path / "custom.yaml").write_text("{}")
+    step.env.update(LLMDV_PROFILE_ROOT=str(tmp_path), LLMDV_PROFILE="custom.yaml")
+    monkeypatch.setattr(step, "runner", lambda: ["pinned-runtime"])
+
+    def command(argv, **kwargs):
+        if "show" in argv:
+            raise smoke.IntegrationError("unsupported profile capability")
+        return "{}"
+
+    monkeypatch.setattr(smoke, "command", command)
+    calls = []
+
+    def kube(*args, **kwargs):
+        calls.append(args[0])
+        return '{"spec":{"ports":[{"port":80}]}}'
+
+    monkeypatch.setattr(step, "kube", kube)
+    assert step.staged("prepare") == 0
+    assert step.status == "setup_error"
+    assert not step.created
+    assert calls == ["get"]
