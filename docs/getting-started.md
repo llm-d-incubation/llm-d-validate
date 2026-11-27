@@ -17,20 +17,20 @@ from the checkout. Keep the directory structure intact rather than downloading a
 | Released container | Clone the same tag for profiles and use the [matching image](../deploy/README.md#use-the-released-image-locally); host Python is not required |
 | Develop or run source changes | Follow [source installation and builds](../CONTRIBUTING.md#development-and-testing) |
 
-These examples pair release `v0.1.3` with package version `0.1.3`:
+These examples pair release `v0.1.4` with package version `0.1.4`:
 
 ```sh
-git clone --branch v0.1.3 https://github.com/llm-d-incubation/llm-d-validate.git
+git clone --branch v0.1.4 https://github.com/llm-d-incubation/llm-d-validate.git
 cd llm-d-validate
 python3 -m venv .venv
 source .venv/bin/activate
-python -m pip install 'llm-d-validate==0.1.3'
+python -m pip install 'llm-d-validate==0.1.4'
 llmdv --version
 ```
 
 Check `python3 --version` first. If it is older than 3.10, as macOS's built-in `python3` is,
 create the environment with a newer interpreter, for example `python3.12 -m venv .venv`. With
-an older one, pip reports `No matching distribution found for llm-d-validate==0.1.3` instead of
+an older one, pip reports `No matching distribution found for llm-d-validate==0.1.4` instead of
 naming the Python version.
 
 Run the remaining examples from the checkout root with the virtual environment active.
@@ -234,7 +234,7 @@ profile checkout and image from the same release. For an existing PyPI installat
 to the version used in this guide, activate its environment and run:
 
 ```sh
-python -m pip install --upgrade 'llm-d-validate==0.1.3'
+python -m pip install --upgrade 'llm-d-validate==0.1.4'
 llmdv --version
 ```
 

@@ -24,9 +24,9 @@ You need Git and a running Docker-compatible container engine. Clone the release
 profiles and shared parts; the image contains the tool, not the profile catalog:
 
 ```sh
-git clone --branch v0.1.3 https://github.com/llm-d-incubation/llm-d-validate.git
+git clone --branch v0.1.4 https://github.com/llm-d-incubation/llm-d-validate.git
 cd llm-d-validate
-export LLMDV_IMAGE=ghcr.io/llm-d-incubation/llm-d-validate:v0.1.3
+export LLMDV_IMAGE=ghcr.io/llm-d-incubation/llm-d-validate:v0.1.4
 docker pull "$LLMDV_IMAGE"
 export P=profiles/llm-d/optimized-baseline/vllm-qwen3-32b-parsers-standalone.yaml
 mkdir -p runs
@@ -67,7 +67,7 @@ cluster execution; [building an image](#build-a-custom-image) is optional.
 
 Replace the quoted placeholders below with your overlay, namespace and image values.
 
-1. Prefer the released image `ghcr.io/llm-d-incubation/llm-d-validate:v0.1.3` with profiles
+1. Prefer the released image `ghcr.io/llm-d-incubation/llm-d-validate:v0.1.4` with profiles
    from the matching tag. A `sha-<short sha>` tag from a successful main build is also available
    when deliberately testing unreleased changes. Set the example overlay's `newTag` to that exact tag;
    `replace-with-published-tag` is a placeholder. New releases do not update your overlay.
