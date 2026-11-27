@@ -13,9 +13,9 @@ bash "$RUNNER_TEMP/llmdv/deploy/llm-d-nightly/smoke-step.sh" verify
 bash "$RUNNER_TEMP/llmdv/deploy/llm-d-nightly/smoke-step.sh" finalize
 ```
 
-This is wrapper protocol **2**, advertised by the adjacent `protocol-version` file.
-It requires a new release; v0.1.3 supports only the single-process entrypoint. The old
-no-argument mode remains available for local callers, but Actions must use separate
+The separate phases require a release containing this change; v0.1.3 supports only
+the single-process entrypoint. No-argument mode remains available for local callers,
+but Actions must use separate
 `prepare`, `verify`, and `finalize` steps and invoke each with `exec` so signals reach Python.
 
 State is atomically saved to `$RUNNER_TEMP/llmdv-state.json` before cluster writes and when

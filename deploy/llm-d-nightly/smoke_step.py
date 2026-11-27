@@ -461,7 +461,6 @@ class SmokeStep:
                 "source",
             )
         }
-        body["protocol"] = 2
         pending = self.state.with_suffix(".tmp")
         pending.write_text(json.dumps(body) + "\n")
         pending.replace(self.state)
@@ -469,8 +468,6 @@ class SmokeStep:
 
     def restore(self):
         body = json.loads(self.state.read_text())
-        if body.pop("protocol", None) != 2:
-            raise IntegrationError("unsupported saved integration state")
         for key in (
             "pod",
             "created",
@@ -608,11 +605,7 @@ def main():
     parser.add_argument(
         "phase", nargs="?", choices=("run", "prepare", "verify", "finalize"), default="run"
     )
-    parser.add_argument("--protocol-version", action="store_true")
     args = parser.parse_args()
-    if args.protocol_version:
-        sys.stdout.write("2\n")
-        return 0
     if args.phase != "run":
         COMMAND_DEADLINE = (
             time.monotonic() + {"prepare": 900, "verify": 910, "finalize": 180}[args.phase]
