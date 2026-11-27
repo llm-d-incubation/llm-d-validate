@@ -1,0 +1,246 @@
+# The profile deploy/llm-d-nightly/smoke-step.sh runs on each llm-d nightly lane, keyed as the
+# step finds it: the lane's scenario (LLMDBENCH_CICD_SCENARIO) and its overlay (accelerator,
+# backend, connector, offloading target and provider, joined with / and empty ones dropped).
+# A scenario or overlay that is not listed has no profile and is skipped.
+#
+# Each row repeats its lane's row in the guide README's maintainers' table (profile and
+# identity flags), and every lane a README lists is either here or under not_run, which
+# tests/test_llmd_overlays.py enforces. To choose a profile yourself, read the guide's README.
+lanes:
+  fast-model-actuation:
+    gpu/vllm/gke:
+      lane: fast-model-actuation-gke-acc-gpu-vllm-x
+      profile: fast-model-actuation/vllm-qwen3-0.6b-inline-standalone
+      identity: [accelerator=gpu, provider=gke]
+    gpu/vllm/ocp:
+      lane: fast-model-actuation-ibm-acc-gpu-vllm-x
+      profile: fast-model-actuation/vllm-qwen3-0.6b-inline-standalone
+      identity: [accelerator=gpu, provider=ocp]
+  multimodal-serving/aggregation:
+    gpu/vllm/gke:
+      lane: multimodal-serving-aggregation-gke-acc-gpu-vllm-x
+      profile: multimodal-serving/vllm-qwen3-vl-32b-instruct-inline-standalone
+      identity: [accelerator=gpu, provider=gke, flavor=aggregation]
+    tpu/v7/vllm/qwen3-vl:
+      lane: multimodal-serving-aggregation-gke-acc-tpu-vllm-x
+      profile: multimodal-serving/vllm-qwen3-vl-32b-instruct-inline-standalone
+      identity: [accelerator=tpu/v7, provider=qwen3-vl, flavor=aggregation]
+  multimodal-serving/e-disaggregation:
+    gpu/vllm/e-pd/gke:
+      lane: multimodal-serving-e-disaggregation-gke-acc-gpu-vllm-x
+      profile: multimodal-serving/vllm-qwen3-vl-32b-instruct-inline-standalone
+      identity: [accelerator=gpu, provider=gke, flavor=e-disaggregation/e-pd]
+  optimized-baseline:
+    amd/atom/amd-ci:
+      lane: optimized-baseline-amd-acc-rocm-atom-x
+      profile: optimized-baseline/atom-qwen3-32b-ctxunknown-inline-standalone
+      identity: [accelerator=amd, provider=amd-ci]
+    amd/sglang/amd-ci:
+      lane: optimized-baseline-amd-acc-rocm-sglang-x
+      profile: optimized-baseline/sglang-qwen3-32b-inline-standalone
+      identity: [accelerator=amd, provider=amd-ci]
+    amd/vllm/amd-ci:
+      lane: optimized-baseline-amd-acc-rocm-vllm-x
+      profile: optimized-baseline/vllm-qwen3-32b-inline-standalone
+      identity: [accelerator=amd, provider=amd-ci]
+    gpu/sglang/gke:
+      lane: optimized-baseline-gke-acc-gpu-sglang-x
+      profile: optimized-baseline/sglang-qwen3-32b-parsers-standalone
+      identity: [accelerator=gpu, provider=gke]
+    gpu/vllm/base:
+      lane: optimized-baseline-cks-acc-gpu-vllm-x
+      profile: optimized-baseline/vllm-qwen3-32b-parsers-standalone
+      identity: [accelerator=gpu, provider=base]
+    gpu/vllm/gke:
+      lane: optimized-baseline-gke-acc-gpu-vllm-x
+      profile: optimized-baseline/vllm-qwen3-32b-parsers-standalone
+      identity: [accelerator=gpu, provider=gke]
+    gpu/vllm/ocp:
+      lane: optimized-baseline-ibm-acc-gpu-vllm-x
+      profile: optimized-baseline/vllm-qwen3-32b-parsers-standalone
+      identity: [accelerator=gpu, provider=ocp]
+    tpu/v5p/sglang:
+      lane: optimized-baseline-gke-acc-tpu-sglang-x
+      profile: optimized-baseline/sglang-qwen3-32b-ctx16k-parsers-standalone
+      identity: [accelerator=tpu/v5p, provider=base]
+    tpu/v5p/vllm:
+      lane: optimized-baseline-gke-acc-tpu-vllm-x
+      profile: optimized-baseline/vllm-qwen3-32b-inline-standalone
+      identity: [accelerator=tpu/v5p, provider=base]
+    xpu/vllm:
+      lane: optimized-baseline-intel-acc-xpu-vllm-x
+      profile: optimized-baseline/vllm-qwen3-0.6b-inline-standalone
+      identity: [accelerator=xpu, provider=base]
+  pd-disaggregation:
+    amd/vllm/moriio/amd-ci-1p1d-tp8:
+      lane: pd-disaggregation-amd-ci-acc-rocm-vllm-moriio
+      profile: pd-disaggregation/vllm-qwen3-32b-inline-standalone
+      identity: [accelerator=amd, provider=moriio/amd-ci-1p1d-tp8]
+    amd/vllm/nixl/amd-ci:
+      lane: pd-disaggregation-amd-ci-acc-rocm-vllm-nixl
+      profile: pd-disaggregation/vllm-gpt-oss-120b-parsers-standalone
+      identity: [accelerator=amd, provider=nixl/amd-ci]
+    gpu/sglang/gke:
+      lane: pd-disaggregation-gke-acc-gpu-sglang-x
+      profile: pd-disaggregation/sglang-gpt-oss-120b-inline-standalone
+      identity: [accelerator=gpu, provider=gke]
+    gpu/vllm/coreweave:
+      lane: pd-disaggregation-cks-acc-gpu-vllm-x
+      profile: pd-disaggregation/vllm-gpt-oss-120b-parsers-standalone
+      identity: [accelerator=gpu, provider=coreweave]
+    gpu/vllm/gke/base:
+      lane: pd-disaggregation-gke-acc-gpu-vllm-x
+      profile: pd-disaggregation/vllm-gpt-oss-120b-parsers-standalone
+      identity: [accelerator=gpu, provider=gke/base]
+    gpu/vllm/ocp:
+      lane: pd-disaggregation-ibm-acc-gpu-vllm-x
+      profile: pd-disaggregation/vllm-gpt-oss-120b-parsers-standalone
+      identity: [accelerator=gpu, provider=ocp]
+    tpu/v5p/vllm:
+      lane: pd-disaggregation-gke-acc-tpu-vllm-x
+      profile: pd-disaggregation/vllm-qwen3-32b-ctx9k-parsers-standalone
+      identity: [accelerator=tpu/v5p, provider=base]
+    xpu/vllm:
+      lane: pd-disaggregation-intel-acc-xpu-vllm-x
+      profile: pd-disaggregation/vllm-qwen3-0.6b-ctx32000-inline-standalone
+      identity: [accelerator=xpu, provider=base]
+  precise-prefix-cache-routing:
+    amd/vllm:
+      lane: precise-prefix-cache-routing-amd-ci-acc-rocm-vllm-x
+      profile: precise-prefix-cache-routing/vllm-qwen3-32b-inline-standalone
+      identity: [accelerator=amd, provider=base]
+    gpu/vllm/base:
+      lane: precise-prefix-cache-routing-cks-acc-gpu-vllm-x
+      profile: precise-prefix-cache-routing/vllm-qwen3-32b-parsers-standalone
+      identity: [accelerator=gpu, provider=base]
+    gpu/vllm/gke:
+      lane: precise-prefix-cache-routing-gke-acc-gpu-vllm-x
+      profile: precise-prefix-cache-routing/vllm-qwen3-32b-parsers-standalone
+      identity: [accelerator=gpu, provider=gke]
+    gpu/vllm/ocp:
+      lane: precise-prefix-cache-routing-ibm-acc-gpu-vllm-x
+      profile: precise-prefix-cache-routing/vllm-qwen3-32b-parsers-standalone
+      identity: [accelerator=gpu, provider=ocp]
+    tpu/v5p/vllm:
+      lane: precise-prefix-cache-routing-gke-acc-tpu-vllm-x
+      profile: precise-prefix-cache-routing/vllm-qwen3-32b-ctx4k-inline-standalone
+      identity: [accelerator=tpu/v5p, provider=base]
+    xpu/vllm:
+      lane: precise-prefix-cache-routing-intel-acc-xpu-vllm-x
+      profile: precise-prefix-cache-routing/vllm-qwen3-0.6b-inline-standalone
+      identity: [accelerator=xpu, provider=base]
+  predicted-latency-routing:
+    amd/vllm:
+      lane: predicted-latency-routing-amd-ci-acc-rocm-vllm-x
+      profile: predicted-latency-routing/vllm-qwen3-32b-ctx128k-parsers-standalone
+      identity: [accelerator=amd, provider=base]
+    gpu/vllm/base:
+      lane: predicted-latency-routing-cks-acc-gpu-vllm-x
+      profile: predicted-latency-routing/vllm-qwen3-32b-ctx128k-parsers-standalone
+      identity: [accelerator=gpu, provider=base]
+    gpu/vllm/gke:
+      lane: predicted-latency-routing-gke-acc-gpu-vllm-x
+      profile: predicted-latency-routing/vllm-qwen3-32b-ctx128k-parsers-standalone
+      identity: [accelerator=gpu, provider=gke]
+    gpu/vllm/ocp:
+      lane: predicted-latency-routing-ibm-acc-gpu-vllm-x
+      profile: predicted-latency-routing/vllm-qwen3-32b-ctx128k-parsers-standalone
+      identity: [accelerator=gpu, provider=ocp]
+    xpu/vllm:
+      lane: predicted-latency-routing-intel-acc-xpu-vllm-x
+      profile: predicted-latency-routing/vllm-qwen3-0.6b-inline-standalone
+      identity: [accelerator=xpu, provider=base]
+  tiered-prefix-cache:
+    amd/vllm/lmcache-connector/cpu/amd-ci:
+      lane: tiered-prefix-cache-amd-cpu-rocm-vllm-lmcache
+      profile: tiered-prefix-cache/vllm-qwen3-32b-inline-standalone
+      identity: [accelerator=amd, provider=amd-ci, flavor=lmcache-connector/cpu]
+    amd/vllm/lmcache-connector/fs/amd-ci:
+      lane: tiered-prefix-cache-amd-fs-rocm-vllm-lmcache
+      profile: tiered-prefix-cache/vllm-qwen3-32b-inline-standalone
+      identity: [accelerator=amd, provider=amd-ci, flavor=lmcache-connector/fs]
+    amd/vllm/native/cpu/amd-ci:
+      lane: tiered-prefix-cache-amd-cpu-rocm-vllm-native
+      profile: tiered-prefix-cache/vllm-qwen3-32b-inline-standalone
+      identity: [accelerator=amd, provider=amd-ci, flavor=native/cpu]
+    amd/vllm/native/fs/amd-ci:
+      lane: tiered-prefix-cache-amd-fs-rocm-vllm-native
+      profile: tiered-prefix-cache/vllm-qwen3-32b-inline-standalone
+      identity: [accelerator=amd, provider=amd-ci, flavor=native/fs]
+    gpu/sglang/native/cpu/gke:
+      lane: tiered-prefix-cache-gke-cpu-gpu-sglang-native
+      profile: tiered-prefix-cache/sglang-qwen3-32b-parsers-standalone
+      identity: [accelerator=gpu, provider=gke, flavor=native/cpu]
+    gpu/vllm/lmcache-connector/cpu/base:
+      lane: tiered-prefix-cache-cks-cpu-gpu-vllm-lmcache
+      profile: tiered-prefix-cache/vllm-qwen3-32b-parsers-standalone
+      identity: [accelerator=gpu, provider=base, flavor=lmcache-connector/cpu]
+    gpu/vllm/lmcache-connector/cpu/gke:
+      lane: tiered-prefix-cache-gke-cpu-gpu-vllm-lmcache
+      profile: tiered-prefix-cache/vllm-qwen3-32b-parsers-standalone
+      identity: [accelerator=gpu, provider=gke, flavor=lmcache-connector/cpu]
+    gpu/vllm/lmcache-connector/cpu/ocp:
+      lane: tiered-prefix-cache-ibm-cpu-gpu-vllm-lmcache
+      profile: tiered-prefix-cache/vllm-qwen3-32b-parsers-standalone
+      identity: [accelerator=gpu, provider=ocp, flavor=lmcache-connector/cpu]
+    gpu/vllm/native/cpu/base:
+      lane: tiered-prefix-cache-cks-cpu-gpu-vllm-native
+      profile: tiered-prefix-cache/vllm-qwen3-32b-parsers-standalone
+      identity: [accelerator=gpu, provider=base, flavor=native/cpu]
+    gpu/vllm/native/cpu/gke:
+      lane: tiered-prefix-cache-gke-cpu-gpu-vllm-native
+      profile: tiered-prefix-cache/vllm-qwen3-32b-parsers-standalone
+      identity: [accelerator=gpu, provider=gke, flavor=native/cpu]
+    gpu/vllm/native/cpu/ocp:
+      lane: tiered-prefix-cache-ibm-cpu-gpu-vllm-native
+      profile: tiered-prefix-cache/vllm-qwen3-32b-parsers-standalone
+      identity: [accelerator=gpu, provider=ocp, flavor=native/cpu]
+    tpu/v5p/sglang/native/cpu:
+      lane: tiered-prefix-cache-gke-cpu-tpu-sglang-native
+      profile: tiered-prefix-cache/sglang-qwen3-32b-ctx16k-parsers-standalone
+      identity: [accelerator=tpu/v5p, provider=base, flavor=native/cpu]
+    tpu/v5p/vllm/native/cpu:
+      lane: tiered-prefix-cache-gke-cpu-tpu-vllm-native
+      profile: tiered-prefix-cache/vllm-qwen3-32b-inline-standalone
+      identity: [accelerator=tpu/v5p, provider=base, flavor=native/cpu]
+    xpu/vllm/lmcache-connector/cpu/base:
+      lane: tiered-prefix-cache-intel-acc-xpu-vllm-lmcache
+      profile: tiered-prefix-cache/vllm-qwen3-8b-ctx20k-inline-standalone
+      identity: [accelerator=xpu, provider=base, flavor=lmcache-connector/cpu]
+    xpu/vllm/native/cpu/base:
+      lane: tiered-prefix-cache-intel-acc-xpu-vllm-native
+      profile: tiered-prefix-cache/vllm-qwen3-32b-inline-standalone
+      identity: [accelerator=xpu, provider=base, flavor=native/cpu]
+  wide-ep:
+    amd/vllm/amd-ci:
+      lane: wide-ep-amd-ci-acc-rocm-vllm-moriio
+      profile: wide-ep/vllm-deepseek-v3-ctx36k-inline-standalone
+      identity: [accelerator=amd, provider=amd-ci]
+    gpu/vllm/coreweave:
+      lane: wide-ep-cks-acc-gpu-vllm-x
+      profile: wide-ep/vllm-deepseek-r1-0528-tools-standalone
+      identity: [accelerator=gpu, provider=coreweave]
+    gpu/vllm/gke:
+      lane: wide-ep-gke-acc-gpu-vllm-x
+      profile: wide-ep/vllm-deepseek-r1-0528-tools-standalone
+      identity: [accelerator=gpu, provider=gke]
+    gpu/vllm/ocp:
+      lane: wide-ep-ibm-acc-gpu-vllm-x
+      profile: wide-ep/vllm-deepseek-r1-0528-tools-standalone
+      identity: [accelerator=gpu, provider=ocp]
+    xpu/vllm/xpu-ci:
+      lane: wide-ep-intel-acc-xpu-vllm-x
+      profile: wide-ep/vllm-deepseek-v2-lite-chat-ctx2k-inline-standalone
+      identity: [accelerator=xpu, provider=xpu-ci]
+# Lanes a guide README lists that the step cannot run on, and why.
+not_run:
+  agentic-api-gke-acc-gpu-vllm-x: deploys with its own workflow steps, not llm-d-infra's reusable nightly workflow
+  async-multitenant-gke-acc-gpu-vllm-x: deploys with its own workflow steps, not llm-d-infra's reusable nightly workflow
+  async-multitenant-holdback-gke-acc-gpu-vllm-x: deploys with its own workflow steps, not llm-d-infra's reusable nightly workflow
+  flow-control-amd-ci-acc-rocm-vllm-x: deploys with its own workflow steps, not llm-d-infra's reusable nightly workflow
+  flow-control-gke-acc-gpu-vllm-x: deploys with its own workflow steps, not llm-d-infra's reusable nightly workflow
+  pod-snapshot-gke-acc-gpu-sglang-x: deploys with its own workflow steps, not llm-d-infra's reusable nightly workflow
+  pod-snapshot-gke-acc-gpu-vllm-x: deploys with its own workflow steps, not llm-d-infra's reusable nightly workflow
+  workload-autoscaling-keda-epp-amd-acc-rocm-vllm-x: deploys with its own workflow steps, not llm-d-infra's reusable nightly workflow
+  workload-autoscaling-keda-epp-gke-acc-gpu-vllm-x: deploys with its own workflow steps, not llm-d-infra's reusable nightly workflow
+  workload-autoscaling-keda-epp-ibm-acc-gpu-vllm-x: deploys with its own workflow steps, not llm-d-infra's reusable nightly workflow

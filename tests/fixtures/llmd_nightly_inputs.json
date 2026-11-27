@@ -1,0 +1,45 @@
+{
+  "upstream_commit": "a931dcd18b39c63aa8d3390dd9e160c921823167",
+  "workflows": {
+    "optimized-baseline-gke-acc-gpu-vllm-x": {
+      "standup_scenario": "optimized-baseline",
+      "accelerator_type": "gpu",
+      "backend_type": "vllm",
+      "connector": "",
+      "offloading_target": "",
+      "infra_provider": "gke"
+    },
+    "optimized-baseline-gke-acc-tpu-vllm-x": {
+      "standup_scenario": "optimized-baseline",
+      "accelerator_type": "tpu/v5p",
+      "backend_type": "vllm",
+      "connector": "",
+      "offloading_target": "",
+      "infra_provider": ""
+    },
+    "pd-disaggregation-gke-acc-gpu-vllm-x": {
+      "standup_scenario": "pd-disaggregation",
+      "accelerator_type": "gpu",
+      "backend_type": "vllm",
+      "connector": "",
+      "offloading_target": "",
+      "infra_provider": "gke/base"
+    },
+    "tiered-prefix-cache-amd-cpu-rocm-vllm-lmcache": {
+      "standup_scenario": "tiered-prefix-cache",
+      "accelerator_type": "amd",
+      "backend_type": "vllm",
+      "connector": "lmcache-connector",
+      "offloading_target": "cpu",
+      "infra_provider": "amd-ci"
+    },
+    "multimodal-serving-aggregation-gke-acc-tpu-vllm-x": {
+      "standup_scenario": "multimodal-serving/aggregation",
+      "accelerator_type": "tpu/v7",
+      "backend_type": "vllm",
+      "connector": "",
+      "offloading_target": "",
+      "infra_provider": "qwen3-vl"
+    }
+  }
+}
