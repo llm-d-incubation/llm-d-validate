@@ -1,3 +1,3 @@
 """llm-d-validate: functional validation for deployed model serving stacks."""
 
-__version__ = "0.1.3"
+__version__ = "0.1.4"

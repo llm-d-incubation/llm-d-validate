@@ -60,7 +60,8 @@ fi
 The separate phases and recovery fixes require a release containing
 [#235](https://github.com/llm-d-incubation/llm-d-validate/pull/235) and
 [#236](https://github.com/llm-d-incubation/llm-d-validate/pull/236);
-**0.1.4 is the expected release**, not an instruction to use an unpublished version.
+**0.1.4 is the first release with both changes.** Use its matching package, image,
+and checkout.
 Version 0.1.3 supports only the single-process entrypoint and cannot be used with these
 steps. No-argument mode remains available for callers that want one process.
 
