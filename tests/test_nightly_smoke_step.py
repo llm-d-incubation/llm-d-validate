@@ -488,3 +488,134 @@ def test_incompatible_profile_is_rejected_before_creating_resources(step, tmp_pa
     assert step.status == "setup_error"
     assert not step.created
     assert calls == ["get"]
+
+
+@pytest.mark.parametrize(
+    "raw,expected", [("-9", 4), ("137", 4), ("42", 4), ("-15", 6), ("1", 1), ("broken", 4)]
+)
+def test_abnormal_exit_is_recorded_without_waiting_for_timeout(step, monkeypatch, raw, expected):
+    calls = []
+
+    def kube(*args, **kwargs):
+        calls.append(args)
+        return raw
+
+    monkeypatch.setattr(step, "kube", kube)
+    assert step.wait(30)
+    assert step.rc == expected
+    assert len(calls) == 1
+    restored = smoke.SmokeStep(step.env)
+    restored.restore()
+    assert restored.rc == expected
+
+
+def test_dead_container_is_not_mistaken_for_running_verification(step, monkeypatch):
+    def kube(*args, **kwargs):
+        if args[0] == "exec":
+            raise smoke.IntegrationError("container is stopped")
+        return json.dumps(
+            {
+                "status": {
+                    "containerStatuses": [
+                        {
+                            "name": "llmdv",
+                            "state": {"terminated": {"exitCode": 137, "reason": "OOMKilled"}},
+                        }
+                    ]
+                }
+            }
+        )
+
+    monkeypatch.setattr(step, "kube", kube)
+    assert step.wait(30)
+    assert step.rc == 4
+    assert any("OOMKilled" in message for message in step.warnings)
+
+
+def test_cleanup_reserves_time_for_configmap_after_slow_pod_delete(step, monkeypatch):
+    step.phase = "finalize"
+    step.cancellation_recovery = True
+    step.created = True
+    now = [100.0]
+    monkeypatch.setattr(smoke.time, "monotonic", lambda: now[0])
+    calls = []
+
+    def kube(*args, timeout, **kwargs):
+        calls.append((args[1], timeout))
+        now[0] += timeout
+        raise smoke.IntegrationError("request timed out")
+
+    monkeypatch.setattr(step, "kube", kube)
+    step.finish()
+    assert [kind for kind, _ in calls] == ["pod", "configmap"]
+    assert calls[0][1] == 10
+    assert calls[1][1] == 10
+
+
+def test_legacy_setup_failure_collects_before_deleting_created_resources(step, monkeypatch):
+    order = []
+
+    def setup():
+        step.created = True
+        raise smoke.IntegrationError("readiness failed after pod creation")
+
+    monkeypatch.setattr(step, "setup", setup)
+    monkeypatch.setattr(step, "stop", lambda: order.append("stop"))
+    monkeypatch.setattr(step, "collect", lambda: order.append("collect"))
+    monkeypatch.setattr(step, "kube", lambda *args, **kw: order.append(args[0]))
+    assert step.run() == 0
+    assert order == ["stop", "collect", "delete", "delete"]
+
+
+@pytest.mark.parametrize("broken", ["outputs", "summary", "report", "state", "all"])
+def test_reporting_failures_do_not_prevent_recovery(step, monkeypatch, broken):
+    step.created = True
+    step.ready = True
+    step.rc = 1
+    step.status = "completed"
+    step.checkpoint()
+    if broken in ("outputs", "all"):
+        step.env["GITHUB_OUTPUT"] = str(step.runs)
+    if broken in ("summary", "all"):
+        step.env["GITHUB_STEP_SUMMARY"] = str(step.runs)
+    if broken in ("report", "all"):
+        (step.runs / "integration.tmp").mkdir()
+    if broken in ("state", "all"):
+        step.state.with_suffix(".tmp").mkdir()
+    recovered = smoke.SmokeStep(step.env)
+    calls = []
+
+    def kube(*args, **kwargs):
+        calls.append(args)
+        if args[0] == "cp":
+            evidence(Path(args[-1]))
+        return "console"
+
+    monkeypatch.setattr(recovered, "kube", kube)
+    assert recovered.staged("finalize") == 1
+    assert recovered.rc == 1
+    assert recovered.collection == "complete"
+    assert [args[1] for args in calls if args[0] == "delete"] == ["pod", "configmap"]
+    assert recovered.warnings
+    if broken in ("report", "state"):
+        assert "verification_exit=1" in Path(step.env["GITHUB_OUTPUT"]).read_text()
+
+
+def test_console_write_failure_does_not_skip_evidence_copy(step, monkeypatch):
+    (step.runs / "console.txt").mkdir()
+
+    def kube(*args, **kwargs):
+        if args[0] == "cp":
+            evidence(Path(args[-1]))
+        return "console"
+
+    monkeypatch.setattr(step, "kube", kube)
+    step.collect()
+    assert step.collection == "complete"
+    assert any("could not collect console" in note for note in step.warnings)
+
+
+def test_initial_resource_identity_must_be_durable(step):
+    step.state.with_suffix(".tmp").mkdir()
+    with pytest.raises(smoke.IntegrationError, match="before creation"):
+        step.checkpoint(required=True)

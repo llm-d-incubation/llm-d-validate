@@ -7,6 +7,7 @@ output file is in [docs/cli.md](../docs/cli.md).
 
 | Path | What it is |
 | --- | --- |
+| [`llm-d-nightly/`](llm-d-nightly/) | optional router smoke checks in llm-d nightlies; CI orchestrates `verify`, recovery, and artifact collection |
 | [`trigger.sh`](trigger.sh) | starts a one-off run from the CronJob's own pod spec, optionally with a per-run profile |
 | [`infra-smoke.sh`](infra-smoke.sh), [`infra-smoke.py`](infra-smoke.py) | checks the runner and S3 publication before a fleet is available |
 | [`base/`](base/) | the kustomize base, with no cluster detail: `cronjob.yaml` (the one pod spec, scheduled nightly, cloned by `trigger.sh`) and `role-trigger.yaml` (the `llmdv-trigger` Role a caller needs) |

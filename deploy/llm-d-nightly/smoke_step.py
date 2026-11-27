@@ -166,13 +166,28 @@ class SmokeStep:
         self.phase = "run"
         self.cancellation_recovery = False
 
+    def reporting_error(self, destination, error):
+        message = f"could not write {destination}: {type(error).__name__}"
+        if message not in self.warnings:
+            self.warnings.append(message)
+            try:
+                sys.stderr.write(f"::warning::llmdv: {message}\n")
+            except OSError:
+                pass  # Losing the log pipe must not prevent resource cleanup.
+
     def note(self, message, warning=False):
-        sys.stdout.write(("::warning::llmdv: " if warning else "llmdv: ") + message + "\n")
         if warning:
             self.warnings.append(message)
+        try:
+            sys.stdout.write(("::warning::llmdv: " if warning else "llmdv: ") + message + "\n")
+        except OSError as exc:
+            self.reporting_error("console", exc)
         if self.env.get("GITHUB_STEP_SUMMARY"):
-            with Path(self.env["GITHUB_STEP_SUMMARY"]).open("a") as stream:
-                stream.write(f"- {'**warning:** ' if warning else ''}{message}\n")
+            try:
+                with Path(self.env["GITHUB_STEP_SUMMARY"]).open("a") as stream:
+                    stream.write(f"- {'**warning:** ' if warning else ''}{message}\n")
+            except OSError as exc:
+                self.reporting_error("GitHub summary", exc)
 
     def kube(self, *args, timeout=60, input=None):
         return command(
@@ -290,7 +305,7 @@ class SmokeStep:
             return False
         # Cleanup also runs when a create request succeeded but its response was lost.
         self.created = True
-        self.checkpoint()  # Persist object identity before the first cluster write.
+        self.checkpoint(required=True)  # Persist identity before the first cluster write.
         self.kube(
             "create",
             "configmap",
@@ -388,14 +403,51 @@ class SmokeStep:
                     "/work/exit",
                     timeout=min(10, max(1, end - time.monotonic())),
                 ).strip()
-                if value in {str(n) for n in range(7)}:
-                    self.rc = int(value)
-                    self.checkpoint()  # Preserve a verdict before collection or cleanup.
-                    return True
+                self.record_process_exit(int(value))
+                return True
+            except ValueError:
+                self.note("verification wrote an invalid process exit", True)
+                self.record_process_exit(4)
+                return True
             except IntegrationError:
-                pass
+                # A dead container cannot answer exec, even when its exit is known to
+                # Kubernetes. Stop polling promptly and retain that reason.
+                try:
+                    pod = json.loads(
+                        self.kube(
+                            "get",
+                            "pod",
+                            self.pod,
+                            "-o",
+                            "json",
+                            timeout=max(0.1, min(10, end - time.monotonic())),
+                        )
+                    )
+                    for container in pod.get("status", {}).get("containerStatuses", []):
+                        terminated = container.get("state", {}).get("terminated")
+                        if container.get("name") == "llmdv" and terminated:
+                            self.note(
+                                "validation container stopped: "
+                                f"{terminated.get('reason', 'unknown')} "
+                                f"(exit {terminated.get('exitCode', 'unknown')})",
+                                True,
+                            )
+                            # The container is the evidence keeper, not verify. Its
+                            # exit does not establish a passing or failing fleet verdict.
+                            self.record_process_exit(4)
+                            return True
+                except (IntegrationError, ValueError, TypeError):
+                    pass
             time.sleep(min(5, max(0, end - time.monotonic())))
         return False
+
+    def record_process_exit(self, code):
+        if code not in range(7):
+            self.note(f"verification process terminated with exit {code}", True)
+        self.rc = (
+            code if code in range(7) else 6 if code in (-signal.SIGINT, -signal.SIGTERM) else 4
+        )
+        self.checkpoint()  # Preserve a verdict before collection or cleanup.
 
     def stop(self):
         # A completion can race the timeout/cancellation. Do not signal a reaped PID.
@@ -423,7 +475,7 @@ class SmokeStep:
         self.collection = "failed"
         try:
             (self.runs / "console.txt").write_text(self.kube("logs", self.pod, timeout=15))
-        except IntegrationError as exc:
+        except (IntegrationError, OSError) as exc:
             self.note(f"could not collect console: {exc}", True)
         for attempt in range(3):
             partial = self.runs / f"runs.partial-{uuid.uuid4().hex[:8]}"
@@ -443,7 +495,7 @@ class SmokeStep:
             "run collection failed; only available diagnostics/partial files can be uploaded", True
         )
 
-    def checkpoint(self):
+    def checkpoint(self, *, required=False):
         body = {
             key: getattr(self, key)
             for key in (
@@ -461,9 +513,14 @@ class SmokeStep:
                 "source",
             )
         }
-        pending = self.state.with_suffix(".tmp")
-        pending.write_text(json.dumps(body) + "\n")
-        pending.replace(self.state)
+        try:
+            pending = self.state.with_suffix(".tmp")
+            pending.write_text(json.dumps(body) + "\n")
+            pending.replace(self.state)
+        except OSError as exc:
+            self.reporting_error("recovery state", exc)
+            if required:
+                raise IntegrationError("cannot save resource identity before creation") from exc
         self.report()
 
     def restore(self):
@@ -491,13 +548,19 @@ class SmokeStep:
             "collection_status": self.collection,
             "warnings": self.warnings,
         }
-        pending = self.runs / "integration.tmp"
-        pending.write_text(json.dumps(body, indent=2) + "\n")
-        pending.replace(self.runs / "integration.json")
+        try:
+            pending = self.runs / "integration.tmp"
+            pending.write_text(json.dumps(body, indent=2) + "\n")
+            pending.replace(self.runs / "integration.json")
+        except OSError as exc:
+            self.reporting_error("integration report", exc)
         if self.env.get("GITHUB_OUTPUT"):
-            with Path(self.env["GITHUB_OUTPUT"]).open("a") as stream:
-                for key in ("status", "verification_exit", "collection_status"):
-                    stream.write(f"{key}={body[key] if body[key] is not None else ''}\n")
+            try:
+                with Path(self.env["GITHUB_OUTPUT"]).open("a") as stream:
+                    for key in ("status", "verification_exit", "collection_status"):
+                        stream.write(f"{key}={body[key] if body[key] is not None else ''}\n")
+            except OSError as exc:
+                self.reporting_error("GitHub outputs", exc)
 
     def finish(self):
         global COMMAND_DEADLINE
@@ -506,10 +569,20 @@ class SmokeStep:
         self.finalizing = True
         self.checkpoint()
         if self.created:
-            for kind in ("pod", "configmap"):
+            for index, kind in enumerate(("pod", "configmap")):
+                # Reserve a share of the cleanup budget for each resource. A slow pod
+                # deletion must not exhaust the ConfigMap deletion's entire allowance.
+                timeout = 20
+                if COMMAND_DEADLINE is not None:
+                    timeout = max(0.1, (COMMAND_DEADLINE - time.monotonic()) / (2 - index))
                 try:
                     self.kube(
-                        "delete", kind, self.pod, "--wait=false", "--ignore-not-found", timeout=20
+                        "delete",
+                        kind,
+                        self.pod,
+                        "--wait=false",
+                        "--ignore-not-found",
+                        timeout=timeout,
                     )
                 except IntegrationError as exc:
                     self.note(f"cleanup failed: {exc}", True)
@@ -594,6 +667,12 @@ class SmokeStep:
                 self.collect()
         except (IntegrationError, OSError, ValueError, KeyError, TypeError) as exc:
             self.note(f"integration failed, not a guide failure: {exc}", True)
+            if self.created:
+                try:
+                    self.stop()
+                except IntegrationError as stop_error:
+                    self.note(f"could not interrupt verification: {stop_error}", True)
+                self.collect()
         finally:
             self.finish()
         return 1 if self.rc == 1 else 0
